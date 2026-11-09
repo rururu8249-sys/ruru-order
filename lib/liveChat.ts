@@ -136,6 +136,8 @@ export type LiveChatMessage = {
   badge: "crown" | "crown_pink" | "mod" | null;
   /** 고정 댓글 */
   pinned: boolean;
+  /** 닉네임 앞 카카오 프로필 사진(https, 없으면 "" → 첫 글자 동그라미) */
+  avatar: string;
 };
 
 /** 서버 줄 또는 소식(Broadcast) → 화면용 글. 모양이 이상하면 null. */
@@ -155,6 +157,7 @@ export function parseChatMessage(raw: unknown): LiveChatMessage | null {
     hidden,
     badge: p.badge === "crown" || p.badge === "crown_pink" || p.badge === "mod" ? p.badge : null,
     pinned: !hidden && (p.pinned === true || Boolean(p.pinned_at)),
+    avatar: (() => { const a = String(p.avatar_url ?? p.avatar ?? "").trim(); return /^https:\/\//i.test(a) ? a.slice(0, 500) : ""; })(),
   };
 }
 

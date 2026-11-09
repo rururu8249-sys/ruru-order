@@ -21,6 +21,7 @@ import {
   isPenaltyAction,
   type LiveChatAction,
 } from "@/lib/liveChat";
+import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { chatRoleOfKakao, moderateChatMessage, pinChatMessage, setChatManager } from "@/lib/liveChatServer";
 
 export const runtime = "nodejs";
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
     const sb = getServiceClient();
     const setting = await readSetting(sb);
     if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [], pinned: null });
-    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at";
+    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url";
     const [listRes, pinRes] = await Promise.all([
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).order("id", { ascending: false }).limit(LIVE_CHAT_RECENT),
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).not("pinned_at", "is", null).order("pinned_at", { ascending: false }).limit(1).maybeSingle(),
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
       readSetting(sb),
       chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null })),
       sb.from("broadcasts").select("id, status").eq("id", bc).maybeSingle(),
-      sb.from("customers").select("id, youtube_nickname, is_blocked").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      sb.from("customers").select("id, youtube_nickname, is_blocked, kakao_profile_image").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("live_chat_bans").select("until_at, lifted_at").eq("kakao_id", kakaoId).is("lifted_at", null).order("id", { ascending: false }).limit(5),
       sb.from("live_chat_messages").select("created_at").eq("kakao_id", kakaoId).order("id", { ascending: false }).limit(1).maybeSingle(),
     ]);
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (!bcRow || String(bcRow.status ?? "") !== "ON") return fail("방송 중에만 쓸 수 있어요.", 403);
 
     // 닉네임은 회원 표에서(카카오 계정 기준, 최신 1줄)
-    const c = custRes.data as { id?: string; youtube_nickname?: string; is_blocked?: unknown } | null;
+    const c = custRes.data as { id?: string; youtube_nickname?: string; is_blocked?: unknown; kakao_profile_image?: unknown } | null;
     const nickname = String(c?.youtube_nickname ?? "").trim().slice(0, 40);
     if (!c || !nickname) return fail("닉네임을 먼저 정해 주세요.", 403);
     if (isBlockedValue(c.is_blocked)) return fail("채팅을 쓸 수 없어요.", 403);
@@ -102,8 +103,8 @@ export async function POST(request: NextRequest) {
     const masked = maskBannedWords(body, [...LIVE_CHAT_DEFAULT_WORDS, ...setting.words]);
     const { data: ins, error } = await sb
       .from("live_chat_messages")
-      .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: masked.text, badge: role.badge ?? null })
-      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at")
+      .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: masked.text, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null })
+      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url")
       .single();
     if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);
     return NextResponse.json({ ok: true, message: parseChatMessage(ins) });
@@ -130,6 +131,8 @@ export async function PATCH(request: NextRequest) {
       if (!role.isOwner) return fail("총관리자만 할 수 있어요.", 403);
       r = await setChatManager(sb, messageId, action === "grant");
     } else if (action === "pin" || action === "unpin") {
+      // 고정 댓글은 왕관 표시 두 사람(금색·분홍 왕관)만 — 사장님 11/10 04:12
+      if (role.badge !== "crown" && role.badge !== "crown_pink") return fail("고정은 왕관 표시 관리자만 할 수 있어요.", 403);
       r = await pinChatMessage(sb, messageId, action === "pin");
     } else if (isPenaltyAction(action)) {
       r = await moderateChatMessage(sb, messageId, action);

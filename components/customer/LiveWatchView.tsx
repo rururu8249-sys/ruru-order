@@ -13,6 +13,7 @@ import {
   youtubeEmbedUrl,
   type LiveWatchItem,
 } from "@/lib/liveWatch";
+import { isKakaoInAppBrowser, kakaoOpenExternalUrl } from "@/lib/youtubeChannelLink";
 import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 
 export type LiveWatchPinned = {
@@ -58,6 +59,8 @@ type Props = {
     pinned: LiveChatMessage | null;
     /** 총관리자 — 길게 눌러 채팅 관리자 지정·해제 */
     canGrant: boolean;
+    /** 왕관 표시 두 사람만 — 길게 눌러 고정 댓글 */
+    canPin: boolean;
     onModerate: (messageId: number, action: LiveChatAction) => Promise<{ ok: boolean; message?: string }>;
   } | null;
 };
@@ -116,6 +119,17 @@ function ChatBadge({ badge }: { badge: LiveChatMessage["badge"] }) {
     </svg>
   );
 }
+// 닉네임 앞 동그란 사진 — 카카오 프로필 사진, 없거나 못 불러오면 닉네임 첫 글자(그 사람 색)
+function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: string }) {
+  const [broken, setBroken] = useState(false);
+  const box = { width: "24px", height: "24px", borderRadius: "9999px", flexShrink: 0, marginTop: "1px", overflow: "hidden" } as const;
+  if (src && !broken) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} style={{ ...box, objectFit: "cover", display: "block", background: "#333333" }} />;
+  }
+  const ch = Array.from(String(nick || "").trim())[0] || "?";
+  return <span aria-hidden="true" style={{ ...box, display: "inline-flex", alignItems: "center", justifyContent: "center", background: color, color: "#111111", fontSize: "12px", fontWeight: 700, textShadow: "none" }}>{ch}</span>;
+}
 // 글자를 상자 없이 영상 위에 바로 — 어떤 화면에서도 읽히게 진한 그림자
 const CHAT_TEXT_SHADOW = "0 0 2px #000, 0 1px 2px #000, 0 0 6px rgba(0,0,0,0.7)";
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
@@ -126,7 +140,8 @@ const IconClose = ({ color = "#111111" }: { color?: string }) => (
 type ChatView = { size: "base" | "mid" | "big"; bold: boolean; height: "base" | "low" | "high" };
 const CHAT_VIEW_KEY = "ruru_live_chat_view_v1";
 const CHAT_VIEW_DEFAULT: ChatView = { size: "base", bold: false, height: "base" };
-const CHAT_SIZES: Record<ChatView["size"], string> = { base: "14px", mid: "16px", big: "18px" };
+// [2026-11-10 04:09] 기본 15px — 유튜브 앱 채팅 글자와 비슷하게(사장님 「유튜브랑 비슷하게」)
+const CHAT_SIZES: Record<ChatView["size"], string> = { base: "15px", mid: "17px", big: "19px" };
 const CHAT_HEIGHTS: Record<ChatView["height"], string> = { base: "24dvh", low: "14dvh", high: "36dvh" };
 function readChatView(): ChatView {
   try {
@@ -207,6 +222,12 @@ export default function LiveWatchView(props: Props) {
   };
   // 앱 설치 — 설치 창을 띄울 수 있으면 바로(PWAInstallBanner 가 모아 둔 것), 아니면 방법 안내
   const installApp = async () => {
+    // [2026-11-10 04:09] 카톡 채널에서 연 화면(카톡 안 브라우저)은 앱 설치가 안 됨 → 폰 기본 브라우저(크롬·삼성인터넷·사파리)로 이 화면을 열어 줌.
+    //   거기서 다시 「앱 설치」를 누르면 설치 창이 뜬다. (카카오가 제공하는 주소 kakaotalk://web/openExternal)
+    if (isKakaoInAppBrowser(navigator.userAgent)) {
+      window.location.href = kakaoOpenExternalUrl(`${window.location.origin}/order`);
+      return;
+    }
     const w = window as unknown as { __ruruPwaPrompt?: { prompt: () => void; userChoice: Promise<unknown> } | null };
     const ev = w.__ruruPwaPrompt;
     if (ev) {
@@ -224,6 +245,7 @@ export default function LiveWatchView(props: Props) {
     try { await navigator.clipboard.writeText(url); setChatHint("주소를 복사했어요. 카톡에 붙여 넣어 보내 주세요."); } catch { setChatHint(url); }
   };
   const [modTarget, setModTarget] = useState<LiveChatMessage | null>(null);
+  const [pinOpen, setPinOpen] = useState(false);
   const [banConfirm, setBanConfirm] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement | null>(null);
   const pressTimer = useRef<number | null>(null);
@@ -286,10 +308,36 @@ export default function LiveWatchView(props: Props) {
     let startTop = 0;
     let inChat: HTMLElement | null = null;
     let moved = false;
+    // [2026-11-10 04:09 사장님 「위아래로 훑을 때 딱딱 끊기고 부자연스러움」]
+    //   손가락만큼만 움직이고 손을 떼면 바로 멈춰서 딱딱했다 → 손 뗄 때 빠르기를 재서 폰처럼 «미끄러지듯» 이어서 멈춤(관성).
+    let lastY = 0;
+    let lastT = 0;
+    let velocity = 0; // 화면 px / ms (아래로 끌면 +)
+    let raf = 0;
+    const stopGlide = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
+    const glide = (el: HTMLElement, v0: number) => {
+      stopGlide();
+      let v = v0;
+      let prev = performance.now();
+      const step = (now: number) => {
+        const dt = Math.min(32, now - prev);
+        prev = now;
+        el.scrollTop -= v * dt;
+        v *= Math.pow(0.95, dt / 16);
+        const atEdge = el.scrollTop <= 0 || el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+        if (Math.abs(v) < 0.02 || atEdge) { raf = 0; return; }
+        raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    };
     const onStart = (e: TouchEvent) => {
       const t = e.touches[0];
       if (!t) return;
+      stopGlide();
       startY = t.clientY;
+      lastY = t.clientY;
+      lastT = e.timeStamp || performance.now();
+      velocity = 0;
       moved = false;
       const box = chatBoxRef.current;
       inChat = box && e.target instanceof Node && box.contains(e.target) ? box : null;
@@ -302,6 +350,11 @@ export default function LiveWatchView(props: Props) {
       if (!moved && Math.abs(dy) > 8) { moved = true; endPress(); }
       if (inChat) {
         inChat.scrollTop = startTop - dy;
+        const now = e.timeStamp || performance.now();
+        const dt = now - lastT;
+        if (dt > 0) velocity = 0.8 * ((t.clientY - lastY) / dt) + 0.2 * velocity;
+        lastY = t.clientY;
+        lastT = now;
         if (e.cancelable) e.preventDefault();
         return;
       }
@@ -309,11 +362,23 @@ export default function LiveWatchView(props: Props) {
       if (target && target.closest("[data-live-scroll]")) return;
       if (e.cancelable) e.preventDefault();
     };
+    const onEnd = (e: TouchEvent) => {
+      if (!inChat || !moved) return;
+      const now = e.timeStamp || performance.now();
+      // 손을 멈췄다 뗐으면(0.1초 넘게 가만) 미끄러지지 않음
+      if (now - lastT > 100 || Math.abs(velocity) < 0.1) return;
+      glide(inChat, Math.max(-4, Math.min(4, velocity)));
+    };
     root.addEventListener("touchstart", onStart, { passive: true });
     root.addEventListener("touchmove", onMove, { passive: false });
+    root.addEventListener("touchend", onEnd, { passive: true });
+    root.addEventListener("touchcancel", onEnd, { passive: true });
     return () => {
+      stopGlide();
       root.removeEventListener("touchstart", onStart);
       root.removeEventListener("touchmove", onMove);
+      root.removeEventListener("touchend", onEnd);
+      root.removeEventListener("touchcancel", onEnd);
     };
   }, []);
   const moderate = async (action: LiveChatAction) => {
@@ -456,58 +521,68 @@ export default function LiveWatchView(props: Props) {
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
           </div>
         ) : null}
-        {chat && chat.pinned ? (
-          <div
-            onPointerDown={chat.canModerate ? () => startPress(chat.pinned!) : undefined}
-            onPointerUp={chat.canModerate ? endPress : undefined}
-            onPointerLeave={chat.canModerate ? endPress : undefined}
-            onPointerCancel={chat.canModerate ? endPress : undefined}
-            onContextMenu={chat.canModerate ? (e) => { e.preventDefault(); setModTarget(chat.pinned); } : undefined}
-            style={{ pointerEvents: chat.canModerate ? "auto" : "none", alignSelf: "flex-start", width: "82%", boxSizing: "border-box", padding: "8px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.55)", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, wordBreak: "break-word", userSelect: "none", WebkitUserSelect: "none" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: 700, color: "#FFFFFF", opacity: 0.85, marginBottom: "2px" }}>
-              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7" /></svg>
-              고정 댓글
-            </div>
-            <span style={{ fontWeight: 700, color: "#FFFFFF" }}>{chat.pinned.nickname}</span>
-            <ChatBadge badge={chat.pinned.badge} />
-            <span style={{ marginLeft: chat.pinned.badge ? 0 : "6px", color: "#FFFFFF", fontWeight: chatView.bold ? 700 : 500 }}>{chat.pinned.body}</span>
-          </div>
-        ) : null}
         {chat && chat.messages.length > 0 ? (
+          <div style={{ position: "relative", width: "86%" }}>
           <div
             ref={chatBoxRef}
             role="log"
             aria-label="채팅"
             aria-live="polite"
             onScroll={onChatScroll}
-            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "6px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
+            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 4px", boxSizing: "border-box", width: "100%" }}
           >
             {chat.messages.map((m) => { const color = chatColorMap.get(m.id) || "#FFFFFF"; return (
               <div
                 key={m.id}
-                style={{ pointerEvents: "auto", touchAction: "pan-y", alignSelf: "flex-start", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 500, lineHeight: 1.45, wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                onPointerDown={chat.canModerate ? () => startPress(m) : undefined}
+                onPointerUp={chat.canModerate ? endPress : undefined}
+                onPointerLeave={chat.canModerate ? endPress : undefined}
+                onPointerCancel={chat.canModerate ? endPress : undefined}
+                onContextMenu={chat.canModerate ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
+                style={{ pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "8px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 500, lineHeight: 1.45, wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
-                {/* 상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
-                    채팅 줄은 터치가 그대로 영상(유튜브 막대)으로 지나감. 관리자만 «닉네임»을 길게 누르면 관리 창 */}
-                <span
-                  onPointerDown={chat.canModerate ? () => startPress(m) : undefined}
-                  onPointerUp={chat.canModerate ? endPress : undefined}
-                  onPointerLeave={chat.canModerate ? endPress : undefined}
-                  onPointerCancel={chat.canModerate ? endPress : undefined}
-                  onContextMenu={chat.canModerate ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
-                  style={{ fontWeight: 800 }}
-                >{m.nickname}</span>
-                <ChatBadge badge={m.badge} />
-                <span style={{ marginLeft: m.badge ? 0 : "6px" }}>{m.body}</span>
+                {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
+                    상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
+                    관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
+                <ChatAvatar src={m.avatar} nick={m.nickname} color={color} />
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ fontWeight: 800 }}>{m.nickname}</span>
+                  <ChatBadge badge={m.badge} />
+                  <span style={{ marginLeft: m.badge ? "4px" : "8px" }}>{m.body}</span>
+                </span>
               </div>
             ); })}
           </div>
+          {!chatAtBottom ? (
+            // 유튜브처럼 채팅 가운데 아래 흰 동그라미 화살표 — 누르면 맨 아래(새 글)로
+            <button type="button" onClick={chatToBottom} aria-label="새 글 보기" style={{ pointerEvents: "auto", position: "absolute", left: "50%", bottom: "4px", transform: "translateX(-50%)", width: "40px", height: "40px", border: "none", borderRadius: "9999px", background: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.35)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+              <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
+            </button>
+          ) : null}
+          </div>
         ) : null}
-        {chat && chat.messages.length > 0 && !chatAtBottom ? (
-          <button type="button" onClick={chatToBottom} style={{ pointerEvents: "auto", alignSelf: "flex-start", height: "32px", padding: "0 12px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
-            새 글 보기 ↓
-          </button>
+        {chat && chat.pinned ? (
+          // 고정 댓글 — 유튜브처럼 채팅 맨 아래(입력 줄 바로 위) 어두운 띠 한 줄. 누르면 전체 글 펼침/접기.
+          //   왕관 표시 두 사람은 길게 누르면 고정 해제 등 관리 창
+          <div
+            role="button"
+            tabIndex={0}
+            aria-expanded={pinOpen}
+            aria-label="고정 댓글"
+            onClick={() => { if (!modTarget) setPinOpen((v) => !v); }}
+            onPointerDown={chat.canPin ? () => startPress(chat.pinned!) : undefined}
+            onPointerUp={chat.canPin ? endPress : undefined}
+            onPointerLeave={chat.canPin ? endPress : undefined}
+            onPointerCancel={chat.canPin ? endPress : undefined}
+            onContextMenu={chat.canPin ? (e) => { e.preventDefault(); setModTarget(chat.pinned); } : undefined}
+            style={{ pointerEvents: "auto", display: "flex", alignItems: pinOpen ? "flex-start" : "center", gap: "8px", width: "100%", boxSizing: "border-box", minHeight: "44px", padding: "8px 12px", borderRadius: "22px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
+          >
+            <ChatAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} color={chatColorMap.get(chat.pinned.id) || "#FFD43B"} />
+            <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "9999px", background: "rgba(255,255,255,0.16)", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {chat.pinned.nickname}<ChatBadge badge={chat.pinned.badge} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0, fontWeight: chatView.bold ? 700 : 500, ...(pinOpen ? { wordBreak: "break-word" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}>{chat.pinned.body}</span>
+          </div>
         ) : null}
         {pinned ? (
           <div style={{ pointerEvents: "auto", background: "#FFFFFF", color: "#111111", borderRadius: "12px", padding: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
@@ -674,7 +749,7 @@ export default function LiveWatchView(props: Props) {
             {!banConfirm ? (() => {
               const isPinned = chat.pinned?.id === modTarget.id;
               const isOwnerTarget = modTarget.badge === "crown" || modTarget.badge === "crown_pink";
-              const rows: [LiveChatAction, string][] = [[isPinned ? "unpin" : "pin", isPinned ? "고정 해제" : "이 글 맨 위에 고정"]];
+              const rows: [LiveChatAction, string][] = chat.canPin ? [[isPinned ? "unpin" : "pin", isPinned ? "고정 해제" : "이 글 고정하기"]] : [];
               if (chat.canGrant && !isOwnerTarget) rows.push(modTarget.badge === "mod" ? ["revoke", "채팅 관리자에서 해제"] : ["grant", "채팅 관리자로 지정"]);
               return rows.map(([a, label]) => (
                 <button key={a} type="button" onClick={() => void moderate(a)} style={{ width: "100%", height: "52px", marginBottom: "8px", border: "1px solid #E5E5E5", borderRadius: "12px", background: "#FFFFFF", color: "#111111", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>{label}</button>

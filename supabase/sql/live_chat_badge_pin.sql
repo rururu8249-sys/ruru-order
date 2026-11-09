@@ -6,6 +6,8 @@
 
 alter table public.live_chat_messages add column if not exists badge text;
 alter table public.live_chat_messages add column if not exists pinned_at timestamptz;
+-- [2026-11-10 04:1x] 닉네임 앞 카카오 프로필 사진(글 쓸 때 회원 표에서 복사)
+alter table public.live_chat_messages add column if not exists avatar_url text;
 create index if not exists live_chat_messages_pin_idx on public.live_chat_messages (broadcast_id, pinned_at desc) where pinned_at is not null;
 
 create or replace function public.ruru_live_chat_event()
@@ -26,6 +28,7 @@ begin
         'created_at', NEW.created_at,
         'hidden', NEW.hidden_at is not null,
         'badge', NEW.badge,
+        'avatar_url', NEW.avatar_url,
         'pinned', NEW.pinned_at is not null and NEW.hidden_at is null
       ),
       'chat',
