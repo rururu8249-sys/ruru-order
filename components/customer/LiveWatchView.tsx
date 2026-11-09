@@ -72,6 +72,9 @@ const IconSound = () => (
 const IconChat = () => (
   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.8"><path d="M4 5h16v11H9l-5 4z" /></svg>
 );
+const IconRewind = () => (
+  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M11 6l-7 6 7 6z" /><path d="M20 6l-7 6 7 6z" /></svg>
+);
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -83,7 +86,10 @@ export default function LiveWatchView(props: Props) {
   const [listOpen, setListOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
-  const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined), [videoId]);
+  // 「돌려보기」 — 누르면 유튜브 막대가 보이는 화면으로 바꿔 지난 장면을 볼 수 있다(채팅·소개 카드는 잠시 숨김). 「실시간으로」 누르면 다시 지금 방송.
+  const [rewind, setRewind] = useState(false);
+  const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined, { controls: rewind }), [videoId, rewind]);
+  const switchRewind = (on: boolean) => { setRewind(on); setMuted(true); };
 
   useEffect(() => { setGuideOpen(!readGuideSeen()); }, []);
 
@@ -94,6 +100,7 @@ export default function LiveWatchView(props: Props) {
   const [sending, setSending] = useState(false);
   const [chatHint, setChatHint] = useState("");
   const [modTarget, setModTarget] = useState<LiveChatMessage | null>(null);
+  const [banConfirm, setBanConfirm] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement | null>(null);
   const pressTimer = useRef<number | null>(null);
   const chatCount = chat?.messages.length ?? 0;
@@ -124,8 +131,10 @@ export default function LiveWatchView(props: Props) {
   const endPress = () => { if (pressTimer.current) { window.clearTimeout(pressTimer.current); pressTimer.current = null; } };
   const moderate = async (action: LiveChatPenalty) => {
     if (!chat || !modTarget) return;
+    if (action === "ban" && !banConfirm) { setBanConfirm(true); return; }
     const id = modTarget.id;
     setModTarget(null);
+    setBanConfirm(false);
     const r = await chat.onModerate(id, action).catch(() => ({ ok: false, message: "처리 못 했어요." }));
     setChatHint(r.message || (r.ok ? "처리했어요." : "처리 못 했어요."));
   };
@@ -160,16 +169,20 @@ export default function LiveWatchView(props: Props) {
       {/* 영상 — 화면 전체 */}
       <iframe
         ref={iframeRef}
-        key={videoId}
+        key={`${videoId}-${rewind ? "r" : "l"}`}
         src={embedSrc}
         title={`${title || "라이브 방송"} 영상`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "#000000" }}
+        style={rewind
+          ? { position: "absolute", left: 0, right: 0, top: "calc(60px + env(safe-area-inset-top))", bottom: "calc(76px + env(safe-area-inset-bottom))", width: "100%", border: 0, background: "#000000" }
+          : { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "#000000" }}
       />
 
-      {/* 영상 위 투명 막 — 손님이 영상을 눌러 멈추거나 돌려보지 못하게(늘 지금 방송). 누르면 다시 재생만 */}
-      <div aria-hidden="true" onClick={() => sendToPlayer(youtubeCommand("playVideo"))} style={{ position: "absolute", inset: 0, background: "transparent" }} />
+      {/* 영상 위 투명 막 — 평소엔 영상을 눌러도 멈추지 않게(늘 지금 방송). 누르면 다시 재생만. 돌려보기 중엔 없음 */}
+      {!rewind ? (
+        <div aria-hidden="true" onClick={() => sendToPlayer(youtubeCommand("playVideo"))} style={{ position: "absolute", inset: 0, background: "transparent" }} />
+      ) : null}
 
       {/* 위 줄 — LIVE·제목 / 쇼핑몰처럼 보기 */}
       <div style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))" }}>
@@ -179,14 +192,27 @@ export default function LiveWatchView(props: Props) {
           </span>
           <span style={{ fontSize: "15px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title || "라이브 방송"}</span>
         </div>
-        <button type="button" onClick={props.onSwitchToShop} style={{ flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
-          쇼핑몰처럼 보기
-        </button>
+        {rewind ? (
+          <button type="button" onClick={() => switchRewind(false)} style={{ flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />실시간으로
+          </button>
+        ) : (
+          <button type="button" onClick={props.onSwitchToShop} style={{ flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
+            쇼핑몰처럼 보기
+          </button>
+        )}
       </div>
+
+      {/* 돌려보기 — 지난 장면 보기 */}
+      {!rewind ? (
+        <button type="button" onClick={() => switchRewind(true)} style={{ position: "absolute", right: "16px", top: "calc(68px + env(safe-area-inset-top))", height: "44px", padding: "0 14px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "rgba(0,0,0,0.4)", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", whiteSpace: "nowrap" }}>
+          <IconRewind />돌려보기
+        </button>
+      ) : null}
 
       {/* 소리 켜기 — 폰은 소리 꺼진 채로만 자동 재생된다(브라우저 규칙) */}
       {muted ? (
-        <button type="button" onClick={turnSoundOn} style={{ position: "absolute", left: "50%", top: "calc(68px + env(safe-area-inset-top))", transform: "translateX(-50%)", height: "44px", padding: "0 18px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap" }}>
+        <button type="button" onClick={turnSoundOn} style={{ position: "absolute", left: "16px", top: "calc(68px + env(safe-area-inset-top))", height: "44px", padding: "0 18px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap" }}>
           <IconSound />소리 켜기
         </button>
       ) : null}
@@ -200,8 +226,8 @@ export default function LiveWatchView(props: Props) {
         </div>
       ) : null}
 
-      {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드 */}
-      <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(88px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+      {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
+      <div style={{ display: rewind ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(88px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
         {chat && chat.notice ? (
           <div style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45 }}>
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
@@ -318,7 +344,7 @@ export default function LiveWatchView(props: Props) {
 
       {/* 관리자 — 글 길게 누르면 */}
       {modTarget && chat ? (
-        <div role="dialog" aria-modal="true" aria-label="채팅 관리" onClick={() => setModTarget(null)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z + 2, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
+        <div role="dialog" aria-modal="true" aria-label="채팅 관리" onClick={() => { setModTarget(null); setBanConfirm(false); }} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z + 2, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#FFFFFF", color: "#111111", borderRadius: "16px 16px 0 0", padding: "16px 16px calc(16px + env(safe-area-inset-bottom))" }}>
             <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "4px" }}>{modTarget.nickname}</div>
             <div style={{ fontSize: "14px", color: "#707072", marginBottom: "12px", wordBreak: "break-word" }}>{modTarget.body}</div>
@@ -326,11 +352,11 @@ export default function LiveWatchView(props: Props) {
               ["hide", "글 지우기"],
               ["mute30s", "지우고 30초 금지"],
               ["mute5m", "지우고 5분 금지"],
-              ["ban", "지우고 채팅 차단"],
-            ] as [LiveChatPenalty, string][]).map(([a, label]) => (
+              ["ban", banConfirm ? "정말 차단하기 · 사이트에 못 들어와요" : "지우고 사이트 접속 차단"],
+            ] as [LiveChatPenalty, string][]).filter(([a]) => !banConfirm || a === "ban").map(([a, label]) => (
               <button key={a} type="button" onClick={() => void moderate(a)} style={{ width: "100%", height: "52px", marginBottom: "8px", border: "1px solid #E5E5E5", borderRadius: "12px", background: "#FFFFFF", color: a === "ban" ? "#D30005" : "#111111", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>{label}</button>
             ))}
-            <button type="button" onClick={() => setModTarget(null)} style={{ width: "100%", height: "52px", border: "none", borderRadius: "12px", background: "#F5F5F5", color: "#111111", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>취소</button>
+            <button type="button" onClick={() => { setModTarget(null); setBanConfirm(false); }} style={{ width: "100%", height: "52px", border: "none", borderRadius: "12px", background: "#F5F5F5", color: "#111111", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>취소</button>
           </div>
         </div>
       ) : null}

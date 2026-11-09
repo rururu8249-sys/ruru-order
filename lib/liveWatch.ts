@@ -62,7 +62,7 @@ export function youtubeVideoIdFromUrl(url: unknown): string {
 }
 
 /** 사이트 안에 끼워 넣는 주소 — 폰 브라우저 규칙상 소리 끈 채 자동 재생, 페이지 안에서 재생(playsinline). */
-export function youtubeEmbedUrl(videoId: string, origin?: string): string {
+export function youtubeEmbedUrl(videoId: string, origin?: string, opts?: { controls?: boolean }): string {
   const p = new URLSearchParams({
     autoplay: "1",
     mute: "1",
@@ -71,7 +71,7 @@ export function youtubeEmbedUrl(videoId: string, origin?: string): string {
     modestbranding: "1",
     enablejsapi: "1",
     // [2026-11-10] 유튜브 자체 막대(돌려보기)·전체화면·제목줄 숨김 — 우리 위·아래 띠와 겹치고, 손님이 지난 장면으로 가 버리지 않게
-    controls: "0",
+    controls: opts?.controls ? "1" : "0",
     fs: "0",
     disablekb: "1",
     iv_load_policy: "3",
