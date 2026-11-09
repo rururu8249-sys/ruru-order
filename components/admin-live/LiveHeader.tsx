@@ -722,6 +722,13 @@ export default function LiveHeader({
                 </div>
                 <Switch on={bot.product} disabled={botSaving} label="상품 안내" onChange={(v) => void saveBot({ ...bot, product: v }, v ? "상품 안내를 켰어요." : "상품 안내를 껐어요.")} />
               </div>
+              <div className="flex items-center justify-between gap-3 px-3 py-3">
+                <div>
+                  <div className="text-[14px] font-bold text-ink">장바구니 담음 알림</div>
+                  <div className="text-[12px] text-ink-mute">「루*동이님 장바구니 담음 · 상품 옵션 · 금액」 — 닉네임 일부는 가려서 모두에게</div>
+                </div>
+                <Switch on={bot.cart} disabled={botSaving} label="장바구니 담음 알림" onChange={(v) => void saveBot({ ...bot, cart: v }, v ? "장바구니 담음 알림을 켰어요." : "장바구니 담음 알림을 껐어요.")} />
+              </div>
               <div className="px-3 py-3">
                 <button type="button" aria-expanded={botFaqOpen} onClick={() => setBotFaqOpen((v) => !v)} className="flex w-full items-center justify-between gap-3 text-left">
                   <span>

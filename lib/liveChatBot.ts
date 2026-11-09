@@ -21,6 +21,8 @@ export type LiveChatBotSetting = {
   enabled: boolean;
   /** 상품 안내 켜기 */
   product: boolean;
+  /** [07:39 사장님] 장바구니 담음 알림 — 누가(닉네임 일부 가림) 무엇을 담았는지 모두에게 */
+  cart: boolean;
   /** 자주 묻는 말 */
   faqs: LiveChatFaq[];
 };
@@ -34,7 +36,7 @@ export const LIVE_CHAT_BOT_DEFAULT_FAQS: LiveChatFaq[] = [
   { words: ["카드", "카드결제"], answer: "카드결제는 배송비 포함 5만원 이상부터 돼요. 주문서에서 카드를 고르면 결제 링크를 보내 드려요." },
 ];
 
-export const LIVE_CHAT_BOT_DEFAULT: LiveChatBotSetting = { enabled: true, product: true, faqs: LIVE_CHAT_BOT_DEFAULT_FAQS };
+export const LIVE_CHAT_BOT_DEFAULT: LiveChatBotSetting = { enabled: true, product: true, cart: true, faqs: LIVE_CHAT_BOT_DEFAULT_FAQS };
 
 function cleanWords(raw: unknown): string[] {
   const list = Array.isArray(raw) ? raw : String(raw ?? "").split(/[,\n]/);
@@ -56,7 +58,7 @@ export function parseLiveChatBotSetting(raw: unknown): LiveChatBotSetting {
         return { words: cleanWords(r.words), answer: String(r.answer ?? "").replace(/\s+/g, " ").trim().slice(0, 200) };
       }).filter((f) => f.words.length > 0 && f.answer).slice(0, 30)
     : LIVE_CHAT_BOT_DEFAULT_FAQS.map((f) => ({ ...f, words: [...f.words] }));
-  return { enabled: o.enabled !== false, product: o.product !== false, faqs };
+  return { enabled: o.enabled !== false, product: o.product !== false, cart: o.cart !== false, faqs };
 }
 
 export function serializeLiveChatBotSetting(s: LiveChatBotSetting): string {
@@ -82,6 +84,10 @@ export type BotCandidate = {
   sizes: string[];
   /** 세부상품이면 묶음(브랜드) 이름 — 「다이슨」처럼 묶음 이름만 쓴 짧은 글을 알아보려고 */
   groupName?: string;
+  /** [07:39] 장바구니 알림용 — 화면에 보일 이름·서버가 아는 판매가 범위(손님이 보낸 값은 이 안일 때만 믿음) */
+  name?: string;
+  priceMin?: number;
+  priceMax?: number;
 };
 
 const NUM_UNIT_AFTER = /^(원|개|만|천|번째|번|시|분|초|일|살|키로|kg|cm|mm|호|프로|%|명|벌|장|켤레)/i;
@@ -183,9 +189,13 @@ export function botRefOfProduct(c: Pick<BotCandidate, "productId" | "detailName"
 export function botRefOfFaq(faq: LiveChatFaq): string {
   return `f:${faq.words.join(",")}`.slice(0, 300);
 }
+/** [07:39] 장바구니 담음 알림 — c:상품id|세부상품(누르면 다른 손님도 그 상품 옵션 창). 상품 안내(p:)와 쉬는 시간을 따로 센다 */
+export function botRefOfCart(c: Pick<BotCandidate, "productId" | "detailName">): string {
+  return `c:${c.productId}|${c.detailName}`.slice(0, 300);
+}
 export function parseBotRef(ref: unknown): { productId: string; detailName: string } | null {
   const s = String(ref ?? "");
-  if (!s.startsWith("p:")) return null;
+  if (!s.startsWith("p:") && !s.startsWith("c:")) return null;
   const body = s.slice(2);
   const bar = body.indexOf("|");
   const productId = (bar >= 0 ? body.slice(0, bar) : body).trim();
@@ -228,7 +238,40 @@ export function cardLinkText(rows: OrderEventRow[]): string {
 export function paidThanksText(rows: OrderEventRow[]): string {
   return `💗 ${clipChatNick(rows[0]?.youtube_nickname)}님 결제 완료! 감사합니다`;
 }
-export const CART_NEXT_STEP_TEXT = "담았어요! 다 고르시면 「주문서」에서 제출하고 입금하시면 주문이 끝나요 😊";
+export const CART_NEXT_STEP_TEXT = "장바구니 담김! 다 고르시면 「주문서」에서 제출하고 입금하시면 주문이 끝나요 😊";
+
+// ── [2026-11-10 07:39 사장님] 장바구니 담음 알림 — 모두에게(구매욕 자극), 닉네임 일부만 가림 ──
+//   닉네임: 첫 글자는 늘 보임. 2글자=1개, 3글자=가운데 1개, 4글자 이상=1~2개(개수·자리 랜덤) 가림. 띄어쓰기는 안 가림.
+//   글: 「🛍️ 루*동이님 장바구니 담음 · PD-202 블랙/M · 259,000원」(여러 개면 「… 외 N종」). 사장님 말 «누구 장바구니 뭐 담음 옵션 금액» 그대로.
+export function maskChatNick(nick: unknown, rand: () => number = Math.random): string {
+  const chars = Array.from(clipChatNick(nick).replace(/…$/, ""));
+  const n = chars.length;
+  if (n <= 1) return chars.join("");
+  const slots = chars.map((c, i) => (i > 0 && c.trim() ? i : -1)).filter((i) => i >= 0);
+  if (!slots.length) return chars.join("");
+  const want = n <= 3 ? 1 : Math.min(slots.length, n - 2, 1 + Math.floor(rand() * 2));
+  const pick = new Set<number>();
+  if (n === 3 && slots.includes(1)) pick.add(1);
+  while (pick.size < Math.max(1, want)) pick.add(slots[Math.floor(rand() * slots.length)]);
+  return chars.map((c, i) => (pick.has(i) ? "*" : c)).join("");
+}
+export type CartAnnounceItem = { name: string; color: string; size: string; price: number | null };
+export function cartAnnounceText(maskedNick: string, items: CartAnnounceItem[]): string {
+  const first = items[0];
+  if (!first) return "";
+  const opt = [first.color, first.size].map((v) => String(v ?? "").replace(/사이즈\s*/g, "").trim()).filter((v) => !EMPTY_OPT.has(v.toLowerCase())).join("/");
+  const parts = [`${cleanProductNameForFeed(first.name)}${opt ? ` ${opt}` : ""}`.trim()];
+  if (first.price != null && first.price > 0) parts.push(`${Math.round(first.price).toLocaleString("ko-KR")}원`);
+  const more = items.length > 1 ? ` 외 ${items.length - 1}종` : "";
+  return `🛍️ ${maskedNick}님 장바구니 담음 · ${parts.join(" · ")}${more}`.slice(0, LIVE_CHAT_BOT_MAX_LEN);
+}
+/** 손님이 보낸 단가는 서버가 아는 범위 안일 때만 그대로, 아니면 서버 값(최소) */
+export function trustedCartPrice(sent: number | null, c: Pick<BotCandidate, "priceMin" | "priceMax">): number | null {
+  const lo = c.priceMin, hi = c.priceMax ?? c.priceMin;
+  if (lo == null || !Number.isFinite(lo)) return null;
+  if (sent != null && Number.isFinite(sent) && hi != null && sent >= lo && sent <= hi) return sent;
+  return lo;
+}
 /** 입금확인·카드결제완료로 «바뀐» 순간인지 */
 export function becamePaid(newRow: OrderEventRow, oldRow: OrderEventRow): boolean {
   const st = (r: OrderEventRow) => String(r.admin_order_status_v2 || r.order_manage_status || r.deposit_status || "").trim();

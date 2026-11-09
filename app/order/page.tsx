@@ -8223,6 +8223,7 @@ export default function OrderPage() {
           {liveWatchShown ? (
             <LiveWatchView
               videoId={liveWatchVideoId}
+              broadcastId={broadcast?.id ? String(broadcast.id) : ""}
               title={String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
               paused={isBroadcastPaused}
               pausedText={livePausedText}

@@ -1,12 +1,13 @@
 // app/api/cart-reservations/route.ts
 // 주문서 담기 재고 홀드(예약) — 표시용 선점 전용. 진짜 재고 차감/복구는 기존 제출 RPC가 단일 소유.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { CART_SEQ_NEW, cartClearNeedsNotice, cartItemClearedBy, normCartOpt, type CartClearMark, type CartIdentity } from "@/lib/cartClearMarks";
 import { sweepExpiredCartHolds } from "@/lib/cartHoldSweep";
 import { readExposedProductIds } from "@/lib/cartExposureServer";
+import { announceNewCartLines, type NewCartLine } from "@/lib/liveCartAnnounceServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -280,6 +281,13 @@ export async function POST(request: NextRequest) {
       }
     } catch { /* 확인 실패 시 평소처럼 sync */ }
 
+    // [2026-11-10 07:39] 장바구니 담음 알림 — 선점 «전» 이미 담겨 있던 줄(새로 담은 것만 알리려고, 읽기만)
+    let heldBefore: Set<string> | null = null;
+    if (kakaoId && items.length > 0) {
+      const { data: hb, error: hbErr } = await supabase.from("cart_reservations").select("product_id,color,size").eq("session_key", sessionKey).limit(MAX_ITEMS * 2);
+      if (!hbErr) heldBefore = new Set(((hb || []) as Array<Record<string, unknown>>).map((h) => keyOf({ productId: String(h.product_id ?? "").trim(), color: String(h.color ?? ""), size: String(h.size ?? "") })));
+    }
+
     const holdMinutes = await getHoldMinutes(supabase);
     const { data, error } = await supabase.rpc("claim_cart_hold", {
       p_session_key: sessionKey,
@@ -305,6 +313,19 @@ export async function POST(request: NextRequest) {
     if (kakaoId) {
       const { error: kakaoError } = await supabase.from("cart_reservations").update({ kakao_id: kakaoId }).eq("session_key", sessionKey);
       if (kakaoError) return NextResponse.json({ ok: false, error: kakaoError.message }, { status: 500 });
+    }
+
+    // [2026-11-10 07:39] 새로 담긴 줄(선점 성공·전에 없던 것) → 방송 채팅 알림(응답 뒤에 · 실패해도 담기 무관)
+    if (heldBefore) {
+      const okKeys = new Set(rpcResults.filter((r) => r && r.ok === true).map((r) => keyOf({ productId: String(r.productId ?? "").trim(), color: String(r.color ?? ""), size: String(r.size ?? "") })));
+      const fresh: NewCartLine[] = items
+        // 이 화면에서 «방금» 담은 줄만(CART_SEQ_NEW) — 다시 접속해 옛 장바구니를 다시 보내는 건 안 알림
+        .filter((r: ReturnType<typeof buildCartHoldSnapshotItem>) => { const k = keyOf(r); return okKeys.has(k) && !heldBefore!.has(k) && seqByKey.get(k) === CART_SEQ_NEW; })
+        .map((r: ReturnType<typeof buildCartHoldSnapshotItem>) => ({ productId: r.productId, productName: r.productName, color: normCartOpt(r.color), size: normCartOpt(r.size), unitPrice: r.unitPrice }));
+      if (fresh.length) {
+        const run = () => announceNewCartLines(supabase, { sessionKey, kakaoId, lines: fresh });
+        try { after(run); } catch { void run(); } // after 를 못 쓰는 환경(시험)에서도 담기는 그대로
+      }
     }
 
     const bankAccountOverride = await currentBankOverride(supabase, sessionKey);

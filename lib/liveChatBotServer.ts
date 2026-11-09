@@ -38,6 +38,9 @@ function productCandidates(row: Record<string, unknown>): BotCandidate[] {
       line: buildDetailChatLine(d),
       soldOut: d.stockManaged && d.stock !== null && d.stock <= 0,
       sizes: d.sizes,
+      name: d.detailName,
+      priceMin: d.price,
+      priceMax: d.price,
     }));
   }
   const note = parseProductNote(row);
@@ -50,10 +53,20 @@ function productCandidates(row: Record<string, unknown>): BotCandidate[] {
     line: buildChatAnnounceText(row),
     soldOut: note.stock_management_enabled === true && Number.isFinite(stock) && stock <= 0,
     sizes: cleanOptionValues(row.size_options),
+    name: String(row.product_name ?? "").trim(),
+    ...priceRangeOf(row, note),
   }];
 }
 
-async function loadCandidates(sb: SupabaseClient, bc: string): Promise<BotCandidate[]> {
+// [07:39] 단품 판매가 범위 — 기본가 ~ 기본가+옵션 추가금 최대(장바구니 알림이 손님이 보낸 값을 믿을지 볼 때)
+function priceRangeOf(row: Record<string, unknown>, note: Record<string, unknown>): { priceMin: number; priceMax: number } {
+  const base = Math.max(0, Number(row.price ?? row.sale_price ?? 0) || 0);
+  const pricing = (note.option_pricing && typeof note.option_pricing === "object" ? note.option_pricing : {}) as Record<string, unknown>;
+  const plus = Object.values(pricing).map((v) => Math.max(0, Math.floor(Number(v) || 0)));
+  return { priceMin: base, priceMax: base + (plus.length ? Math.max(...plus) : 0) };
+}
+
+export async function loadCandidates(sb: SupabaseClient, bc: string): Promise<BotCandidate[]> {
   const hit = candCache.get(bc);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.list;
   const { data: bp, error } = await sb.from("broadcast_products").select("product_id").eq("broadcast_id", bc).limit(2000);

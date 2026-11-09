@@ -43,6 +43,8 @@ type Props = {
   /** [07:18·07:28 사장님] 사이트 접속 수(최근 2분) — 유튜브 숫자와 같이 모든 손님에게 */
   siteViewers?: number | null;
   showSiteViewers?: boolean;
+  /** 방송 번호 — 인사하기를 방송마다 다시 띄우려고 */
+  broadcastId?: string;
   pinned: LiveWatchPinned | null;
   items: LiveWatchItem[];
   cartCount: number;
@@ -369,16 +371,19 @@ export default function LiveWatchView(props: Props) {
     window.addEventListener("blur", onBlur);
     return () => { window.removeEventListener("blur", onBlur); if (timer) window.clearTimeout(timer); if (check) window.clearTimeout(check); };
   }, []);
-  // 실시간 채팅에서 인사하기(유튜브처럼) — 이 방송에서 아직 글을 안 쓴 손님에게 한 번, 1분 지나면 저절로 숨김
-  const greetKey = `ruru_live_greet_${videoId}`;
+  // 실시간 채팅에서 인사하기(유튜브처럼)
+  //   [07:42 사장님 「한 번 나오고 안 나옴 · 유튜브와 같게」] 원인: 기록을 «유튜브 영상 번호»로 해서, 같은 라이브 주소를 계속 쓰면
+  //   예전 방송에서 한 번 쓴 기록이 남아 안 떴고, 1분 지나면 저절로 숨겼음.
+  //   이제 유튜브처럼 — «이 방송»(방송 번호)에서 아직 글을 안 쓴 손님이면 방송 화면에 들어올 때마다 뜨고, 글을 한 번 쓰면(인사 포함) 그 방송에선 안 뜸.
+  //   저절로 숨기지 않음. 새 방송이면 다시 뜸.
+  const greetKey = `ruru_live_greet_${props.broadcastId || videoId}`;
   const [greetOpen, setGreetOpen] = useState(false);
   useEffect(() => {
     let done = false;
     try { done = window.localStorage.getItem(greetKey) === "1"; } catch { /* 무시 */ }
-    if (done) return;
+    if (done) { setGreetOpen(false); return; }
     const t1 = window.setTimeout(() => setGreetOpen(true), 1500);
-    const t2 = window.setTimeout(() => setGreetOpen(false), 61500);
-    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
+    return () => { window.clearTimeout(t1); };
   }, [greetKey]);
   const closeGreet = () => {
     setGreetOpen(false);
