@@ -183,18 +183,18 @@ export default function LiveWatchView(props: Props) {
         title={`${title || "라이브 방송"} 영상`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
-        style={{ position: "absolute", left: 0, right: 0, top: "calc(60px + env(safe-area-inset-top))", width: "100%", height: "calc(100% - 136px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", border: 0, background: "#000000" }}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: "calc(100% - 76px - env(safe-area-inset-bottom))", border: 0, background: "#000000" }}
       />
 
       {/* 위 줄 — LIVE·제목 / 쇼핑몰처럼 보기 */}
-      <div style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "#000000" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "9999px", background: paused ? "#707072" : "#D30005", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
             <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />{paused ? "쉬는 중" : "LIVE"}
           </span>
           <span style={{ fontSize: "15px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title || "라이브 방송"}</span>
         </div>
-          <button type="button" onClick={props.onSwitchToShop} style={{ flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
+          <button type="button" onClick={props.onSwitchToShop} style={{ pointerEvents: "auto", flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
             쇼핑몰처럼 보기
           </button>
       </div>
@@ -238,7 +238,7 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
-      <div style={{ display: "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(128px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+      <div style={{ display: "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(84px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
         {chat && chat.notice ? (
           <div style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45 }}>
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
@@ -250,7 +250,7 @@ export default function LiveWatchView(props: Props) {
             role="log"
             aria-label="채팅"
             aria-live="polite"
-            style={{ pointerEvents: "auto", maxHeight: "24dvh", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
+            style={{ pointerEvents: chat.canModerate ? "auto" : "none", maxHeight: "24dvh", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
           >
             {chat.messages.map((m) => (
               <div
@@ -323,7 +323,7 @@ export default function LiveWatchView(props: Props) {
 
       {/* 채팅 안내(보냄 실패·금지 등) */}
       {chatHint ? (
-        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(128px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
+        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
           <span style={{ padding: "8px 14px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 600 }}>{chatHint}</span>
         </div>
       ) : null}
