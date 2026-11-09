@@ -22,7 +22,7 @@ const openMore=async(label)=>{await act(async()=>more(label)[0].props.onClick({s
 const menuItem=(items,label)=>items.find(b=>b.children.includes(label));
 assert.equal(more('NEW').length,1,'search must find linked detail through broadcast-contained brand');
 // RowMoreMenu 는 fragment 라 버튼의 parent = 컴포넌트, 그 parent = 줄
-const rowOf=(label)=>more(label)[0].parent.parent;
+const rowOf=(label)=>more(label)[0].parent.parent.parent;
 // 「소개」는 ⋯ 안 — 고정 + 채팅 현재상품 + 안내문 복사(a2-6/a2-10 과 같은 broadcastOneClick)
 let items=await openMore('NEW');
 await act(async()=>menuItem(items,'소개').props.onClick({stopPropagation(){}}));

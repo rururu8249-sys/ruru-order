@@ -2196,7 +2196,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           onDrop={(e) => { e.preventDefault(); if (bcDragPid) reorderBcByPid(bcDragPid, pid); setBcDragPid(null); setBcDragOver(null); }}
                           onDragEnd={() => { setBcDragPid(null); setBcDragOver(null); }}
                           style={{ border: bcCopyMode && bcCopySel.has(pid) ? "2px solid var(--color-ink)" : parentPinned ? "2px solid var(--color-ink)" : "1px solid var(--color-line)", borderRadius: "8px", background: bcCopyMode && bcCopySel.has(pid) ? "var(--color-surface-2)" : bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragPid === pid ? 0.4 : 1, overflow: "hidden", cursor: bcCopyMode || isBrandFolder ? "pointer" : !bcDragEnabled ? "default" : "grab" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px", minHeight: "56px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px", minHeight: "56px", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
                             {bcCopyMode ? <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "20px", height: "20px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : <span aria-hidden="true" style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }}>⠿</span>}
                             {!bcCopyMode ? <input type="checkbox" aria-label={`${productName(p)} 체크`} checked={rotChecked.has(pid)} onChange={() => toggleRotRowCheck(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "20px", height: "20px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : null}
                             <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
@@ -2217,10 +2217,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               </div>
                               <div style={{ fontSize: "12px", fontWeight: isBrandFolder ? 600 : 700, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-ink)", marginTop: "2px" }}>{isBrandFolder ? `세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div>
                             </div>
+                            {/* [폰] 이름이 안 눌리게 버튼 줄은 아랫줄 오른쪽(10/22 폰 규칙). PC 는 같은 줄 */}
                             {!bcCopyMode ? (
-                              <button type="button" disabled={!rotationLive || rotBusy} onClick={(e) => { e.stopPropagation(); if (rowRot === "on") void removeRowFromRotation(p); else void addRowToRotation(p); }} title={!rotationLive ? "방송을 켜면 바꿀 수 있어요" : rowRot === "on" ? "방송 화면 순환에서 뺌" : "방송 화면 순환에 넣고 채팅 안내글을 복사"} style={actBtn(rowRot === "on")}>{rotLabel}</button>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, ...(isNarrow ? { flexBasis: "100%", justifyContent: "flex-end" } : {}) }}>
+                                <button type="button" disabled={!rotationLive || rotBusy} onClick={(e) => { e.stopPropagation(); if (rowRot === "on") void removeRowFromRotation(p); else void addRowToRotation(p); }} title={!rotationLive ? "방송을 켜면 바꿀 수 있어요" : rowRot === "on" ? "방송 화면 순환에서 뺌" : "방송 화면 순환에 넣고 채팅 안내글을 복사"} style={actBtn(rowRot === "on")}>{rotLabel}</button>
+                                <RowMoreMenu name={productName(p)} items={moreItems} size={btnH} />
+                              </div>
                             ) : null}
-                            {!bcCopyMode ? <RowMoreMenu name={productName(p)} items={moreItems} size={btnH} /> : null}
                           </div>
                           {isBrandFolder && expanded ? (
                             <div onClick={(e) => e.stopPropagation()} style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px", cursor: "default" }}>
@@ -2237,7 +2240,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                   { label: "수정", ariaLabel: `${detail.detailName} 수정`, onClick: () => editProduct(p, detail.detailName) },
                                 ];
                                 return (
-                                  <div key={broadcastPinKey(pid, detail.detailName)} style={{ display: "flex", alignItems: "center", gap: "8px", border: pinned ? "2px solid var(--color-ink)" : "1px solid var(--color-line)", borderRadius: "8px", padding: pinned ? "7px" : "8px", background: "var(--color-surface)", minHeight: "56px" }}>
+                                  <div key={broadcastPinKey(pid, detail.detailName)} style={{ display: "flex", alignItems: "center", gap: "8px", border: pinned ? "2px solid var(--color-ink)" : "1px solid var(--color-line)", borderRadius: "8px", padding: pinned ? "7px" : "8px", background: "var(--color-surface)", minHeight: "56px", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
                                     {!bcCopyMode ? <input type="checkbox" aria-label={`${detail.detailName} 체크`} checked={rotCheckedDetails.has(rotDetailKey(pid, detail.detailName))} onChange={() => toggleRotDetailCheck(pid, detail)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "20px", height: "20px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : null}
                                     <button type="button" aria-label={`${detail.detailName} 사진 크게 보기`} onClick={() => detail.image && setLightbox(detail.image)} style={{ width: 42, height: 42, flexShrink: 0, border: 0, borderRadius: 7, overflow: "hidden", padding: 0, background: "var(--color-surface-2)", cursor: detail.image ? "zoom-in" : "default" }}>{detail.image ? <img src={detail.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</button>
                                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2249,9 +2252,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                       <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink-soft)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optionText}{detail.stockManaged && detail.stock !== null ? ` · 재고 ${detail.stock}` : ""}</div>
                                     </div>
                                     {!bcCopyMode ? (
-                                      <button type="button" disabled={!rotationLive || rotBusy} onClick={(e) => { e.stopPropagation(); if (detailOn) void removeRowFromRotation(p, detail); else void addRowToRotation(p, detail); }} title={!rotationLive ? "방송을 켜면 바꿀 수 있어요" : detailOn ? "방송 화면 순환에서 뺌" : "방송 화면 순환에 넣고 채팅 안내글을 복사"} style={actBtn(detailOn)}>{detailRotLabel}</button>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, ...(isNarrow ? { flexBasis: "100%", justifyContent: "flex-end" } : {}) }}>
+                                        <button type="button" disabled={!rotationLive || rotBusy} onClick={(e) => { e.stopPropagation(); if (detailOn) void removeRowFromRotation(p, detail); else void addRowToRotation(p, detail); }} title={!rotationLive ? "방송을 켜면 바꿀 수 있어요" : detailOn ? "방송 화면 순환에서 뺌" : "방송 화면 순환에 넣고 채팅 안내글을 복사"} style={actBtn(detailOn)}>{detailRotLabel}</button>
+                                        <RowMoreMenu name={detail.detailName} items={detailMore} size={btnH} />
+                                      </div>
                                     ) : null}
-                                    {!bcCopyMode ? <RowMoreMenu name={detail.detailName} items={detailMore} size={btnH} /> : null}
                                   </div>
                                 );
                               })}
