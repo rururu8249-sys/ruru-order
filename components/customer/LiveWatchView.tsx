@@ -144,7 +144,7 @@ function ChatBadge({ badge }: { badge: LiveChatMessage["badge"] }) {
 // 닉네임 앞 동그란 사진 — 카카오 프로필 사진, 없거나 못 불러오면 닉네임 첫 글자(그 사람 색)
 function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: string }) {
   const [broken, setBroken] = useState(false);
-  const box = { width: "24px", height: "24px", borderRadius: "9999px", flexShrink: 0, marginTop: "1px", overflow: "hidden" } as const;
+  const box = { width: "24px", height: "24px", borderRadius: "9999px", flexShrink: 0, marginTop: "-2px", overflow: "hidden" } as const;
   if (src && !broken) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => setBroken(true)} style={{ ...box, pointerEvents: "none", WebkitTouchCallout: "none", objectFit: "cover", display: "block", background: "#333333" }} />;
@@ -153,7 +153,7 @@ function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: st
   return <span aria-hidden="true" style={{ ...box, display: "inline-flex", alignItems: "center", justifyContent: "center", background: color, color: "#111111", fontSize: "12px", fontWeight: 700, textShadow: "none" }}>{ch}</span>;
 }
 // 글자를 상자 없이 영상 위에 바로 — 어떤 화면에서도 읽히게 진한 그림자
-const CHAT_TEXT_SHADOW = "0 0 2px #000, 0 1px 2px #000, 0 0 6px rgba(0,0,0,0.7)";
+const CHAT_TEXT_SHADOW = "0 0 2px rgba(0,0,0,0.9), 0 1px 3px rgba(0,0,0,0.6)";
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -163,7 +163,9 @@ type ChatView = { size: "base" | "mid" | "big"; bold: boolean; height: "base" | 
 const CHAT_VIEW_KEY = "ruru_live_chat_view_v1";
 const CHAT_VIEW_DEFAULT: ChatView = { size: "base", bold: false, height: "base" };
 // [2026-11-10 04:09] 기본 15px — 유튜브 앱 채팅 글자와 비슷하게(사장님 「유튜브랑 비슷하게」)
-const CHAT_SIZES: Record<ChatView["size"], string> = { base: "15px", mid: "17px", big: "19px" };
+// [08:39 사장님 「유튜브 라이브 채팅과 글자 크기·굵기·줄 간격·여백 모두 같게」] 유튜브 앱 라이브 채팅 기준: 글자 14 · 줄 높이 20 · 줄 사이 8 · 사진 24 · 사진과 이름 사이 12 · 이름 흐린 흰색(보통 굵기) · 글 흰색
+const CHAT_SIZES: Record<ChatView["size"], string> = { base: "14px", mid: "16px", big: "18px" };
+const CHAT_LINE_H: Record<ChatView["size"], string> = { base: "20px", mid: "22px", big: "25px" };
 const CHAT_HEIGHTS: Record<ChatView["height"], string> = { base: "24dvh", low: "14dvh", high: "36dvh" };
 function readChatView(): ChatView {
   try {
@@ -724,7 +726,7 @@ export default function LiveWatchView(props: Props) {
             aria-label="채팅"
             aria-live="polite"
             onScroll={onChatScroll}
-            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 4px", boxSizing: "border-box", width: "100%" }}
+            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
           >
             {chat.messages.map((m) => { const color = chatColorMap.get(m.id) || "#FFFFFF";
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
@@ -745,16 +747,16 @@ export default function LiveWatchView(props: Props) {
                   props.onOpenProduct(botProduct.productId, botProduct.detailName || undefined);
                 } : undefined}
                 role={botProduct ? "button" : undefined}
-                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "8px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 500, lineHeight: 1.45, wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "12px", maxWidth: "100%", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 400, letterSpacing: "normal", lineHeight: CHAT_LINE_H[chatView.size], wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
                 <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
                 <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ fontWeight: 800 }}>{m.nickname}</span>
+                  <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.7)" }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
-                  <span style={{ marginLeft: m.badge ? "4px" : "8px" }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
+                  <span style={{ marginLeft: m.badge ? "4px" : "10px" }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
                     <span style={{ display: "inline-flex", alignItems: "center", marginLeft: "8px", height: "24px", padding: "0 10px", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, textShadow: "none", verticalAlign: "middle", whiteSpace: "nowrap" }}>담기 ›</span>
                   ) : null}
