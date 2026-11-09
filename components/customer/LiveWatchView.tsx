@@ -84,6 +84,13 @@ const MenuIcon = ({ k }: { k: string }) => {
   if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
   return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
 };
+// 닉네임마다 다른 색(같은 사람은 늘 같은 색) — 어두운 영상 위에서 잘 보이는 밝은 색만
+const NICK_COLORS = ["#FFD43B", "#8CE99A", "#74C0FC", "#FFA8C5", "#B197FC", "#FFA94D", "#63E6BE", "#FF8787", "#C0EB75", "#99E9F2"];
+function nicknameColor(nick: string): string {
+  let h = 0;
+  for (const ch of String(nick || "")) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
+  return NICK_COLORS[h % NICK_COLORS.length];
+}
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -262,7 +269,7 @@ export default function LiveWatchView(props: Props) {
                 onContextMenu={(e) => { if (chat.canModerate) { e.preventDefault(); setModTarget(m); } }}
                 style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "4px 10px", borderRadius: "12px", background: "rgba(0,0,0,0.35)", fontSize: "14px", lineHeight: 1.45, wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,0.6)", userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
-                <span style={{ fontWeight: 700, color: "#E5E5E5", marginRight: "6px" }}>{m.nickname}</span>
+                <span style={{ fontWeight: 700, color: nicknameColor(m.nickname), marginRight: "6px" }}>{m.nickname}</span>
                 <span>{m.body}</span>
               </div>
             ))}
