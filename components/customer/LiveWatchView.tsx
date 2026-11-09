@@ -145,7 +145,7 @@ function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: st
   const box = { width: "24px", height: "24px", borderRadius: "9999px", flexShrink: 0, marginTop: "1px", overflow: "hidden" } as const;
   if (src && !broken) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} style={{ ...box, objectFit: "cover", display: "block", background: "#333333" }} />;
+    return <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => setBroken(true)} style={{ ...box, pointerEvents: "none", WebkitTouchCallout: "none", objectFit: "cover", display: "block", background: "#333333" }} />;
   }
   const ch = Array.from(String(nick || "").trim())[0] || "?";
   return <span aria-hidden="true" style={{ ...box, display: "inline-flex", alignItems: "center", justifyContent: "center", background: color, color: "#111111", fontSize: "12px", fontWeight: 700, textShadow: "none" }}>{ch}</span>;
@@ -566,7 +566,9 @@ export default function LiveWatchView(props: Props) {
       tabIndex={-1}
       role="region"
       aria-label="방송 보며 주문"
-      style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none", outline: "none" }}
+      // [07:32 사장님] 채팅 그림(이모티콘·프로필)을 꾹 눌러도 «이미지 저장» 창이 안 뜨게 — 그림에서만 막음(글자 입력칸 붙여넣기는 그대로)
+      onContextMenu={(e) => { if ((e.target as HTMLElement | null)?.tagName === "IMG") e.preventDefault(); }}
+      style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none", outline: "none" }}
     >
       {/* 영상 — 화면 전체 */}
       <iframe
@@ -584,7 +586,8 @@ export default function LiveWatchView(props: Props) {
       {/* 돌려보기 중 — 영상 전체를 반투명 검정으로 어둡게(유튜브 막대는 빨강·흰색이라 그대로 보임) */}
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
       <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+        {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0 }}>
           {/* [07:05 사장님] LIVE + 시청자 수(유튜브 동시 시청자) — 오늘만셀러처럼 한 알약 */}
           <span aria-label={props.viewers != null ? `${paused ? "쉬는 중" : "라이브"} · 시청자 ${props.viewers}명` : undefined} style={{ display: "inline-flex", alignItems: "stretch", height: "28px", borderRadius: "9999px", overflow: "hidden", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 10px", background: paused ? "#707072" : "#D30005" }}>
@@ -609,7 +612,7 @@ export default function LiveWatchView(props: Props) {
               </span>
             ) : null}
           </span>
-          <span style={{ fontSize: "15px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title || "라이브 방송"}</span>
+          <span style={{ maxWidth: "100%", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>{title || "라이브 방송"}</span>
         </div>
           {/* 오른쪽 위 — 오늘만셀러처럼 그림만: 새로고침 · 소리 · 닫기(X = 상품 사진으로 보는 쇼핑몰 화면) */}
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0, pointerEvents: "auto", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>

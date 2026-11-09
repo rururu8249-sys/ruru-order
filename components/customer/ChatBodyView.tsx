@@ -4,6 +4,7 @@
 //     [07:11 사장님 「유튜브와 같은 조건으로」] 유튜브는 이모티콘만 보내도 크기가 같음 → 늘 높이 2em(15px 글자에서 30px)
 //   가로로 긴 글씨 스티커는 가로로 긴 그대로(높이만 맞춤, 최대 3배 폭). 글자 크기 설정(중간·크게)을 따라 같이 커짐.
 //   지웠거나 꺼진 이모티콘은 «:이름:» 글자로.
+//   [07:32 사장님] 그림은 손가락을 받지 않음(pointer-events none) → 꾹 누르면 «이미지 저장» 대신 글 줄의 관리 창이 뜸.
 import { splitChatBody, type ChatEmoji } from "@/lib/liveChatEmoji";
 
 export const EMOJI_INLINE_EM = 2;
@@ -23,7 +24,7 @@ export function ChatBodyView({ body, emojis, scale = 1 }: { body: string; emojis
         return (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={i} src={e.url} alt={`:${e.name}:`} title={e.name} draggable={false}
-            style={{ display: "inline-block", height: h, width: "auto", maxWidth: `calc(${h} * 3)`, objectFit: "contain", verticalAlign: "middle", margin: "-0.25em 0.06em 0", userSelect: "none" }} />
+            style={{ display: "inline-block", height: h, width: "auto", maxWidth: `calc(${h} * 3)`, objectFit: "contain", verticalAlign: "middle", margin: "-0.25em 0.06em 0", userSelect: "none", pointerEvents: "none", WebkitTouchCallout: "none" }} />
         );
       })}
     </>
