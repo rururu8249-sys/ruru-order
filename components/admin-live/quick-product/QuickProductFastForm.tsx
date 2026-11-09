@@ -2115,6 +2115,8 @@ export default function QuickProductFastForm({
 
       const savedRenames = detailRenamesRef.current.splice(0);
       if (isEditMode && savedRenames.length > 0) {
+        // [2026-11-09] 상품 창의 줄 체크(옛 이름 키)도 새 이름으로 따라가게 — 상품은 이미 저장됐으니 API 결과와 무관하게 알림
+        window.dispatchEvent(new CustomEvent("ruru-widget-rotation-renamed", { detail: { productId: String(editingProductId ?? ""), renames: savedRenames } }));
         // 순환 목록 이름 맞추기 — 실패해도 상품 저장은 이미 끝남(안내만).
         try {
           const res = await fetch("/api/admin-live/widget-library", {

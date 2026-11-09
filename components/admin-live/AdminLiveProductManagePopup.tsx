@@ -33,6 +33,30 @@ import ProductBrandMoveDialog from "./ProductBrandMoveDialog";
 import StockFlowModal, { type StockFlowProduct } from "./StockFlowModal";
 import { kstDateKey } from "@/lib/orderPickingWorkspace";
 
+// [2026-11-09 사장님 「수정하고 나면 체크한 게 풀림」] 줄 체크는 창(컴포넌트) 안 state 였는데, 「수정」을 누르면
+//   창을 닫고(onClose) 폼을 연 뒤 다시 열어서 매번 비워졌다. 체크를 창 밖(모듈 메모리)에 두어 다시 열어도 남게.
+//   새로고침이면 비움(운영 데이터 아님·저장 안 함). 폼이 세부상품 이름을 바꾸면(ruru-widget-rotation-renamed) 체크 키도 따라 바꿈.
+const rotCheckStore: { rows: Set<string>; details: Map<string, RotationDetailRef> } = { rows: new Set(), details: new Map() };
+const rotDetailKeyOf = (pid: string, name: string) => `${pid}\u0001${name}`;
+export function applyRotCheckRenames(productId: string, renames: { from: string; to: string }[]): void {
+  if (!productId || !Array.isArray(renames) || renames.length === 0) return;
+  for (const r of renames) {
+    const from = String(r?.from ?? "").trim(), to = String(r?.to ?? "").trim();
+    if (!from || !to || from === to) continue;
+    const oldKey = rotDetailKeyOf(productId, from);
+    const ref = rotCheckStore.details.get(oldKey);
+    if (!ref) continue;
+    rotCheckStore.details.delete(oldKey);
+    rotCheckStore.details.set(rotDetailKeyOf(productId, to), { ...ref, detailName: to });
+  }
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("ruru-widget-rotation-renamed", (event) => {
+    const d = (event as CustomEvent<{ productId?: string; renames?: { from: string; to: string }[] }>).detail;
+    applyRotCheckRenames(String(d?.productId ?? ""), d?.renames ?? []);
+  });
+}
+
 type ProductRow = Record<string, unknown>;
 
 export type ProductManageTab = "broadcast" | "shop" | "products";
@@ -321,8 +345,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [widgetRotation, setWidgetRotation] = useState<WidgetRotationConfig>({ mode: "all", paused: false, targets: [] });
   // [2026-10-21 a2-10] 방송 상품 줄 체크(순환 넣기/빼기용) — 이 화면 안에서만, 저장 안 함
   const [rotBusy, setRotBusy] = useState(false);
-  const [rotChecked, setRotChecked] = useState<Set<string>>(new Set());
-  const [rotCheckedDetails, setRotCheckedDetails] = useState<Map<string, RotationDetailRef>>(new Map());
+  const [rotChecked, setRotChecked] = useState<Set<string>>(() => new Set(rotCheckStore.rows));
+  const [rotCheckedDetails, setRotCheckedDetails] = useState<Map<string, RotationDetailRef>>(() => new Map(rotCheckStore.details));
+  // 체크가 바뀔 때마다 보관소에 복사(창이 닫혀도 남음)
+  useEffect(() => { rotCheckStore.rows = new Set(rotChecked); }, [rotChecked]);
+  useEffect(() => { rotCheckStore.details = new Map(rotCheckedDetails); }, [rotCheckedDetails]);
+  // 폼이 이름을 바꾸면(모듈 리스너가 보관소를 먼저 고침) 화면 state 도 보관소에서 다시 읽음
+  useEffect(() => {
+    const onRenamed = () => setRotCheckedDetails(new Map(rotCheckStore.details));
+    window.addEventListener("ruru-widget-rotation-renamed", onRenamed);
+    return () => window.removeEventListener("ruru-widget-rotation-renamed", onRenamed);
+  }, []);
   const [onScreenOnly, setOnScreenOnly] = useState(false);
   const widgetLibraryLoadSeqRef = useRef(0);
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
@@ -1453,7 +1486,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return out;
   };
   const clearRotCheck = () => { setRotChecked(new Set()); setRotCheckedDetails(new Map()); };
-  const rotDetailKey = (pid: string, name: string) => `${pid}\u0001${name}`;
+  const rotDetailKey = rotDetailKeyOf;
   const toggleRotRowCheck = (pid: string) => setRotChecked((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; });
   const toggleRotDetailCheck = (pid: string, detail: { detailName: string }) => setRotCheckedDetails((prev) => {
     const next = new Map(prev);
