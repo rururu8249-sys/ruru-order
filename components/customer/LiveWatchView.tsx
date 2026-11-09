@@ -375,9 +375,12 @@ export default function LiveWatchView(props: Props) {
           </button>
         ) : null}
         {cartCount > 0 ? (
-          <button type="button" onClick={props.onOpenCart} style={{ flex: chat && chat.canWrite ? "0 0 auto" : 1, minWidth: 0, height: "52px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap", padding: "0 16px" }}>
+          <button type="button" onClick={props.onOpenCart} aria-label={chat && chat.canWrite ? `주문서 ${cartCount}개 보기` : undefined} style={chat && chat.canWrite ? { position: "relative", flex: "0 0 auto", width: "52px", height: "52px", padding: 0, border: "none", borderRadius: "9999px", background: "#FFFFFF", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" } : { flex: 1, minWidth: 0, height: "52px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap", padding: "0 16px" }}>
             {chat && chat.canWrite ? (
-              <span role="status" aria-atomic="true">주문서 {cartCount}개</span>
+              <>
+                <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2" strokeLinejoin="round"><path d="M3 4h2l2.2 10.2a1 1 0 001 .8h9.4a1 1 0 001-.8L20 8H6.2" /><circle cx="9" cy="19.5" r="1.3" /><circle cx="17" cy="19.5" r="1.3" /></svg>
+                <span role="status" aria-atomic="true" style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "22px", height: "22px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, lineHeight: "22px", textAlign: "center", border: "2px solid #000000" }}>{cartCount > 99 ? "99+" : cartCount}</span>
+              </>
             ) : (
               <><span role="status" aria-atomic="true">{cartCount}개 · {cartTotalText}</span><span aria-hidden="true">·</span><span>주문서 확인</span></>
             )}
@@ -496,7 +499,7 @@ export default function LiveWatchView(props: Props) {
             {([
               ["1", <>방송에서 마음에 드는 상품이 나오면</>],
               ["2", <>왼쪽 아래 <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "26px", padding: "0 8px", borderRadius: "9999px", border: "1px solid #E5E5E5", verticalAlign: "middle", fontSize: "14px", fontWeight: 700 }}><IconGridDark />{items.length}</span> 를 눌러 상품 목록을 열고, 그 상품의 「상품 선택」으로 옵션을 골라 담아요</>],
-              ["3", <>담으면 아래에 생기는 「주문서」를 눌러 주문하면 끝</>],
+              ["3", <>담으면 오른쪽 아래 장바구니(숫자)가 생겨요. 눌러서 주문서를 내면 끝</>],
             ] as [string, ReactNode][]).map(([n, t]) => (
               <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
                 <span aria-hidden="true" style={{ width: "28px", height: "28px", flexShrink: 0, borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{n}</span>
