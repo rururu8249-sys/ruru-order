@@ -185,18 +185,9 @@ export default function LiveWatchView(props: Props) {
   const onGuideOpenChange = props.onGuideOpenChange;
   useEffect(() => { onGuideOpenChange?.(guideOpen); }, [guideOpen, onGuideOpenChange]);
   // 방송 화면이 떠 있는 동안 뒤 쇼핑몰 화면이 밀려 올라오지 않게(폰에서 꾹 눌러 올리면 아래 메뉴가 튀어나오던 것)
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const prev = [html.style.overflow, body.style.overflow, html.style.overscrollBehavior, body.style.overscrollBehavior];
-    html.style.overflow = "hidden"; body.style.overflow = "hidden";
-    html.style.overscrollBehavior = "none"; body.style.overscrollBehavior = "none";
-    return () => {
-      html.style.overflow = prev[0]; body.style.overflow = prev[1];
-      html.style.overscrollBehavior = prev[2]; body.style.overscrollBehavior = prev[3];
-    };
-  }, []);
-
+  //   [04:47 근본 수정] 예전엔 html·body 글자 칸(style.overflow)에 직접 hidden 을 넣고 닫을 때 «넣기 전 값»으로 되돌렸는데,
+  //   접속 차단 확인(CustomerAccessBlockGuard)도 같은 칸을 잠갔다 풀어서 순서가 엇갈리면 닫은 뒤 «hidden»이 되살아나 스크롤이 안 됐다.
+  //   이제 칸은 안 건드리고, 방송 화면 안에 넣은 <style> 한 줄로만 잠금 → 방송 화면이 사라지면 잠금도 같이 사라짐.
   // ── 사이트 채팅 ──
   const chat = props.chat ?? null;
   const [composeOpen, setComposeOpen] = useState(false);
@@ -586,6 +577,7 @@ export default function LiveWatchView(props: Props) {
       {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
       {/* 돌려보기 모드 — 안의 모든 것이 손가락을 막지 않게(유튜브 막대로 그대로) */}
       <style>{`[data-live-seek="1"], [data-live-seek="1"] * { pointer-events: none !important; }`}</style>
+      <style>{`html, body { overflow: hidden !important; overscroll-behavior: none !important; }`}</style>
       <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: seekMode ? 0.06 : 1, transition: "opacity 0.2s" }}>
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex" }}>
