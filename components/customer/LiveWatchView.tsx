@@ -301,7 +301,7 @@ export default function LiveWatchView(props: Props) {
         </div>
         {pinned ? (
           <div style={{ pointerEvents: "auto", background: "#FFFFFF", color: "#111111", borderRadius: "12px", padding: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <button type="button" onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} aria-label={`${pinned.name} ${pinned.brand ? "상품 선택" : "담기"}`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", cursor: "pointer", overflow: "hidden" }}>
+            <button type="button" onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} aria-label={`${pinned.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", cursor: "pointer", overflow: "hidden" }}>
               {pinned.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={pinned.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -313,7 +313,7 @@ export default function LiveWatchView(props: Props) {
               <span style={{ fontSize: "15px", fontWeight: 700 }}>{pinned.priceText}</span>
             </div>
             <button type="button" disabled={pinned.soldOut} onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} style={{ flexShrink: 0, height: "44px", padding: "0 16px", border: "none", borderRadius: "9999px", background: pinned.soldOut ? "#E5E5E5" : "#111111", color: pinned.soldOut ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: pinned.soldOut ? "default" : "pointer" }}>
-              {pinned.soldOut ? "품절" : pinned.brand ? "상품 선택" : "담기"}
+              {pinned.soldOut ? "품절" : "상품 선택"}
             </button>
           </div>
         ) : null}
@@ -422,7 +422,7 @@ export default function LiveWatchView(props: Props) {
                 <div style={{ padding: "32px 0", textAlign: "center", fontSize: "15px", color: "#707072" }}>{query ? "찾는 상품이 없어요" : "방송 상품이 아직 없어요"}</div>
               ) : listItems.map((it) => { const no = items.findIndex((x) => x.id === it.id) + 1; return (
                 <div key={it.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "1px solid #E5E5E5" }}>
-                  <button type="button" onClick={() => { if (!it.soldOut) { setListOpen(false); props.onOpenProduct(it.id); } }} aria-label={`${no}번 ${it.name} ${it.brand ? "상품 선택" : "담기"}`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>
+                  <button type="button" onClick={() => { if (!it.soldOut) { setListOpen(false); props.onOpenProduct(it.id); } }} aria-label={`${no}번 ${it.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>
                     <span aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, zIndex: 1, minWidth: "22px", height: "20px", padding: "0 5px", boxSizing: "border-box", background: "rgba(0,0,0,0.7)", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{no}</span>
                     {it.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -435,7 +435,7 @@ export default function LiveWatchView(props: Props) {
                     <span style={{ fontSize: "15px", fontWeight: 700 }}>{it.priceText}</span>
                   </div>
                   <button type="button" disabled={it.soldOut} onClick={() => { setListOpen(false); props.onOpenProduct(it.id); }} style={{ flexShrink: 0, height: "40px", minWidth: "64px", padding: "0 14px", border: "none", borderRadius: "9999px", background: it.soldOut ? "#E5E5E5" : "#111111", color: it.soldOut ? "#707072" : "#FFFFFF", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: it.soldOut ? "default" : "pointer" }}>
-                    {it.soldOut ? "품절" : it.brand ? "상품 선택" : "담기"}
+                    {it.soldOut ? "품절" : "상품 선택"}
                   </button>
                 </div>
               ); })}
