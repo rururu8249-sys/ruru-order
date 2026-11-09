@@ -13,7 +13,7 @@ const LABEL: Record<LiveChatPenalty, string> = {
   ban: "지우고 사이트 접속을 차단했어요",
 };
 
-/** 이 카카오 계정이 채팅 관리자인지 — 관리자 시험 계정 표(켜진 것) 또는 「방송 보며 주문」 허용 번호 */
+/** 이 카카오 계정이 채팅 관리자인지 — 관리자 시험 계정 표(켜진 것) 또는 설정 mods 번호(보기만 허용된 phones 와 따로) */
 export async function isChatModeratorKakao(sb: SupabaseClient, kakaoId: string): Promise<boolean> {
   if (!kakaoId) return false;
   const { data: cust } = await sb.from("customers").select("customer_phone").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -22,7 +22,7 @@ export async function isChatModeratorKakao(sb: SupabaseClient, kakaoId: string):
   const { data: ops } = await sb.from("operator_test_accounts").select("customer_phone, is_active").eq("is_active", true);
   if ((ops ?? []).some((o) => String((o as { customer_phone?: string }).customer_phone ?? "").replace(/[^0-9]/g, "") === phone)) return true;
   const { data: st } = await sb.from("settings").select("value").eq("key", LIVE_WATCH_KEY).maybeSingle();
-  return parseLiveWatchSetting((st as { value?: unknown } | null)?.value).phones.includes(phone);
+  return parseLiveWatchSetting((st as { value?: unknown } | null)?.value).mods.includes(phone);
 }
 
 /** 글 지우기(+ 그 손님 잠깐 금지/차단). 결과 문구를 돌려준다. */

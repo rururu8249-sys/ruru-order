@@ -8092,7 +8092,7 @@ export default function OrderPage() {
                 messages: liveChatMessages,
                 notice: liveChatNotice,
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
-                canModerate: operatorTestAccount !== null || liveWatchSetting.phones.includes(normalizePhone(customerPhone)),
+                canModerate: operatorTestAccount !== null || liveWatchSetting.mods.includes(normalizePhone(customerPhone)),
                 onSend: async (body) => {
                   // 누르자마자 화면에 먼저 띄움(임시 번호) — 서버 답이 오면 진짜 글로 바꿈, 실패하면 뺌
                   const tempId = 9_000_000_000_000 + Date.now();
