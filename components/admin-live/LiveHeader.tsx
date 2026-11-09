@@ -196,6 +196,8 @@ export default function LiveHeader({
   // 방송알림: 대상(신청자/전체) 선택 + 이미 받은 사람 제외(증분) + 미리보기
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMode, setAlertMode] = useState<"priority" | "optin" | "all">("priority");
+  // [2026-11-09] 같은 방송을 쉬었다 다시 시작할 때 «오늘 다시 알림» — 이 방송 알림을 이미 받은 사람에게도 한 번 더(오늘 한 번까지)
+  const [alertAgain, setAlertAgain] = useState(false);
   const [alertLimit, setAlertLimit] = useState("300");
   const [alertOrderDays, setAlertOrderDays] = useState("90");
   const [alertRecentDays, setAlertRecentDays] = useState("30");
@@ -264,7 +266,7 @@ export default function LiveHeader({
       const r = await fetch("/api/admin-live/live-alert-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcastId: activeBroadcast.id, dryRun: true, mode, limit: Number(alertLimit), orderDays: Number(alertOrderDays), recentDays: Number(alertRecentDays), includeIds:edits?.includeIds ?? alertIncluded,excludeIds:edits?.excludeIds ?? alertExcluded,selectionToken:edits?.selectionToken }),
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, again: alertAgain, dryRun: true, mode, limit: Number(alertLimit), orderDays: Number(alertOrderDays), recentDays: Number(alertRecentDays), includeIds:edits?.includeIds ?? alertIncluded,excludeIds:edits?.excludeIds ?? alertExcluded,selectionToken:edits?.selectionToken }),
       }).then((res) => res.json()).catch(() => null);
       if (requestId !== alertRequest.current) return;
       if (!r?.ok) { setAlertResult("대상 조회 실패: " + (r?.error || "권한/네트워크 확인")); return; }
@@ -300,6 +302,13 @@ export default function LiveHeader({
     }, 300);
   };
   // 계속 제외를 바꾸면 명단을 다시 받는다(단골 모드는 뽑은 명단 유지, 나머지는 새로 계산)
+  // 「오늘 다시 알림」을 켜고 끄면 명단을 새로 받는다(바뀐 값으로 계산되게 렌더 뒤에)
+  const againMounted = useRef(false);
+  useEffect(() => {
+    if (!againMounted.current) { againMounted.current = true; return; }
+    if (alertOpen) void loadAlertPreview(alertMode, { includeIds: [], excludeIds: [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alertAgain]);
   const refreshAfterBlock = () => {
     if (alertMode === "priority") {
       if (alertPreview?.selectionToken) void loadAlertPreview("priority", { includeIds: alertIncluded, excludeIds: alertExcluded, selectionToken: alertPreview.selectionToken });
@@ -386,7 +395,7 @@ export default function LiveHeader({
       const r = await fetch("/api/admin-live/live-alert-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode, selectionToken, templateId: alertTemplateId || undefined }),
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, again: alertAgain, mode: alertMode, selectionToken, templateId: alertTemplateId || undefined }),
       }).then((res) => res.json()).catch(() => null);
       // [2026-11-08] 실패하면 이유를 그대로(잔액 부족 등) — 서버가 실패한 사람을 「이미 받음」에서 빼 두니 다시 뽑기 → 발송으로 재시도
       setAlertResult(r?.ok ? `발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)${r?.error ? ` · ${r.error}` : ""}` : "발송 실패: " + (r?.error || "알 수 없는 오류"));
@@ -607,6 +616,10 @@ export default function LiveHeader({
                 </div>
               )}
 
+              <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line px-3 text-[13px] text-ink">
+                <input type="checkbox" checked={alertAgain} disabled={alertSending} onChange={(e) => { setAlertAgain(e.target.checked); alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); setAlertIncluded([]); setAlertExcluded([]); }} className="h-4 w-4 accent-black" />
+                <span><b className="font-semibold">오늘 다시 알림</b> · 이 방송 알림을 이미 받은 사람에게도 한 번 더 보내요(쉬었다 다시 시작할 때, 오늘 한 번까지)</span>
+              </label>
               {/* 받을 사람 수 */}
               <div className="mt-4 rounded-xl bg-surface-2 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">

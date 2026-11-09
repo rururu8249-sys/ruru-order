@@ -47,11 +47,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({} as any));
-    const broadcastId = String(body?.broadcastId ?? "").trim();
+    const baseBroadcastId = String(body?.broadcastId ?? "").trim();
+    // [2026-11-09 사장님 「오전에 켰다 쉬고 저녁에 다시 시작 — 알림 재전송이 안 된다」] 같은 방송이라도 «오늘 다시 알림»(again)이면
+    //   받은 사람 기록을 «방송id#again-날짜» 따로 둬서 오늘 한 번 더 보낼 수 있게. 같은 날 다시 알림도 두 번째부턴 이미 받은 사람 제외(중복 방지 그대로).
+    const againDay = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const broadcastId = baseBroadcastId && body?.again === true ? `${baseBroadcastId}#again-${againDay}` : baseBroadcastId;
     const dryRun = body?.dryRun === true;
     const mode: SendMode = body?.mode === "priority" ? "priority" : body?.mode === "all" ? "all" : "optin";
     const actor = String((session as any)?.sub ?? (session as any)?.name ?? "admin");
-    if (!broadcastId) return NextResponse.json({ok:false,error:"현재 방송을 선택해 주세요."},{status:400});
+    if (!baseBroadcastId) return NextResponse.json({ok:false,error:"현재 방송을 선택해 주세요."},{status:400});
 
     const supabase = getSupabaseAdmin();
     // [2026-11-02] 발송 창에서 고른 템플릿 — 저장된 목록(+ Vercel 기존 템플릿)에 있는 것만. 안 고르면 기본값.
@@ -60,7 +64,7 @@ export async function POST(request: NextRequest) {
     try{const {data:tplRows}=await supabase.from("settings").select("value").eq("key",LIVE_ALERT_TEMPLATES_KEY).limit(1);tplRaw=Array.isArray(tplRows)&&tplRows[0]?tplRows[0].value:null;}catch{tplRaw=null;}
     const templateId=resolveLiveAlertTemplateId(parseLiveAlertTemplates(tplRaw),envTemplateId,body?.templateId);
     if(!templateId)return NextResponse.json({ok:false,error:"알림톡 템플릿을 확인할 수 없어요. 설정 › 카톡 알림 › 방송 알림 템플릿을 확인해 주세요. 발송하지 않았습니다."},{status:400});
-    const {data:broadcast,error:broadcastError}=await supabase.from("broadcasts").select("id,status").eq("id",broadcastId).maybeSingle();
+    const {data:broadcast,error:broadcastError}=await supabase.from("broadcasts").select("id,status").eq("id",baseBroadcastId).maybeSingle();
     if(broadcastError||!broadcast||String(broadcast.status).toUpperCase()!=="ON")return NextResponse.json({ok:false,error:"진행 중인 방송을 확인할 수 없습니다. 발송하지 않았습니다."},{status:409});
 
     // 이 방송에서 이미 받은 사람(성공 기록) — 증분 발송을 위해 제외 목록으로 사용
@@ -305,14 +309,14 @@ export async function POST(request: NextRequest) {
     // 발송 요약 로그(기존 유지)
     const sentBy = String((session as any)?.name ?? (session as any)?.sub ?? (session as any)?.id ?? "admin");
     await supabase.from("live_alert_logs").insert({
-      broadcast_id: broadcastId || null,
+      broadcast_id: baseBroadcastId || null,
       template_code: templateId,
       target_count: targetCount,
       success_count: successCount,
       fail_count: failCount,
       status,
       sent_by: sentBy,
-      memo: memo || `mode=${mode}`,
+      memo: (memo || `mode=${mode}`) + (broadcastId !== baseBroadcastId ? ` again=${againDay}` : ""),
       raw_result: rawResults,
     });
 
