@@ -496,3 +496,8 @@ body {
     box-shadow: none;
   }
 }
+
+/* [2026-11-09] 방송 보며 주문 — 「OO님이 주문했어요」 알림이 살짝 올라오며 나타남(동작 줄이기 설정이면 없음) */
+@keyframes ruruLiveWatchToastIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.ruru-live-watch-toast { animation: ruruLiveWatchToastIn 0.25s ease-out; }
+@media (prefers-reduced-motion: reduce) { .ruru-live-watch-toast { animation: none; } }

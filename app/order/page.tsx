@@ -45,6 +45,9 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText } from "@/lib/livePausedText";
+import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
+import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@/components/customer/LiveWatchView";
+import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
@@ -1439,6 +1442,10 @@ export default function OrderPage() {
   // [2026-08-21] 방송정보 조회가 끝났는지. false(로딩중)를 "방송 꺼짐"으로 오판해
   //   "지금은 방송 전이에요" 배너가 먼저 떴다가 라이브 배너로 바뀌던 깜빡임 방지. 표시 전용.
   const [broadcastLoaded, setBroadcastLoaded] = useState(false);
+  // [2026-11-09] 「방송 보며 주문」 — 설정·손님이 고른 화면(null = 아직 안 정함)·「OO님이 주문했어요」 알림
+  const [liveWatchSetting, setLiveWatchSetting] = useState<LiveWatchSetting>(LIVE_WATCH_DEFAULT);
+  const [liveViewOn, setLiveViewOn] = useState<boolean | null>(null);
+  const [liveOrderToasts, setLiveOrderToasts] = useState<LiveWatchOrderToast[]>([]);
   const [productListState, setProductListState] = useState<"loading" | "ready" | "error">("loading");
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
   const [groupBuyQuickProductsFromCatalog, setGroupBuyQuickProductsFromCatalog] = useState<BroadcastProduct[]>([]);
@@ -2958,6 +2965,13 @@ export default function OrderPage() {
       .eq("key", LIVE_PAUSED_TEXT_KEY)
       .maybeSingle();
 
+    // [2026-11-09] 「방송 보며 주문」 설정(누구에게·처음 화면) — 없거나 실패하면 꺼짐
+    const liveWatchRequest = supabase
+      .from("settings")
+      .select("value")
+      .eq("key", LIVE_WATCH_KEY)
+      .maybeSingle();
+
     const broadcastRequest = supabase
       .from("broadcasts")
       .select("*")
@@ -2965,7 +2979,8 @@ export default function OrderPage() {
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const [{ data: shopSetting }, { data: nextLiveSetting }, { data: pausedTextSetting }, { data, error }] = await Promise.all([shopRequest, nextLiveRequest, pausedTextRequest, broadcastRequest]);
+    const [{ data: shopSetting }, { data: nextLiveSetting }, { data: pausedTextSetting }, { data: liveWatchSettingRow }, { data, error }] = await Promise.all([shopRequest, nextLiveRequest, pausedTextRequest, liveWatchRequest, broadcastRequest]);
+    setLiveWatchSetting(parseLiveWatchSetting(liveWatchSettingRow?.value));
     setShopOpen(String(shopSetting?.value ?? "").trim().toLowerCase() !== "false");
     setNextLiveText(String(nextLiveSetting?.value ?? "").trim());
     setLivePausedText(resolveLivePausedText(pausedTextSetting?.value));
@@ -6411,6 +6426,131 @@ export default function OrderPage() {
   // P3. 방송 영상 — 방송 ON + 유튜브 URL 있을 때만 (isBroadcastOn 은 위쪽 broadcast 선언부로 이동)
   const broadcastYoutubeUrl = String(broadcast?.youtube_live_url || broadcast?.youtube_url || "").trim();
 
+  // ── [2026-11-09] 「방송 보며 주문」 ②단계 ─────────────────────────────────────────
+  //   방송 영상 위에서 고르고 담는 화면. 담기·옵션 창·주문서는 아래 기존 함수를 그대로 부른다(돈·주문 로직 무접촉).
+  //   관리자 설정(live_watch_v1): 꺼짐 / 관리자 시험 계정만 / 모든 손님, 처음 화면(방송/쇼핑몰).
+  const liveWatchVideoId = youtubeVideoIdFromUrl(broadcastYoutubeUrl);
+  const liveWatchUsable = canUseLiveWatch({
+    setting: liveWatchSetting,
+    broadcastOn: isBroadcastOn,
+    videoId: liveWatchVideoId,
+    isAdminViewer: operatorTestAccount !== null,
+  });
+  const liveWatchShown = liveWatchUsable && liveViewOn === true;
+  // 방송이 바뀌면 손님이 고른 화면도 새로 정한다
+  useEffect(() => { setLiveViewOn(null); }, [broadcast?.id]);
+  useEffect(() => {
+    if (!liveWatchUsable || liveViewOn !== null) return;
+    let remembered: string | null = null;
+    try { remembered = window.sessionStorage.getItem(liveWatchViewKey(broadcast?.id)); } catch { remembered = null; }
+    setLiveViewOn(initialLiveView(liveWatchSetting, remembered));
+  }, [liveWatchUsable, liveViewOn, liveWatchSetting, broadcast?.id]);
+  const chooseLiveView = (on: boolean) => {
+    setLiveViewOn(on);
+    try { window.sessionStorage.setItem(liveWatchViewKey(broadcast?.id), on ? "live" : "shop"); } catch { /* 기억 못 해도 화면은 바뀜 */ }
+    if (!on) window.scrollTo({ top: 0 });
+  };
+  // 방송 화면이 떠 있을 때만: 관리자가 「소개」를 바꾸면 곧바로(소식 받기 — DB 다시 읽기는 방송 한 줄만, 3초에 한 번까지),
+  //   다른 손님 주문은 「OO님이 주문했어요」(소식에 든 닉네임만 — DB 안 읽음). 시험 주문은 안 띄움.
+  useEffect(() => {
+    if (!liveWatchShown) return;
+    const bid = broadcast?.id;
+    if (!bid) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastAt = 0;
+    const seenGroups = new Set<string>();
+    const refetchBroadcast = () => {
+      if (timer) return;
+      const wait = Math.max(800, 3000 - (Date.now() - lastAt));
+      timer = setTimeout(() => {
+        timer = null;
+        lastAt = Date.now();
+        void (async () => {
+          const { data: fresh } = await supabase.from("broadcasts").select("*").eq("id", bid).maybeSingle();
+          if (!fresh) return;
+          setBroadcast((prev: any) => (prev && String(prev.id) === String(fresh.id) ? { ...prev, ...fresh } : prev));
+        })();
+      }, wait);
+    };
+    const off = subscribeLiveEvents(supabase, {
+      onCatalog: (e) => { if (e.table === "broadcasts") refetchBroadcast(); },
+      onOrder: (e) => {
+        if (e.type !== "INSERT") return;
+        const n = e.new as Record<string, unknown>;
+        if (n.is_test_order === true || n.is_deleted === true) return;
+        if (n.broadcast_id != null && String(n.broadcast_id) !== String(bid)) return;
+        const nick = String(n.youtube_nickname ?? "").trim();
+        if (!nick) return;
+        const key = String(n.order_group_id ?? n.id ?? "");
+        if (key && seenGroups.has(key)) return;
+        if (key) seenGroups.add(key);
+        const shown = nick.length > 8 ? `${nick.slice(0, 7)}…` : nick;
+        const toast = { key: `${key}-${Date.now()}`, nickname: shown };
+        setLiveOrderToasts((prev) => [...prev.slice(-4), toast]);
+        window.setTimeout(() => setLiveOrderToasts((prev) => prev.filter((t) => t.key !== toast.key)), 4000);
+      },
+    });
+    return () => { if (timer) clearTimeout(timer); off(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveWatchShown, broadcast?.id]);
+  // 방송 화면 상품 목록 — 지금 손님 화면에 보이는 방송 상품과 같은 목록(같은 순서)
+  const liveWatchItems: LiveWatchItem[] = useMemo(() => {
+    if (!liveWatchUsable) return [];
+    return quickGroupBuyProducts.map((product) => {
+      const brand = readBrandGroupOrderProduct(product);
+      const price = Number(product.price || 0);
+      return {
+        id: String(product.id ?? ""),
+        name: String(product.product_name || "상품"),
+        imageUrl: pickOrderProductImageUrl(product),
+        priceText: brand ? `최저가 ${won(price)}부터` : won(price),
+        soldOut: isSoldOutOrderProduct(product),
+        pinned: Boolean(livePinnedProductId) && String(product.id ?? "") === livePinnedProductId,
+      };
+    }).filter((it) => it.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveWatchUsable, quickGroupBuyProducts, livePinnedProductId]);
+  // 「지금 소개 중」 카드 — 유튜브 영상이 실제보다 몇 초 늦어서, 관리자가 바꾼 뒤 1.5초 늦게 바꾼다
+  const livePinDetailName = isBroadcastOn ? String((broadcast as any)?.widget_pin_detail_name ?? "").trim() : "";
+  const livePinKeyNow = livePinnedProductId ? `${livePinnedProductId}|${livePinDetailName}` : "";
+  const [livePinKeyShown, setLivePinKeyShown] = useState("");
+  useEffect(() => {
+    if (livePinKeyNow === livePinKeyShown) return;
+    const t = window.setTimeout(() => setLivePinKeyShown(livePinKeyNow), livePinKeyShown ? 1500 : 0);
+    return () => window.clearTimeout(t);
+  }, [livePinKeyNow, livePinKeyShown]);
+  const liveWatchPinned: LiveWatchPinned | null = (() => {
+    if (!liveWatchUsable || !livePinKeyShown) return null;
+    const [pid, detail = ""] = livePinKeyShown.split("|");
+    const product = quickGroupBuyProducts.find((p) => String(p.id ?? "") === pid);
+    if (!product) return null;
+    let shownProduct: BroadcastProduct = product;
+    if (detail && readBrandGroupOrderProduct(product)) {
+      try { shownProduct = resolveBrandOrderSelection(product as unknown as Record<string, unknown>, detail) as unknown as BroadcastProduct; } catch { shownProduct = product; }
+    }
+    return {
+      productId: pid,
+      detailName: detail,
+      name: String((detail || shownProduct.product_name || product.product_name || "상품")),
+      imageUrl: pickOrderProductImageUrl(shownProduct) || pickOrderProductImageUrl(product),
+      priceText: won(Number(shownProduct.price || product.price || 0)),
+      soldOut: isSoldOutOrderProduct(product),
+    };
+  })();
+  const liveWatchCartCount = items.filter((it) => it.product_name.trim()).length;
+  const liveWatchCartTotal = items.reduce((sum, it) => {
+    const qty = Math.max(0, Math.floor(Number(String(it.qty || "").replace(/[^0-9]/g, "")) || 0));
+    const price = Math.max(0, Math.floor(Number(String(it.product_price || "").replace(/[^0-9]/g, "")) || 0));
+    return sum + qty * price;
+  }, 0);
+  const openLiveWatchProduct = (productId: string, detailName?: string) => {
+    const product = quickGroupBuyProducts.find((p) => String(p.id ?? "") === productId);
+    if (!product) return;
+    if (detailName && readBrandGroupOrderProduct(product)) openRegisteredOptionSelectSheet(product as BroadcastProduct, detailName);
+    else selectQuickGroupBuyProduct(product as BroadcastProduct);
+  };
+  // ───────────────────────────────────────────────────────────────────────────
+
   const directInputItem = items[directInputTargetIndex] || null;
   const registeredOptionResolvedProduct = (() => {
     if (!registeredOptionSelectProduct) return null;
@@ -7123,6 +7263,13 @@ export default function OrderPage() {
                 <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, lineHeight: 1.5, opacity: 0.9, marginTop: "-4px", marginBottom: "10px", wordBreak: "keep-all" as const } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.9, marginTop: "-4px", marginBottom: "10px" }}>
                   아래 방송 상품은 <b>지금도 주문</b>하실 수 있어요
                 </div>
+              ) : null}
+              {/* [2026-11-09] 「방송 보며 주문」 — 쇼핑몰 화면에서 방송 화면으로 돌아가기(설정이 켜졌고 영상 주소가 있을 때만) */}
+              {liveWatchUsable && !liveWatchShown ? (
+                <button type="button" onClick={() => chooseLiveView(true)} style={{ width: "100%", height: "48px", marginBottom: "8px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.8"><rect x="2" y="5" width="20" height="14" rx="3" /><path d="M10 9l5 3-5 3z" /></svg>
+                  방송 보면서 주문하기
+                </button>
               ) : null}
               <div style={{ display: "flex", gap: "8px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1, height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
@@ -7892,6 +8039,24 @@ export default function OrderPage() {
               </section>
             );
           })()}
+
+          {/* [2026-11-09] 「방송 보며 주문」 화면 — 옵션 창·주문서 창(z 100)은 이 위로 올라온다 */}
+          {liveWatchShown ? (
+            <LiveWatchView
+              videoId={liveWatchVideoId}
+              title={String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
+              paused={isBroadcastPaused}
+              pausedText={livePausedText}
+              pinned={liveWatchPinned}
+              items={liveWatchItems}
+              cartCount={liveWatchCartCount}
+              cartTotalText={won(liveWatchCartTotal)}
+              orderToasts={liveOrderToasts}
+              onOpenProduct={openLiveWatchProduct}
+              onOpenCart={() => setOrderSheetOpen(true)}
+              onSwitchToShop={() => chooseLiveView(false)}
+            />
+          ) : null}
 
           {orderSheetOpen && (
           <CustomerBottomSheet

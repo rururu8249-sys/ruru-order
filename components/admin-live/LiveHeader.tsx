@@ -10,6 +10,7 @@ import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 import { feedPinLayout, FEED_PIN_SIZE } from "@/lib/feedText";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX } from "@/lib/livePausedText";
+import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, type LiveWatchSetting } from "@/lib/liveWatch";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 type AlertMember = { id: string; cid?: string; name: string; phone: string; orderDays?: number; recent?: boolean; manual?: boolean };
@@ -103,6 +104,34 @@ export default function LiveHeader({
     });
     return () => { alive = false; };
   }, []);
+  // [2026-11-09] 「방송 보며 주문」 — 손님 주문서에서 방송 영상을 보며 담기. 누구에게(끔/관리자 시험 계정만/모든 손님)·처음 화면.
+  //   settings 한 키(live_watch_v1). 손님 화면 loadBroadcast 가 읽는다(표시만 — 담기·주문은 기존 그대로).
+  const [liveWatch, setLiveWatch] = useState<LiveWatchSetting>(LIVE_WATCH_DEFAULT);
+  const [liveWatchSaving, setLiveWatchSaving] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    supabase.from("settings").select("value").eq("key", LIVE_WATCH_KEY).maybeSingle().then(({ data }) => {
+      if (alive) setLiveWatch(parseLiveWatchSetting(data?.value));
+    });
+    return () => { alive = false; };
+  }, []);
+  const saveLiveWatch = async (next: LiveWatchSetting) => {
+    if (liveWatchSaving) return;
+    const prev = liveWatch;
+    setLiveWatch(next);
+    setLiveWatchSaving(true);
+    try {
+      const { error } = await supabase.from("settings").upsert([{ key: LIVE_WATCH_KEY, value: serializeLiveWatchSetting(next) }], { onConflict: "key" });
+      if (error) throw error;
+      showAdminToast(next.audience === "off" ? "「방송 보며 주문」을 껐어요." : next.audience === "admin" ? "관리자 시험 계정에만 보여요. 손님 화면을 새로고침하면 나와요." : "모든 손님에게 켰어요. 새로 들어오는 손님부터 보여요.", "success");
+    } catch {
+      setLiveWatch(prev);
+      showAdminToast("설정 저장에 실패했어요.", "error");
+    } finally {
+      setLiveWatchSaving(false);
+    }
+  };
+
   const savePausedText = async () => {
     if (pausedSaving) return;
     setPausedSaving(true);
@@ -517,6 +546,26 @@ export default function LiveHeader({
             <button type="button" disabled={pinSaving || !activeBroadcast} onClick={() => void savePinText()} className={primaryCls}>{pinSaving ? "저장 중…" : "저장"}</button>
           </div>
         </div>
+      </div>
+
+      {/* [2026-11-09] 「방송 보며 주문」 — 손님 주문서에서 유튜브 방송을 보면서 담기(라이브 URL 이 있을 때만 나옴) */}
+      <div>
+        <div className="mb-1 text-[13px] font-bold text-ink">방송 보며 주문 <span className="font-normal text-ink-mute">· 손님 주문서에서 방송 영상을 보며 바로 담기</span></div>
+        <div className="flex flex-wrap items-center gap-2">
+          {([["off", "끔"], ["admin", "관리자 시험 계정만"], ["all", "모든 손님"]] as const).map(([v, label]) => (
+            <button key={v} type="button" disabled={liveWatchSaving} aria-pressed={liveWatch.audience === v} onClick={() => void saveLiveWatch({ ...liveWatch, audience: v })}
+              className={liveWatch.audience === v ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>{label}</button>
+          ))}
+        </div>
+        {liveWatch.audience !== "off" ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-[13px] text-ink-soft">처음 화면</span>
+            {([["live", "방송 화면"], ["shop", "쇼핑몰 화면"]] as const).map(([v, label]) => (
+              <button key={v} type="button" disabled={liveWatchSaving} aria-pressed={liveWatch.firstView === v} onClick={() => void saveLiveWatch({ ...liveWatch, firstView: v })}
+                className={liveWatch.firstView === v ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>{label}</button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* [2026-11-09] 손님 화면 「잠시 쉬는 중」 문구 — 사이드바 「잠시 멈춤」 누르면 방송 상자에 나오는 글. 상시 설정(방송 끝나도 유지) */}
