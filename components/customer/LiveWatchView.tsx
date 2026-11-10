@@ -21,6 +21,7 @@ import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessag
 import { EMOJI_MAX_PER_MSG, countEmojiTokens, encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
 import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { useIsDesktop } from "@/lib/useIsDesktop";
+import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 
 export type LiveWatchPinned = {
@@ -506,44 +507,14 @@ export default function LiveWatchView(props: Props) {
   const [pinOpen, setPinOpen] = useState(false);
   const pinTextRef = useRef<HTMLSpanElement | null>(null);
   const [banConfirm, setBanConfirm] = useState(false);
-  const chatBoxRef = useRef<HTMLDivElement | null>(null);
   const pressTimer = useRef<number | null>(null);
-  const chatCount = chat?.messages.length ?? 0;
-  const hasChat = chatCount > 0;
+  const hasChat = (chat?.messages.length ?? 0) > 0;
   const chatColorMap = useMemo(() => chatColors(chat?.messages ?? []), [chat?.messages]);
-  // 지난 글을 올려 보는 중이면 새 글이 와도 끌어내리지 않는다 — 대신 「새 글 보기」
-  const [chatAtBottom, setChatAtBottom] = useState(true);
-  const chatAtBottomRef = useRef(true);
-  const onChatScroll = () => {
-    const el = chatBoxRef.current;
-    if (!el) return;
-    const at = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-    chatAtBottomRef.current = at;
-    setChatAtBottom(at);
-  };
-  const chatToBottom = () => {
-    const el = chatBoxRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-    chatAtBottomRef.current = true;
-    setChatAtBottom(true);
-  };
-  useEffect(() => {
-    const el = chatBoxRef.current;
-    if (el && chatAtBottomRef.current) el.scrollTop = el.scrollHeight;
-  }, [chatCount]);
-  // [13:28 사장님 캡처 「들어가자마자 채팅이 살짝 위에 멈춰 동실장 이모티콘·글씨가 밑에 잘림」]
-  //   원인: 처음 맨 아래로 내린 «뒤에» 이모티콘·프로필 사진이 늦게 불러와져 글 높이가 커짐 → 맨 아래가 아니게 됨.
-  //   맨 아래를 보던 중이면 사진이 다 뜰 때·채팅 칸 크기가 바뀔 때마다 다시 맨 아래로(지난 글 올려 보는 중엔 안 건드림).
-  useEffect(() => {
-    const el = chatBoxRef.current;
-    if (!el) return;
-    const stick = () => { if (chatAtBottomRef.current) el.scrollTop = el.scrollHeight; };
-    el.addEventListener("load", stick, true); // 안쪽 그림(img)이 뜰 때마다(load 는 거품이 안 올라와 capture 로 받음)
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(stick) : null;
-    ro?.observe(el);
-    const timers = [100, 400, 1000, 2500].map((ms) => window.setTimeout(stick, ms));
-    return () => { el.removeEventListener("load", stick, true); ro?.disconnect(); timers.forEach((t) => window.clearTimeout(t)); };
-  }, [hasChat]);
+  // 80개 상한에서도 내용 변경·그림 로드·화면 크기를 추적. 사용자가 지난 글을 읽을 때만 멈춘다.
+  const { boxRef: chatBoxRef, contentRef: chatContentRef, atBottom: chatAtBottom, followLatest: chatToBottom } = useChatAutoScroll(
+    chat?.messages, `${isDesktop}:${focus}:${chatView.size}:${chatView.height}:${chatView.bold}`,
+    Boolean(chat && (hasChat || isDesktop)),
+  );
   useEffect(() => {
     if (!chatHint) return;
     const t = window.setTimeout(() => setChatHint(""), 3000);
@@ -1133,7 +1104,7 @@ export default function LiveWatchView(props: Props) {
             role="log"
             aria-label="채팅"
             aria-live="polite"
-            onScroll={onChatScroll}
+            tabIndex={0}
             // [09:39 사장님 「빈 곳 톡 잘 안 먹힘」] 글 줄이 화면 폭 끝까지라 «빈 곳»이 줄 사이 8px 뿐이었음 →
             //   채팅 칸 어디든(글 줄 포함) 짧게 «톡» 누르면 재생 막대. 끌기(8px↑)·길게 누르기(0.45초↑, 관리 창)·「담기 ›」 줄은 제외.
             onPointerDown={(e) => { chatTapRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
@@ -1146,6 +1117,7 @@ export default function LiveWatchView(props: Props) {
             }}
             style={{ pointerEvents: "auto", overscrollBehavior: "contain", maxHeight: isDesktop ? "none" : CHAT_HEIGHTS[chatView.height], height: isDesktop ? "100%" : undefined, overflowY: "auto", scrollbarWidth: isDesktop ? "thin" : "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: isDesktop ? "none" : "linear-gradient(transparent, #000 24px)", WebkitMaskImage: isDesktop ? "none" : "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
           >
+            <div ref={chatContentRef} style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0 }}>
             {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
               const localLine = !Number.isInteger(m.id);
@@ -1154,6 +1126,7 @@ export default function LiveWatchView(props: Props) {
               return (
               <div
                 key={m.id}
+                data-chat-id={m.id}
                 onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; if (canMod) startPress(m); }}
                 onPointerUp={canMod ? endPress : undefined}
                 onPointerLeave={canMod ? endPress : undefined}
@@ -1184,6 +1157,7 @@ export default function LiveWatchView(props: Props) {
                 </span>
               </div>
             ); })}
+            </div>
           </div>
           {!chatAtBottom ? (
             // 유튜브처럼 채팅 가운데 아래 흰 동그라미 화살표 — 누르면 맨 아래(새 글)로
