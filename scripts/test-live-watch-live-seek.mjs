@@ -47,3 +47,34 @@ playerInfo.current.live = false;
 jump();
 assert.equal(calls.length, 0, 'Do not jump recorded video to its end');
 console.log('PASS live seek commands, latest duration, preserved sound/player, confirmed position and invalid/VOD guards');
+
+// Reproduce the reported -0:19 case through the real telemetry listener.
+let listener;
+function findListener(node) {
+  if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'onMsg') listener = node.initializer;
+  ts.forEachChild(node, findListener);
+}
+findListener(ast);
+assert.ok(listener);
+let behind = false;
+const liveModule = createUiLoader()('lib/liveWatch.ts');
+const onMsg = vm.runInNewContext(ts.transpile(`const handle = ${listener.getText(ast)}; handle;`, {target: ts.ScriptTarget.ES2022}), {
+  playerInfo, lastTick: {current: {}}, pausedRef: {current: false},
+  ccOffAt: {current: Date.now()}, captionsOff() {},
+  LIVE_EDGE_TOLERANCE_SECONDS: liveModule.LIVE_EDGE_TOLERANCE_SECONDS,
+  setBehindLive: update => { behind = update(behind); },
+});
+function telemetry(t, d, live = true, state = 1) {
+  playerInfo.current = {t: 0, d: 0, live: false, state: -1, d0: 0, d0at: 0};
+  onMsg({origin: 'https://www.youtube.com', data: {event: 'infoDelivery', info: {
+    currentTime: t, duration: d, playerState: state, videoData: {isLive: live},
+  }}});
+  return behind;
+}
+assert.equal(telemetry(1189, 1208), true, '19 seconds behind must show the live-return button');
+assert.equal(telemetry(1189, 1204), true, '15-second boundary must show the button');
+assert.equal(telemetry(1189, 1203.9), false, 'Within live tolerance hides the button');
+assert.equal(telemetry(0, 1208), true, 'Rewinding to the very beginning must allow return');
+assert.equal(telemetry(1189, 1208, false), false, 'Recorded video must not show live return');
+assert.equal(telemetry(1189, 1208, true, 0), false, 'Ended playback must not show live return');
+console.log('PASS live-return visibility at 19s/15s/14.9s, timeline start, recorded video and ended state');

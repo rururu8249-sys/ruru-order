@@ -117,6 +117,9 @@ export function youtubeEmbedUrl(videoId: string, origin?: string, opts?: { contr
   return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${p.toString()}`;
 }
 
+/** 재생 막대의 실시간 표시와 실시간 복귀 버튼이 함께 쓰는 허용 지연(초). */
+export const LIVE_EDGE_TOLERANCE_SECONDS = 15;
+
 /** 소리 켜기 등 — 끼워 넣은 플레이어에 보내는 명령(enablejsapi=1 필요) */
 export function youtubeCommand(func: "unMute" | "mute" | "playVideo" | "pauseVideo" | "seekTo", args: unknown[] = []): string {
   return JSON.stringify({ event: "command", func, args });

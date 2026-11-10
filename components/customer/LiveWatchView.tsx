@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   LIVE_WATCH_GUIDE_SEEN_KEY,
+  LIVE_EDGE_TOLERANCE_SECONDS,
   liveWatchList,
   youtubeCommand,
   youtubeEmbedUrl,
@@ -235,7 +236,7 @@ function LiveSeekControls(props: { getPos: () => { t: number; d: number; playing
     setPos((p) => ({ ...p, playing: next }));
   };
   const behind = pos.live && hasDur ? pos.d - shownT : 0;
-  const rightText = pos.live ? (behind < 15 ? "실시간" : `-${fmtTime(behind)}`) : hasDur ? fmtTime(pos.d) : "";
+  const rightText = pos.live ? (behind < LIVE_EDGE_TOLERANCE_SECONDS ? "실시간" : `-${fmtTime(behind)}`) : hasDur ? fmtTime(pos.d) : "";
   const roundBtn = (size: number) => ({ width: `${size}px`, height: `${size}px`, borderRadius: "9999px", border: "none", background: "rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, pointerEvents: "auto" as const });
   return (
     <div
@@ -265,7 +266,7 @@ function LiveSeekControls(props: { getPos: () => { t: number; d: number; playing
         <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "12px", pointerEvents: "none" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 600, color: "#FFFFFF", textShadow: "0 1px 2px rgba(0,0,0,0.8)", fontVariantNumeric: "tabular-nums", marginBottom: "2px" }}>
             <span>{fmtTime(shownT)}</span>
-            <span style={{ color: pos.live && behind < 15 ? "#FF4E45" : "#FFFFFF" }}>{rightText}</span>
+            <span style={{ color: pos.live && behind < LIVE_EDGE_TOLERANCE_SECONDS ? "#FF4E45" : "#FFFFFF" }}>{rightText}</span>
           </div>
           <div
             ref={trackRef}
@@ -718,7 +719,7 @@ export default function LiveWatchView(props: Props) {
     sendToPlayer(JSON.stringify({ event: "command", func: "setOption", args: ["captions", "track", {}] }));
   };
   // ── 돌려보다가 「실시간으로 돌아가기」 ──
-  //   유튜브 플레이어가 보내 주는 재생 정보(infoDelivery)로 «재생 중인데 지금 방송보다 30초 넘게 뒤»일 때만 버튼을 띄운다.
+  //   유튜브 재생 정보(infoDelivery)가 재생 막대와 같은 실시간 허용 범위를 벗어나면 버튼을 띄운다.
   //   실시간 이동은 막대를 끝으로 끌 때처럼 seekTo, 영상 새로고침은 별도 버튼으로 처리한다.
   const [reloadKey, setReloadKey] = useState(0);
   // [09:08 사장님 「좌우 여백」] 화면이 9:16 보다 넓으면(카톡 브라우저 등) 세로 영상 좌우에 검은 띠 → 영상을 그만큼 키워 꽉 채움(위아래 조금 잘림, 최대 1.12배).
@@ -772,8 +773,8 @@ export default function LiveWatchView(props: Props) {
       const vd = info.videoData as { isLive?: unknown } | undefined;
       if (vd && vd.isLive === true) cur.live = true;
       if (typeof info.playerState === "number") { cur.state = info.playerState; pausedRef.current = info.playerState === 2; }
-      // 막대를 움직여 지난 장면을 볼 때만(재생 중·30초 넘게 뒤). 멈춤·오류·끝난 방송엔 안 띄움
-      const behind = cur.live && cur.state === 1 && cur.d > 0 && cur.t > 0 && cur.d - cur.t > 30;
+      // 막대가 지연 시간을 표시하는 기준과 통일(15~30초 구간에서도 복귀 가능). 멈춤·오류·끝난 방송엔 안 띄움.
+      const behind = cur.live && cur.state === 1 && cur.d > 0 && cur.t >= 0 && cur.d - cur.t >= LIVE_EDGE_TOLERANCE_SECONDS;
       setBehindLive((prev) => (prev === behind ? prev : behind));
     };
     window.addEventListener("message", onMsg);
