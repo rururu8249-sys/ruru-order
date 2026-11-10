@@ -5,6 +5,7 @@
 //   사이트 채팅 = /api/live-chat (처음 한 번) + 소식(ruru-live chat)으로 새 글. 이모티콘 그림·왕관·AI 표시 그대로.
 //   화면 꺼짐 방지(되는 브라우저만). 글자 크기 이 기기에만 기억.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { supabase } from "@/lib/supabase";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
@@ -40,9 +41,9 @@ export default function ChatViewClient() {
   // [07:18 사장님] 유튜브 시청자 수·사이트 접속 수 — 각 칸 제목 옆(30초마다)
   const [counts, setCounts] = useState<{ yt: number | null; site: number | null }>({ yt: null, site: null });
   const emojiMap = useMemo(() => emojiMapOf(emojis), [emojis]);
-  const boxRef = useRef<HTMLDivElement | null>(null);
-  const stick = useRef(true);
-  const [atBottom, setAtBottom] = useState(true);
+  const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(list, `${sizeIdx}:${show.site}:${show.yt}`, show.site);
+  const [recent, setRecent] = useState<Array<{ id: number; at: number }>>([]);
+  const seen = useRef<{ bc: string; maxId: number } | null>(null);
 
   // 글자 크기(이 기기에만)
   useEffect(() => {
@@ -54,7 +55,7 @@ export default function ChatViewClient() {
     return () => window.clearTimeout(t);
   }, []);
   const changeYtSize = (d: number) => setYtSizeIdx((v) => { const n = Math.min(YT_SCALES.length - 1, Math.max(0, v + d)); try { window.localStorage.setItem(YT_SIZE_KEY, String(n)); } catch { /* 무시 */ } return n; });
-  const setShowSaved = (next: { yt: boolean; site: boolean }) => { if (!next.yt && !next.site) return; if (next.site && !show.site) { stick.current = true; setAtBottom(true); } setShow(next); try { window.localStorage.setItem(SHOW_KEY, JSON.stringify(next)); } catch { /* 무시 */ } };
+  const setShowSaved = (next: { yt: boolean; site: boolean }) => { if (!next.yt && !next.site) return; if (next.site && !show.site) followLatest(); setShow(next); try { window.localStorage.setItem(SHOW_KEY, JSON.stringify(next)); } catch { /* 무시 */ } };
   const changeSize = (d: number) => setSizeIdx((v) => { const n = Math.min(SIZES.length - 1, Math.max(0, v + d)); try { window.localStorage.setItem(SIZE_KEY, String(n)); } catch { /* 무시 */ } return n; });
 
   // 지금 켜진 방송 — 처음 + 1분마다
@@ -82,6 +83,8 @@ export default function ChatViewClient() {
   // 사이트 채팅 — 방송이 정해지면 최근 글 + 소식
   const bcId = bc?.id ?? "";
   useEffect(() => {
+    setList([]);
+    followLatest();
     if (!bcId) return;
     let alive = true;
     const load = async () => {
@@ -120,11 +123,24 @@ export default function ChatViewClient() {
     return () => { alive = false; window.clearInterval(t); };
   }, [bcId]);
 
-  // 맨 아래 보고 있으면 새 글 따라 내려감
+  // 최근에 도착한 글 중 최대 3개만 15초 강조. 재조회·수정으로 같은 글을 다시 깜박이지 않는다.
   useEffect(() => {
-    const el = boxRef.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [list, sizeIdx, show.site, show.yt]);
+    if (!bcId || list.length === 0) { seen.current = null; setRecent([]); return; }
+    const now = Date.now();
+    const previous = seen.current?.bc === bcId ? seen.current.maxId : null;
+    const fresh = list.filter((m) => previous == null
+      ? now - Date.parse(m.createdAt) >= 0 && now - Date.parse(m.createdAt) < 15000
+      : m.id > previous);
+    seen.current = { bc: bcId, maxId: Math.max(previous ?? 0, ...list.map((m) => m.id)) };
+    setRecent((prev) => [...(previous == null ? [] : prev).filter((r) => now - r.at < 15000 && list.some((m) => m.id === r.id)),
+      ...fresh.map((m) => ({ id: m.id, at: now }))].slice(-3));
+  }, [list, bcId]);
+  useEffect(() => {
+    if (!recent.length) return;
+    const t = window.setTimeout(() => setRecent((prev) => prev.filter((r) => Date.now() - r.at < 15000)),
+      Math.max(1, Math.min(...recent.map((r) => r.at + 15000)) - Date.now()));
+    return () => window.clearTimeout(t);
+  }, [recent]);
 
   // 화면 꺼짐 방지(되는 브라우저만 — 크롬 OK)
   useEffect(() => {
@@ -165,7 +181,11 @@ export default function ChatViewClient() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: C.page, color: C.ink, display: "flex", flexDirection: "column", fontFamily: "inherit", colorScheme: "dark" }}>
-      <style>{`.ruru-chat-grid{grid-template-columns:1fr 1fr;grid-template-rows:100%}.ruru-chat-grid.one{grid-template-columns:100%;grid-template-rows:100%}@media (orientation: portrait){.ruru-chat-grid{grid-template-columns:100%;grid-template-rows:1fr 1fr}}`}</style>
+      <style>{`.ruru-chat-grid{grid-template-columns:1fr 1fr;grid-template-rows:100%}.ruru-chat-grid.one{grid-template-columns:100%;grid-template-rows:100%}@media (orientation: portrait){.ruru-chat-grid{grid-template-columns:100%;grid-template-rows:1fr 1fr}}
+.ruru-chat-row{border-radius:8px;transition:background-color .6s;box-shadow:inset 2px 0 transparent}
+.ruru-chat-new{background-color:rgba(116,192,252,.09);box-shadow:inset 2px 0 rgba(116,192,252,.42);animation:ruru-chat-arrival 1.6s ease-in-out 2}
+@keyframes ruru-chat-arrival{0%,100%{background-color:rgba(116,192,252,.09)}50%{background-color:rgba(116,192,252,.18)}}
+@media(prefers-reduced-motion:reduce){.ruru-chat-row{transition:none}.ruru-chat-new{animation:none}}`}</style>
 
       {/* 위 줄 — 채팅 켜고 끄기(하나는 늘 켜짐) */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px 0", flexWrap: "nowrap", minWidth: 0 }}>
@@ -213,18 +233,20 @@ export default function ChatViewClient() {
           role="log"
           aria-live="polite"
           aria-label="사이트 채팅"
-          onScroll={(e) => { const el = e.currentTarget; const at = el.scrollHeight - el.scrollTop - el.clientHeight < 40; stick.current = at; setAtBottom(at); }}
-          style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 12px", fontSize: `${fontPx}px`, lineHeight: 1.45 }}
+          tabIndex={0}
+          style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowAnchor: "none", padding: "8px 12px", fontSize: `${fontPx}px`, lineHeight: 1.45 }}
         >
+          <div ref={contentRef}>
           {!bc ? (
             <div style={{ padding: "24px", textAlign: "center", color: C.mute, fontSize: "18px" }}>{loaded ? "지금 켜진 방송이 없어요." : "불러오는 중…"}</div>
           ) : list.length === 0 ? (
             <div style={{ padding: "24px", textAlign: "center", color: C.mute, fontSize: "18px" }}>아직 글이 없어요. 손님이 쓰면 바로 나와요.</div>
           ) : list.map((m) => {
+            const isNew = recent.some((r) => r.id === m.id);
             const b = m.badge ? BADGE[m.badge] : null;
             const avatar = m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar;
             return (
-              <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "6px 0" }}>
+              <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "7px 8px" }}>
                 {avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatar} alt="" referrerPolicy="no-referrer" style={{ width: "1.6em", height: "1.6em", borderRadius: "9999px", objectFit: "cover", flexShrink: 0 }} />
@@ -234,14 +256,16 @@ export default function ChatViewClient() {
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink }}>
                   <span style={{ fontWeight: 700, color: C.soft, marginRight: "6px" }}>{m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
+                  {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}
                   <ChatBodyView body={m.body} emojis={emojiMap} />
                 </div>
               </div>
             );
           })}
+          </div>
         </div>
         {!atBottom ? (
-          <button type="button" onClick={() => { const el = boxRef.current; if (el) el.scrollTop = el.scrollHeight; stick.current = true; setAtBottom(true); }}
+          <button type="button" onClick={followLatest}
             style={{ position: "absolute", left: "50%", bottom: "12px", transform: "translateX(-50%)", height: "44px", padding: "0 18px", border: "none", borderRadius: "9999px", background: "#F1F1F1", color: "#0F0F0F", fontSize: "16px", fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
             새 글 보기 ↓
           </button>
