@@ -808,7 +808,9 @@ export default function LiveWatchView(props: Props) {
 
   const closeGuide = () => { writeGuideSeen(); setGuideOpen(false); };
 
-  const videoRight = isDesktop && !focus ? "400px" : 0;
+  // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
+  const desktopChatWidth = "max(400px, 35%)";
+  const videoRight = isDesktop && !focus ? desktopChatWidth : 0;
   const pinnedProductCard = (pinned ? (
           <div style={{ pointerEvents: "auto", background: "#FFFFFF", color: "#111111", borderRadius: "12px", padding: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
             <button type="button" onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} aria-label={`${pinned.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", cursor: "pointer", overflow: "hidden" }}>
@@ -1064,7 +1066,7 @@ export default function LiveWatchView(props: Props) {
       {/* 13:03 사장님 유튜브 캡처 11장 실측: 유튜브도 채팅 뒤(화면 아래 약 45%)를 위에서 아래로 점점 어둡게 깖
           (흰 털 화면 밝기 206 → 맨 아래 80 ≈ 검정 60%). 채팅 칸 위부터만, 손가락 통과, 집중모드·돌려보기엔 숨김 */}
       <div aria-hidden="true" style={{ display: isDesktop || focus || seekMode ? "none" : "block", position: "absolute", left: 0, right: 0, bottom: 0, height: `calc(${CHAT_HEIGHTS[chatView.height]} + 170px + env(safe-area-inset-bottom))`, background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 30%, rgba(0,0,0,0.45) 65%, rgba(0,0,0,0.6) 100%)", pointerEvents: "none" }} />
-      <div data-live-chat-panel="1" data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: "400px", padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : {}) }}>
+      <div data-live-chat-panel="1" data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : {}) }}>
         {isDesktop ? <div style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", fontSize: "16px", fontWeight: 600 }}>실시간 채팅</div> : null}
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex", flexShrink: 0 }}>
