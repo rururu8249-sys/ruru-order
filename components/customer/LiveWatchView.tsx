@@ -422,6 +422,7 @@ export default function LiveWatchView(props: Props) {
     caretRef.current = { start: start + token.length, end: start + token.length };
     setCaretEnd(start + token.length);
     setComposeHint("");
+    return next;
   };
   // [15:41 사장님 「카톡처럼 단어 쓰면 이모티콘」] 커서 앞 마지막 낱말 → 어울리는 이모티콘(입력칸 위 한 줄 · 이모티콘 판 맨 위)
   //   키보드는 그대로(누를 때 입력칸 포커스 안 뺏김), 누르면 «:이름:» 을 커서 자리에 넣고 보내기 누르면 글과 함께 감.
@@ -430,6 +431,15 @@ export default function LiveWatchView(props: Props) {
   const typedWord = canEmoji && (composeOpen || isDesktop) ? lastTypedWord(draft.slice(0, Math.min(caretEnd ?? draft.length, draft.length))) : "";
   const wordSuggests = typedWord ? suggestEmojis(typedWord, emojiItems) : [];
   const showSuggestRow = wordSuggests.length > 0 && !emojiOpen && typedWord !== suggestHiddenFor && draftEmojiCount < EMOJI_MAX_PER_MSG;
+  const suggestRowRef = useRef<HTMLDivElement | null>(null);
+  const [keyboardEmojiId, setKeyboardEmojiId] = useState<string | null>(null);
+  const focusSuggestion = (index: number) => {
+    const buttons = suggestRowRef.current?.querySelectorAll<HTMLButtonElement>("button");
+    if (!buttons?.length) return;
+    const button = buttons[(index + buttons.length) % buttons.length];
+    button.focus({ preventScroll: true });
+    button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
   const composingRef = useRef(false);
   const insertSuggested = (e: ChatEmoji) => {
     const el = inputRef.current;
@@ -538,9 +548,9 @@ export default function LiveWatchView(props: Props) {
     const t = window.setTimeout(() => setChatHint(""), 3000);
     return () => window.clearTimeout(t);
   }, [chatHint]);
-  const sendChat = async () => {
+  const sendChat = async (bodyOverride?: string) => {
     if (!chat || sending) return;
-    const body = draft.trim();
+    const body = (bodyOverride ?? draft).trim();
     if (!body) return;
     // 누르자마자 창 닫고 글을 바로 띄운다(부모가 먼저 화면에 넣음). 실패하면 글을 되돌려 놓고 안내.
     setSending(true);
@@ -855,17 +865,33 @@ export default function LiveWatchView(props: Props) {
             {showSuggestRow ? (
               // 쓰고 있는 낱말에 어울리는 이모티콘 — 누르면 커서 자리에 넣음(키보드 안 내려감)
               <div role="group" aria-label={`「${typedWord}」 어울리는 이모티콘`} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px", background: "#F5F5F5", borderRadius: "12px", padding: "2px 2px 2px 6px" }}>
-                <div data-live-scroll="1" style={{ flex: 1, minWidth: 0, display: "flex", gap: "2px", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "none" }}>
-                  {wordSuggests.map((e) => (
+                <div ref={suggestRowRef} data-live-scroll="1" style={{ flex: 1, minWidth: 0, display: "flex", gap: "2px", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "none" }}>
+                  {wordSuggests.map((e, index) => (
                     <button
                       key={e.id}
                       type="button"
                       onPointerDown={(ev) => ev.preventDefault()}
                       onMouseDown={(ev) => ev.preventDefault()}
                       onClick={() => insertSuggested(e)}
+                      onFocus={() => setKeyboardEmojiId(e.id)}
+                      onBlur={() => setKeyboardEmojiId(null)}
+                      onKeyDown={isDesktop ? (ev) => {
+                        if (ev.nativeEvent.isComposing || composingRef.current || ev.keyCode === 229) { if (ev.key === "Enter") ev.preventDefault(); return; }
+                        if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") { ev.preventDefault(); focusSuggestion(index + (ev.key === "ArrowLeft" ? -1 : 1)); }
+                        else if (ev.key === "Escape" || ev.key === "ArrowDown") { ev.preventDefault(); inputRef.current?.focus(); }
+                        else if (ev.key === "ArrowUp") ev.preventDefault();
+                        else if (ev.key === "Enter") {
+                          ev.preventDefault();
+                          if (sending || ev.repeat) return;
+                          const next = insertEmoji(e);
+                          inputRef.current?.focus();
+                          // setDraft 직후의 이전 글을 보내지 않도록 완성한 본문을 같은 전송 함수에 전달.
+                          if (next !== undefined) void sendChat(next);
+                        }
+                      } : undefined}
                       aria-label={`이모티콘 ${e.name} 넣기`}
-                      title={e.name}
-                      style={{ flexShrink: 0, width: "52px", height: "52px", border: "none", borderRadius: "10px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
+                      title={isDesktop ? `${e.name} · ← → 선택 · Enter 전송` : e.name}
+                      style={{ flexShrink: 0, width: "52px", height: "52px", border: "none", borderRadius: "10px", background: keyboardEmojiId === e.id ? "#E0E7FF" : "transparent", outline: keyboardEmojiId === e.id ? "2px solid #2563EB" : undefined, outlineOffset: "-2px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={e.url} alt="" draggable={false} style={{ width: "44px", height: "44px", objectFit: "contain", pointerEvents: "none" }} />
@@ -894,7 +920,9 @@ export default function LiveWatchView(props: Props) {
                   onSelect={(e) => rememberCaret(e.currentTarget)}
                   onFocus={() => setEmojiOpen(false)}
                   onKeyDown={isDesktop ? (e) => {
-                    if (e.key === "Enter" && (e.nativeEvent.isComposing || composingRef.current || e.keyCode === 229)) e.preventDefault();
+                    if (e.nativeEvent.isComposing || composingRef.current || e.keyCode === 229) { if (e.key === "Enter") e.preventDefault(); return; }
+                    if (e.key === "Enter" && e.repeat) { e.preventDefault(); return; }
+                    if (e.key === "ArrowUp" && showSuggestRow) { e.preventDefault(); rememberCaret(e.currentTarget); focusSuggestion(0); }
                     if (e.key === "Escape") { setEmojiOpen(false); inputRef.current?.focus(); }
                   } : undefined}
                   onCompositionStart={() => { composingRef.current = true; }}
