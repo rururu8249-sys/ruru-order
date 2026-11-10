@@ -106,8 +106,8 @@ const IconChat = () => (
 const IconSmile = ({ color = "#707072", size = 24 }: { color?: string; size?: number }) => (
   <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5c1 1.3 2.2 2 3.5 2s2.5-.7 3.5-2" /><circle cx="9" cy="10" r="0.6" fill={color} /><circle cx="15" cy="10" r="0.6" fill={color} /></svg>
 );
-const IconSoundOn = () => (
-  <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9a4 4 0 010 6" /><path d="M19 6a8 8 0 010 12" /></svg>
+const IconSoundOn = ({ color = "#FFFFFF" }: { color?: string }) => (
+  <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9a4 4 0 010 6" /><path d="M19 6a8 8 0 010 12" /></svg>
 );
 const MenuIcon = ({ k }: { k: string }) => {
   const p = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "#FFFFFF", strokeWidth: 1.8 } as const;
@@ -326,6 +326,7 @@ export default function LiveWatchView(props: Props) {
   const noticeBadge = props.menu?.find((m) => m.key === "notice")?.badge || 0;
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [muted, setMuted] = useState(true);
+  const [soundPromptDone, setSoundPromptDone] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
@@ -704,6 +705,24 @@ export default function LiveWatchView(props: Props) {
   //   유튜브 재생 정보(infoDelivery)가 재생 막대와 같은 실시간 허용 범위를 벗어나면 버튼을 띄운다.
   //   실시간 이동은 막대를 끝으로 끌 때처럼 seekTo, 영상 새로고침은 별도 버튼으로 처리한다.
   const [reloadKey, setReloadKey] = useState(0);
+  // Each entry/new player starts muted. Dismiss the large prompt only after
+  // this iframe confirms unmute; a later deliberate mute keeps just the icon.
+  useEffect(() => {
+    setMuted(true);
+    setSoundPromptDone(false);
+    const onSoundMessage = (e: MessageEvent) => {
+      if (e.origin !== "https://www.youtube.com" || e.source !== iframeRef.current?.contentWindow) return;
+      try {
+        const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+        if ((data?.event === "infoDelivery" || data?.event === "initialDelivery") && typeof data.info?.muted === "boolean") {
+          setMuted(data.info.muted);
+          if (!data.info.muted) setSoundPromptDone(true);
+        }
+      } catch { /* Ignore unrelated/malformed player messages. */ }
+    };
+    window.addEventListener("message", onSoundMessage);
+    return () => window.removeEventListener("message", onSoundMessage);
+  }, [videoId, reloadKey]);
   // [09:08 사장님 「좌우 여백」] 화면이 9:16 보다 넓으면(카톡 브라우저 등) 세로 영상 좌우에 검은 띠 → 영상을 그만큼 키워 꽉 채움(위아래 조금 잘림, 최대 1.12배).
   // 돌려보기 중엔 원래 크기(유튜브 막대가 잘리지 않게).
   const [videoScale, setVideoScale] = useState(1);
@@ -1051,6 +1070,14 @@ export default function LiveWatchView(props: Props) {
           </div>
       </div>
 
+      {!soundPromptDone && !guideOpen ? (
+        <div style={{ position: "absolute", left: "16px", right: "16px", top: "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
+          <button type="button" aria-label="방송 소리 켜기" onClick={turnSoundOn}
+            style={{ minWidth: "192px", minHeight: "60px", padding: "12px 24px", border: "1px solid rgba(255,255,255,0.7)", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", boxShadow: "0 4px 24px rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "10px", fontSize: "20px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", pointerEvents: "auto" }}>
+            <IconSoundOn color="#111111" />소리 켜기
+          </button>
+        </div>
+      ) : null}
 
       {/* 돌려보는 중 → 지금 방송으로 */}
       {/* 실시간 스트림으로 건너뛰기 — 유튜브 라이브처럼 오른쪽 아래 흰 알약(돌려보기 중에도 보임) */}

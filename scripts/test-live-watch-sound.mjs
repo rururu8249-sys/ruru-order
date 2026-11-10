@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const source=fs.readFileSync('components/customer/LiveWatchView.tsx','utf8');
+const ast=ts.createSourceFile('LiveWatchView.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+let handler;
+function visit(node){if(ts.isVariableDeclaration(node)&&node.name.getText(ast)==='onSoundMessage')handler=node.initializer;ts.forEachChild(node,visit);}
+visit(ast);assert.ok(handler);
+const frame={}, muted=[], dismissed=[];
+const onMessage=vm.runInNewContext(ts.transpile(`(${handler.getText(ast)})`,{target:ts.ScriptTarget.ES2020}),{iframeRef:{current:{contentWindow:frame}},setMuted:v=>muted.push(v),setSoundPromptDone:v=>dismissed.push(v)});
+const message=(data,origin='https://www.youtube.com',source=frame)=>onMessage({data,origin,source});
+for(const data of ['not json',null,{}, {event:'infoDelivery',info:{muted:'false'}},{event:'other',info:{muted:false}}])message(data);
+message({event:'infoDelivery',info:{muted:false}},'https://www.youtube.com.evil.example');
+message({event:'infoDelivery',info:{muted:false}},'https://www.youtube.com',{});
+assert.deepEqual(muted,[]);assert.deepEqual(dismissed,[]);
+message(JSON.stringify({event:'infoDelivery',info:{muted:true}}));
+assert.deepEqual(muted,[true]);assert.deepEqual(dismissed,[],'Muted confirmation must keep the entry prompt');
+message({event:'initialDelivery',info:{muted:false}});
+assert.deepEqual(muted,[true,false]);assert.deepEqual(dismissed,[true],'Actual unmute confirmation dismisses prompt');
+message({event:'infoDelivery',info:{muted:true}});
+assert.deepEqual(muted,[true,false,true]);assert.deepEqual(dismissed,[true],'Later deliberate mute must not reset onboarding');
+console.log('PASS sound confirmation, initial delivery, deliberate mute, source/origin isolation, malformed data');
