@@ -719,7 +719,7 @@ export default function LiveWatchView(props: Props) {
   };
   // ── 돌려보다가 「실시간으로 돌아가기」 ──
   //   유튜브 플레이어가 보내 주는 재생 정보(infoDelivery)로 «재생 중인데 지금 방송보다 30초 넘게 뒤»일 때만 버튼을 띄운다.
-  //   누르면 영상을 다시 불러 지금 방송으로(가장 확실한 방법). 정보가 안 오면 버튼도 안 뜬다(유튜브 막대의 「라이브」로도 돌아갈 수 있음).
+  //   실시간 이동은 막대를 끝으로 끌 때처럼 seekTo, 영상 새로고침은 별도 버튼으로 처리한다.
   const [reloadKey, setReloadKey] = useState(0);
   // [09:08 사장님 「좌우 여백」] 화면이 9:16 보다 넓으면(카톡 브라우저 등) 세로 영상 좌우에 검은 띠 → 영상을 그만큼 키워 꽉 채움(위아래 조금 잘림, 최대 1.12배).
   // 돌려보기 중엔 원래 크기(유튜브 막대가 잘리지 않게).
@@ -787,12 +787,20 @@ export default function LiveWatchView(props: Props) {
     //   플레이어 준비가 늦거나 라이브 중 자막이 다시 붙을 수 있어 여러 번 보냄(명령만 — 실패해도 무시)
     [800, 2500, 6000, 15000, 40000].forEach((ms) => window.setTimeout(captionsOff, ms));
   };
-  const backToLive = () => {
+  const reloadPlayer = () => {
     playerInfo.current = { t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0 };
     lastTick.current = { t: 0, at: 0, state: -1 };
     setBehindLive(false);
     setMuted(true);
     setReloadKey((k) => k + 1);
+  };
+  const backToLive = () => {
+    const { live, d } = playerInfo.current;
+    if (!live || !Number.isFinite(d) || d <= 0) return;
+    // 새로 불러오면 이전 위치가 복원될 수 있다. 막대의 맨 끝과 같은 위치로 직접 이동한다.
+    sendToPlayer(youtubeCommand("seekTo", [Math.max(0, d - 1), true]));
+    sendToPlayer(youtubeCommand("playVideo"));
+    // 소리·플레이어를 유지하고, 실시간 도착 표시는 실제 infoDelivery 응답으로만 갱신한다.
   };
 
   const turnSoundOn = () => {
@@ -1022,7 +1030,7 @@ export default function LiveWatchView(props: Props) {
             <button type="button" onClick={() => { const next = !focus; setFocus(next); setChatHint(next ? "집중모드 — 채팅을 숨겼어요. 눈을 다시 누르면 보여요." : "채팅을 다시 보여 드려요."); }} aria-label={focus ? "집중모드 끄기" : "집중모드 켜기"} aria-pressed={focus} style={TOP_ICON_BTN}>
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" />{focus ? <path d="M4 4l16 16" /> : null}</svg>
             </button>
-            <button type="button" onClick={backToLive} aria-label="방송 새로고침" style={TOP_ICON_BTN}>
+            <button type="button" onClick={reloadPlayer} aria-label="방송 새로고침" style={TOP_ICON_BTN}>
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0014.3 4.9L20 16" /><path d="M20 20v-4h-4" /></svg>
             </button>
             <button type="button" onClick={muted ? turnSoundOn : () => { sendToPlayer(youtubeCommand("mute")); setMuted(true); }} aria-label={muted ? "소리 켜기" : "소리 끄기"} aria-pressed={!muted} style={TOP_ICON_BTN}>
