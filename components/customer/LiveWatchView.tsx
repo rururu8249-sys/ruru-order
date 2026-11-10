@@ -18,7 +18,7 @@ import { isKakaoInAppBrowser } from "@/lib/youtubeChannelLink";
 import { openOrderInExternalBrowser } from "@/components/customer/KakaoExternalOpen";
 import { parseBotRef } from "@/lib/liveChatBot";
 import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
-import { EMOJI_MAX_PER_MSG, countEmojiTokens, encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
+import { EMOJI_MAX_PER_MSG, chatBodyAsText, countEmojiTokens, encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
 import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
@@ -505,6 +505,34 @@ export default function LiveWatchView(props: Props) {
     try { await navigator.clipboard.writeText(url); setChatHint("주소를 복사했어요. 카톡에 붙여 넣어 보내 주세요."); } catch { setChatHint(url); }
   };
   const [modTarget, setModTarget] = useState<LiveChatMessage | null>(null);
+  const [chatMenu, setChatMenu] = useState<{ message: LiveChatMessage; x: number; y: number; canManage: boolean } | null>(null);
+  const chatMenuFocus = useRef<HTMLElement | null>(null);
+  const closeChatMenu = () => {
+    setChatMenu(null);
+    chatMenuFocus.current?.focus({ preventScroll: true });
+  };
+  const openChatMenu = (message: LiveChatMessage, x: number, y: number, canManage: boolean) => {
+    endPress();
+    // 폰의 길게 누르기 뒤 contextmenu가 따라와도 관리 창 위에 복사 창을 겹치지 않는다.
+    if (canManage && (!isDesktop || modTarget)) {
+      setModTarget(message);
+      setBanConfirm(false);
+      setChatMenu(null);
+      return;
+    }
+    chatMenuFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setChatMenu({ message, x: Math.max(8, Math.min(x, window.innerWidth - 228)), y: Math.max(8, Math.min(y, window.innerHeight - 152)), canManage });
+  };
+  const copyChatMessage = async () => {
+    if (!chatMenu) return;
+    try {
+      await navigator.clipboard.writeText(chatBodyAsText(chatMenu.message.body));
+      setChatHint("채팅글을 복사했어요.");
+    } catch {
+      setChatHint("복사하지 못했어요. 브라우저의 클립보드 권한을 확인해 주세요.");
+    }
+    closeChatMenu();
+  };
   const [pinOpen, setPinOpen] = useState(false);
   const pinTextRef = useRef<HTMLSpanElement | null>(null);
   const [banConfirm, setBanConfirm] = useState(false);
@@ -912,6 +940,7 @@ export default function LiveWatchView(props: Props) {
               <div style={{ flex: 1, minWidth: 0, height: "48px", boxSizing: "border-box", border: isDesktop ? "1px solid #555555" : "1px solid #E5E5E5", borderRadius: "9999px", display: "flex", alignItems: "center", background: isDesktop ? "#272727" : "#FFFFFF" }}>
                 <input
                   ref={inputRef}
+                  data-live-chat-input
                   autoFocus={!isDesktop && !emojiOpen}
                   value={draft}
                   onChange={(e) => { setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN)); rememberCaret(e.target); }}
@@ -1154,11 +1183,11 @@ export default function LiveWatchView(props: Props) {
               <div
                 key={m.id}
                 data-chat-id={m.id}
-                onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; if (canMod) startPress(m); }}
+                onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; if (canMod && e.button === 0) startPress(m); }}
                 onPointerUp={canMod ? endPress : undefined}
                 onPointerLeave={canMod ? endPress : undefined}
                 onPointerCancel={canMod ? endPress : undefined}
-                onContextMenu={canMod ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openChatMenu(m, e.clientX, e.clientY, canMod); }}
                 onClick={botProduct ? (e) => {
                   e.stopPropagation(); // 「담기 ›」 줄은 상품 창만(재생 막대 안 띄움)
                   const d = downAt.current;
@@ -1210,11 +1239,11 @@ export default function LiveWatchView(props: Props) {
               if (!pinOpen && el && el.scrollWidth <= el.clientWidth + 1) return;
               setPinOpen((v) => !v);
             }}
-            onPointerDown={chat.canPin ? () => startPress(chat.pinned!) : undefined}
+            onPointerDown={chat.canPin ? (e) => { if (e.button === 0) startPress(chat.pinned!); } : undefined}
             onPointerUp={chat.canPin ? endPress : undefined}
             onPointerLeave={chat.canPin ? endPress : undefined}
             onPointerCancel={chat.canPin ? endPress : undefined}
-            onContextMenu={chat.canPin ? (e) => { e.preventDefault(); setModTarget(chat.pinned); } : undefined}
+            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openChatMenu(chat.pinned!, e.clientX, e.clientY, chat.canPin && Number.isInteger(chat.pinned!.id)); }}
             style={{ ...(isDesktop ? { order: 2, flexShrink: 0, maxHeight: "30%", overflowY: "auto" } : {}), pointerEvents: "auto", display: "flex", alignItems: isDesktop && pinOpen ? "flex-start" : "center", gap: "8px", width: "100%", boxSizing: "border-box", minHeight: "44px", padding: "8px 12px", borderRadius: "22px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
           >
             <ChatAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} color={chatColorMap.get(chat.pinned.id) || "#FFD43B"} />
@@ -1367,6 +1396,23 @@ export default function LiveWatchView(props: Props) {
       {!isDesktop && composeOpen && chat ? (
         <div role="dialog" aria-modal="true" aria-label="채팅 쓰기" onPointerDown={(e) => { composeDownOnBackdrop.current = e.target === e.currentTarget; }} onClick={(e) => { if (e.target === e.currentTarget && composeDownOnBackdrop.current) setComposeOpen(false); composeDownOnBackdrop.current = false; }} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "flex-end" }}>
           {composer}
+        </div>
+      ) : null}
+
+      {/* 오른쪽 클릭 — 손님은 복사, 관리자는 기존 관리 창도 열 수 있다. */}
+      {chatMenu ? (
+        <div onPointerDown={(e) => { if (e.target === e.currentTarget) closeChatMenu(); }} onContextMenu={(e) => { e.preventDefault(); closeChatMenu(); }} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z + 3 }}>
+          <div role="dialog" aria-label="채팅글 메뉴" onKeyDown={(e) => {
+            if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeChatMenu(); }
+            if (e.key === "Tab") {
+              const buttons = Array.from(e.currentTarget.querySelectorAll("button"));
+              const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+              e.preventDefault(); buttons[(index + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length]?.focus();
+            }
+          }} style={{ position: "absolute", left: chatMenu.x, top: chatMenu.y, width: "220px", padding: "6px", boxSizing: "border-box", border: "1px solid #555", borderRadius: "12px", background: "#272727", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
+            <button autoFocus type="button" onClick={() => void copyChatMessage()} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>글 복사하기</button>
+            {chatMenu.canManage ? <button type="button" onClick={() => { setModTarget(chatMenu.message); setBanConfirm(false); setChatMenu(null); }} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>채팅 관리</button> : null}
+          </div>
         </div>
       ) : null}
 

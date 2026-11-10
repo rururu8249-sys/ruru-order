@@ -642,9 +642,12 @@ const maskAddress = (base: string, detail: string) => {
 
 
 const blockCustomerCopyEvents = () => {
-  const block = (event: Event) => event.preventDefault();
+  // 방송 채팅 입력은 상품 복사 방지 대상이 아니다(⌘A/C/X/V·입력칸 기본 메뉴).
+  const isChatInput = (event: Event) => event.target instanceof Element && event.target.matches("input[data-live-chat-input]");
+  const block = (event: Event) => { if (!isChatInput(event)) event.preventDefault(); };
 
   const blockKey = (event: KeyboardEvent) => {
+    if (isChatInput(event)) return;
     const key = event.key.toLowerCase();
     const isMac = event.metaKey;
     const isWin = event.ctrlKey;
