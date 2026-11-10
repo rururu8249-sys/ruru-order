@@ -1193,16 +1193,19 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
-      <div style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", gap: "8px", background: "#000000" }}>
+      <div style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
         {/* 오늘만셀러처럼 — 지금 소개 중(없으면 첫) 상품 사진 + 오른쪽 위 숫자(고를 수 있는 상품 수, 세부상품까지) */}
-        <button type="button" onClick={() => setListOpen(true)} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: "52px", height: "52px", padding: 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer" }}>
+        <button type="button" onClick={() => setListOpen(true)} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: isDesktop ? "208px" : "52px", height: "52px", padding: isDesktop ? "4px 12px 4px 4px" : 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer", ...(isDesktop ? { display: "flex", alignItems: "center", gap: "10px", color: "#111111" } : {}) }}>
           {thumbUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumbUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "10px" }} />
+            <img src={thumbUrl} alt="" style={{ width: isDesktop ? "40px" : "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "10px" }} />
           ) : (
-            <span style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center" }}><IconGridDark /></span>
+            <span style={{ display: "flex", width: isDesktop ? "40px" : "100%", height: "100%", alignItems: "center", justifyContent: "center" }}><IconGridDark /></span>
           )}
-          <span aria-hidden="true" style={{ position: "absolute", top: "-8px", right: "-8px", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "24px", textAlign: "center", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }}>{totalCount > 999 ? "999+" : totalCount}</span>
+          {isDesktop ? <>
+            <span style={{ fontSize: "16px", fontWeight: 700, whiteSpace: "nowrap" }}>상품 목록</span>
+            <span style={{ marginLeft: "auto", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" }}>{totalCount > 999 ? "999+" : totalCount}개</span>
+          </> : <span aria-hidden="true" style={{ position: "absolute", top: "-8px", right: "-8px", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "24px", textAlign: "center", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }}>{totalCount > 999 ? "999+" : totalCount}</span>}
         </button>
         {!isDesktop && chat && chat.canWrite && !focus ? (
           <div style={{ flex: 1, minWidth: "112px", height: "52px", boxSizing: "border-box", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "9999px", background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", overflow: "hidden" }}>
@@ -1216,7 +1219,7 @@ export default function LiveWatchView(props: Props) {
               </button>
             ) : null}
           </div>
-        ) : <span style={{ flex: 1 }} />}
+        ) : !isDesktop ? <span style={{ flex: 1 }} /> : null}
         <BarBtn label="주문서" badge={cartCount} badgeRed onClick={props.onOpenCart}>
           <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M6 8h12l1 13H5zM9 8V7a3 3 0 016 0v1" stroke="#FFFFFF" strokeWidth="1.6" strokeLinejoin="round" /></svg>
         </BarBtn>
@@ -1230,7 +1233,7 @@ export default function LiveWatchView(props: Props) {
       {/* 더보기 — 오늘만셀러처럼 오른쪽 아래에서 위로 펼쳐지는 메뉴 */}
       {moreOpen ? (
         <div role="dialog" aria-modal="true" aria-label="더보기" onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.55)" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: "12px", bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: isDesktop ? undefined : "12px", ...(isDesktop ? { left: `calc((100% - ${videoRight || "0px"}) / 2)`, transform: "translateX(-50%)", width: "328px" } : {}), bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
             {[
               ...(props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지·쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 })),
               { key: "share", label: "공유하기", onClick: shareLive },
