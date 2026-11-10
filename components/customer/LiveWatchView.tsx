@@ -463,6 +463,7 @@ export default function LiveWatchView(props: Props) {
   };
   const [modTarget, setModTarget] = useState<LiveChatMessage | null>(null);
   const [pinOpen, setPinOpen] = useState(false);
+  const pinTextRef = useRef<HTMLSpanElement | null>(null);
   const [banConfirm, setBanConfirm] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement | null>(null);
   const pressTimer = useRef<number | null>(null);
@@ -977,19 +978,26 @@ export default function LiveWatchView(props: Props) {
             tabIndex={0}
             aria-expanded={pinOpen}
             aria-label="고정 댓글"
-            onClick={() => { if (!modTarget) setPinOpen((v) => !v); }}
+            onClick={() => {
+              if (modTarget) return;
+              // [14:52 사장님 「고정인데 누를 때마다 왜 움직여」] 다 보이는 글은 눌러도 그대로(펼칠 게 있을 때만 펼침)
+              const el = pinTextRef.current;
+              if (!pinOpen && el && el.scrollWidth <= el.clientWidth + 1) return;
+              setPinOpen((v) => !v);
+            }}
             onPointerDown={chat.canPin ? () => startPress(chat.pinned!) : undefined}
             onPointerUp={chat.canPin ? endPress : undefined}
             onPointerLeave={chat.canPin ? endPress : undefined}
             onPointerCancel={chat.canPin ? endPress : undefined}
             onContextMenu={chat.canPin ? (e) => { e.preventDefault(); setModTarget(chat.pinned); } : undefined}
-            style={{ pointerEvents: "auto", display: "flex", alignItems: pinOpen ? "flex-start" : "center", gap: "8px", width: "100%", boxSizing: "border-box", minHeight: "44px", padding: "8px 12px", borderRadius: "22px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
+            style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: "8px", width: "100%", boxSizing: "border-box", minHeight: "44px", padding: "8px 12px", borderRadius: "22px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
           >
             <ChatAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} color={chatColorMap.get(chat.pinned.id) || "#FFD43B"} />
             <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "9999px", background: "rgba(255,255,255,0.16)", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis" }}>
               {chat.pinned.nickname}<ChatBadge badge={chat.pinned.badge} />
             </span>
-            <span style={{ flex: 1, minWidth: 0, fontWeight: chatView.bold ? 700 : 500, ...(pinOpen ? { wordBreak: "break-word" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}><ChatBodyView body={chat.pinned.body} emojis={emojiMap} /></span>
+            {/* 줄 높이 = 이모티콘 높이(2em) — 한 줄로 접혀 있어도 이모티콘 위아래가 안 잘리고, 펼쳐도 줄 높이가 같아 안 움직임 */}
+            <span ref={pinTextRef} style={{ flex: 1, minWidth: 0, lineHeight: "2em", padding: "0.15em 0", fontWeight: chatView.bold ? 700 : 500, ...(pinOpen ? { wordBreak: "break-word" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}><ChatBodyView body={chat.pinned.body} emojis={emojiMap} /></span>
           </div>
         ) : null}
         {chat && chat.canWrite && greetOpen ? (
