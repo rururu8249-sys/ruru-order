@@ -894,6 +894,16 @@ export async function POST(request: NextRequest) {
     // 유튜브 라이브 채팅 자동 게시(자동알림 ON일 때만). 주문 저장 완료 후 응답과 별개로 실행 →
     //   - after()로 응답 보낸 뒤 실행하므로 주문 제출 속도/성공에 영향 0.
     //   - postLiveChatMessage는 throw하지 않고 notify OFF면 내부에서 스킵. 실패해도 주문과 무관.
+    // [2026-11-10 21:54] 사이트 채팅 «주문 감사합니다» 글 — 서버가 채팅 표에 저장(모든 화면에 남음). 실패해도 주문 무관.
+    after(async () => {
+      try {
+        const { getServiceClient } = await import("@/lib/youtube");
+        const { announceOrderThanks } = await import("@/lib/liveOrderChatServer");
+        await announceOrderThanks(getServiceClient(), text((orderRows[0] as AnyRow | undefined)?.order_group_id));
+      } catch {
+        /* 채팅 글 실패는 주문과 무관 */
+      }
+    });
     after(async () => {
       try {
         const rows = normalizedSubmit.orderRows;

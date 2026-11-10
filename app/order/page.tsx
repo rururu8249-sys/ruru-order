@@ -51,7 +51,7 @@ import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { CHAT_TEMP_ID_BASE, isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
 import { encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
-import { LIVE_CHAT_BOT_NICK, orderThanksText, cardLinkText, paidThanksText, isCardOrderRow, becamePaid, CART_NEXT_STEP_TEXT, orderItemLine, cartOwnerTag, cartRefOwner } from "@/lib/liveChatBot";
+import { LIVE_CHAT_BOT_NICK, CART_NEXT_STEP_TEXT, orderItemLine, cartOwnerTag, cartRefOwner } from "@/lib/liveChatBot";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
@@ -6649,17 +6649,8 @@ export default function OrderPage() {
       },
       onOrder: (e) => {
         const n = e.new as Record<string, unknown>;
-        if (e.type === "UPDATE") {
-          // 결제 완료(입금확인·카드결제완료로 바뀐 순간) — 주문서 하나에 한 번
-          if (!liveChatEnabledRef.current || n.is_test_order === true || n.is_deleted === true) return;
-          if (n.broadcast_id != null && String(n.broadcast_id) !== String(bid)) return;
-          if (!becamePaid(n, (e.old || {}) as Record<string, unknown>)) return;
-          const pkey = `paid:${String(n.order_group_id ?? n.id ?? "")}`;
-          if (!String(n.youtube_nickname ?? "").trim() || seenGroups.has(pkey)) return;
-          seenGroups.add(pkey);
-          addLiveBotLine(String(bid), paidThanksText([n]), `local:${pkey}`);
-          return;
-        }
+        // [2026-11-10 21:54] 결제 완료 글은 서버가 채팅 표에 저장(lib/liveOrderChatServer) — 화면에서 따로 안 끼움
+        if (e.type === "UPDATE") return;
         if (e.type !== "INSERT") return;
         // 같은 주문서의 다른 상품 줄 — 모으는 중이면 더함
         const gk = String(n.order_group_id ?? n.id ?? "");
@@ -6673,16 +6664,8 @@ export default function OrderPage() {
         if (key && seenGroups.has(key)) return;
         if (key) seenGroups.add(key);
         // [2026-11-10 사장님 05:14] 채팅이 켜져 있으면 알림 칸 대신 채팅에 루루동이AI 글로(주문서 줄을 0.6초 모아 한 줄)
-        if (liveChatEnabledRef.current) {
-          const rows: Record<string, unknown>[] = [n];
-          orderBuf.set(key, rows);
-          window.setTimeout(() => {
-            orderBuf.delete(key);
-            addLiveBotLine(String(bid), orderThanksText(rows), `local:order:${key}`);
-            if (rows.some(isCardOrderRow)) addLiveBotLine(String(bid), cardLinkText(rows), `local:card:${key}`);
-          }, 600);
-          return;
-        }
+        // [2026-11-10 21:54] 채팅이 켜져 있으면 «주문 감사합니다» 글은 서버가 채팅 표에 저장(모든 화면·새로고침해도 남음)
+        if (liveChatEnabledRef.current) return;
         const shown = nick.length > 8 ? `${nick.slice(0, 7)}…` : nick;
         const toast = { key: `${key}-${Date.now()}`, nickname: shown };
         setLiveOrderToasts((prev) => [...prev.slice(-4), toast]);

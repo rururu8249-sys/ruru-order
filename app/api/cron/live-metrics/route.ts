@@ -3,6 +3,8 @@
 //   chat-orders-read cron 과 같은 호출 검증. 돈·주문 무접촉.
 import { NextRequest, NextResponse } from "next/server";
 import { recordLiveMetricsTick } from "@/lib/liveMetricsServer";
+import { announceRecentPaid } from "@/lib/liveOrderChatServer";
+import { getServiceClient } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,5 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: { message: "인증 필요" } }, { status: 401 });
   }
   const r = await recordLiveMetricsTick();
-  return NextResponse.json(r);
+  // [2026-11-10 21:54] 방송 중이면 최근 결제 완료 주문서에 「결제 완료! 감사합니다」 채팅 글(이미 올린 건 건너뜀)
+  const paidPosted = await announceRecentPaid(getServiceClient()).catch(() => 0);
+  return NextResponse.json({ ...r, paidPosted });
 }
