@@ -155,7 +155,11 @@ function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: st
 // 글자를 상자 없이 영상 위에 바로 — 어떤 화면에서도 읽히게 진한 그림자
 // [08:50 사장님 「닉네임 흐리멍텅·블러 같다」] 번지는 그림자 대신 1px 또렷한 테두리 그림자
 // [09:08 사장님 「밝은 배경에서 흐리멍텅」] 번지는 그림자 대신 또렷한 1px 테두리 + 아래 옅은 그림자
-const CHAT_TEXT_SHADOW = "-1px 0 0 rgba(0,0,0,0.75), 1px 0 0 rgba(0,0,0,0.75), 0 -1px 0 rgba(0,0,0,0.75), 0 1px 0 rgba(0,0,0,0.75), 0 0 3px rgba(0,0,0,0.55)";
+// [12:41 사장님 「유튜브 글씨는 깔끔한데 우리는 도트 폰트처럼 거칠다」] 원인: 위·아래·좌·우 1px 딱딱한 그림자 4개가 글자 가장자리를 계단처럼 깎음
+//   → 유튜브 앱처럼 테두리 없이 부드러운 그림자 한 겹(가장자리 그대로 매끈) + 아래로 살짝
+const CHAT_TEXT_SHADOW = "0 0 1px rgba(0,0,0,0.6), 0 0 3px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.5)";
+// 유튜브 앱 글꼴 = 안드로이드 Roboto + 한글 Noto Sans CJK(시스템), 아이폰 시스템 글꼴 — 같은 글꼴을 이 화면에 지정(웹 글꼴 내려받기 없음)
+const LIVE_FONT = 'Roboto, "Noto Sans CJK KR", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -740,7 +744,7 @@ export default function LiveWatchView(props: Props) {
       aria-label="방송 보며 주문"
       // [07:32 사장님] 채팅 그림(이모티콘·프로필)을 꾹 눌러도 «이미지 저장» 창이 안 뜨게 — 그림에서만 막음(글자 입력칸 붙여넣기는 그대로)
       onContextMenu={(e) => { if ((e.target as HTMLElement | null)?.tagName === "IMG") e.preventDefault(); }}
-      style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none", outline: "none" }}
+      style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: LIVE_FONT, textRendering: "optimizeLegibility", overscrollBehavior: "none", outline: "none" }}
     >
       {/* 영상 — 화면 전체 */}
       <iframe
@@ -893,16 +897,16 @@ export default function LiveWatchView(props: Props) {
                   props.onOpenProduct(botProduct.productId, botProduct.detailName || undefined);
                 } : undefined}
                 role={botProduct ? "button" : undefined}
-                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "12px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 500, WebkitFontSmoothing: "antialiased", letterSpacing: "normal", lineHeight: CHAT_LINE_H[chatView.size], wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "12px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 400, WebkitFontSmoothing: "antialiased", letterSpacing: "normal", lineHeight: CHAT_LINE_H[chatView.size], wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
                 <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
                 <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ fontWeight: 700 }}>{m.nickname}</span>
+                  <span style={{ fontWeight: chatView.bold ? 700 : 500 }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
-                  <span style={{ marginLeft: m.badge ? "4px" : "10px" }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
+                  <span style={{ marginLeft: m.badge ? "4px" : "8px" }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
                     <span style={{ display: "inline-flex", alignItems: "center", marginLeft: "8px", height: "24px", padding: "0 10px", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, textShadow: "none", verticalAlign: "middle", whiteSpace: "nowrap" }}>담기 ›</span>
                   ) : null}
