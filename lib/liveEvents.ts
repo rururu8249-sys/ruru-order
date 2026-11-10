@@ -58,3 +58,20 @@ export function subscribeLiveEvents(
     void supabase.removeChannel(channel);
   };
 }
+
+/**
+ * [2026-11-10 사장님 09:50 「저장했는데 왜 안 나와」] 설정을 바꾼 화면이 «바뀌었어요» 소식만 보낸다(REST, 채널 안 엶).
+ *   받는 쪽은 소식 내용을 믿지 않고 서버에서 다시 읽는다(가짜 소식으로 공지를 바꿀 수 없게). 실패해도 조용히(30초 다시 읽기가 받쳐 줌).
+ */
+export async function pokeLiveSetting(table: string): Promise<void> {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+    await fetch(`${url}/realtime/v1/api/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ messages: [{ topic: LIVE_EVENTS_TOPIC, event: "catalog", payload: { table, type: "UPDATE" }, private: false }] }),
+    });
+  } catch { /* 소식 못 보내도 손님 화면은 30초 안에 다시 읽음 */ }
+}

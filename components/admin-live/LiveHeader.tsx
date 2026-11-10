@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
 import { supabase } from "@/lib/supabase";
+import { pokeLiveSetting } from "@/lib/liveEvents";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
@@ -106,7 +107,7 @@ export default function LiveHeader({
     }
   };
 
-  // [2026-11-10 사장님 05:54] 시험 손님(베타테스터) — 「시험 손님만」일 때 보이는 손님. 넣기·빼기는 서버(live-watch-testers)가 phones 한 칸만 바꿈.
+  // [2026-11-10 사장님 05:54] 베타테스터(옛 이름 시험 손님) — 「시험 손님만」일 때 보이는 손님. 넣기·빼기는 서버(live-watch-testers)가 phones 한 칸만 바꿈.
   type Tester = { key: string; phone: string; nickname: string; name: string; op?: boolean };
   type TesterResult = Tester & { tester: boolean };
   const [testers, setTesters] = useState<Tester[]>([]);
@@ -145,7 +146,7 @@ export default function LiveHeader({
       setTesters(items);
       setLiveWatch((prev) => ({ ...prev, phones: items.map((t) => t.key) })); // 다른 설정 저장 때 옛 명단으로 덮지 않게
       setTesterResults((prev) => prev.map((x) => (x.key === key ? { ...x, tester: add } : x)));
-      showAdminToast(add ? `${label || "손님"}님을 시험 손님에 넣었어요.` : `${label || "손님"}님을 뺐어요.`, "success");
+      showAdminToast(add ? `${label || "손님"}님을 베타테스터에 넣었어요.` : `${label || "손님"}님을 뺐어요.`, "success");
     } catch {
       showAdminToast("저장 못 했어요.", "error");
     } finally {
@@ -180,6 +181,7 @@ export default function LiveHeader({
       if (error) throw error;
       setLiveChatNoticeDraft(clean.notice);
       setLiveChatWordsDraft(clean.words.join(", "));
+      void pokeLiveSetting("live_chat_setting");
       showAdminToast(okText, "success");
     } catch {
       setLiveChat(prev);
@@ -615,41 +617,53 @@ export default function LiveHeader({
         </div>
       </section>
 
-      {/* ② 방송 보며 주문 — 누구에게·처음 화면·시험 손님 */}
+      {/* ② 방송 보며 주문 — 켜기 · 테스트 모드(베타테스터만) · 처음 화면 [2026-11-10 사장님 09:50 「테스트 모드 버튼·베타테스터·엑셀처럼」] */}
       <section className={sectionCls}>
-        <h3 className={titleCls}>방송 보며 주문</h3>
-        <p className={subCls}>손님 주문서에서 방송 영상을 보며 바로 담기</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className={titleCls}>방송 보며 주문</h3>
+            <p className={subCls}>손님 주문서에서 방송 영상을 보며 바로 담기</p>
+          </div>
+          <Switch on={watchOn} disabled={liveWatchSaving} label="방송 보며 주문" onChange={(v) => void saveLiveWatch({ ...liveWatch, audience: v ? "admin" : "off" })} />
+        </div>
+        {watchOn ? (
         <div className="mt-3 space-y-3">
-          <OptionRow label="보이는 손님">
-            <Segmented value={liveWatch.audience} disabled={liveWatchSaving} options={[["off", "끔"], ["admin", "시험 손님만"], ["all", "모든 손님"]]} onChange={(v) => void saveLiveWatch({ ...liveWatch, audience: v })} />
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-[14px] font-bold text-ink">테스트 모드</div>
+              <div className="text-[12px] text-ink-mute">{liveWatch.audience === "admin" ? "켜짐 · 아래 베타테스터만 보여요" : "꺼짐 · 모든 손님에게 보여요"}</div>
+            </div>
+            <Switch on={liveWatch.audience === "admin"} disabled={liveWatchSaving} label="테스트 모드" onChange={(v) => void saveLiveWatch({ ...liveWatch, audience: v ? "admin" : "all" })} />
+          </div>
+          <OptionRow label="처음 화면">
+            <Segmented value={liveWatch.firstView} disabled={liveWatchSaving} options={[["live", "방송 화면"], ["shop", "쇼핑몰 화면"]]} onChange={(v) => void saveLiveWatch({ ...liveWatch, firstView: v })} />
           </OptionRow>
-          {watchOn ? (
-            <OptionRow label="처음 화면">
-              <Segmented value={liveWatch.firstView} disabled={liveWatchSaving} options={[["live", "방송 화면"], ["shop", "쇼핑몰 화면"]]} onChange={(v) => void saveLiveWatch({ ...liveWatch, firstView: v })} />
-            </OptionRow>
-          ) : null}
           {liveWatch.audience === "admin" ? (
-            <div className="rounded-xl bg-surface-2 p-3">
+            <div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[14px] font-bold text-ink">시험 손님 {testers.length}명</span>
-                <span className="text-[12px] text-ink-mute">관리자 시험 계정은 늘 포함 · 잠시 멈춤 중에도 시험 가능</span>
+                <span className="text-[14px] font-bold text-ink">베타테스터 {testers.length}명</span>
+                <span className="text-[12px] text-ink-mute">관리자 계정은 늘 포함</span>
               </div>
-              {testers.length ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {testers.map((t) => (
-                    <span key={t.key} className="inline-flex h-9 items-center gap-1 rounded-full border border-line bg-surface pl-3 pr-1 text-[13px] text-ink">
-                      <b className="font-bold">{t.nickname || t.name || "이름 없음"}</b>
-                      {t.nickname && t.name ? <span className="text-ink-soft">{t.name}</span> : null}
-                      <span className="text-ink-mute">{t.phone.slice(-4)}</span>
-                      {t.op ? <span className="rounded bg-surface-2 px-1 text-[11px] font-bold text-ink-soft">관리자 번호</span> : null}
-                      <button type="button" disabled={testerBusy} onClick={() => void setTester(t.key, false, t.nickname || t.name)} aria-label={`${t.nickname || t.name} 빼기`} className="flex h-7 w-7 items-center justify-center rounded-full text-ink-mute hover:bg-surface-2 hover:text-ink">
+              <div className="mt-2 overflow-hidden rounded-lg border border-line">
+                <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_64px_80px_56px] items-center gap-2 bg-surface-2 px-3 py-2 text-[12px] font-bold text-ink-soft">
+                  <span>닉네임</span><span>이름</span><span className="text-right">전화</span><span>비고</span><span className="text-right">빼기</span>
+                </div>
+                {testers.length === 0 ? <div className="px-3 py-3 text-[13px] text-ink-mute">아직 없어요 · 아래에서 찾아 넣으세요</div> : null}
+                {testers.map((t) => (
+                  <div key={t.key} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_64px_80px_56px] items-center gap-2 border-t border-line bg-surface px-3 py-1.5 text-[13px] text-ink">
+                    <b className="truncate font-bold">{t.nickname || "-"}</b>
+                    <span className="truncate text-ink-soft">{t.name || "-"}</span>
+                    <span className="text-right tabular-nums text-ink-soft">{t.phone.slice(-4)}</span>
+                    <span className="truncate text-[12px] text-ink-mute">{t.op ? "관리자 번호" : ""}</span>
+                    <span className="flex justify-end">
+                      <button type="button" disabled={testerBusy} onClick={() => void setTester(t.key, false, t.nickname || t.name)} aria-label={`${t.nickname || t.name} 빼기`} className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute hover:bg-surface-2 hover:text-danger">
                         <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                       </button>
                     </span>
-                  ))}
-                </div>
-              ) : null}
-              <input value={testerQuery} onChange={(e) => searchTesters(e.target.value)} type="search" placeholder="시험 손님 추가 · 닉네임 · 이름 · 전화 뒤 4자리" aria-label="시험 손님 찾기" className={`${fieldCls} mt-2 w-full`} />
+                  </div>
+                ))}
+              </div>
+              <input value={testerQuery} onChange={(e) => searchTesters(e.target.value)} type="search" placeholder="베타테스터 추가 · 닉네임 · 이름 · 전화 뒤 4자리" aria-label="베타테스터 찾기" className={`${fieldCls} mt-2 w-full`} />
               {testerQuery.trim() ? (
                 <ul className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-line bg-surface">
                   {testerSearching ? <li className="px-3 py-2 text-[13px] text-ink-mute">찾는 중…</li> : null}
@@ -667,6 +681,7 @@ export default function LiveHeader({
             </div>
           ) : null}
         </div>
+        ) : null}
       </section>
 
       {/* ③ 사이트 채팅 — 방송 보며 주문 화면 안에서만 */}

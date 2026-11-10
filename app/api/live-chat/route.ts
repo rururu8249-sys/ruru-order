@@ -50,6 +50,8 @@ export async function GET(request: NextRequest) {
     const sb = getServiceClient();
     const setting = await readSetting(sb);
     if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [], pinned: null });
+    // [2026-11-10 09:50] 설정만(켜짐·공지) — 손님 화면이 공지 바뀐 걸 다시 읽을 때
+    if (request.nextUrl.searchParams.get("meta") === "1") return NextResponse.json({ ok: true, enabled: true, notice: setting.notice });
     const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref";
     const [listRes, pinRes] = await Promise.all([
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).order("id", { ascending: false }).limit(LIVE_CHAT_RECENT),

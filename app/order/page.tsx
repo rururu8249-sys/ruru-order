@@ -6593,8 +6593,25 @@ export default function OrderPage() {
     };
     void loadViewers();
     const viewersTimer = window.setInterval(() => { if (document.visibilityState === "visible") void loadViewers(); }, 30000);
+    // [2026-11-10 사장님 09:50 「저장했는데 왜 안 나와」] 채팅 켜짐·공지 — 관리자가 저장하면 소식(live_chat_setting)으로 바로, 못 받아도 30초마다 다시 읽음
+    let chatMetaBusy = false;
+    const refetchChatMeta = async () => {
+      if (chatMetaBusy) return;
+      chatMetaBusy = true;
+      try {
+        const res = await fetch(`/api/live-chat?bc=${encodeURIComponent(String(bid))}&meta=1`, { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (!json?.ok) return;
+        const on = json.enabled === true;
+        const wasOn = liveChatEnabledRef.current;
+        setLiveChatEnabled(on);
+        setLiveChatNotice(String(json.notice ?? ""));
+        if (on && !wasOn) void loadChatFull();
+      } catch { /* 다음에 다시 */ } finally { chatMetaBusy = false; }
+    };
+    const chatMetaTimer = window.setInterval(() => { if (document.visibilityState === "visible") void refetchChatMeta(); }, 30000);
     // 사이트 채팅 — 처음 한 번 최근 글 읽고, 그 뒤는 소식으로만
-    void (async () => {
+    const loadChatFull = async () => {
       try {
         const res = await fetch(`/api/live-chat?bc=${encodeURIComponent(String(bid))}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
@@ -6606,9 +6623,13 @@ export default function OrderPage() {
         const pin = json.pinned ? parseChatMessage(json.pinned) : null;
         setLiveChatPinned(pin && pin.broadcastId === String(bid) ? pin : null);
       } catch { /* 채팅 못 읽어도 방송·주문은 그대로 */ }
-    })();
+    };
+    void loadChatFull();
     const off = subscribeLiveEvents(supabase, {
-      onCatalog: (e) => { if (e.table === "broadcasts") refetchBroadcast(); },
+      onCatalog: (e) => {
+        if (e.table === "broadcasts") refetchBroadcast();
+        if (e.table === "live_chat_setting") void refetchChatMeta();
+      },
       onChat: (payload) => {
         const m = parseChatMessage(payload);
         if (!m || m.broadcastId !== String(bid)) return;
@@ -6660,7 +6681,7 @@ export default function OrderPage() {
         window.setTimeout(() => setLiveOrderToasts((prev) => prev.filter((t) => t.key !== toast.key)), 4000);
       },
     });
-    return () => { if (timer) clearTimeout(timer); window.clearInterval(emojiTimer); window.clearInterval(viewersTimer); off(); };
+    return () => { if (timer) clearTimeout(timer); window.clearInterval(emojiTimer); window.clearInterval(viewersTimer); window.clearInterval(chatMetaTimer); off(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveWatchShown, broadcast?.id]);
   // 방송 화면 상품 목록 — 지금 손님 화면에 보이는 방송 상품과 같은 목록(같은 순서)
