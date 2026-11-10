@@ -6450,18 +6450,15 @@ export default function OrderPage() {
             {uiV2 ? (
               <button type="button" onClick={() => setAlertSheetOpen(true)} aria-label={liveAlertOptin ? "방송 알림 받는 중 · 끄기" : "방송 알림 꺼짐 · 켜기"} style={{ flexShrink: 0, width: "40px", height: "40px", marginLeft: "-4px", border: "none", borderRadius: "9999px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" }}>
                 {liveAlertOptin ? (
-                  /* [16:49 사장님 「알림 받는 사람은 종이 흔들리는 그림으로」] 종 양옆 울림 선 + 3초마다 살짝 흔들림(동작 줄이기 설정이면 멈춤) */
-                  <>
-                    <style>{`@keyframes ruruBellRing{0%,60%,100%{transform:rotate(0)}6%{transform:rotate(16deg)}12%{transform:rotate(-14deg)}18%{transform:rotate(10deg)}24%{transform:rotate(-8deg)}30%{transform:rotate(4deg)}36%{transform:rotate(0)}}@media (prefers-reduced-motion: reduce){.ruru-bell-ring{animation:none!important}}`}</style>
-                    <svg className="ruru-bell-ring" aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ transformOrigin: "50% 15%", animation: "ruruBellRing 3s ease-in-out infinite" }}>
-                      <path d="M7 10.5a5 5 0 0110 0v3.5l1.6 2.6H5.4L7 14z" fill="#111111" />
-                      <path d="M10.3 19a1.8 1.8 0 003.4 0" />
-                      <path d="M3.6 8.2a7 7 0 012-3.4" />
-                      <path d="M2 10.6a9 9 0 011.2-3.9" />
-                      <path d="M20.4 8.2a7 7 0 00-2-3.4" />
-                      <path d="M22 10.6a9 9 0 00-1.2-3.9" />
-                    </svg>
-                  </>
+                  /* [19:13 사장님] 알림 받는 손님 = 움직이지 않는 «울리는 종» 그림(선만, 양옆 울림 선 두 줄) */
+                  <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7 10.5a5 5 0 0110 0v3.5l1.6 2.6H5.4L7 14z" />
+                    <path d="M10.3 19a1.8 1.8 0 003.4 0" />
+                    <path d="M3.6 8.2a7 7 0 012-3.4" />
+                    <path d="M2 10.6a9 9 0 011.2-3.9" />
+                    <path d="M20.4 8.2a7 7 0 00-2-3.4" />
+                    <path d="M22 10.6a9 9 0 00-1.2-3.9" />
+                  </svg>
                 ) : (
                   <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9E9EA0" strokeWidth="1.8"><path d="M6 10a6 6 0 0112 0v4l2 3H4l2-3z" /><path d="M10 20a2 2 0 004 0" /><path d="M3 3l18 18" /></svg>
                 )}
