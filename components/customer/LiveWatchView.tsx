@@ -158,7 +158,8 @@ function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: st
 // [12:41 사장님 「유튜브 글씨는 깔끔한데 우리는 도트 폰트처럼 거칠다」] 원인: 위·아래·좌·우 1px 딱딱한 그림자 4개가 글자 가장자리를 계단처럼 깎음
 //   → 유튜브 앱처럼 테두리 없이 부드러운 그림자 한 겹(가장자리 그대로 매끈) + 아래로 살짝
 // [12:49 사장님 「뒤에 물체 없으면 블러 같다」] 3px 번짐을 빼고 얇은 그림자 두 겹만(글자 둘레가 뿌옇게 안 보이게)
-const CHAT_TEXT_SHADOW = "0 0 1px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.6)";
+// 유튜브 캡처 확대: 글자 아래에 아주 얇은 어두운 테두리만(번짐 거의 없음) → 같은 정도로
+const CHAT_TEXT_SHADOW = "0 0 1px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.5)";
 // 유튜브 앱 글꼴 = 안드로이드 Roboto + 한글 Noto Sans CJK(시스템), 아이폰 시스템 글꼴 — 같은 글꼴을 이 화면에 지정(웹 글꼴 내려받기 없음)
 const LIVE_FONT = 'Roboto, "Noto Sans CJK KR", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
@@ -905,7 +906,8 @@ export default function LiveWatchView(props: Props) {
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
                 <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
                 <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ fontWeight: chatView.bold ? 700 : 500 }}>{m.nickname}</span>
+                  {/* [12:54 사장님 「유튜브랑 똑같이」] 사장님 유튜브 캡처에서 잰 값: 닉네임 흐린 흰색(약 80%)·보통 굵기, 글 흰색·보통 굵기 */}
+                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: "rgba(255,255,255,0.8)" }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
                   <span style={{ marginLeft: m.badge ? "4px" : "8px", color: "#FFFFFF" /* 글은 유튜브처럼 늘 흰색 — 연한 색 글은 밝은 배경에서 안 읽힘(12:49), 닉네임만 사람 색 */ }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
