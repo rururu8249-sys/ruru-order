@@ -455,6 +455,7 @@ export default function LiveWatchView(props: Props) {
   const chatBoxRef = useRef<HTMLDivElement | null>(null);
   const pressTimer = useRef<number | null>(null);
   const chatCount = chat?.messages.length ?? 0;
+  const hasChat = chatCount > 0;
   const chatColorMap = useMemo(() => chatColors(chat?.messages ?? []), [chat?.messages]);
   // 지난 글을 올려 보는 중이면 새 글이 와도 끌어내리지 않는다 — 대신 「새 글 보기」
   const [chatAtBottom, setChatAtBottom] = useState(true);
@@ -476,6 +477,19 @@ export default function LiveWatchView(props: Props) {
     const el = chatBoxRef.current;
     if (el && chatAtBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [chatCount]);
+  // [13:28 사장님 캡처 「들어가자마자 채팅이 살짝 위에 멈춰 동실장 이모티콘·글씨가 밑에 잘림」]
+  //   원인: 처음 맨 아래로 내린 «뒤에» 이모티콘·프로필 사진이 늦게 불러와져 글 높이가 커짐 → 맨 아래가 아니게 됨.
+  //   맨 아래를 보던 중이면 사진이 다 뜰 때·채팅 칸 크기가 바뀔 때마다 다시 맨 아래로(지난 글 올려 보는 중엔 안 건드림).
+  useEffect(() => {
+    const el = chatBoxRef.current;
+    if (!el) return;
+    const stick = () => { if (chatAtBottomRef.current) el.scrollTop = el.scrollHeight; };
+    el.addEventListener("load", stick, true); // 안쪽 그림(img)이 뜰 때마다(load 는 거품이 안 올라와 capture 로 받음)
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(stick) : null;
+    ro?.observe(el);
+    const timers = [100, 400, 1000, 2500].map((ms) => window.setTimeout(stick, ms));
+    return () => { el.removeEventListener("load", stick, true); ro?.disconnect(); timers.forEach((t) => window.clearTimeout(t)); };
+  }, [hasChat]);
   useEffect(() => {
     if (!chatHint) return;
     const t = window.setTimeout(() => setChatHint(""), 3000);
@@ -654,6 +668,13 @@ export default function LiveWatchView(props: Props) {
   const sendToPlayer = (cmd: string) => {
     try { iframeRef.current?.contentWindow?.postMessage(cmd, "https://www.youtube.com"); } catch { /* 플레이어 준비 전이면 무시 */ }
   };
+  // 유튜브 자막 끄기 명령 묶음(자막 모듈 내리기 + 자막 언어 비우기). 실패해도 무시.
+  const ccOffAt = useRef(0);
+  const captionsOff = () => {
+    sendToPlayer(JSON.stringify({ event: "command", func: "unloadModule", args: ["captions"] }));
+    sendToPlayer(JSON.stringify({ event: "command", func: "unloadModule", args: ["cc"] }));
+    sendToPlayer(JSON.stringify({ event: "command", func: "setOption", args: ["captions", "track", {}] }));
+  };
   // ── 돌려보다가 「실시간으로 돌아가기」 ──
   //   유튜브 플레이어가 보내 주는 재생 정보(infoDelivery)로 «재생 중인데 지금 방송보다 30초 넘게 뒤»일 때만 버튼을 띄운다.
   //   누르면 영상을 다시 불러 지금 방송으로(가장 확실한 방법). 정보가 안 오면 버튼도 안 뜬다(유튜브 막대의 「라이브」로도 돌아갈 수 있음).
@@ -688,6 +709,10 @@ export default function LiveWatchView(props: Props) {
       let data: { event?: string; info?: Record<string, unknown> } | null = null;
       try { data = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
       if (!data || data.event !== "infoDelivery" || !data.info) return;
+      // [13:28 사장님 「아직도 자막 나옴」] 처음 40초만 끄던 것 → 재생 정보가 올 때마다(5초에 한 번까지) 계속 끔.
+      //   라이브는 중간에 유튜브가 자동 자막을 새로 만들어 붙이거나 다시 연결하며 자막이 되살아날 수 있음.
+      const nowCc = Date.now();
+      if (nowCc - ccOffAt.current > 5000) { ccOffAt.current = nowCc; captionsOff(); }
       const info = data.info;
       const cur = playerInfo.current;
       if (typeof info.currentTime === "number") {
@@ -718,10 +743,7 @@ export default function LiveWatchView(props: Props) {
     [300, 1500, 4000].forEach((ms) => window.setTimeout(() => sendToPlayer(JSON.stringify({ event: "listening", id: 1, channel: "widget" })), ms));
     // [13:18 사장님 캡처] 유튜브 자동 자막이 저절로 켜져 채팅 위에 겹침 → 자막 모듈 끄기(손님 유튜브 계정 설정이 켜져 있어도).
     //   플레이어 준비가 늦거나 라이브 중 자막이 다시 붙을 수 있어 여러 번 보냄(명령만 — 실패해도 무시)
-    [800, 2500, 6000, 15000, 40000].forEach((ms) => window.setTimeout(() => {
-      sendToPlayer(JSON.stringify({ event: "command", func: "unloadModule", args: ["captions"] }));
-      sendToPlayer(JSON.stringify({ event: "command", func: "unloadModule", args: ["cc"] }));
-    }, ms));
+    [800, 2500, 6000, 15000, 40000].forEach((ms) => window.setTimeout(captionsOff, ms));
   };
   const backToLive = () => {
     playerInfo.current = { t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0 };
