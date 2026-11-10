@@ -323,6 +323,7 @@ export default function LiveWatchView(props: Props) {
   const chat = props.chat ?? null;
   const [composeOpen, setComposeOpen] = useState(false);
   const downAt = useRef<{ x: number; y: number } | null>(null);
+  const chatTapRef = useRef<{ x: number; y: number; t: number } | null>(null);
   // [04:55 사장님] 채팅 쓰는 중 폰 «뒤로» → 사이트에서 나가지 말고 쓰기 창만 닫고 방송 화면으로.
   //   쓰기 창을 열 때 방문 기록을 하나 쌓아 두고, 뒤로가 오면 그 기록만 지우며 창을 닫음.
   useEffect(() => {
@@ -860,8 +861,16 @@ export default function LiveWatchView(props: Props) {
             aria-label="채팅"
             aria-live="polite"
             onScroll={onChatScroll}
-            // 글 줄이 아닌 빈 곳(줄 사이·글 오른쪽)을 «톡» 누르면 재생 막대(끌어 올리고 내리는 건 스크롤)
-            onClick={(e) => { if (e.target === e.currentTarget) toggleSeek(); }}
+            // [09:39 사장님 「빈 곳 톡 잘 안 먹힘」] 글 줄이 화면 폭 끝까지라 «빈 곳»이 줄 사이 8px 뿐이었음 →
+            //   채팅 칸 어디든(글 줄 포함) 짧게 «톡» 누르면 재생 막대. 끌기(8px↑)·길게 누르기(0.45초↑, 관리 창)·「담기 ›」 줄은 제외.
+            onPointerDown={(e) => { chatTapRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
+            onClick={(e) => {
+              const d = chatTapRef.current;
+              chatTapRef.current = null;
+              if (!d || modTarget) return;
+              if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8 || Date.now() - d.t > 450) return;
+              toggleSeek();
+            }}
             style={{ pointerEvents: "auto", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
           >
             {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
@@ -878,6 +887,7 @@ export default function LiveWatchView(props: Props) {
                 onPointerCancel={canMod ? endPress : undefined}
                 onContextMenu={canMod ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
                 onClick={botProduct ? (e) => {
+                  e.stopPropagation(); // 「담기 ›」 줄은 상품 창만(재생 막대 안 띄움)
                   const d = downAt.current;
                   if (modTarget || (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8)) return; // 길게 누름·끌기는 열지 않음
                   props.onOpenProduct(botProduct.productId, botProduct.detailName || undefined);
