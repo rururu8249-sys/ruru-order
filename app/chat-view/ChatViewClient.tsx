@@ -194,6 +194,23 @@ export default function ChatViewClient() {
     <button type="button" onClick={onClick} disabled={disabled} aria-label={aria}
       style={{ width: "44px", height: "44px", border: `1px solid ${C.line}`, borderRadius: "8px", background: C.btn, color: disabled ? C.mute : C.ink, fontSize: fs, fontWeight: 700, opacity: disabled ? 0.45 : 1, flexShrink: 0 }}>{label}</button>
   );
+  const sizeInput = (label: string, percent: number, min: number, max: number, change: (delta: number) => void, title: string) => (
+    <label className="ruru-chat-percent" title={title}>
+      <input key={`${label}:${percent}`} type="number" inputMode="numeric" min={min} max={max} step={1}
+        aria-label={label} defaultValue={percent}
+        onBlur={(e) => {
+          const value = e.currentTarget.valueAsNumber;
+          const next = Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : percent;
+          e.currentTarget.value = String(next);
+          if (next !== percent) change(next - percent);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { e.currentTarget.value = String(percent); e.currentTarget.blur(); }
+          else if (e.key === "Enter") e.currentTarget.blur();
+        }} />
+      <span aria-hidden="true">%</span>
+    </label>
+  );
   const toggle = (key: "yt" | "site", label: string, dot: string) => {
     const on = show[key];
     const last = on && !(key === "yt" ? show.site : show.yt);
@@ -213,7 +230,7 @@ export default function ChatViewClient() {
 .ruru-chat-view *{box-sizing:border-box}
 .ruru-chat-view button{cursor:pointer;font-family:inherit}
 .ruru-chat-view button:disabled{cursor:default}
-.ruru-chat-view :is(button,select,[role=log]):focus-visible{outline:2px solid #A5D8FF;outline-offset:-3px}
+.ruru-chat-view :is(button,select,input,[role=log]):focus-visible{outline:2px solid #A5D8FF;outline-offset:-3px}
 .ruru-chat-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-wrap:wrap;border-bottom:1px solid #2A2A2A}
 .ruru-chat-brand{display:flex;align-items:center;gap:10px;min-width:0;margin-right:auto}
 .ruru-chat-control{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 12px;border:1px solid #363636;border-radius:8px;background:#1F1F1F;color:#F1F1F1;font-size:14px;white-space:nowrap}
@@ -227,7 +244,9 @@ export default function ChatViewClient() {
 .ruru-chat-panel-title h2{margin:0;font-size:20px;font-weight:750;line-height:1.35}
 .ruru-chat-panel-meta{font-size:13px;color:#AAA;margin-top:3px;font-variant-numeric:tabular-nums}
 .ruru-chat-size{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.ruru-chat-size output{min-width:40px;text-align:center;color:#AAA;font-size:13px;font-variant-numeric:tabular-nums}
+.ruru-chat-percent{display:flex;align-items:center;gap:2px;color:#AAA;font-size:13px;font-variant-numeric:tabular-nums}
+.ruru-chat-percent input{width:50px;height:44px;padding:0 3px;border:1px solid #363636;border-radius:8px;background:#1F1F1F;color:#F1F1F1;font:inherit;text-align:center;appearance:textfield;-moz-appearance:textfield}
+.ruru-chat-percent input::-webkit-inner-spin-button,.ruru-chat-percent input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .ruru-chat-status{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:6px 14px;border-top:1px solid #2A2A2A;font-size:12px;color:#AAA}
 @media(orientation:portrait){.ruru-chat-grid.auto{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr)}}
 .ruru-chat-grid.one{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
@@ -272,7 +291,7 @@ export default function ChatViewClient() {
           </div>
           <div className="ruru-chat-size">
             {sizeBtn("가−", "유튜브 채팅 글자 작게", () => changeYtSize(-1), ytSizeIdx === 0, "15px")}
-            <output aria-label="유튜브 확대 배율">{Math.round(ytScale * 100)}%</output>
+            {sizeInput("유튜브 확대 배율", Math.round(ytScale * 100), 80, 200, changeYtSize, "1%씩 조절 · 숫자 입력 후 Enter 또는 바깥 누르기")}
             {sizeBtn("가+", "유튜브 채팅 글자 크게", () => changeYtSize(1), ytSizeIdx === YT_SCALES.length - 1, "18px")}
           </div>
         </header>
@@ -299,7 +318,7 @@ export default function ChatViewClient() {
           </div>
           <div className="ruru-chat-size">
             {sizeBtn("가−", "사이트 채팅 글자 작게", () => changeSize(-1), sizeIdx === 0, "15px")}
-            <output aria-label="사이트 글자 크기">{fontPx}</output>
+            {sizeInput("사이트 글자 크기", Math.round(fontPx * 5), 60, 170, changeSize, `100% = 20px · 현재 ${fontPx}px · 1%씩 조절`)}
             {sizeBtn("가+", "사이트 채팅 글자 크게", () => changeSize(1), sizeIdx === SIZES.length - 1, "18px")}
           </div>
         </header>
