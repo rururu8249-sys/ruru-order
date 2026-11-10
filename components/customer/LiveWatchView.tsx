@@ -393,6 +393,10 @@ export default function LiveWatchView(props: Props) {
   const emojiMap = useMemo(() => emojiMapOf(emojiItems), [emojiItems]);
   const canEmoji = Boolean(chat?.canEmoji) && emojiItems.length > 0;
   const [emojiOpen, setEmojiOpen] = useState(false);
+  // [14:42 사장님 영상 「이모티콘 넣고 입력칸 다시 누르면 화면 꺼짐」] 원인: 입력칸을 누르는 순간(포커스) 이모티콘 판이 사라져
+  //   쓰기 창이 232px 낮아지고, 같은 손가락의 «클릭»이 그 자리(이제 바깥 어두운 곳)에 떨어져 창이 닫혔음.
+  //   → 바깥 누르기로 닫는 건 «누르기 시작도 바깥»일 때만.
+  const composeDownOnBackdrop = useRef(false);
   const [composeHint, setComposeHint] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const caretRef = useRef<{ start: number; end: number } | null>(null);
@@ -1140,7 +1144,7 @@ export default function LiveWatchView(props: Props) {
 
       {/* 채팅 쓰기 줄 — 쓸 수 있는 손님은 입력칸 오른쪽 웃는 얼굴 → 키보드 자리에 이모티콘 판 */}
       {composeOpen && chat ? (
-        <div role="dialog" aria-modal="true" aria-label="채팅 쓰기" onClick={() => setComposeOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "flex-end" }}>
+        <div role="dialog" aria-modal="true" aria-label="채팅 쓰기" onPointerDown={(e) => { composeDownOnBackdrop.current = e.target === e.currentTarget; }} onClick={(e) => { if (e.target === e.currentTarget && composeDownOnBackdrop.current) setComposeOpen(false); composeDownOnBackdrop.current = false; }} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "flex-end" }}>
           <form
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => { e.preventDefault(); if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } setEmojiOpen(false); void sendChat(); }}
