@@ -7393,8 +7393,10 @@ export default function OrderPage() {
                   방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>바로 구매</b> 가능</> : null}
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
+                {uiV2 ? null : (
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "40px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
-                {broadcastYoutubeUrl ? (
+                )}
+                {!uiV2 && broadcastYoutubeUrl ? (
                   <button type="button" aria-label="유튜브 채널 열기" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flexShrink: 0, width: "36px", height: "36px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer" } : { flexShrink: 0, width: "30px", height: "30px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "transparent", color: "#fff", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>▶</button>
                 ) : null}
                 </div>
@@ -7406,8 +7408,10 @@ export default function OrderPage() {
                   방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>바로 구매</b> 가능</> : null}
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
+                {uiV2 ? null : (
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "40px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
-                {broadcastYoutubeUrl ? (
+                )}
+                {!uiV2 && broadcastYoutubeUrl ? (
                   <button type="button" aria-label="유튜브 채널 열기" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flexShrink: 0, width: "36px", height: "36px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer" } : { flexShrink: 0, width: "30px", height: "30px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "transparent", color: "#fff", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>▶</button>
                 ) : null}
               </div>
@@ -7427,11 +7431,13 @@ export default function OrderPage() {
                 {nextLiveText ? <>다음 라이브 · {nextLiveText}<br /></> : null}
                 {productListState === "loading" || instantReadyCount > 0 ? <>아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>지금 바로 주문</b>하실 수 있어요{uiS5 ? "" : " 👇"}</> : null}
               </div>
-              <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+              <div style={{ display: uiV2 ? "none" : "flex", gap: "8px", marginTop: "10px" }}>
+                {uiV2 ? null : (
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1.2, height: "44px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, cursor: "pointer" } : { flex: 1.2, height: "40px", border: "none", borderRadius: "12px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
                   {uiS5 ? "방송 알림 받기" : "🔔 방송 알림 받기"}
                 </button>
-                {broadcastYoutubeUrl ? (
+                )}
+                {!uiV2 && broadcastYoutubeUrl ? (
                   <button type="button" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flex: 0.8, height: "44px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: "pointer" } : { flex: 0.8, height: "40px", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "12px", background: "transparent", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>▶ 유튜브 채널</button>
                 ) : null}
               </div>
@@ -7476,8 +7482,8 @@ export default function OrderPage() {
                   방송 보면서 주문하기
                 </button>
               ) : null}
-              {/* [2026-11-10 사장님] 「방송 보면서 주문하기」가 보이는 손님에겐 알림·「방송 보러가기」(유튜브) 줄을 숨김 — 알림은 위 닉네임 옆 종, 코드는 그대로 둠 */}
-              <div style={{ display: liveWatchUsable && uiV2 ? "none" : "flex", gap: "8px" }}>
+              {/* [2026-11-10 사장님] 알림·「방송 보러가기」(유튜브) 줄은 새 모양 손님 전원 숨김(16:40 「방송을 하든 안 하든 다 안 나와야」) — 알림은 위 닉네임 옆 종, 코드는 그대로 둠 */}
+              <div style={{ display: uiV2 ? "none" : "flex", gap: "8px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1, height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
                   {liveAlertOptin ? (uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓") : (uiS5 ? "다음방송 알림받기" : "🔔 다음방송 알림받기")}
                 </button>
