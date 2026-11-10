@@ -35,6 +35,7 @@ import {
   type EmojiAccessLists,
 } from "@/lib/liveChatEmojiServer";
 import { koreanPhoneVariants } from "@/lib/order/phone";
+import { parseEmojiKeywords } from "@/lib/liveChatEmojiSuggest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -191,7 +192,11 @@ export async function POST(request: NextRequest) {
           if (names.has(name)) return fail(`이름 「${name}」 이 두 번 있어요.`);
           seen.add(old.id);
           names.add(name);
-          next.push({ ...old, name, on: it.on !== false });
+          // 부르는 말 — 보냈으면 바꿈(빈 목록 = «추천 안 함»), 안 보냈으면 그대로, null 이면 기본 단어표로 되돌림
+          const kw = it.keywords === null ? undefined : Array.isArray(it.keywords) ? parseEmojiKeywords(it.keywords) : old.keywords;
+          const { keywords: _drop, ...rest } = old;
+          void _drop;
+          next.push(kw === undefined ? { ...rest, name, on: it.on !== false } : { ...rest, name, on: it.on !== false, keywords: kw });
         }
         // 화면에 없던 것(다른 창에서 막 올린 것)은 뒤에 그대로
         for (const e of cur.items) if (!seen.has(e.id)) { if (names.has(e.name)) continue; next.push(e); }

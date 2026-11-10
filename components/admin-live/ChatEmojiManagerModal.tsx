@@ -20,6 +20,7 @@ import {
   type ChatEmojiPeriod,
   type ChatEmojiSetting,
 } from "@/lib/liveChatEmoji";
+import { emojiKeywordsOf, parseEmojiKeywords, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 
 type Person = { key: string; phone: string; nickname: string; name: string; total: number | null; canUse: boolean; always: boolean; allowed: boolean; denied: boolean };
 type State = { setting: ChatEmojiSetting; allow: Person[]; deny: Person[]; owners: Person[]; results: Person[] };
@@ -171,6 +172,9 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
+  // [15:41] 부르는 말(쉼표로) — 손님이 이 말을 쓰면 입력칸 위에 추천
+  const [kwText, setKwText] = useState<Record<string, string>>({});
+  const [tryWord, setTryWord] = useState("");
   const [amountText, setAmountText] = useState("");
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
@@ -180,6 +184,7 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
     setSt((prev) => (prev ? { ...prev, ...next } : (next as State)));
     if (next.setting) {
       setNames(Object.fromEntries(next.setting.items.map((e) => [e.id, e.name])));
+      setKwText(Object.fromEntries(next.setting.items.map((e) => [e.id, emojiKeywordsOf(e).join(", ")])));
       setAmountText(next.setting.minAmount.toLocaleString("ko-KR"));
       onChanged?.(next.setting);
       window.dispatchEvent(new Event("ruru-chat-emoji-changed"));
@@ -267,6 +272,21 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
     void saveItems(st.setting.items.map((x) => (x.id === e.id ? { ...x, name: v } : x)), "이름을 바꿨어요.");
   };
 
+  /** 부르는 말 저장 — list=null 이면 기본 단어표로 되돌림 */
+  const saveKeywords = async (e: ChatEmoji, list: string[] | null, okText: string) => {
+    if (!st) return;
+    const r = await post({ action: "save", items: st.setting.items.map((x) => (x.id === e.id ? { id: x.id, name: x.name, on: x.on, keywords: list } : { id: x.id, name: x.name, on: x.on })) }, okText);
+    if (r) apply({ setting: r.setting });
+    else void load();
+  };
+  const commitKeywords = (e: ChatEmoji) => {
+    const raw = kwText[e.id] ?? "";
+    const list = parseEmojiKeywords(raw);
+    const now = emojiKeywordsOf(e);
+    if (list.join("\u0001") === now.join("\u0001")) { setKwText((m) => ({ ...m, [e.id]: now.join(", ") })); return; }
+    void saveKeywords(e, list, list.length ? "부르는 말을 저장했어요." : "부르는 말을 비웠어요 — 이름으로만 떠요.");
+  };
+
   const move = (idx: number, dir: -1 | 1) => {
     if (!st) return;
     const items = [...st.setting.items];
@@ -351,7 +371,30 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
                     <button type="button" disabled={Boolean(uploading) || busy} onClick={() => fileRef.current?.click()} className="h-9 rounded-lg bg-ink px-4 text-[13px] font-bold text-white disabled:opacity-40">+ 이모티콘 추가</button>
                   </div>
                 </div>
-                <p className="mb-3 text-[12px] text-ink-mute">여러 장 한 번에 · 흰 바탕은 투명하게, 둘레 빈 여백은 잘라서 그림이 꽉 차게 · 긴 쪽 {EMOJI_PIXELS}px 로 줄여 저장(한 장 수십 KB)</p>
+                <p className="mb-2 text-[12px] text-ink-mute">여러 장 한 번에 · 흰 바탕은 투명하게, 둘레 빈 여백은 잘라서 그림이 꽉 차게 · 긴 쪽 {EMOJI_PIXELS}px 로 줄여 저장(한 장 수십 KB)</p>
+                <p className="mb-3 text-[12px] text-ink-mute">부르는 말 = 손님이 채팅에 이 말을 쓰면 입력칸 위에 이 이모티콘이 떠요(카톡처럼). 이름은 늘 같이 봐요 · 초성(ㄱㅅ)·반복(ㅋㅋㅋㅋ)·끝말(감사해요)은 저절로 알아들어요.</p>
+                {s.items.length > 0 ? (
+                  <div className="mb-3 rounded-lg bg-surface-2 p-3">
+                    <label className="flex items-center gap-2">
+                      <span className="shrink-0 text-[13px] font-bold text-ink">시험해 보기</span>
+                      <input value={tryWord} onChange={(ev) => setTryWord(ev.target.value.slice(0, 20))} placeholder="손님처럼 써 보기 · 예) ㄱㅅ, ㅋㅋㅋ, 감사해요" aria-label="추천 시험해 보기" className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus:border-ink" />
+                    </label>
+                    {tryWord.trim() ? (() => {
+                      const got = suggestEmojis(tryWord.trim(), s.items);
+                      return got.length === 0 ? <div className="mt-2 text-[13px] text-ink-mute">추천 없음 — 이 말을 어느 이모티콘의 부르는 말에 넣어 주세요.</div> : (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {got.map((e) => (
+                            <span key={e.id} className="inline-flex flex-col items-center gap-0.5 rounded-lg bg-surface px-1 py-1">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={e.url} alt="" className="h-10 w-10 object-contain" />
+                              <span className="text-[12px] text-ink-mute">{e.name}</span>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })() : null}
+                  </div>
+                ) : null}
                 {s.items.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-line p-6 text-center text-[13px] text-ink-mute">아직 이모티콘이 없어요. 「+ 이모티콘 추가」로 사진을 올려 주세요.</div>
                 ) : (
@@ -362,13 +405,23 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={e.url} alt="" className="h-11 w-11 object-contain" />
                         </span>
-                        <label className="min-w-0 flex-1">
-                          <span className="sr-only">이름</span>
-                          <span className="flex items-center gap-1 text-[13px] text-ink-mute">:
-                            <input value={names[e.id] ?? e.name} onChange={(ev) => setNames((n) => ({ ...n, [e.id]: ev.target.value.slice(0, 10) }))} onBlur={() => commitName(e)} onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
-                              aria-label={`이모티콘 이름 ${e.name}`} className="h-9 w-32 rounded-lg border border-line bg-surface px-2 text-[14px] font-bold text-ink outline-none focus:border-ink" />:
-                          </span>
-                        </label>
+                        <div className="min-w-0 flex-1">
+                          <label className="block">
+                            <span className="sr-only">이름</span>
+                            <span className="flex items-center gap-1 text-[13px] text-ink-mute">:
+                              <input value={names[e.id] ?? e.name} onChange={(ev) => setNames((n) => ({ ...n, [e.id]: ev.target.value.slice(0, 10) }))} onBlur={() => commitName(e)} onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+                                aria-label={`이모티콘 이름 ${e.name}`} className="h-9 w-32 rounded-lg border border-line bg-surface px-2 text-[14px] font-bold text-ink outline-none focus:border-ink" />:
+                            </span>
+                          </label>
+                          <label className="mt-1 flex items-center gap-2">
+                            <span className="shrink-0 text-[12px] text-ink-mute">부르는 말</span>
+                            <input value={kwText[e.id] ?? emojiKeywordsOf(e).join(", ")} onChange={(ev) => setKwText((m) => ({ ...m, [e.id]: ev.target.value.slice(0, 600) }))} onBlur={() => commitKeywords(e)} onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+                              placeholder="쉼표로 여러 개 · 예) 감사, 고마워, 땡큐" aria-label={`${e.name} 부르는 말`} className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink outline-none focus:border-ink" />
+                            {Array.isArray(e.keywords) ? (
+                              <button type="button" disabled={busy} onClick={() => void saveKeywords(e, null, "기본 단어로 되돌렸어요.")} className="h-8 shrink-0 px-1 text-[12px] font-bold text-ink-mute underline disabled:opacity-40">기본으로</button>
+                            ) : <span className="shrink-0 text-[12px] text-ink-mute">기본</span>}
+                          </label>
+                        </div>
                         <div className="flex items-center gap-1">
                           <button type="button" onClick={() => move(i, -1)} disabled={i === 0 || busy} aria-label="위로" className="h-9 w-9 rounded-lg border border-line text-[13px] font-bold text-ink disabled:opacity-30">↑</button>
                           <button type="button" onClick={() => move(i, 1)} disabled={i === s.items.length - 1 || busy} aria-label="아래로" className="h-9 w-9 rounded-lg border border-line text-[13px] font-bold text-ink disabled:opacity-30">↓</button>

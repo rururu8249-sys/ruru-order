@@ -18,6 +18,7 @@ import { openOrderInExternalBrowser } from "@/components/customer/KakaoExternalO
 import { parseBotRef } from "@/lib/liveChatBot";
 import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 import { EMOJI_MAX_PER_MSG, countEmojiTokens, encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
+import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 
 export type LiveWatchPinned = {
@@ -401,7 +402,9 @@ export default function LiveWatchView(props: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const caretRef = useRef<{ start: number; end: number } | null>(null);
   const draftEmojiCount = canEmoji ? countEmojiTokens(draft, emojiItems) : 0;
-  const rememberCaret = (el: HTMLInputElement) => { caretRef.current = { start: el.selectionStart ?? el.value.length, end: el.selectionEnd ?? el.value.length }; };
+  // 커서 자리 — 넣기용 ref + 추천 낱말 계산용 state(화면이 다시 그려지게)
+  const [caretEnd, setCaretEnd] = useState<number | null>(null);
+  const rememberCaret = (el: HTMLInputElement) => { caretRef.current = { start: el.selectionStart ?? el.value.length, end: el.selectionEnd ?? el.value.length }; setCaretEnd(caretRef.current.end); };
   const insertEmoji = (e: ChatEmoji) => {
     if (draftEmojiCount >= EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지 보낼 수 있어요.`); return; }
     const token = `:${e.name}:`;
@@ -412,7 +415,29 @@ export default function LiveWatchView(props: Props) {
     if (next.length > LIVE_CHAT_MAX_LEN) { setComposeHint("글이 너무 길어요."); return; }
     setDraft(next);
     caretRef.current = { start: start + token.length, end: start + token.length };
+    setCaretEnd(start + token.length);
     setComposeHint("");
+  };
+  // [15:41 사장님 「카톡처럼 단어 쓰면 이모티콘」] 커서 앞 마지막 낱말 → 어울리는 이모티콘(입력칸 위 한 줄 · 이모티콘 판 맨 위)
+  //   키보드는 그대로(누를 때 입력칸 포커스 안 뺏김), 누르면 «:이름:» 을 커서 자리에 넣고 보내기 누르면 글과 함께 감.
+  //   ✕ 누르면 그 낱말에선 다시 안 뜸(다른 낱말을 쓰면 다시).
+  const [suggestHiddenFor, setSuggestHiddenFor] = useState("");
+  const typedWord = canEmoji && composeOpen ? lastTypedWord(draft.slice(0, Math.min(caretEnd ?? draft.length, draft.length))) : "";
+  const wordSuggests = typedWord ? suggestEmojis(typedWord, emojiItems) : [];
+  const showSuggestRow = wordSuggests.length > 0 && !emojiOpen && typedWord !== suggestHiddenFor && draftEmojiCount < EMOJI_MAX_PER_MSG;
+  const composingRef = useRef(false);
+  const insertSuggested = (e: ChatEmoji) => {
+    const el = inputRef.current;
+    // 한글 조합 중(아직 글자가 덜 끝남)이면 먼저 조합을 끝내야 넣은 뒤 글자가 두 번 들어가지 않음
+    if (el && composingRef.current) { el.blur(); composingRef.current = false; }
+    insertEmoji(e);
+    if (!el) return;
+    // 넣은 뒤에도 키보드·커서 그대로(이모티콘 바로 뒤에서 이어 쓰기) — focus 는 누른 순간 바로 해야 아이폰도 키보드 유지
+    if (document.activeElement !== el) el.focus();
+    window.requestAnimationFrame(() => {
+      const at = caretRef.current?.start ?? el.value.length;
+      try { el.setSelectionRange(at, at); } catch { /* 무시 */ }
+    });
   };
   const openCompose = (withEmoji: boolean) => {
     setEmojiOpen(withEmoji && canEmoji); setComposeHint(""); setComposeOpen(true);
@@ -1165,6 +1190,38 @@ export default function LiveWatchView(props: Props) {
               </div>
             ) : null}
             {composeHint ? <div role="status" style={{ marginBottom: "8px", fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{composeHint}</div> : null}
+            {showSuggestRow ? (
+              // 쓰고 있는 낱말에 어울리는 이모티콘 — 누르면 커서 자리에 넣음(키보드 안 내려감)
+              <div role="group" aria-label={`「${typedWord}」 어울리는 이모티콘`} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px", background: "#F5F5F5", borderRadius: "12px", padding: "2px 2px 2px 6px" }}>
+                <div data-live-scroll="1" style={{ flex: 1, minWidth: 0, display: "flex", gap: "2px", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "none" }}>
+                  {wordSuggests.map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onPointerDown={(ev) => ev.preventDefault()}
+                      onMouseDown={(ev) => ev.preventDefault()}
+                      onClick={() => insertSuggested(e)}
+                      aria-label={`이모티콘 ${e.name} 넣기`}
+                      title={e.name}
+                      style={{ flexShrink: 0, width: "52px", height: "52px", border: "none", borderRadius: "10px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={e.url} alt="" draggable={false} style={{ width: "44px", height: "44px", objectFit: "contain", pointerEvents: "none" }} />
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onPointerDown={(ev) => ev.preventDefault()}
+                  onMouseDown={(ev) => ev.preventDefault()}
+                  onClick={() => setSuggestHiddenFor(typedWord)}
+                  aria-label="추천 이모티콘 닫기"
+                  style={{ flexShrink: 0, width: "44px", height: "44px", border: "none", background: "transparent", color: "#707072", fontSize: "18px", lineHeight: 1, cursor: "pointer", padding: 0 }}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : null}
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <div style={{ flex: 1, minWidth: 0, height: "48px", boxSizing: "border-box", border: "1px solid #E5E5E5", borderRadius: "9999px", display: "flex", alignItems: "center", background: "#FFFFFF" }}>
                 <input
@@ -1174,6 +1231,8 @@ export default function LiveWatchView(props: Props) {
                   onChange={(e) => { setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN)); rememberCaret(e.target); }}
                   onSelect={(e) => rememberCaret(e.currentTarget)}
                   onFocus={() => setEmojiOpen(false)}
+                  onCompositionStart={() => { composingRef.current = true; }}
+                  onCompositionEnd={() => { composingRef.current = false; }}
                   placeholder="채팅 입력"
                   aria-label="채팅 메시지"
                   enterKeyHint="send"
@@ -1206,6 +1265,19 @@ export default function LiveWatchView(props: Props) {
                   <span style={{ fontSize: "13px", color: "#707072" }}>{draftEmojiCount}/{EMOJI_MAX_PER_MSG}</span>
                 </div>
                 <div data-live-scroll="1" style={{ height: "232px", overflowY: "auto", overscrollBehavior: "contain", padding: "8px 12px calc(12px + env(safe-area-inset-bottom))", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))", gap: "4px", alignContent: "start" }}>
+                  {/* 쓰다 만 낱말이 있으면 맨 위에 어울리는 것부터(카톡 이모티콘 «검색»처럼) */}
+                  {wordSuggests.length > 0 ? (
+                    <>
+                      <div style={{ gridColumn: "1 / -1", fontSize: "13px", fontWeight: 600, color: "#707072", padding: "2px 4px 0" }}>「{typedWord}」 어울리는 이모티콘</div>
+                      {wordSuggests.map((e) => (
+                        <button key={`s-${e.id}`} type="button" onClick={() => insertEmoji(e)} aria-label={`이모티콘 ${e.name}`} title={e.name} style={{ height: "60px", border: "none", borderRadius: "12px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={e.url} alt="" draggable={false} style={{ width: "48px", height: "48px", objectFit: "contain" }} />
+                        </button>
+                      ))}
+                      <div style={{ gridColumn: "1 / -1", fontSize: "13px", fontWeight: 600, color: "#707072", padding: "6px 4px 0" }}>전체</div>
+                    </>
+                  ) : null}
                   {emojiItems.map((e) => (
                     <button key={e.id} type="button" onClick={() => insertEmoji(e)} aria-label={`이모티콘 ${e.name}`} title={e.name} style={{ height: "60px", border: "none", borderRadius: "12px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}

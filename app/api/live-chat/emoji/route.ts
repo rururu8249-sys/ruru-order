@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   try {
     const sb = getServiceClient();
     const setting = await readEmojiSetting(sb);
-    const items = setting.items.filter((e) => e.on).map((e) => ({ id: e.id, name: e.name, url: e.url, on: true }));
+    const items = setting.items.filter((e) => e.on).map((e) => ({ id: e.id, name: e.name, url: e.url, on: true, ...(Array.isArray(e.keywords) ? { keywords: e.keywords } : {}) }));
     const kakaoId = String(request.nextUrl.searchParams.get("kakao_id") ?? "").trim().slice(0, 64);
     const canUse = items.length > 0 && kakaoId ? await canUseChatEmoji(sb, kakaoId, setting).catch(() => false) : false;
     return NextResponse.json({ ok: true, items, canUse });

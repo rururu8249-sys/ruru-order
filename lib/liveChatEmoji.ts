@@ -17,7 +17,8 @@ export const EMOJI_MAX_BYTES = 1024 * 1024;
 /** 사장님 지정(11/10 06:29) — 이 번호는 규칙과 상관없이 늘 쓸 수 있음 */
 export const EMOJI_ALWAYS_PHONES = ["01099992420", "01046822420", "01081912420"];
 
-export type ChatEmoji = { id: string; name: string; url: string; on: boolean };
+/** keywords = 손님이 이 말을 쓰면 입력칸 위에 추천(관리 창에서 고침). 없으면 기본 단어표(lib/liveChatEmojiSuggest) */
+export type ChatEmoji = { id: string; name: string; url: string; on: boolean; keywords?: string[] };
 /** off = 아무도 못 씀(최고 관리자만) / all = 로그인 손님 모두 / amount = 누적 구매 금액 이상 / list = 직접 넣은 손님만 */
 export type ChatEmojiAccess = "off" | "all" | "amount" | "list";
 export type ChatEmojiPeriod = "all" | "1y";
@@ -61,6 +62,21 @@ export function uniqueEmojiName(base: string, taken: string[]): string {
   return b;
 }
 
+/** 부르는 말 정리(칸마다 12글자·최대 30개·빈칸/겹침 빼기) — 자세한 비교 규칙은 lib/liveChatEmojiSuggest */
+function cleanKeywords(list: unknown[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of list) {
+    const t = Array.from(String(v ?? "").trim()).slice(0, 12).join("");
+    const k = t.toLowerCase();
+    if (!t || seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
 function cleanItem(v: unknown): ChatEmoji | null {
   const o = (v && typeof v === "object" ? v : null) as Record<string, unknown> | null;
   if (!o) return null;
@@ -68,7 +84,9 @@ function cleanItem(v: unknown): ChatEmoji | null {
   const name = String(o.name ?? "").trim();
   const url = String(o.url ?? "").trim();
   if (!ID_RE.test(id) || !isEmojiName(name) || !/^https:\/\//i.test(url)) return null;
-  return { id, name, url: url.slice(0, 500), on: o.on !== false };
+  const item: ChatEmoji = { id, name, url: url.slice(0, 500), on: o.on !== false };
+  if (Array.isArray(o.keywords)) item.keywords = cleanKeywords(o.keywords);
+  return item;
 }
 
 export function parseChatEmojiSetting(raw: unknown): ChatEmojiSetting {
