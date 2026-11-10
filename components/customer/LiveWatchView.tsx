@@ -160,6 +160,14 @@ function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: st
 // [12:49 사장님 「뒤에 물체 없으면 블러 같다」] 3px 번짐을 빼고 얇은 그림자 두 겹만(글자 둘레가 뿌옇게 안 보이게)
 // 유튜브 캡처 확대: 글자 아래에 아주 얇은 어두운 테두리만(번짐 거의 없음) → 같은 정도로
 const CHAT_TEXT_SHADOW = "0 0 1px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.5)";
+// 닉네임 연한 색 — 사람 색(#RRGGBB)을 흰색과 반쯤 섞음(파스텔). 모르는 값이면 흐린 흰색
+function softNickColor(hex: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return "rgba(255,255,255,0.8)";
+  const n = parseInt(m[1], 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * 0.45);
+  return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+}
 // 유튜브 앱 글꼴 = 안드로이드 Roboto + 한글 Noto Sans CJK(시스템), 아이폰 시스템 글꼴 — 같은 글꼴을 이 화면에 지정(웹 글꼴 내려받기 없음)
 const LIVE_FONT = 'Roboto, "Noto Sans CJK KR", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
@@ -938,7 +946,8 @@ export default function LiveWatchView(props: Props) {
                 <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
                 <span style={{ minWidth: 0, flex: 1 }}>
                   {/* [12:54 사장님 「유튜브랑 똑같이」] 사장님 유튜브 캡처에서 잰 값: 닉네임 흐린 흰색(약 80%)·보통 굵기, 글 흰색·보통 굵기 */}
-                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: "rgba(255,255,255,0.8)" }}>{m.nickname}</span>
+                  {/* [13:44 사장님 「닉네임만 연한 색」] 닉네임만 사람마다 정해진 색을 흰색과 반쯤 섞은 연한 색(글은 흰색 그대로), 루루동이 안내는 흐린 흰색 */}
+                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: m.badge === "bot" ? "rgba(255,255,255,0.8)" : softNickColor(color) }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
                   <span style={{ marginLeft: m.badge ? "4px" : "8px", color: "#FFFFFF" /* 글은 유튜브처럼 늘 흰색 — 연한 색 글은 밝은 배경에서 안 읽힘(12:49), 닉네임만 사람 색 */ }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
