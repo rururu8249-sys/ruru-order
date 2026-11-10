@@ -2,10 +2,12 @@
 // [2026-11-10] 「방송 보며 주문」 ③단계 — 사이트 채팅(손님용).
 //   GET ?bc=방송id → 최근 글 50개(지운 글 빼고) + 고정 공지.
 //   POST { kakao_id, bc, body } → 글 쓰기. 닉네임은 손님이 보낸 값이 아니라 회원 표(customers)의 유튜브 닉네임.
-//   표 live_chat_messages / live_chat_bans 만 쓴다(supabase/sql/live_chat.sql). 주문·돈·포인트 무접촉.
+//   채팅 표 + 관리자 /상품번호 명령의 위젯 순환 설정·소개 고정 해제만 쓴다. 주문·돈·포인트 무접촉.
 //   새 글은 DB 트리거가 소식(Broadcast)으로 모두에게 보낸다.
 import { NextRequest, NextResponse, after } from "next/server";
 import { runLiveChatBot } from "@/lib/liveChatBotServer";
+import { parseChatProductCommand } from "@/lib/liveChatProductCommand";
+import { runChatProductCommand } from "@/lib/liveChatProductCommandServer";
 import { getServiceClient } from "@/lib/youtube";
 import {
   LIVE_CHAT_DEFAULT_WORDS,
@@ -85,8 +87,8 @@ export async function POST(request: NextRequest) {
     // 빠르게 — 서로 상관없는 읽기는 한꺼번에
     const [setting, role, bcRes, custRes, bansRes, lastRes] = await Promise.all([
       readSetting(sb),
-      chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null })),
-      sb.from("broadcasts").select("id, status").eq("id", bc).maybeSingle(),
+      chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null, isMod: false })),
+      sb.from("broadcasts").select("id, status, widget_card_enabled").eq("id", bc).maybeSingle(),
       sb.from("customers").select("id, youtube_nickname, is_blocked, kakao_profile_image").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("live_chat_bans").select("until_at, lifted_at").eq("kakao_id", kakaoId).is("lifted_at", null).order("id", { ascending: false }).limit(5),
       sb.from("live_chat_messages").select("created_at").eq("kakao_id", kakaoId).order("id", { ascending: false }).limit(1).maybeSingle(),
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
     if (!setting.enabled) return fail("지금은 채팅을 쓸 수 없어요.", 403);
 
     // 방송이 켜져 있을 때만
-    const bcRow = bcRes.data as { status?: unknown } | null;
+    const bcRow = bcRes.data as { status?: unknown; widget_card_enabled?: boolean } | null;
     if (!bcRow || String(bcRow.status ?? "") !== "ON") return fail("방송 중에만 쓸 수 있어요.", 403);
 
     // 닉네임은 회원 표에서(카카오 계정 기준, 최신 1줄)
@@ -110,6 +112,19 @@ export async function POST(request: NextRequest) {
     // 너무 빨리 연달아 쓰기 막기
     const lastAt = Date.parse(String((lastRes.data as { created_at?: string } | null)?.created_at ?? ""));
     if (Number.isFinite(lastAt) && Date.now() - lastAt < LIVE_CHAT_MIN_GAP_MS) return fail("조금 천천히 써 주세요.", 429);
+
+    if (body.startsWith("/")) {
+      if (!role.isMod) return fail("상품 순환 명령은 채팅 관리자만 사용할 수 있어요.", 403);
+      const query = parseChatProductCommand(body);
+      if (!query) return fail("/335 또는 /mc335처럼 상품번호만 입력해 주세요.");
+      if (bcRow.widget_card_enabled === false) return fail("방송 관리에서 상품 위젯을 먼저 켜 주세요.");
+      try {
+        const message = await runChatProductCommand(sb, bc, query, { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null });
+        return NextResponse.json({ ok: true, message: parseChatMessage(message) });
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : "상품 순환을 변경하지 못했어요.");
+      }
+    }
 
     const masked = maskBannedWords(body, [...LIVE_CHAT_DEFAULT_WORDS, ...setting.words]);
     // [2026-11-10] 이모티콘 — «:이름:» 이 있고 쓸 수 있는 손님이면 그림 표식으로(아니면 글자 그대로)

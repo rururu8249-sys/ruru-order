@@ -69,6 +69,7 @@ const SEED_BRAND_CODES: Array<[string[], string[]]> = [
   [["로에베", "loewe"], ["loe"]],
   [["미우미우", "miumiu"], ["miu"]],
   [["막스마라", "maxmara"], ["mx"]],
+  [["몽클레어", "몽클레르", "moncler"], ["mc"]],
   [["브루넬로쿠치넬리", "쿠치넬리", "brunellocucinelli", "cucinelli"], ["bc"]],
 ];
 
