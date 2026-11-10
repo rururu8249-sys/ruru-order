@@ -51,6 +51,7 @@ import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { CHAT_TEMP_ID_BASE, isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
 import { encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
+import { createLiveReadPrefetch } from "@/lib/liveReadPrefetch";
 import { LIVE_CHAT_BOT_NICK, CART_NEXT_STEP_TEXT, orderItemLine, cartOwnerTag, cartRefOwner } from "@/lib/liveChatBot";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
@@ -1451,11 +1452,18 @@ export default function OrderPage() {
   const [liveViewOn, setLiveViewOn] = useState<boolean | null>(null);
   // [2026-11-10] 방송 화면 «쓰는 법» 창이 떠 있는 동안 다른 안내 팝업은 기다린다
   const [liveGuideOpen, setLiveGuideOpen] = useState(false);
-  // [2026-11-10] 지난번 방송 화면으로 봤던 손님은 쇼핑몰 화면이 먼저 번쩍 보이지 않게, 정해질 때까지 검은 화면(최대 4초)
-  const [liveBootCover, setLiveBootCover] = useState(false);
-  useLayoutEffect(() => {
-    try { if (window.localStorage.getItem("ruru_live_watch_boot") === "1") setLiveBootCover(true); } catch { /* 무시 */ }
-  }, []);
+  // First paint (including server HTML) stays covered until the initial view is decided.
+  const [liveBootCover, setLiveBootCover] = useState(true);
+  const [liveBootSlow, setLiveBootSlow] = useState(false);
+  // Display readiness only; the existing operator/test-order decision is unchanged.
+  const [liveViewerRolePhone, setLiveViewerRolePhone] = useState<string | null>(null);
+  const liveReadPrefetch = useRef<ReturnType<typeof createLiveReadPrefetch> | null>(null);
+  if (!liveReadPrefetch.current) liveReadPrefetch.current = createLiveReadPrefetch(async (url) => {
+    const res = await fetch(url, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok || !json?.ok) throw new Error("Live read failed");
+    return json;
+  });
   const [liveOrderToasts, setLiveOrderToasts] = useState<LiveWatchOrderToast[]>([]);
   // [2026-11-10 ③] 사이트 채팅(방송 보며 주문 화면 안에서만)
   const [liveChatMessages, setLiveChatMessages] = useState<LiveChatMessage[]>([]);
@@ -2316,12 +2324,16 @@ export default function OrderPage() {
 
     if (clean.length < 10 || clean.length > 11) {
       setOperatorTestAccount(null);
+      setLiveViewerRolePhone(clean);
       return;
     }
 
     (async () => {
       const flags = await getOperatorTestOrderFlags(clean);
-      if (!cancelled) setOperatorTestAccount(flags.isTestOrder ? flags : null);
+      if (!cancelled) {
+        setOperatorTestAccount(flags.isTestOrder ? flags : null);
+        setLiveViewerRolePhone(clean);
+      }
     })();
 
     return () => {
@@ -3019,19 +3031,36 @@ export default function OrderPage() {
       .maybeSingle();
 
     // [2026-11-09] 「방송 보며 주문」 설정(누구에게·처음 화면) — 없거나 실패하면 꺼짐
-    const liveWatchRequest = supabase
+    const liveWatchRequest = Promise.resolve(supabase
       .from("settings")
       .select("value")
       .eq("key", LIVE_WATCH_KEY)
-      .maybeSingle();
+      .maybeSingle());
 
-    const broadcastRequest = supabase
+    const broadcastRequest = Promise.resolve(supabase
       .from("broadcasts")
       .select("*")
       .eq("status", "ON")
       .order("started_at", { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle());
+    // Preload the public emoji dictionary only for a known eligible initial live view.
+    // Chat history is read fresh alongside its realtime subscription (no snapshot gap).
+    void Promise.all([liveWatchRequest, broadcastRequest]).then(([watch, live]) => {
+      const setting = parseLiveWatchSetting(watch.data?.value);
+      const bid = live.data?.id;
+      if (live.error || !bid || setting.audience === "off" || !youtubeVideoIdFromUrl(live.data?.youtube_live_url || live.data?.youtube_url)) return;
+      let remembered: string | null = null;
+      let kid = "";
+      let phone = "";
+      try {
+        remembered = window.sessionStorage.getItem(liveWatchViewKey(bid));
+        kid = String(window.localStorage.getItem("ruru_kakao_id") || "").trim();
+        phone = String(window.localStorage.getItem("ruru_customer_phone") || "");
+      } catch { /* storage unavailable: use the configured first view */ }
+      if (!initialLiveView(setting, remembered) || !canUseLiveWatch({ setting, broadcastOn: true, videoId: youtubeVideoIdFromUrl(live.data?.youtube_live_url || live.data?.youtube_url), isAdminViewer: operatorTestAccount !== null, viewerPhone: phone })) return;
+      liveReadPrefetch.current?.preload(`/api/live-chat/emoji${kid ? `?kakao_id=${encodeURIComponent(kid)}` : ""}`);
+    }).catch(() => { /* normal entry reads can retry */ });
     const [{ data: shopSetting }, { data: nextLiveSetting }, { data: pausedTextSetting }, { data: liveWatchSettingRow }, { data, error }] = await Promise.all([shopRequest, nextLiveRequest, pausedTextRequest, liveWatchRequest, broadcastRequest]);
     setLiveWatchSetting(parseLiveWatchSetting(liveWatchSettingRow?.value));
     setShopOpen(String(shopSetting?.value ?? "").trim().toLowerCase() !== "false");
@@ -6527,23 +6556,25 @@ export default function OrderPage() {
     viewerPhone: customerPhone,
   });
   const liveWatchShown = liveWatchUsable && liveViewOn === true;
-  // 검은 화면은: 방송 화면이 뜨면 / 쇼핑몰 화면으로 정해지면 / 방송이 꺼져 있으면 / 4초 지나면 걷는다
+  // A slow request must not reveal home and then jump to live a few seconds later.
   useEffect(() => {
     if (!liveBootCover) return;
-    const t = window.setTimeout(() => setLiveBootCover(false), 4000);
+    const t = window.setTimeout(() => setLiveBootSlow(true), 8000);
     return () => window.clearTimeout(t);
   }, [liveBootCover]);
-  useEffect(() => {
-    if (!liveBootCover) return;
-    if (liveWatchShown || liveViewOn === false || (broadcastLoaded && !isBroadcastOn)) setLiveBootCover(false);
-    if (broadcastLoaded && !isBroadcastOn) { try { window.localStorage.removeItem("ruru_live_watch_boot"); } catch { /* 무시 */ } }
-  }, [liveBootCover, liveWatchShown, liveViewOn, broadcastLoaded, isBroadcastOn]);
+  useLayoutEffect(() => {
+    if (!liveBootCover || !broadcastLoaded) return;
+    const rolePending = isBroadcastOn && Boolean(liveWatchVideoId) && liveWatchSetting.audience === "admin" && !liveWatchUsable && liveViewerRolePhone !== normalizePhone(customerPhone);
+    if (hasSavedInfo && rolePending) return;
+    if (!hasSavedInfo || !liveWatchUsable || liveWatchShown || liveViewOn === false) setLiveBootCover(false);
+    if (!isBroadcastOn) { try { window.localStorage.removeItem("ruru_live_watch_boot"); } catch { /* 무시 */ } }
+  }, [liveBootCover, broadcastLoaded, hasSavedInfo, liveWatchUsable, liveWatchShown, liveViewOn, isBroadcastOn, liveWatchVideoId, liveWatchSetting.audience, liveViewerRolePhone, customerPhone]);
   useEffect(() => {
     if (liveWatchShown) { try { window.localStorage.setItem("ruru_live_watch_boot", "1"); } catch { /* 무시 */ } }
   }, [liveWatchShown]);
   // 방송이 바뀌면 손님이 고른 화면도 새로 정한다
-  useEffect(() => { setLiveViewOn(null); }, [broadcast?.id]);
-  useEffect(() => {
+  useLayoutEffect(() => { setLiveViewOn(null); }, [broadcast?.id]);
+  useLayoutEffect(() => {
     if (!liveWatchUsable || liveViewOn !== null) return;
     let remembered: string | null = null;
     try { remembered = window.sessionStorage.getItem(liveWatchViewKey(broadcast?.id)); } catch { remembered = null; }
@@ -6561,6 +6592,7 @@ export default function OrderPage() {
     if (!liveWatchShown) return;
     const bid = broadcast?.id;
     if (!bid) return;
+    let active = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let lastAt = 0;
     const seenGroups = new Set<string>();
@@ -6583,9 +6615,8 @@ export default function OrderPage() {
       try {
         let kid = "";
         try { kid = String(window.localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { /* 무시 */ }
-        const res = await fetch(`/api/live-chat/emoji${kid ? `?kakao_id=${encodeURIComponent(kid)}` : ""}`, { cache: "no-store" });
-        const json = await res.json().catch(() => null);
-        if (!json?.ok) return;
+        const json = await liveReadPrefetch.current!.take(`/api/live-chat/emoji${kid ? `?kakao_id=${encodeURIComponent(kid)}` : ""}`);
+        if (!active || !json?.ok) return;
         setLiveChatEmojis(Array.isArray(json.items) ? json.items : []);
         setLiveChatCanEmoji(json.canUse === true);
       } catch { /* 이모티콘 못 읽어도 채팅은 그대로(글자로 보임) */ }
@@ -6595,6 +6626,7 @@ export default function OrderPage() {
     const loadViewers = async () => {
       try {
         const j = await fetch(`/api/live-viewers?bc=${encodeURIComponent(String(bid))}`).then((r) => r.json());
+        if (!active) return;
         setLiveViewers(j && Number.isFinite(Number(j.viewers)) && j.viewers != null ? Number(j.viewers) : null);
         setLiveSiteViewers(j && Number.isFinite(Number(j.site)) && j.site != null ? Number(j.site) : null);
       } catch { /* 숫자 못 읽으면 그대로 */ }
@@ -6609,7 +6641,7 @@ export default function OrderPage() {
       try {
         const res = await fetch(`/api/live-chat?bc=${encodeURIComponent(String(bid))}&meta=1`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
-        if (!json?.ok) return;
+        if (!active || !json?.ok) return;
         const on = json.enabled === true;
         const wasOn = liveChatEnabledRef.current;
         setLiveChatEnabled(on);
@@ -6623,7 +6655,7 @@ export default function OrderPage() {
       try {
         const res = await fetch(`/api/live-chat?bc=${encodeURIComponent(String(bid))}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
-        if (!json?.ok) return;
+        if (!active || !json?.ok) return;
         setLiveChatEnabled(json.enabled === true);
         setLiveChatNotice(String(json.notice ?? ""));
         const list = (Array.isArray(json.messages) ? json.messages : []).map(parseChatMessage).filter(Boolean) as LiveChatMessage[];
@@ -6672,7 +6704,7 @@ export default function OrderPage() {
         window.setTimeout(() => setLiveOrderToasts((prev) => prev.filter((t) => t.key !== toast.key)), 4000);
       },
     });
-    return () => { if (timer) clearTimeout(timer); window.clearInterval(emojiTimer); window.clearInterval(viewersTimer); window.clearInterval(chatMetaTimer); off(); };
+    return () => { active = false; if (timer) clearTimeout(timer); window.clearInterval(emojiTimer); window.clearInterval(viewersTimer); window.clearInterval(chatMetaTimer); off(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveWatchShown, broadcast?.id]);
   // 방송 화면 상품 목록 — 지금 손님 화면에 보이는 방송 상품과 같은 목록(같은 순서)
@@ -7181,6 +7213,12 @@ export default function OrderPage() {
 
   return (
     <OrderPageShell tone={uiV2 ? "v2" : undefined} edge16={uiS7} wide={uiPc}>
+      {liveBootCover && !liveWatchShown ? (
+        <div role="status" aria-label="화면 준비 중" style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#E5E5E5", display: "flex", flexDirection: "column", gap: 16, alignItems: "center", justifyContent: "center", fontSize: "15px" }}>
+          <span>화면 준비 중…</span>
+          {liveBootSlow ? <button type="button" onClick={() => window.location.reload()} style={{ border: "1px solid #666", borderRadius: 24, padding: "10px 20px", background: "#222", color: "#fff", cursor: "pointer" }}>다시 불러오기</button> : null}
+        </div>
+      ) : null}
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}@keyframes ruruLivePing{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.8);opacity:0}}@keyframes ruruNudge{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@keyframes ruruLiveRing{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.7);opacity:0}}@keyframes ruruLiveBlink{0%,100%{opacity:1}50%{opacity:.45}}@media (prefers-reduced-motion: reduce){.ruru-live-ping,.ruru-nudge-arrow,.ruru-live-ring,.ruru-live-blink{animation:none!important}}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
       {/* [2026-09-20 실측] 손님 첫 화면에서 상품이 보이기까지 상단 «껍데기»가 388px였다.
@@ -8249,9 +8287,6 @@ export default function OrderPage() {
           })()}
 
           {/* [2026-11-09] 「방송 보며 주문」 화면 — 옵션 창·주문서 창(z 100)은 이 위로 올라온다 */}
-          {liveBootCover && !liveWatchShown ? (
-            <div role="status" aria-label="방송 화면 여는 중" style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#E5E5E5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px" }}>방송 화면 여는 중…</div>
-          ) : null}
           {liveWatchShown ? (
             <LiveWatchView
               videoId={liveWatchVideoId}

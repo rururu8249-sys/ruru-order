@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+let releaseSetting,queries=[],enabled=true,meta=false,failList=false;
+const sb={from(table){let pin=false;const filters=[];const q={select(){return q;},eq(k,v){filters.push(['eq',k,v]);return q;},is(k,v){filters.push(['is',k,v]);return q;},not(){pin=true;return q;},order(){return q;},limit(){return q;},maybeSingle(){return q;},then(resolve,reject){if(table==='settings')return new Promise(r=>{releaseSetting=()=>r({data:{value:JSON.stringify({enabled,notice:'공지'})}});}).then(resolve,reject);queries.push({table,pin,filters});return Promise.resolve({data:pin?null:[],error:failList&&!pin?{message:'offline'}:null}).then(resolve,reject);}};return q;}};
+const route=createUiLoader({'@/lib/youtube':{getServiceClient:()=>sb},'@/lib/liveChatBotServer':{},'@/lib/liveChatEmojiServer':{},'@/lib/liveChatServer':{}})('app/api/live-chat/route.ts');
+const request=()=>({nextUrl:new URL('https://example.com/api/live-chat?bc=00000000-0000-0000-0000-000000000001'+(meta?'&meta=1':''))});
+const pending=route.GET(request());await new Promise(r=>setImmediate(r));assert.equal(queries.length,2,'Recent messages and pin must start while settings are pending');for(const q of queries){assert.ok(q.filters.some(x=>x[1]==='hidden_at'&&x[2]===null));assert.ok(q.filters.some(x=>x[1]==='broadcast_id'));}releaseSetting();let res=await pending;assert.equal(res.status,200);assert.equal((await res.json()).notice,'공지');
+queries=[];meta=true;const minimal=route.GET(request());await new Promise(r=>setImmediate(r));assert.equal(queries.length,0,'Meta poll must not load messages');releaseSetting();await minimal;
+meta=false;enabled=false;const off=route.GET(request());await new Promise(r=>setImmediate(r));releaseSetting();assert.deepEqual(await (await off).json(),{ok:true,enabled:false,notice:'',messages:[],pinned:null});
+enabled=true;failList=true;const failure=route.GET(request());await new Promise(r=>setImmediate(r));releaseSetting();assert.equal((await failure).status,500);
+assert.equal((await route.GET({nextUrl:new URL('https://example.com/api/live-chat?bc=invalid')})).status,400);
+console.log('PASS concurrent initial reads; metadata-only poll, disabled chat, hidden/broadcast filtering and errors preserved');

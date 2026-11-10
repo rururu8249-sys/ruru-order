@@ -48,15 +48,21 @@ export async function GET(request: NextRequest) {
   if (!UUID.test(bc)) return fail("방송 정보가 없어요.");
   try {
     const sb = getServiceClient();
-    const setting = await readSetting(sb);
-    if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [], pinned: null });
-    // [2026-11-10 09:50] 설정만(켜짐·공지) — 손님 화면이 공지 바뀐 걸 다시 읽을 때
-    if (request.nextUrl.searchParams.get("meta") === "1") return NextResponse.json({ ok: true, enabled: true, notice: setting.notice });
+    // Metadata polling needs only the setting. Initial history reads are independent
+    // and can run in parallel; disabled chat still returns no messages or pin.
+    if (request.nextUrl.searchParams.get("meta") === "1") {
+      const setting = await readSetting(sb);
+      return NextResponse.json(setting.enabled
+        ? { ok: true, enabled: true, notice: setting.notice }
+        : { ok: true, enabled: false, notice: "", messages: [], pinned: null });
+    }
     const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref";
-    const [listRes, pinRes] = await Promise.all([
+    const [setting, listRes, pinRes] = await Promise.all([
+      readSetting(sb),
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).order("id", { ascending: false }).limit(LIVE_CHAT_RECENT),
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).not("pinned_at", "is", null).order("pinned_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+    if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [], pinned: null });
     if (listRes.error) return fail("채팅을 못 불러왔어요.", 500);
     const messages = (listRes.data ?? []).map(parseChatMessage).filter(Boolean).reverse();
     return NextResponse.json({ ok: true, enabled: true, notice: setting.notice, messages, pinned: pinRes.data ? parseChatMessage(pinRes.data) : null });
