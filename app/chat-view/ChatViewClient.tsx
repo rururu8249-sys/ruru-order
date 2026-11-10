@@ -153,7 +153,7 @@ export default function ChatViewClient() {
     return (
       <button type="button" role="switch" aria-checked={on} disabled={last} onClick={() => setShowSaved({ ...show, [key]: !on })}
         title={last ? "둘 다 끌 수는 없어요" : undefined}
-        style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 14px 0 10px", borderRadius: "9999px", border: `1px solid ${on ? "#5A5A5A" : C.line}`, background: on ? "#2A2A2A" : "transparent", color: on ? C.ink : C.mute, fontSize: "16px", fontWeight: 700, cursor: last ? "default" : "pointer" }}>
+        style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 14px 0 10px", borderRadius: "9999px", whiteSpace: "nowrap", flexShrink: 0, border: `1px solid ${on ? "#5A5A5A" : C.line}`, background: on ? "#2A2A2A" : "transparent", color: on ? C.ink : C.mute, fontSize: "16px", fontWeight: 700, cursor: last ? "default" : "pointer" }}>
         <span aria-hidden="true" style={{ position: "relative", width: "34px", height: "20px", borderRadius: "9999px", background: on ? dot : "#3A3A3A", transition: "background .15s", flexShrink: 0 }}>
           <span style={{ position: "absolute", top: "2px", left: on ? "16px" : "2px", width: "16px", height: "16px", borderRadius: "9999px", background: "#FFFFFF", transition: "left .15s" }} />
         </span>
@@ -168,10 +168,10 @@ export default function ChatViewClient() {
       <style>{`.ruru-chat-grid{grid-template-columns:1fr 1fr;grid-template-rows:100%}.ruru-chat-grid.one{grid-template-columns:100%;grid-template-rows:100%}@media (orientation: portrait){.ruru-chat-grid{grid-template-columns:100%;grid-template-rows:1fr 1fr}}`}</style>
 
       {/* 위 줄 — 채팅 켜고 끄기(하나는 늘 켜짐) */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px 0", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px 0", flexWrap: "nowrap", minWidth: 0 }}>
         {toggle("yt", "유튜브 채팅", "#FF0000")}
         {toggle("site", "사이트 채팅", "#3EA6FF")}
-        {bc?.paused ? <span style={{ marginLeft: "auto", fontSize: "15px", fontWeight: 700, color: C.mute }}>방송 쉬는 중</span> : null}
+        {bc?.paused ? <span style={{ marginLeft: "auto", fontSize: "15px", fontWeight: 700, color: C.mute, whiteSpace: "nowrap" }}>방송 쉬는 중</span> : null}
       </div>
 
       <div className={`ruru-chat-grid${both ? "" : " one"}`} style={{ flex: 1, minHeight: 0, display: "grid", gap: "8px", padding: "8px", boxSizing: "border-box" }}>
