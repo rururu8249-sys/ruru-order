@@ -846,6 +846,9 @@ export default function LiveWatchView(props: Props) {
       {/* 돌려보기 모드 — 안의 모든 것이 손가락을 막지 않게(유튜브 막대로 그대로) */}
       <style>{`[data-live-seek="1"], [data-live-seek="1"] * { pointer-events: none !important; }`}</style>
       <style>{`html, body { overflow: hidden !important; overscroll-behavior: none !important; }`}</style>
+      {/* 13:03 사장님 유튜브 캡처 11장 실측: 유튜브도 채팅 뒤(화면 아래 약 45%)를 위에서 아래로 점점 어둡게 깖
+          (흰 털 화면 밝기 206 → 맨 아래 80 ≈ 검정 60%). 채팅 칸 위부터만, 손가락 통과, 집중모드·돌려보기엔 숨김 */}
+      <div aria-hidden="true" style={{ display: focus || seekMode ? "none" : "block", position: "absolute", left: 0, right: 0, bottom: 0, height: `calc(${CHAT_HEIGHTS[chatView.height]} + 170px + env(safe-area-inset-bottom))`, background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 30%, rgba(0,0,0,0.45) 65%, rgba(0,0,0,0.6) 100%)", pointerEvents: "none" }} />
       <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: seekMode ? 0.06 : 1, transition: "opacity 0.2s" }}>
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex" }}>
