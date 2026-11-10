@@ -158,6 +158,7 @@ export default function ChatViewClient() {
           <span style={{ position: "absolute", top: "2px", left: on ? "16px" : "2px", width: "16px", height: "16px", borderRadius: "9999px", background: "#FFFFFF", transition: "left .15s" }} />
         </span>
         {label}
+        <span style={{ fontSize: "14px", fontWeight: 700, color: on ? C.ink : C.mute, marginLeft: "2px" }}>{on ? "켬" : "끔"}</span>
       </button>
     );
   };
@@ -168,6 +169,7 @@ export default function ChatViewClient() {
 
       {/* 위 줄 — 채팅 켜고 끄기(하나는 늘 켜짐) */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px 0", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "15px", fontWeight: 700, color: C.soft, marginRight: "4px", whiteSpace: "nowrap" }}>채팅 화면 켜기·끄기</span>
         {toggle("yt", "유튜브 채팅", "#FF0000")}
         {toggle("site", "사이트 채팅", "#3EA6FF")}
         {bc?.paused ? <span style={{ marginLeft: "auto", fontSize: "15px", fontWeight: 700, color: C.mute }}>방송 쉬는 중</span> : null}
