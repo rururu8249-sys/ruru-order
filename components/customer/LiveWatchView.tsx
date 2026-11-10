@@ -755,11 +755,11 @@ export default function LiveWatchView(props: Props) {
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
       {/* 돌려보기 중 — 영상 전체를 반투명 검정으로 어둡게(유튜브 막대는 빨강·흰색이라 그대로 보임) */}
-      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
+      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
       {/* [09:08 사장님] 채팅 글 뒤 아래쪽만 살짝 어둡게 — 밝은 화면에서도 글이 또렷하게(손가락은 통과) */}
-      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: "calc(84px + env(safe-area-inset-bottom))", height: "45%", pointerEvents: "none", background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 45%, rgba(0,0,0,0.42) 100%)", opacity: seekMode || focus ? 0 : 1, transition: "opacity 0.2s" }} />
+      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "calc(45% + 84px + env(safe-area-inset-bottom))", pointerEvents: "none", background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 45%, rgba(0,0,0,0.42) 100%)", opacity: seekMode || focus ? 0 : 1, transition: "opacity 0.2s" }} />
       {/* 영상 위 투명 판 — 빈 곳 누름을 우리가 직접 받음(유튜브로 손가락이 안 감) */}
-      <div aria-hidden="true" onClick={toggleSeek} style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", background: "transparent", WebkitTapHighlightColor: "transparent" }} />
+      <div aria-hidden="true" onClick={toggleSeek} style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, background: "transparent", WebkitTapHighlightColor: "transparent" }} />
       {seekMode ? (
         <LiveSeekControls
           getPos={() => {
@@ -862,6 +862,8 @@ export default function LiveWatchView(props: Props) {
             aria-label="채팅"
             aria-live="polite"
             onScroll={onChatScroll}
+            // 글 줄이 아닌 빈 곳(줄 사이·글 오른쪽)을 «톡» 누르면 재생 막대(끌어 올리고 내리는 건 스크롤)
+            onClick={(e) => { if (e.target === e.currentTarget) toggleSeek(); }}
             style={{ pointerEvents: "auto", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
           >
             {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
