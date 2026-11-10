@@ -12,10 +12,9 @@ import { mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveCha
 import { youtubeVideoIdFromUrl } from "@/lib/liveWatch";
 import type { ChatEmoji } from "@/lib/liveChatEmoji";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
+import { CHAT_FONT_SIZES as SIZES, CHAT_YT_SCALES as YT_SCALES, CHAT_FONT_KEY as SIZE_KEY, CHAT_YT_SCALE_KEY as YT_SIZE_KEY, readChatViewSizeIndex } from "@/lib/chatViewSize";
 
 type Bc = { id: string; title: string; videoId: string; paused: boolean };
-const SIZE_KEY = "ruru_chat_view_size";
-const SIZES = [16, 18, 20, 23, 26, 30, 34];
 
 const BADGE: Record<string, { label: string; bg: string; fg: string }> = {
   crown: { label: "관리자", bg: "rgba(255,212,59,0.18)", fg: "#FFD43B" },
@@ -25,9 +24,7 @@ const BADGE: Record<string, { label: string; bg: string; fg: string }> = {
 };
 // [16:11 사장님] 어두운 화면(눈 덜 피곤) — 유튜브 어두운 채팅과 같은 색
 const C = { page: "#000000", panel: "#0F0F0F", line: "#2A2A2A", btn: "#1F1F1F", ink: "#F1F1F1", soft: "#AAAAAA", mute: "#8A8A8A" };
-// 유튜브 채팅 확대 배율(기본 1.3) · 켜고 끄기 — 이 기기에만 기억
-const YT_SCALES = [1, 1.15, 1.3, 1.5, 1.75, 2];
-const YT_SIZE_KEY = "ruru_chat_view_yt_size";
+// 유튜브 확대 배율과 사이트 글자 크기는 각각 이 기기에만 기억.
 const SHOW_KEY = "ruru_chat_view_show";
 const LAYOUT_KEY = "ruru_chat_view_layout";
 type Layout = "auto" | "columns" | "rows";
@@ -37,8 +34,8 @@ export default function ChatViewClient() {
   const [loaded, setLoaded] = useState(false);
   const [list, setList] = useState<LiveChatMessage[]>([]);
   const [emojis, setEmojis] = useState<ChatEmoji[]>([]);
-  const [sizeIdx, setSizeIdx] = useState(2);
-  const [ytSizeIdx, setYtSizeIdx] = useState(3);
+  const [sizeIdx, setSizeIdx] = useState(SIZES.indexOf(20));
+  const [ytSizeIdx, setYtSizeIdx] = useState(YT_SCALES.indexOf(1.5));
   const [layout, setLayout] = useState<Layout>("auto");
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
@@ -53,17 +50,25 @@ export default function ChatViewClient() {
 
   // 글자 크기(이 기기에만)
   useEffect(() => {
+    const screen = window.matchMedia("(max-height: 650px) and (orientation: landscape)");
+    const applySizes = () => {
+      const compact = screen.matches;
+      try {
+        setSizeIdx(readChatViewSizeIndex(window.localStorage, "site", compact));
+        setYtSizeIdx(readChatViewSizeIndex(window.localStorage, "yt", compact));
+      } catch { setSizeIdx(SIZES.indexOf(compact ? 16 : 20)); setYtSizeIdx(YT_SCALES.indexOf(compact ? 1 : 1.5)); }
+    };
+    screen.addEventListener("change", applySizes);
     const t = window.setTimeout(() => {
-      try { const raw = window.localStorage.getItem(SIZE_KEY); const n = Number(raw); if (raw != null && Number.isInteger(n) && n >= 0 && n < SIZES.length) setSizeIdx(n); } catch { /* 무시 */ }
-      try { const raw = window.localStorage.getItem(YT_SIZE_KEY); const n = Number(raw); if (raw != null && Number.isInteger(n) && n >= 0 && n < YT_SCALES.length) setYtSizeIdx(n); } catch { /* 무시 */ }
+      applySizes();
       try { const v = window.localStorage.getItem(LAYOUT_KEY); if (v === "auto" || v === "columns" || v === "rows") setLayout(v); } catch { /* 무시 */ }
       try { const v = JSON.parse(window.localStorage.getItem(SHOW_KEY) || "null"); if (v && typeof v === "object" && (v.yt === true || v.site === true)) setShow({ yt: v.yt !== false, site: v.site !== false }); } catch { /* 무시 */ }
     }, 0);
-    return () => window.clearTimeout(t);
+    return () => { window.clearTimeout(t); screen.removeEventListener("change", applySizes); };
   }, []);
-  const changeYtSize = (d: number) => setYtSizeIdx((v) => { const n = Math.min(YT_SCALES.length - 1, Math.max(0, v + d)); try { window.localStorage.setItem(YT_SIZE_KEY, String(n)); } catch { /* 무시 */ } return n; });
+  const changeYtSize = (d: number) => setYtSizeIdx((v) => { const n = Math.min(YT_SCALES.length - 1, Math.max(0, v + d)); try { window.localStorage.setItem(YT_SIZE_KEY, String(YT_SCALES[n])); } catch { /* 무시 */ } return n; });
   const setShowSaved = (next: { yt: boolean; site: boolean }) => { if (!next.yt && !next.site) return; if (next.site && !show.site) followLatest(); setShow(next); try { window.localStorage.setItem(SHOW_KEY, JSON.stringify(next)); } catch { /* 무시 */ } };
-  const changeSize = (d: number) => setSizeIdx((v) => { const n = Math.min(SIZES.length - 1, Math.max(0, v + d)); try { window.localStorage.setItem(SIZE_KEY, String(n)); } catch { /* 무시 */ } return n; });
+  const changeSize = (d: number) => setSizeIdx((v) => { const n = Math.min(SIZES.length - 1, Math.max(0, v + d)); try { window.localStorage.setItem(SIZE_KEY, String(SIZES[n])); } catch { /* 무시 */ } return n; });
 
   useEffect(() => {
     setFullscreenAvailable(Boolean(document.fullscreenEnabled));
@@ -204,6 +209,7 @@ export default function ChatViewClient() {
   return (
     <div className="ruru-chat-view" style={{ position: "fixed", inset: 0, background: C.page, color: C.ink, display: "flex", flexDirection: "column", fontFamily: 'Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif', colorScheme: "dark" }}>
       <style>{`
+.ruru-chat-view{text-size-adjust:100%;-webkit-text-size-adjust:100%}
 .ruru-chat-view *{box-sizing:border-box}
 .ruru-chat-view button{cursor:pointer;font-family:inherit}
 .ruru-chat-view button:disabled{cursor:default}
@@ -226,6 +232,14 @@ export default function ChatViewClient() {
 @media(orientation:portrait){.ruru-chat-grid.auto{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr)}}
 .ruru-chat-grid.one{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
 @media(max-width:600px){.ruru-chat-toolbar{gap:6px;padding:6px 8px}.ruru-chat-brand{width:100%}.ruru-chat-control{padding:0 9px}.ruru-chat-panel-head{padding:6px 10px}.ruru-chat-panel-title h2{font-size:18px}.ruru-chat-panel-meta{font-size:12px}}
+@media(max-height:650px) and (orientation:landscape){
+ .ruru-chat-toolbar{padding:4px 8px;gap:6px}
+ .ruru-chat-panel-head{padding:4px 8px;gap:6px}
+ .ruru-chat-panel-title h2{font-size:16px}
+ .ruru-chat-panel-meta{font-size:11px;margin-top:1px}
+ .ruru-chat-status{min-height:24px;padding:3px 8px;font-size:11px}
+ .ruru-chat-log{--chat-line-height:1.45;--chat-row-padding:4px 6px;--chat-row-gap:6px}
+}
 
 .ruru-chat-row{border-radius:8px;transition:background-color .6s;box-shadow:inset 2px 0 transparent}
 .ruru-chat-new{background-color:rgba(116,192,252,.09);box-shadow:inset 2px 0 rgba(116,192,252,.42);animation:ruru-chat-arrival 1.6s ease-in-out 2}
@@ -292,10 +306,11 @@ export default function ChatViewClient() {
         <div
           ref={boxRef}
           role="log"
+          className="ruru-chat-log"
           aria-live="polite"
           aria-label="사이트 채팅"
           tabIndex={0}
-          style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowAnchor: "none", padding: "8px 12px", fontSize: `${fontPx}px`, lineHeight: 1.6 }}
+          style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowAnchor: "none", padding: "8px 12px", fontSize: `${fontPx}px`, lineHeight: "var(--chat-line-height, 1.6)" }}
         >
           <div ref={contentRef}>
           {!bc ? (
@@ -307,7 +322,7 @@ export default function ChatViewClient() {
             const b = m.badge ? BADGE[m.badge] : null;
             const avatar = m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar;
             return (
-              <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "7px 8px" }}>
+              <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "var(--chat-row-gap, 10px)", padding: "var(--chat-row-padding, 7px 8px)" }}>
                 {avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatar} alt="" referrerPolicy="no-referrer" style={{ width: "1.6em", height: "1.6em", borderRadius: "9999px", objectFit: "cover", flexShrink: 0 }} />
