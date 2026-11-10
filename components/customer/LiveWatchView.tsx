@@ -169,6 +169,111 @@ const CHAT_VIEW_DEFAULT: ChatView = { size: "base", bold: false, height: "base" 
 const CHAT_SIZES: Record<ChatView["size"], string> = { base: "14px", mid: "16px", big: "18px" };
 const CHAT_LINE_H: Record<ChatView["size"], string> = { base: "20px", mid: "22px", big: "25px" };
 const CHAT_HEIGHTS: Record<ChatView["height"], string> = { base: "24dvh", low: "14dvh", high: "36dvh" };
+// 우리 재생 막대(유튜브 막대 대신) — 위치·길이는 유튜브가 보내 주는 재생 정보, 옮기기는 seekTo 명령
+function fmtTime(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
+}
+type SeekFunc = "playVideo" | "pauseVideo" | "seekTo";
+function LiveSeekControls(props: { getPos: () => { t: number; d: number; playing: boolean; live: boolean }; send: (func: SeekFunc, args?: unknown[]) => void; onHold: (hold: boolean) => void }) {
+  const { getPos, send, onHold } = props;
+  const [pos, setPos] = useState(() => getPos());
+  const [drag, setDrag] = useState<number | null>(null); // 끄는 중 위치(0~1)
+  const pending = useRef<{ t: number; until: number; playing?: boolean } | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const getPosRef = useRef(getPos);
+  useEffect(() => { getPosRef.current = getPos; });
+  useEffect(() => {
+    const tick = () => {
+      const p = getPosRef.current();
+      const pd = pending.current;
+      if (pd && Date.now() < pd.until) setPos({ ...p, t: pd.t >= 0 ? pd.t : p.t, playing: pd.playing ?? p.playing });
+      else { pending.current = null; setPos(p); }
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, []);
+  const hasDur = pos.d > 0;
+  const frac = drag != null ? drag : hasDur ? Math.min(1, Math.max(0, pos.t / pos.d)) : 0;
+  const shownT = drag != null && hasDur ? drag * pos.d : pos.t;
+  const seekTo = (t: number) => {
+    const target = Math.max(0, hasDur ? Math.min(t, pos.d - 1) : t);
+    send("seekTo", [target, true]);
+    pending.current = { t: target, until: Date.now() + 1500 };
+    setPos((p) => ({ ...p, t: target }));
+  };
+  const fracAt = (clientX: number) => {
+    const el = trackRef.current;
+    if (!el) return 0;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 ? Math.min(1, Math.max(0, (clientX - r.left) / r.width)) : 0;
+  };
+  const togglePlay = () => {
+    const next = !pos.playing;
+    send(next ? "playVideo" : "pauseVideo");
+    pending.current = { t: -1, until: Date.now() + 1500, playing: next };
+    setPos((p) => ({ ...p, playing: next }));
+  };
+  const behind = pos.live && hasDur ? pos.d - shownT : 0;
+  const rightText = pos.live ? (behind < 15 ? "실시간" : `-${fmtTime(behind)}`) : hasDur ? fmtTime(pos.d) : "";
+  const roundBtn = (size: number) => ({ width: `${size}px`, height: `${size}px`, borderRadius: "9999px", border: "none", background: "rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, pointerEvents: "auto" as const });
+  return (
+    <div
+      onPointerDown={() => onHold(true)}
+      onPointerUp={() => onHold(false)}
+      onPointerCancel={() => onHold(false)}
+      style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", zIndex: 3 }}
+    >
+      {/* 가운데 — 10초 뒤로 · 멈춤/재생 · 10초 앞으로 */}
+      <div style={{ position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", display: "flex", justifyContent: "center", alignItems: "center", gap: "40px", pointerEvents: "none" }}>
+        <button type="button" aria-label="10초 뒤로" onClick={() => seekTo(pos.t - 10)} style={roundBtn(52)}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><text x="12" y="15.5" textAnchor="middle" fontSize="7" fill="#FFFFFF" stroke="none" fontWeight="700">10</text></svg>
+        </button>
+        <button type="button" aria-label={pos.playing ? "멈춤" : "재생"} onClick={togglePlay} style={roundBtn(68)}>
+          {pos.playing ? (
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+          ) : (
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+          )}
+        </button>
+        <button type="button" aria-label="10초 앞으로" onClick={() => seekTo(pos.t + 10)} style={roundBtn(52)}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /><text x="12" y="15.5" textAnchor="middle" fontSize="7" fill="#FFFFFF" stroke="none" fontWeight="700">10</text></svg>
+        </button>
+      </div>
+      {/* 아래 — 시간 + 막대(끌어서 옮김) */}
+      {hasDur ? (
+        <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "12px", pointerEvents: "none" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 600, color: "#FFFFFF", textShadow: "0 1px 2px rgba(0,0,0,0.8)", fontVariantNumeric: "tabular-nums", marginBottom: "2px" }}>
+            <span>{fmtTime(shownT)}</span>
+            <span style={{ color: pos.live && behind < 15 ? "#FF4E45" : "#FFFFFF" }}>{rightText}</span>
+          </div>
+          <div
+            ref={trackRef}
+            role="slider"
+            aria-label="재생 위치"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(pos.d)}
+            aria-valuenow={Math.round(shownT)}
+            onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setDrag(fracAt(e.clientX)); }}
+            onPointerMove={(e) => { if (drag != null) setDrag(fracAt(e.clientX)); }}
+            onPointerUp={(e) => { const f = drag != null ? drag : fracAt(e.clientX); setDrag(null); seekTo(f * pos.d); }}
+            onPointerCancel={() => setDrag(null)}
+            style={{ position: "relative", height: "36px", touchAction: "none", pointerEvents: "auto", cursor: "pointer" }}
+          >
+            <div style={{ position: "absolute", left: 0, right: 0, top: "16px", height: drag != null ? "6px" : "4px", marginTop: drag != null ? "-1px" : 0, borderRadius: "9999px", background: "rgba(255,255,255,0.35)" }} />
+            <div style={{ position: "absolute", left: 0, top: "16px", width: `${frac * 100}%`, height: drag != null ? "6px" : "4px", marginTop: drag != null ? "-1px" : 0, borderRadius: "9999px", background: "#FF0033" }} />
+            <div style={{ position: "absolute", left: `${frac * 100}%`, top: "18px", width: drag != null ? "20px" : "14px", height: drag != null ? "20px" : "14px", transform: "translate(-50%, -50%)", borderRadius: "9999px", background: "#FF0033" }} />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function readChatView(): ChatView {
   try {
     const o = JSON.parse(window.localStorage.getItem(CHAT_VIEW_KEY) || "{}") as Partial<ChatView>;
@@ -205,7 +310,7 @@ export default function LiveWatchView(props: Props) {
   const [query, setQuery] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
   // 영상을 누르면 유튜브 막대(돌려보기)가 나온다. 막대가 우리 위·아래 띠·채팅에 안 가리게 영상 칸을 띠 사이에만 둔다.
-  const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined, { controls: true }), [videoId]);
+  const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined, { controls: false }), [videoId]);
 
   useEffect(() => { setGuideOpen(!readGuideSeen()); }, []);
   const onGuideOpenChange = props.onGuideOpenChange;
@@ -387,40 +492,28 @@ export default function LiveWatchView(props: Props) {
   //   4초 동안 더 안 누르면 원래대로. 다음 누름도 알아채려고 포커스를 우리 화면으로 바로 돌려 놓는다.
   //   [04:33 보정] 돌려보기 중 한 번 더 빈 곳을 누르면 바로 원래대로(유튜브 앱처럼). 막대를 끌거나 멈춤/재생을 누른 것과 구별하려고
   //   누른 뒤 1.2초 동안 재생 위치·상태가 «건너뛰었는지» 본다 — 건너뛰었으면 막대 조작(돌려보기 유지), 그대로면 빈 곳 누름(원래대로).
+  // [09:22 사장님 「터치가 먹혔다 안 먹혔다 · 어두워지는데 재생바 안 나옴」] 원인: 유튜브 화면을 누른 걸 «포커스가 넘어갔는지»로
+  //   짐작했고, 유튜브 막대는 유튜브가 따로 켜고 끄니(누를 때마다 켬/끔·3초 뒤 저절로 숨김) 우리 어두운 화면과 자주 어긋났음.
+  //   이제 유튜브 막대는 끄고(controls=0), 영상 위 투명 판이 누름을 직접 받아 «우리 막대»(재생 위치·멈춤/재생·10초 앞뒤)를 띄움 → 늘 같이 움직임.
+  //   한 번 누르면 켜짐, 다시 누르면 꺼짐, 3.5초 손 안 대면 꺼짐(멈춤 중엔 계속 보임).
   const [seekMode, setSeekMode] = useState(false);
-  const seekModeRef = useRef(false);
-  const seekPokeRef = useRef<() => void>(() => {});
-  useEffect(() => { seekModeRef.current = seekMode; }, [seekMode]);
-  useEffect(() => {
-    let timer = 0;
-    let check = 0;
-    const SEEK_MS = 3500;
-    const restart = () => { if (timer) window.clearTimeout(timer); timer = window.setTimeout(() => setSeekMode(false), SEEK_MS); };
-    // 재생 위치가 건너뛰었다는 소식(막대를 끌어 놓음) → 돌려보기 화면 다시/유지
-    seekPokeRef.current = () => { if (check) window.clearTimeout(check); setSeekMode(true); restart(); };
-    // [08:31 사장님 「들어가고 초반 24초쯤 빈 곳 눌러도 막대 안 나옴」] 원인: 화면에 들어온 직후엔 창(window)이 아직 포커스를 안 가져
-    //   유튜브를 눌러도 창 blur 소식이 안 옴 → 돌려보기 화면이 안 켜지고 유튜브 막대가 채팅 밑에 가려 있었음.
-    //   들어오자마자 우리 화면에 포커스를 주고, blur 가 안 와도 0.3초마다 «유튜브가 포커스를 가졌는지» 직접 확인.
-    let handling = false;
-    const onBlur = () => {
-      if (handling) return;
-      window.setTimeout(() => {
-        if (document.activeElement !== iframeRef.current) return;
-        handling = true;
-        window.setTimeout(() => { handling = false; try { rootRef.current?.focus({ preventScroll: true }); } catch { /* 무시 */ } }, 150);
-        if (!seekModeRef.current) { setSeekMode(true); restart(); return; }
-        // [05:38 사장님 「다시 누르면 글씨가 늦게 나타남」] 돌려보기 중 또 누르면 바로 원래대로(기다리지 않음).
-        //   막대를 끌어 놓은 거였으면 재생 위치가 건너뛴 소식(seekPokeRef)이 와서 다시 돌려보기 화면이 됨.
-        if (timer) window.clearTimeout(timer);
-        if (check) window.clearTimeout(check);
-        setSeekMode(false);
-      }, 0);
-    };
-    window.addEventListener("blur", onBlur);
-    try { rootRef.current?.focus({ preventScroll: true }); } catch { /* 무시 */ }
-    const poll = window.setInterval(() => { if (!handling && document.activeElement === iframeRef.current) onBlur(); }, 300);
-    return () => { window.removeEventListener("blur", onBlur); window.clearInterval(poll); if (timer) window.clearTimeout(timer); if (check) window.clearTimeout(check); };
-  }, []);
+  const seekTimer = useRef(0);
+  const pausedRef = useRef(false);
+  const clearSeekTimer = () => { if (seekTimer.current) { window.clearTimeout(seekTimer.current); seekTimer.current = 0; } };
+  const restartSeekTimer = () => {
+    clearSeekTimer();
+    seekTimer.current = window.setTimeout(() => {
+      seekTimer.current = 0;
+      if (pausedRef.current) return; // 멈춤 중엔 막대 그대로
+      setSeekMode(false);
+    }, 3500);
+  };
+  const toggleSeek = () => {
+    if (seekMode) { clearSeekTimer(); setSeekMode(false); return; }
+    setSeekMode(true);
+    restartSeekTimer();
+  };
+  useEffect(() => () => clearSeekTimer(), []);
   // 실시간 채팅에서 인사하기(유튜브처럼)
   //   [07:42 사장님 「한 번 나오고 안 나옴 · 유튜브와 같게」] 원인: 기록을 «유튜브 영상 번호»로 해서, 같은 라이브 주소를 계속 쓰면
   //   예전 방송에서 한 번 쓴 기록이 남아 안 떴고, 1분 지나면 저절로 숨겼음.
@@ -591,13 +684,8 @@ export default function LiveWatchView(props: Props) {
       const info = data.info;
       const cur = playerInfo.current;
       if (typeof info.currentTime === "number") {
-        // 막대로 건너뛴 걸 알아채기 — 예상 위치에서 3초 넘게 벗어나면 돌려보기 화면(채팅 흐리게)
+        // 재생 위치 기억(우리 막대가 0.25초마다 이걸로 지금 위치를 셈)
         const now = Date.now();
-        const last = lastTick.current;
-        if (last.at > 0 && last.t > 0) {
-          const expected = last.state === 1 ? last.t + (now - last.at) / 1000 : last.t;
-          if (Math.abs(info.currentTime - expected) > 3) seekPokeRef.current();
-        }
         lastTick.current = { t: info.currentTime, at: now, state: typeof info.playerState === "number" ? info.playerState : cur.state };
         cur.t = info.currentTime;
       }
@@ -609,7 +697,7 @@ export default function LiveWatchView(props: Props) {
       }
       const vd = info.videoData as { isLive?: unknown } | undefined;
       if (vd && vd.isLive === true) cur.live = true;
-      if (typeof info.playerState === "number") cur.state = info.playerState;
+      if (typeof info.playerState === "number") { cur.state = info.playerState; pausedRef.current = info.playerState === 2; }
       // 막대를 움직여 지난 장면을 볼 때만(재생 중·30초 넘게 뒤). 멈춤·오류·끝난 방송엔 안 띄움
       const behind = cur.live && cur.state === 1 && cur.d > 0 && cur.t > 0 && cur.d - cur.t > 30;
       setBehindLive((prev) => (prev === behind ? prev : behind));
@@ -662,7 +750,7 @@ export default function LiveWatchView(props: Props) {
         title={`${title || "라이브 방송"} 영상`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
-        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000", transform: seekMode || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000", transform: videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}
       />
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
@@ -670,6 +758,20 @@ export default function LiveWatchView(props: Props) {
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
       {/* [09:08 사장님] 채팅 글 뒤 아래쪽만 살짝 어둡게 — 밝은 화면에서도 글이 또렷하게(손가락은 통과) */}
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: "calc(84px + env(safe-area-inset-bottom))", height: "45%", pointerEvents: "none", background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 45%, rgba(0,0,0,0.42) 100%)", opacity: seekMode || focus ? 0 : 1, transition: "opacity 0.2s" }} />
+      {/* 영상 위 투명 판 — 빈 곳 누름을 우리가 직접 받음(유튜브로 손가락이 안 감) */}
+      <div aria-hidden="true" onClick={toggleSeek} style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", background: "transparent", WebkitTapHighlightColor: "transparent" }} />
+      {seekMode ? (
+        <LiveSeekControls
+          getPos={() => {
+            const cur = playerInfo.current;
+            const tick = lastTick.current;
+            const t = tick.at > 0 && cur.state === 1 ? tick.t + (Date.now() - tick.at) / 1000 : cur.t;
+            return { t: cur.d > 0 ? Math.min(t, cur.d) : t, d: cur.d, playing: cur.state === 1, live: cur.live };
+          }}
+          send={(func, args) => sendToPlayer(youtubeCommand(func, args || []))}
+          onHold={(hold) => { if (hold) clearSeekTimer(); else restartSeekTimer(); }}
+        />
+      ) : null}
       <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
         {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0 }}>
@@ -760,7 +862,7 @@ export default function LiveWatchView(props: Props) {
             aria-label="채팅"
             aria-live="polite"
             onScroll={onChatScroll}
-            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
+            style={{ pointerEvents: "auto", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
           >
             {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창

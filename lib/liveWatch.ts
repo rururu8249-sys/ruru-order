@@ -116,7 +116,7 @@ export function youtubeEmbedUrl(videoId: string, origin?: string, opts?: { contr
 }
 
 /** 소리 켜기 등 — 끼워 넣은 플레이어에 보내는 명령(enablejsapi=1 필요) */
-export function youtubeCommand(func: "unMute" | "mute" | "playVideo", args: unknown[] = []): string {
+export function youtubeCommand(func: "unMute" | "mute" | "playVideo" | "pauseVideo" | "seekTo", args: unknown[] = []): string {
   return JSON.stringify({ event: "command", func, args });
 }
 
