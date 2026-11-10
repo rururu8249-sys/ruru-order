@@ -195,7 +195,7 @@ function fmtTime(sec: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
 }
 type SeekFunc = "playVideo" | "pauseVideo" | "seekTo";
-function LiveSeekControls(props: { getPos: () => { t: number; d: number; playing: boolean; live: boolean }; send: (func: SeekFunc, args?: unknown[]) => void; onHold: (hold: boolean) => void }) {
+function LiveSeekControls(props: { getPos: () => { t: number; d: number; playing: boolean; live: boolean; atLiveHead: boolean | null }; send: (func: SeekFunc, args?: unknown[]) => void; onHold: (hold: boolean) => void }) {
   const { getPos, send, onHold } = props;
   const [pos, setPos] = useState(() => getPos());
   const [drag, setDrag] = useState<number | null>(null); // 끄는 중 위치(0~1)
@@ -218,7 +218,7 @@ function LiveSeekControls(props: { getPos: () => { t: number; d: number; playing
   const frac = drag != null ? drag : hasDur ? Math.min(1, Math.max(0, pos.t / pos.d)) : 0;
   const shownT = drag != null && hasDur ? drag * pos.d : pos.t;
   const seekTo = (t: number) => {
-    const target = Math.max(0, hasDur ? Math.min(t, pos.d - 1) : t);
+    const target = Math.max(0, hasDur ? Math.min(t, pos.live ? pos.d : pos.d - 1) : t);
     send("seekTo", [target, true]);
     pending.current = { t: target, until: Date.now() + 1500 };
     setPos((p) => ({ ...p, t: target }));
@@ -236,7 +236,8 @@ function LiveSeekControls(props: { getPos: () => { t: number; d: number; playing
     setPos((p) => ({ ...p, playing: next }));
   };
   const behind = pos.live && hasDur ? pos.d - shownT : 0;
-  const rightText = pos.live ? (behind < LIVE_EDGE_TOLERANCE_SECONDS ? "실시간" : `-${fmtTime(behind)}`) : hasDur ? fmtTime(pos.d) : "";
+  const atLiveHead = drag != null ? behind < LIVE_EDGE_TOLERANCE_SECONDS : (pos.atLiveHead ?? (behind < LIVE_EDGE_TOLERANCE_SECONDS));
+  const rightText = pos.live ? (atLiveHead ? "실시간" : `-${fmtTime(behind)}`) : hasDur ? fmtTime(pos.d) : "";
   const roundBtn = (size: number) => ({ width: `${size}px`, height: `${size}px`, borderRadius: "9999px", border: "none", background: "rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, pointerEvents: "auto" as const });
   return (
     <div
@@ -266,7 +267,7 @@ function LiveSeekControls(props: { getPos: () => { t: number; d: number; playing
         <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "12px", pointerEvents: "none" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 600, color: "#FFFFFF", textShadow: "0 1px 2px rgba(0,0,0,0.8)", fontVariantNumeric: "tabular-nums", marginBottom: "2px" }}>
             <span>{fmtTime(shownT)}</span>
-            <span style={{ color: pos.live && behind < LIVE_EDGE_TOLERANCE_SECONDS ? "#FF4E45" : "#FFFFFF" }}>{rightText}</span>
+            <span style={{ color: pos.live && atLiveHead ? "#FF4E45" : "#FFFFFF" }}>{rightText}</span>
           </div>
           <div
             ref={trackRef}
@@ -754,7 +755,7 @@ export default function LiveWatchView(props: Props) {
   const [behindLive, setBehindLive] = useState(false);
   // [08:35 사장님 「녹화 영상인데 왜 실시간으로 돌아가기가 떠」] 녹화 영상은 길이(duration) 전체가 끝이라 늘 «30초 넘게 뒤»로 잡혔음.
   //   이제 «진짜 라이브»일 때만: 유튜브가 알려 주는 isLive, 또는 영상 길이가 시간 따라 계속 늘어날 때(라이브는 길이가 자람).
-  const playerInfo = useRef<{ t: number; d: number; state: number; live: boolean; d0: number; d0at: number }>({ t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0 });
+  const playerInfo = useRef<{ t: number; d: number; state: number; live: boolean; d0: number; d0at: number; seekableEnd: number | null; atLiveHead: boolean | null }>({ t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0, seekableEnd: null, atLiveHead: null });
   const lastTick = useRef<{ t: number; at: number; state: number }>({ t: 0, at: 0, state: -1 });
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
@@ -783,8 +784,14 @@ export default function LiveWatchView(props: Props) {
       const vd = info.videoData as { isLive?: unknown } | undefined;
       if (vd && vd.isLive === true) cur.live = true;
       if (typeof info.playerState === "number") { cur.state = info.playerState; pausedRef.current = info.playerState === 2; }
-      // 막대가 지연 시간을 표시하는 기준과 통일(15~30초 구간에서도 복귀 가능). 멈춤·오류·끝난 방송엔 안 띄움.
-      const behind = cur.live && cur.state === 1 && cur.d > 0 && cur.t >= 0 && cur.d - cur.t >= LIVE_EDGE_TOLERANCE_SECONDS;
+      // 실제 라이브 응답에서 duration(5767초)과 이동 가능한 끝(2170초)이 달랐다.
+      // progressState는 현재 DVR 범위와 실제 실시간 도착 여부. 부분 응답에서도 마지막 값을 유지한다.
+      const progress = info.progressState as { seekableEnd?: unknown; isAtLiveHead?: unknown } | undefined;
+      if (typeof progress?.seekableEnd === "number" && Number.isFinite(progress.seekableEnd) && progress.seekableEnd > 0) cur.seekableEnd = progress.seekableEnd;
+      if (typeof progress?.isAtLiveHead === "boolean") cur.atLiveHead = progress.isAtLiveHead;
+      const end = cur.seekableEnd ?? cur.d;
+      const behind = cur.live && [1, 2, 3].includes(cur.state) && end > 0 && cur.t >= 0 &&
+        (cur.atLiveHead !== null ? !cur.atLiveHead : end - cur.t >= LIVE_EDGE_TOLERANCE_SECONDS);
       setBehindLive((prev) => (prev === behind ? prev : behind));
     };
     window.addEventListener("message", onMsg);
@@ -799,17 +806,18 @@ export default function LiveWatchView(props: Props) {
     [800, 2500, 6000, 15000, 40000].forEach((ms) => window.setTimeout(captionsOff, ms));
   };
   const reloadPlayer = () => {
-    playerInfo.current = { t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0 };
+    playerInfo.current = { t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0, seekableEnd: null, atLiveHead: null };
     lastTick.current = { t: 0, at: 0, state: -1 };
     setBehindLive(false);
     setMuted(true);
     setReloadKey((k) => k + 1);
   };
   const backToLive = () => {
-    const { live, d } = playerInfo.current;
-    if (!live || !Number.isFinite(d) || d <= 0) return;
-    // 새로 불러오면 이전 위치가 복원될 수 있다. 막대의 맨 끝과 같은 위치로 직접 이동한다.
-    sendToPlayer(youtubeCommand("seekTo", [Math.max(0, d - 1), true]));
+    const { live, d, seekableEnd } = playerInfo.current;
+    const target = seekableEnd ?? Math.max(0, d - 1);
+    if (!live || !Number.isFinite(target) || target <= 0) return;
+    // 최신 재생 가능 끝으로 이동. 1초를 빼면 유튜브가 DVR 재생으로 남길 수 있다.
+    sendToPlayer(youtubeCommand("seekTo", [target, true]));
     sendToPlayer(youtubeCommand("playVideo"));
     // 소리·플레이어를 유지하고, 실시간 도착 표시는 실제 infoDelivery 응답으로만 갱신한다.
   };
@@ -1018,7 +1026,8 @@ export default function LiveWatchView(props: Props) {
             const cur = playerInfo.current;
             const tick = lastTick.current;
             const t = tick.at > 0 && cur.state === 1 ? tick.t + (Date.now() - tick.at) / 1000 : cur.t;
-            return { t: cur.d > 0 ? Math.min(t, cur.d) : t, d: cur.d, playing: cur.state === 1, live: cur.live };
+            const d = cur.live ? (cur.seekableEnd ?? cur.d) : cur.d;
+            return { t: d > 0 ? Math.min(t, d) : t, d, playing: cur.state === 1, live: cur.live, atLiveHead: cur.atLiveHead };
           }}
           send={(func, args) => sendToPlayer(youtubeCommand(func, args || []))}
           onHold={(hold) => { if (hold) clearSeekTimer(); else restartSeekTimer(); }}

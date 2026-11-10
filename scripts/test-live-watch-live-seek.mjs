@@ -65,7 +65,7 @@ const onMsg = vm.runInNewContext(ts.transpile(`const handle = ${listener.getText
   setBehindLive: update => { behind = update(behind); },
 });
 function telemetry(t, d, live = true, state = 1) {
-  playerInfo.current = {t: 0, d: 0, live: false, state: -1, d0: 0, d0at: 0};
+  playerInfo.current = {t: 0, d: 0, live: false, state: -1, d0: 0, d0at: 0, seekableEnd: null, atLiveHead: null};
   onMsg({origin: 'https://www.youtube.com', data: {event: 'infoDelivery', info: {
     currentTime: t, duration: d, playerState: state, videoData: {isLive: live},
   }}});
@@ -78,3 +78,28 @@ assert.equal(telemetry(0, 1208), true, 'Rewinding to the very beginning must all
 assert.equal(telemetry(1189, 1208, false), false, 'Recorded video must not show live return');
 assert.equal(telemetry(1189, 1208, true, 0), false, 'Ended playback must not show live return');
 console.log('PASS live-return visibility at 19s/15s/14.9s, timeline start, recorded video and ended state');
+
+// Captured from the real live iframe: metadata duration 5767s, playable edge 2170s.
+telemetry(2170, 5767);
+onMsg({origin: 'https://www.youtube.com', data: {event: 'infoDelivery', info: {
+  progressState: {seekableEnd: 2170, isAtLiveHead: true},
+}}});
+assert.equal(behind, false, 'Real live-head confirmation must override inflated metadata duration');
+onMsg({origin: 'https://www.youtube.com', data: {event: 'infoDelivery', info: {
+  currentTime: 2165, progressState: {seekableEnd: 2172, isAtLiveHead: false},
+}}});
+assert.equal(behind, true, '7s behind is still DVR when YouTube says it is not live');
+calls.length = 0;
+jump();
+assert.equal(calls[0].args[0], 2172, 'Seek exact playable edge, not metadata duration or edge minus one');
+onMsg({origin: 'https://www.youtube.com', data: {event: 'infoDelivery', info: {duration: 5770}}});
+calls.length = 0;
+jump();
+assert.equal(calls[0].args[0], 2172, 'Duration-only update must not overwrite the playable edge');
+onMsg({origin: 'https://www.youtube.com', data: {event: 'infoDelivery', info: {playerState: 2}}});
+assert.equal(behind, true, 'Paused DVR must keep its return button');
+onMsg({origin: 'https://www.youtube.com', data: {event: 'infoDelivery', info: {
+  currentTime: 2174, playerState: 1, progressState: {seekableEnd: 2174, isAtLiveHead: true},
+}}});
+assert.equal(behind, false, 'Only real live-head confirmation clears the button');
+console.log('PASS captured live telemetry: inflated/stale duration, exact edge, 7s DVR, paused return and real arrival');
