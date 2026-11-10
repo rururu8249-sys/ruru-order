@@ -1,5 +1,10 @@
 {
   "functions": {
+    "app/api/live-chat/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
     "app/api/product-brand-catalog/route.ts": {
       "regions": [
         "sin1"

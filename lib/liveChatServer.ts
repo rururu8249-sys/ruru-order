@@ -26,12 +26,13 @@ async function readWatchSetting(sb: SupabaseClient) {
 
 /** 이 카카오 계정의 채팅 역할 — 표시(badge)·관리 가능·총관리자. 관리자 시험 계정 표(켜진 것)도 채팅 관리자. */
 export async function chatRoleOfKakao(sb: SupabaseClient, kakaoId: string): Promise<{ phone: string; badge: LiveChatBadge | null; isMod: boolean; isOwner: boolean }> {
-  const phone = await phoneOfKakao(sb, kakaoId);
-  if (!phone) return { phone: "", badge: null, isMod: false, isOwner: false };
-  const [setting, opsRes] = await Promise.all([
+  // 서로 독립적인 조회를 함께 시작 — 글마다 회원 조회가 끝날 때까지 기다리지 않는다.
+  const [phone, setting, opsRes] = await Promise.all([
+    phoneOfKakao(sb, kakaoId),
     readWatchSetting(sb),
     sb.from("operator_test_accounts").select("customer_phone, is_active").eq("is_active", true),
   ]);
+  if (!phone) return { phone: "", badge: null, isMod: false, isOwner: false };
   const isOwner = isChatOwnerPhone(setting, phone);
   const isOp = (opsRes.data ?? []).some((o) => String((o as { customer_phone?: string }).customer_phone ?? "").replace(/[^0-9]/g, "") === phone);
   const badge = chatBadgeOf(setting, phone) ?? (isOp ? "mod" : null);
