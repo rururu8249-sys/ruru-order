@@ -36,6 +36,7 @@ import {
 } from "@/lib/liveChatEmojiServer";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import { parseEmojiKeywords } from "@/lib/liveChatEmojiSuggest";
+import { chatEmojiGifError, chatEmojiImageExtension } from "@/lib/liveChatEmojiGif";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -137,8 +138,12 @@ export async function POST(request: NextRequest) {
       const form = await request.formData();
       const file = form.get("file");
       if (!(file instanceof File)) return fail("사진 파일이 없어요.");
-      if (!/^image\/(png|webp|jpeg)$/.test(file.type)) return fail("PNG·WEBP·JPG 만 올릴 수 있어요.");
+      if (!/^image\/(png|webp|jpeg|gif)$/.test(file.type)) return fail("PNG·WEBP·JPG·GIF 만 올릴 수 있어요.");
       if (file.size > EMOJI_MAX_BYTES) return fail("1MB 이하로 줄여서 올려 주세요.");
+      if (file.type === "image/gif") {
+        const gifError = chatEmojiGifError(new Uint8Array(await file.arrayBuffer()));
+        if (gifError) return fail(gifError);
+      }
       const setting = await readEmojiSetting(sb);
       // 그림 바꾸기(같은 아이디 유지 — 이미 보낸 채팅 글에도 새 그림이 나옴)
       const replaceId = String(form.get("replaceId") || "");
@@ -146,7 +151,7 @@ export async function POST(request: NextRequest) {
       if (replaceId && !replacing) return fail("바꿀 이모티콘을 못 찾았어요.", 404);
       if (!replacing && setting.items.length >= EMOJI_MAX_ITEMS) return fail(`이모티콘은 ${EMOJI_MAX_ITEMS}개까지예요.`);
       if (replacing) {
-        const ext2 = file.type === "image/webp" ? "webp" : file.type === "image/png" ? "png" : "jpg";
+        const ext2 = chatEmojiImageExtension(file.type);
         const path2 = `live-emoji/${replacing.id}-${Date.now().toString(36)}.${ext2}`;
         const { error: e2 } = await sb.storage.from(EMOJI_PUBLIC_BUCKET).upload(path2, file, { contentType: file.type, upsert: false, cacheControl: "31536000" });
         if (e2) return fail(`사진을 못 올렸어요: ${e2.message}`, 500);
@@ -159,7 +164,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true, setting: parseChatEmojiSetting(next) });
       }
       const id = newEmojiId();
-      const ext = file.type === "image/webp" ? "webp" : file.type === "image/png" ? "png" : "jpg";
+      const ext = chatEmojiImageExtension(file.type);
       const path = `live-emoji/${id}.${ext}`;
       const { error: upErr } = await sb.storage.from(EMOJI_PUBLIC_BUCKET).upload(path, file, { contentType: file.type, upsert: false, cacheControl: "31536000" });
       if (upErr) return fail(`사진을 못 올렸어요: ${upErr.message}`, 500);

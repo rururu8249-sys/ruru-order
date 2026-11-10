@@ -9,7 +9,7 @@ export const LIVE_CHAT_EMOJI_KEY = "live_chat_emoji_v1";
 /** 한 글에 넣을 수 있는 이모티콘 수 */
 export const EMOJI_MAX_PER_MSG = 5;
 /** 이모티콘 개수 상한 */
-export const EMOJI_MAX_ITEMS = 60;
+export const EMOJI_MAX_ITEMS = 80;
 /** 저장 그림 긴 쪽 크기 — 여백을 잘라 꽉 채운 그림. 이모티콘만 보낸 글은 크게(약 56px) 나오니 폰 3배 화면에서도 또렷하게 256 */
 export const EMOJI_PIXELS = 256;
 /** 올릴 때 파일 크기 상한(유튜브와 같은 1MB) — 브라우저가 줄여서 보내므로 보통 30KB 안팎 */

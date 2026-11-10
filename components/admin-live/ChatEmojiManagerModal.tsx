@@ -21,6 +21,7 @@ import {
   type ChatEmojiSetting,
 } from "@/lib/liveChatEmoji";
 import { emojiKeywordsOf, parseEmojiKeywords, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
+import { chatEmojiImageExtension, preserveChatEmojiGif } from "@/lib/liveChatEmojiGif";
 
 type Person = { key: string; phone: string; nickname: string; name: string; total: number | null; canUse: boolean; always: boolean; allowed: boolean; denied: boolean };
 type State = { setting: ChatEmojiSetting; allow: Person[]; deny: Person[]; owners: Person[]; results: Person[] };
@@ -33,6 +34,7 @@ const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
  *  ②둘레 빈 여백을 잘라 그림이 칸을 꽉 채우게 ③긴 쪽 EMOJI_PIXELS(256) — 가로로 긴 글씨 스티커는 가로로 긴 그대로(최대 3:1).
  *  WEBP 가 되면 WEBP, 아니면 PNG. */
 async function shrinkImage(file: File): Promise<Blob> {
+  if (file.type === "image/gif") return preserveChatEmojiGif(file);
   const src: CanvasImageSource & { width: number; height: number } = await (async () => {
     if (typeof createImageBitmap === "function") {
       try { return await createImageBitmap(file); } catch { /* 아래 방법으로 */ }
@@ -247,7 +249,7 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
       try {
         const blob = await shrinkImage(f);
         const fd = new FormData();
-        fd.append("file", new File([blob], `emoji.${blob.type === "image/webp" ? "webp" : "png"}`, { type: blob.type }));
+        fd.append("file", new File([blob], `emoji.${chatEmojiImageExtension(blob.type)}`, { type: blob.type }));
         fd.append("name", nameFromFile(f.name));
         const r = await fetch(API, { method: "POST", body: fd }).then((res) => res.json());
         if (!r?.ok) throw new Error(r?.message || "못 올렸어요.");
