@@ -154,7 +154,8 @@ function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: st
 }
 // 글자를 상자 없이 영상 위에 바로 — 어떤 화면에서도 읽히게 진한 그림자
 // [08:50 사장님 「닉네임 흐리멍텅·블러 같다」] 번지는 그림자 대신 1px 또렷한 테두리 그림자
-const CHAT_TEXT_SHADOW = "0 0 1px rgba(0,0,0,0.9), 0 1px 1px rgba(0,0,0,0.85)";
+// [09:08 사장님 「밝은 배경에서 흐리멍텅」] 번지는 그림자 대신 또렷한 1px 테두리 + 아래 옅은 그림자
+const CHAT_TEXT_SHADOW = "-1px 0 0 rgba(0,0,0,0.75), 1px 0 0 rgba(0,0,0,0.75), 0 -1px 0 rgba(0,0,0,0.75), 0 1px 0 rgba(0,0,0,0.75), 0 0 3px rgba(0,0,0,0.55)";
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -557,6 +558,25 @@ export default function LiveWatchView(props: Props) {
   //   유튜브 플레이어가 보내 주는 재생 정보(infoDelivery)로 «재생 중인데 지금 방송보다 30초 넘게 뒤»일 때만 버튼을 띄운다.
   //   누르면 영상을 다시 불러 지금 방송으로(가장 확실한 방법). 정보가 안 오면 버튼도 안 뜬다(유튜브 막대의 「라이브」로도 돌아갈 수 있음).
   const [reloadKey, setReloadKey] = useState(0);
+  // [09:08 사장님 「좌우 여백」] 화면이 9:16 보다 넓으면(카톡 브라우저 등) 세로 영상 좌우에 검은 띠 → 영상을 그만큼 키워 꽉 채움(위아래 조금 잘림, 최대 1.12배).
+  // 돌려보기 중엔 원래 크기(유튜브 막대가 잘리지 않게).
+  const [videoScale, setVideoScale] = useState(1);
+  useEffect(() => {
+    const el = iframeRef.current;
+    if (!el) return;
+    const calc = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w <= 0 || h <= 0) return;
+      const s = w / (h * 9 / 16);
+      setVideoScale(s > 1.005 ? Math.min(1.12, s) : 1);
+    };
+    calc();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(calc) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", calc);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", calc); };
+  }, [videoId, reloadKey]);
   const [behindLive, setBehindLive] = useState(false);
   // [08:35 사장님 「녹화 영상인데 왜 실시간으로 돌아가기가 떠」] 녹화 영상은 길이(duration) 전체가 끝이라 늘 «30초 넘게 뒤»로 잡혔음.
   //   이제 «진짜 라이브»일 때만: 유튜브가 알려 주는 isLive, 또는 영상 길이가 시간 따라 계속 늘어날 때(라이브는 길이가 자람).
@@ -642,12 +662,14 @@ export default function LiveWatchView(props: Props) {
         title={`${title || "라이브 방송"} 영상`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
-        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000" }}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000", transform: seekMode || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}
       />
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
       {/* 돌려보기 중 — 영상 전체를 반투명 검정으로 어둡게(유튜브 막대는 빨강·흰색이라 그대로 보임) */}
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
+      {/* [09:08 사장님] 채팅 글 뒤 아래쪽만 살짝 어둡게 — 밝은 화면에서도 글이 또렷하게(손가락은 통과) */}
+      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: "calc(84px + env(safe-area-inset-bottom))", height: "45%", pointerEvents: "none", background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 45%, rgba(0,0,0,0.42) 100%)", opacity: seekMode || focus ? 0 : 1, transition: "opacity 0.2s" }} />
       <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
         {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0 }}>
@@ -740,7 +762,7 @@ export default function LiveWatchView(props: Props) {
             onScroll={onChatScroll}
             style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
           >
-            {chat.messages.map((m) => { const color = chatColorMap.get(m.id) || "#FFFFFF";
+            {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
               const localLine = !Number.isInteger(m.id);
               const canMod = chat.canModerate && !localLine;
