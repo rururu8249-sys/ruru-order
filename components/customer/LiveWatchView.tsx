@@ -716,6 +716,12 @@ export default function LiveWatchView(props: Props) {
     lastTick.current = { t: 0, at: 0, state: -1 };
     // 플레이어에게 «재생 정보 보내 줘» 요청(몇 번 시도 — 준비가 늦을 수 있음)
     [300, 1500, 4000].forEach((ms) => window.setTimeout(() => sendToPlayer(JSON.stringify({ event: "listening", id: 1, channel: "widget" })), ms));
+    // [13:18 사장님 캡처] 유튜브 자동 자막이 저절로 켜져 채팅 위에 겹침 → 자막 모듈 끄기(손님 유튜브 계정 설정이 켜져 있어도).
+    //   플레이어 준비가 늦거나 라이브 중 자막이 다시 붙을 수 있어 여러 번 보냄(명령만 — 실패해도 무시)
+    [800, 2500, 6000, 15000, 40000].forEach((ms) => window.setTimeout(() => {
+      sendToPlayer(JSON.stringify({ event: "command", func: "unloadModule", args: ["captions"] }));
+      sendToPlayer(JSON.stringify({ event: "command", func: "unloadModule", args: ["cc"] }));
+    }, ms));
   };
   const backToLive = () => {
     playerInfo.current = { t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0 };

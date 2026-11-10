@@ -110,6 +110,8 @@ export function youtubeEmbedUrl(videoId: string, origin?: string, opts?: { contr
     fs: "0",
     disablekb: "1",
     iv_load_policy: "3",
+    // 자막 기본 끔(자동 자막이 채팅 위에 겹치지 않게)
+    cc_load_policy: "0",
   });
   if (origin) p.set("origin", origin);
   return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${p.toString()}`;
