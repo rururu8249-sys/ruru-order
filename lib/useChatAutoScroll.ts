@@ -19,6 +19,19 @@ export function useChatAutoScroll(items: unknown, layoutKey: string, visible: bo
     let frame = 0;
     let manualStartTop = 0;
     let resumeOnRelease = false;
+    let gestureActive = false;
+    let gestureMoved = false;
+    let gestureOrigin: { x: number; y: number } | null = null;
+    const pointOf = (event?: Event) => {
+      if (!event) return null;
+      const touch = (event as TouchEvent).touches?.[0] ?? (event as TouchEvent).changedTouches?.[0];
+      const point = touch ?? event as PointerEvent;
+      return Number.isFinite(point.clientX) && Number.isFinite(point.clientY) ? { x: point.clientX, y: point.clientY } : null;
+    };
+    const onGestureMove = (event: Event) => {
+      const point = pointOf(event);
+      if (gestureActive && gestureOrigin && point && Math.hypot(point.x - gestureOrigin.x, point.y - gestureOrigin.y) > 3) gestureMoved = true;
+    };
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     const gap = () => Math.max(0, box.scrollHeight - box.clientHeight - box.scrollTop);
     const cancel = () => { cancelAnimationFrame(frame); frame = 0; };
@@ -37,26 +50,37 @@ export function useChatAutoScroll(items: unknown, layoutKey: string, visible: bo
     move.current = follow;
     const onScroll = () => {
       // Programmatic animation/scroll anchoring is not a request to stop following.
-      if (!manual.current) return;
-      const at = gap() < 40 && box.scrollTop >= manualStartTop;
+      if (!manual.current || gestureActive) return;
+      const at = gap() < 1 || (gap() < 40 && box.scrollTop >= manualStartTop);
       following.current = at;
       if (at) { manual.current = false; follow(true); }
       setAtBottom(at);
     };
     const onManual = (event: Event) => {
-      if (box.scrollHeight <= box.clientHeight || (event instanceof WheelEvent && event.deltaY >= 0 && gap() < 1)) return;
-      if (event.type === "pointerdown" || event.type === "touchstart") resumeOnRelease ||= following.current;
+      if (box.scrollHeight <= box.clientHeight || (event instanceof WheelEvent && (event.deltaY === 0 || (event.deltaY > 0 && gap() < 1)))) return;
+      if (event.type === "pointerdown" || event.type === "touchstart") {
+        resumeOnRelease ||= following.current;
+        gestureActive = true;
+        gestureOrigin = pointOf(event);
+        gestureMoved = false;
+      }
       manualStartTop = box.scrollTop;
       cancel();
       manual.current = true;
       following.current = false;
       setAtBottom(false);
     };
-    const onRelease = () => {
-      if (resumeOnRelease && box.scrollTop === manualStartTop) {
+    const onRelease = (event?: Event) => {
+      if (!gestureActive) return;
+      if (event) onGestureMove(event);
+      gestureActive = false;
+      // A stationary tap is still a tap if image reflow/history trimming moved
+      // scrollTop underneath it. Only actual finger/mouse movement pauses reading.
+      if (resumeOnRelease && ((gestureOrigin && !gestureMoved) || box.scrollTop === manualStartTop)) {
         manual.current = false; following.current = true; setAtBottom(true); follow(true);
       } else onScroll();
       resumeOnRelease = false;
+      gestureOrigin = null;
     };
     const onKey = (e: KeyboardEvent) => {
       const forward = ["ArrowDown", "PageDown", "End"].includes(e.key) || (e.key === " " && !e.shiftKey);
@@ -68,9 +92,12 @@ export function useChatAutoScroll(items: unknown, layoutKey: string, visible: bo
     box.addEventListener("wheel", onManual, { passive: true });
     box.addEventListener("touchstart", onManual, { passive: true });
     box.addEventListener("pointerdown", onManual, { passive: true });
-    box.addEventListener("pointerup", onRelease, { passive: true });
-    box.addEventListener("touchend", onRelease, { passive: true });
-    box.addEventListener("touchcancel", onRelease, { passive: true });
+    // Release can occur outside the scroll box (e.g. dragging its scrollbar).
+    window.addEventListener("pointermove", onGestureMove, { passive: true });
+    window.addEventListener("touchmove", onGestureMove, { passive: true });
+    window.addEventListener("pointerup", onRelease, { passive: true });
+    window.addEventListener("touchend", onRelease, { passive: true });
+    window.addEventListener("touchcancel", onRelease, { passive: true });
     box.addEventListener("keydown", onKey);
     box.addEventListener("load", onResize, true);
     const observer = new ResizeObserver(onResize);
@@ -83,9 +110,11 @@ export function useChatAutoScroll(items: unknown, layoutKey: string, visible: bo
       box.removeEventListener("wheel", onManual);
       box.removeEventListener("touchstart", onManual);
       box.removeEventListener("pointerdown", onManual);
-      box.removeEventListener("pointerup", onRelease);
-      box.removeEventListener("touchend", onRelease);
-      box.removeEventListener("touchcancel", onRelease);
+      window.removeEventListener("pointermove", onGestureMove);
+      window.removeEventListener("touchmove", onGestureMove);
+      window.removeEventListener("pointerup", onRelease);
+      window.removeEventListener("touchend", onRelease);
+      window.removeEventListener("touchcancel", onRelease);
       box.removeEventListener("keydown", onKey);
       box.removeEventListener("load", onResize, true);
     };

@@ -7,7 +7,7 @@ const box={scrollHeight:1200,clientHeight:400,_top:0,
  get scrollTop(){return this._top;},set scrollTop(n){this._top=Math.min(Math.max(0,n),this.scrollHeight-this.clientHeight);},
  addEventListener(name,fn){listeners.set(name,fn);},removeEventListener(name){listeners.delete(name);}};
 const content={};let refCount=0;
-globalThis.window={matchMedia:()=>({get matches(){return reduced;}})};
+globalThis.window={matchMedia:()=>({get matches(){return reduced;}}),addEventListener(name,fn){listeners.set(name,fn);},removeEventListener(name){listeners.delete(name);}};
 globalThis.requestAnimationFrame=fn=>{frames.set(++id,fn);return id;};
 globalThis.cancelAnimationFrame=i=>frames.delete(i);
 globalThis.ResizeObserver=class{constructor(fn){resize=fn;}observe(){}disconnect(){disconnected=true;}};
@@ -28,3 +28,29 @@ listeners.get('touchstart')({type:'touchstart'});assert.equal(listeners.has('poi
 reduced=true;box.scrollHeight+=300;resize();assert.equal(box.scrollTop,1500,'Reduced-motion follows instantly');
 cleanup();assert.equal(disconnected,true);assert.equal(listeners.size,0);assert.equal(frames.size,0);
 console.log('PASS chat-view auto-scroll: late layout, smooth settling, manual read, resume, wheel boundary, reduced motion, cleanup');
+
+// A tap must not become a permanent reading pause when history/layout shrinks
+// under the finger (e.g. chat-view's one-minute history refresh).
+refCount=0;effects.length=0;layouts.length=0;reduced=false;following=true;disconnected=false;
+box.scrollHeight=1200;box.clientHeight=400;box.scrollTop=800;
+useChatAutoScroll([1],'layout',true);
+const disposeTap=effects[0]();layouts[0]();finish();
+listeners.get('pointerdown')({type:'pointerdown',clientX:20,clientY:100});
+box.scrollHeight=900;box.scrollTop=500;listeners.get('scroll')();
+assert.equal(following,false,'Layout clamping during contact must not resume before the gesture ends');
+// A row arrives before release, so the tap ends with a gap and a changed scrollTop.
+box.scrollHeight=1000;resize();finish();
+assert.equal(box.scrollTop,500,'Keep the viewport still while the finger is down');
+listeners.get('pointerup')({type:'pointerup',clientX:20,clientY:100});
+box.scrollHeight=1100;resize();finish();
+assert.equal(box.scrollTop,700,'Stationary tap plus history shrink must resume and follow the next incoming row');
+listeners.get('pointerdown')({type:'pointerdown',clientX:20,clientY:100});
+box.scrollHeight=900;box.scrollTop=500;listeners.get('scroll')();
+listeners.get('pointermove')({type:'pointermove',clientX:20,clientY:200});
+box.scrollTop=400;listeners.get('scroll')();
+listeners.get('pointerup')({type:'pointerup',clientX:20,clientY:200});
+box.scrollHeight=1000;resize();finish();
+assert.equal(box.scrollTop,400,'A drag following history shrink must preserve the reading position');
+assert.equal(following,false);
+disposeTap();
+console.log('PASS stationary tap resumes after layout changes; deliberate drag stays paused');
