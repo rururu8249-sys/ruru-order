@@ -253,7 +253,9 @@ export default function ChatViewClient() {
       </div>
       <div className="ruru-chat-grid one" style={{ flex: 1, minHeight: 0, display: "grid", padding: "8px", boxSizing: "border-box" }}>
       {/* 유튜브 채팅 */}
-      <section id="chat-panel-yt" role="tabpanel" aria-labelledby="chat-tab-yt" className="ruru-chat-panel" hidden={tab!=="yt"} style={{ display:tab==="yt"?"flex":"none", borderTop: "3px solid #FF5555" }}>
+      {/* [2026-11-12 사장님 「사이트 채팅 보다 유튜브로 오면 글이 안 뜨거나 늦게 뜸」] 예전엔 display:none 으로 숨겨
+          브라우저가 유튜브 채팅 갱신·자동 스크롤을 멈췄다 → 늘 켜 둔 채 아래 깔고, 사이트 채팅 창이 위를 덮는다. */}
+      <section id="chat-panel-yt" role="tabpanel" aria-labelledby="chat-tab-yt" className="ruru-chat-panel" aria-hidden={tab!=="yt"} inert={tab!=="yt"} style={{ display:"flex", gridArea:"1 / 1", borderTop: "3px solid #FF5555" }}>
         <header className="ruru-chat-panel-head">
           <div className="ruru-chat-panel-title">
             <h2>유튜브 채팅</h2>
@@ -279,7 +281,7 @@ export default function ChatViewClient() {
       </section>
 
       {/* 사이트 채팅 */}
-      <section id="chat-panel-site" role="tabpanel" aria-labelledby="chat-tab-site" className="ruru-chat-panel" hidden={tab!=="site"} style={{ display:tab==="site"?"flex":"none", borderTop: "3px solid #74C0FC" }}>
+      <section id="chat-panel-site" role="tabpanel" aria-labelledby="chat-tab-site" className="ruru-chat-panel" hidden={tab!=="site"} style={{ display:tab==="site"?"flex":"none", gridArea:"1 / 1", zIndex:1, borderTop: "3px solid #74C0FC" }}>
         <header className="ruru-chat-panel-head">
           <div className="ruru-chat-panel-title">
             <h2>사이트 채팅</h2>
