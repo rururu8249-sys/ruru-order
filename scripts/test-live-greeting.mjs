@@ -15,9 +15,8 @@ const unmount=async()=>act(async()=>tree.unmount());
 async function advance(ms){await act(async()=>{const end=now+ms;while(true){const due=[...timers].filter(([,v])=>v.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!due)break;now=due[1].at;timers.delete(due[0]);due[1].f();}now=end;});}
 await mount(); assert.equal(result.open,false);
 await advance(LIVE_GREETING_TIMING.delayMs);assert.equal(result.open,true,'first entry shows greeting');
-await advance(LIVE_GREETING_TIMING.visibleMs-1);assert.equal(result.open,true);
-await advance(1);assert.equal(result.open,false,'unused greeting disappears after 10 seconds');
-await advance(3600000);assert.equal(result.open,false,'continuous viewing never repeats greeting');
+await advance(10000);assert.equal(result.open,true,'greeting must not disappear on a timer');
+await advance(3600000);assert.equal(result.open,true,'same greeting stays available until it scrolls away or is sent');
 await unmount(); await advance(60000);await mount();await advance(2000);assert.equal(result.open,false,'quick re-entry is quiet, even after a long viewing session');
 await unmount();await advance(LIVE_GREETING_TIMING.returnAfterMs);await mount();await advance(1500);assert.equal(result.open,true,'30 minutes outside the viewer permits a new greeting');
 await act(async()=>result.dismiss());assert.equal(result.open,false);await advance(15000);assert.equal(result.open,false,'send/dismiss cancels all timers');
@@ -26,6 +25,6 @@ await unmount();await mount({id:'C',enabled:false});await advance(20000);assert.
 await unmount();await mount({id:'D'});await advance(1500);assert.equal(result.open,true,'new broadcast gets its own first entry');
 await act(async()=>listeners.get('pagehide')?.());await unmount();await mount({id:'D'});await advance(1500);assert.equal(result.open,false,'page reload does not immediately repeat');
 await act(async()=>listeners.get('pagehide')?.());await advance(LIVE_GREETING_TIMING.returnAfterMs);await act(async()=>listeners.get('pageshow')?.({persisted:true}));await advance(1500);assert.equal(result.open,true,'browser back-cache restore respects return cooldown');
-await unmount();blocked=true;await mount({id:'E'});await advance(1500);assert.equal(result.open,true);await advance(10000);assert.equal(result.open,false,'storage failures do not stop expiry');await unmount();
+await unmount();blocked=true;await mount({id:'E'});await advance(1500);assert.equal(result.open,true);await advance(10000);assert.equal(result.open,true,'storage failures do not create a hidden expiry');await unmount();
 assert.equal(timers.size,0);assert.equal(listeners.size,0);Date.now=originalNow;
-console.log('PASS greeting: first entry, 10s expiry, 30m since exit, continuous watching, early dismissal, new broadcast, reload, StrictMode, blocked storage and cleanup');
+console.log('PASS greeting: first entry, no timed expiry, 30m since exit, continuous watching, early dismissal, new broadcast, reload, StrictMode, blocked storage and cleanup');

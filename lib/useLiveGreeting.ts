@@ -2,7 +2,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 
 // Product defaults, kept together so timing can be adjusted without changing the lifecycle.
-export const LIVE_GREETING_TIMING = {delayMs: 1500, visibleMs: 10_000, returnAfterMs: 30 * 60_000} as const;
+export const LIVE_GREETING_TIMING = {delayMs: 1500, returnAfterMs: 30 * 60_000} as const;
 type Visit = {shownAt: number; leftAt?: number};
 function readVisit(key: string): Visit | null {
   try {
@@ -15,7 +15,7 @@ function writeVisit(key: string, value: Visit) {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* Storage is optional. */ }
 }
 
-/** One brief greeting per visit; returning after time OUTSIDE the viewer permits another. */
+/** One greeting per eligible visit; its row scrolls with chat instead of expiring. */
 export function useLiveGreeting(broadcastKey: string, enabled: boolean) {
   const key = `ruru_live_greeting_v2_${broadcastKey}`;
   const [visibleKey, setVisibleKey] = useState<string | null>(null);
@@ -43,7 +43,6 @@ export function useLiveGreeting(broadcastKey: string, enabled: boolean) {
         timers.current.push(window.setTimeout(() => {
           writeVisit(key, {shownAt: Date.now()});
           setVisibleKey(key);
-          timers.current.push(window.setTimeout(() => setVisibleKey(null), LIVE_GREETING_TIMING.visibleMs));
         }, LIVE_GREETING_TIMING.delayMs));
       }
     };

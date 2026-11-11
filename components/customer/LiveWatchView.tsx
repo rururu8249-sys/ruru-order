@@ -9,7 +9,7 @@ import { useLiveFeaturedProducts } from "@/lib/useLiveFeaturedProducts";
 import { useReplayProductCard } from "@/lib/useReplayProductCard";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
 import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
 import {
   LIVE_WATCH_GUIDE_SEEN_KEY,
   LIVE_EDGE_TOLERANCE_SECONDS,
@@ -23,6 +23,7 @@ import { openOrderInExternalBrowser } from "@/components/customer/KakaoExternalO
 import { parseBotRef } from "@/lib/liveChatBot";
 import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 import { EMOJI_MAX_PER_MSG, chatBodyAsText, countEmojiTokens, encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
+import { removeEmojiTrigger, composeEmojiMessage } from "@/lib/chatEmojiComposer";
 import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
@@ -437,6 +438,9 @@ export default function LiveWatchView(props: Props) {
   const emojiMap = useMemo(() => emojiMapOf(emojiItems), [emojiItems]);
   const canEmoji = Boolean(chat?.canEmoji) && emojiItems.length > 0;
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [selectedEmoji, setSelectedEmoji] = useState<ChatEmoji | null>(null);
+  const [emojiSearchWord, setEmojiSearchWord] = useState("");
+  const composedDraft = composeEmojiMessage(draft, selectedEmoji?.name);
   // [14:42 사장님 영상 「이모티콘 넣고 입력칸 다시 누르면 화면 꺼짐」] 원인: 입력칸을 누르는 순간(포커스) 이모티콘 판이 사라져
   //   쓰기 창이 232px 낮아지고, 같은 손가락의 «클릭»이 그 자리(이제 바깥 어두운 곳)에 떨어져 창이 닫혔음.
   //   → 바깥 누르기로 닫는 건 «누르기 시작도 바깥»일 때만.
@@ -444,31 +448,34 @@ export default function LiveWatchView(props: Props) {
   const [composeHint, setComposeHint] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const caretRef = useRef<{ start: number; end: number } | null>(null);
-  const draftEmojiCount = canEmoji ? countEmojiTokens(draft, emojiItems) : 0;
+  const draftEmojiCount = canEmoji ? countEmojiTokens(composedDraft, emojiItems) : 0;
   // 커서 자리 — 넣기용 ref + 추천 낱말 계산용 state(화면이 다시 그려지게)
   const [caretEnd, setCaretEnd] = useState<number | null>(null);
   const rememberCaret = (el: HTMLInputElement) => { caretRef.current = { start: el.selectionStart ?? el.value.length, end: el.selectionEnd ?? el.value.length }; setCaretEnd(caretRef.current.end); };
-  const insertEmoji = (e: ChatEmoji) => {
-    if (draftEmojiCount >= EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지 보낼 수 있어요.`); return; }
-    const token = `:${e.name}:`;
-    const c = caretRef.current ?? { start: draft.length, end: draft.length };
-    const start = Math.min(c.start, draft.length);
-    const end = Math.min(Math.max(c.end, start), draft.length);
-    const next = draft.slice(0, start) + token + draft.slice(end);
-    if (next.length > LIVE_CHAT_MAX_LEN) { setComposeHint("글이 너무 길어요."); return; }
-    setDraft(next);
-    caretRef.current = { start: start + token.length, end: start + token.length };
-    setCaretEnd(start + token.length);
-    setComposeHint("");
-    return next;
+  const selectEmoji = (e: ChatEmoji, replaceTrigger = false) => {
+    if (sending) return;
+    const el = inputRef.current;
+    const value = el?.value ?? draft;
+    const at = el?.selectionEnd ?? caretRef.current?.end ?? value.length;
+    const next = replaceTrigger ? removeEmojiTrigger(value, at, e) : {text: value, caret: at, word: ""};
+    const body = composeEmojiMessage(next.text, e.name);
+    if (countEmojiTokens(body, emojiItems) > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; }
+    if (body.length > LIVE_CHAT_MAX_LEN) { setComposeHint("글이 너무 길어요."); return; }
+    // Finish Korean composition and release the phone keyboard before opening the drawer.
+    el?.blur(); composingRef.current = false;
+    setDraft(next.text); setSelectedEmoji(e); setComposeHint("");
+    caretRef.current = {start: next.caret, end: next.caret}; setCaretEnd(next.caret);
+    if (replaceTrigger) setEmojiSearchWord(next.word);
+    setEmojiOpen(true);
+    return body;
   };
-  // [15:41 사장님 「카톡처럼 단어 쓰면 이모티콘」] 커서 앞 마지막 낱말 → 어울리는 이모티콘(입력칸 위 한 줄 · 이모티콘 판 맨 위)
-  //   키보드는 그대로(누를 때 입력칸 포커스 안 뺏김), 누르면 «:이름:» 을 커서 자리에 넣고 보내기 누르면 글과 함께 감.
-  //   ✕ 누르면 그 낱말에선 다시 안 뜸(다른 낱말을 쓰면 다시).
+  // Recommendations replace their trigger; the selected image stays separate from typed text.
   const [suggestHiddenFor, setSuggestHiddenFor] = useState("");
   const typedWord = canEmoji && (composeOpen || isDesktop) ? lastTypedWord(draft.slice(0, Math.min(caretEnd ?? draft.length, draft.length))) : "";
   const wordSuggests = typedWord ? suggestEmojis(typedWord, emojiItems) : [];
-  const showSuggestRow = wordSuggests.length > 0 && !emojiOpen && typedWord !== suggestHiddenFor && draftEmojiCount < EMOJI_MAX_PER_MSG;
+  const pickerWord = emojiSearchWord || typedWord;
+  const pickerSuggests = pickerWord ? suggestEmojis(pickerWord, emojiItems) : [];
+  const showSuggestRow = wordSuggests.length > 0 && !selectedEmoji && !emojiOpen && typedWord !== suggestHiddenFor && draftEmojiCount < EMOJI_MAX_PER_MSG;
   const suggestRowRef = useRef<HTMLDivElement | null>(null);
   const [keyboardEmojiId, setKeyboardEmojiId] = useState<string | null>(null);
   const focusSuggestion = (index: number) => {
@@ -479,20 +486,8 @@ export default function LiveWatchView(props: Props) {
     button.scrollIntoView({ block: "nearest", inline: "nearest" });
   };
   const composingRef = useRef(false);
-  const insertSuggested = (e: ChatEmoji) => {
-    const el = inputRef.current;
-    // 한글 조합 중(아직 글자가 덜 끝남)이면 먼저 조합을 끝내야 넣은 뒤 글자가 두 번 들어가지 않음
-    if (el && composingRef.current) { el.blur(); composingRef.current = false; }
-    insertEmoji(e);
-    if (!el) return;
-    // 넣은 뒤에도 키보드·커서 그대로(이모티콘 바로 뒤에서 이어 쓰기) — focus 는 누른 순간 바로 해야 아이폰도 키보드 유지
-    if (document.activeElement !== el) el.focus();
-    window.requestAnimationFrame(() => {
-      const at = caretRef.current?.start ?? el.value.length;
-      try { el.setSelectionRange(at, at); } catch { /* 무시 */ }
-    });
-  };
   const openCompose = (withEmoji: boolean) => {
+    if (withEmoji) inputRef.current?.blur();
     setEmojiOpen(withEmoji && canEmoji); setComposeHint(""); if (!isDesktop) setComposeOpen(true);
   };
   useEffect(() => { if (!composeHint) return; const t = window.setTimeout(() => setComposeHint(""), 2500); return () => window.clearTimeout(t); }, [composeHint]);
@@ -575,12 +570,18 @@ export default function LiveWatchView(props: Props) {
   const pinTextRef = useRef<HTMLSpanElement | null>(null);
   const [banConfirm, setBanConfirm] = useState(false);
   const pressTimer = useRef<number | null>(null);
+  const {open: greetOpen, dismiss: closeGreet} = useLiveGreeting(props.broadcastId || videoId, Boolean(chat?.canWrite));
+  const [greetingAnchor, setGreetingAnchor] = useState<{afterId: number | null} | null>(null);
+  useEffect(() => {
+    if (!greetOpen) { setGreetingAnchor(null); return; }
+    setGreetingAnchor(anchor => anchor ?? {afterId: chat?.messages.at(-1)?.id ?? null});
+  }, [greetOpen, chat?.messages]);
   const hasChat = (chat?.messages.length ?? 0) > 0;
   const chatColorMap = useMemo(() => chatColors(chat?.messages ?? []), [chat?.messages]);
   // 80개 상한에서도 내용 변경·그림 로드·화면 크기를 추적. 사용자가 지난 글을 읽을 때만 멈춘다.
   const { boxRef: chatBoxRef, contentRef: chatContentRef, atBottom: chatAtBottom, followLatest: chatToBottom } = useChatAutoScroll(
     chat?.messages, `${isDesktop}:${focus}:${chatView.size}:${chatView.height}:${chatView.bold}`,
-    Boolean(chat && (hasChat || isDesktop)),
+    Boolean(chat && (hasChat || isDesktop || greetOpen)),
   );
   useEffect(() => {
     if (!chatHint) return;
@@ -590,16 +591,22 @@ export default function LiveWatchView(props: Props) {
   const productPickerOpen = Boolean(chat?.canModerate && draft.trimStart().startsWith("/"));
   const sendChat = async (bodyOverride?: string, target?: ChatProductSelection) => {
     if (!chat || sending) return;
-    const body = (bodyOverride ?? draft).trim();
+    const body = (bodyOverride ?? composedDraft).trim();
     if (!body) return;
     // Keep a batch selection visible until the server confirms it; retries retain the checks.
     const batch = target && "targets" in target;
     setSending(true);
     setComposeHint("");
-    if (!batch) { setDraft(""); setComposeOpen(false); }
+    const previousDraft = draft, previousEmoji = selectedEmoji;
+    const keepPicker = !isDesktop && emojiOpen && Boolean(selectedEmoji) && bodyOverride === undefined;
+    if (!batch) { setDraft(""); setSelectedEmoji(null); if (!keepPicker) setComposeOpen(false); }
     closeGreet();
     const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
     const r = await chat.onSend(body, commandTarget).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
+    if (!r.ok && !batch) {
+      setDraft(previousDraft); setSelectedEmoji(previousEmoji);
+      if (!isDesktop) { setComposeOpen(true); setEmojiOpen(Boolean(previousEmoji)); }
+    }
     if (r.ok && batch && target.mode === "replace" && props.broadcastId) {
       invalidateProductIntroCatalog(props.broadcastId, videoId);
       void loadProductIntroCatalog(props.broadcastId, videoId).catch(() => {});
@@ -609,7 +616,7 @@ export default function LiveWatchView(props: Props) {
     if (batch) {
       if (r.ok) { setDraft(""); setComposeOpen(false); }
       else setComposeHint(r.message || "못 보냈어요. 선택을 유지했으니 다시 눌러 주세요.");
-    } else if (!r.ok) { setDraft(body); setChatHint(r.message || "못 보냈어요."); }
+    } else if (!r.ok) { setChatHint(r.message || "못 보냈어요."); }
   };
   // [2026-11-10 04:17 사장님] 화면 빈 곳(영상)을 누르면 «돌려보기 모드» — 채팅·카드가 흐려지고 손가락이 그대로 유튜브 막대로 감.
   //   영상은 유튜브 화면(다른 사이트)이라 누른 걸 직접 못 듣는다 → 누르면 그 화면으로 «포커스»가 넘어가는 순간(창 blur)을 보고 안다.
@@ -638,7 +645,6 @@ export default function LiveWatchView(props: Props) {
     restartSeekTimer();
   };
   useEffect(() => () => clearSeekTimer(), []);
-  const {open: greetOpen, dismiss: closeGreet} = useLiveGreeting(props.broadcastId || videoId, Boolean(chat?.canWrite));
   const sendGreet = async () => {
     if (!chat) return;
     closeGreet();
@@ -918,23 +924,38 @@ export default function LiveWatchView(props: Props) {
   const videoRight = isDesktop && !focus ? desktopChatWidth : 0;
   const pinnedProductCard = <LiveFeaturedProductCard product={featured.current} count={featured.products.length} label={replayFeatured.replay ? "지금 보는 상품" : undefined} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} />;
   // 한 벌의 입력 폼을 PC 채팅 아래 또는 폰 쓰기 시트에만 렌더한다.
+  const greetingRow = chat?.canWrite && greetOpen ? (
+          // Local row at the entry position; new chat pushes it up naturally.
+          <div data-live-greeting onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()} style={{ flexShrink: 0, pointerEvents: "auto", display: "flex", alignItems: "center", gap: "8px", width: "100%", boxSizing: "border-box", minHeight: "40px", padding: "4px 6px 4px 10px", borderRadius: "10px", background: "rgba(40,40,40,0.82)", color: "#FFFFFF" }}>
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: "rotate(-18deg)" }}>
+              <path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+            </svg>
+            <span style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>실시간 채팅에서 인사하기</span>
+            <button type="button" onClick={() => void sendGreet()} style={{ flexShrink: 0, height: "32px", padding: "0 12px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>보내기</button>
+          </div>
+  ) : null;
+
   const composer = (
           <form
             onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => { e.preventDefault(); if (composingRef.current || productPickerOpen) return; if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } setEmojiOpen(false); void sendChat(); }}
+            onSubmit={(e) => { e.preventDefault(); if (composingRef.current || productPickerOpen) return; if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } if (!selectedEmoji) setEmojiOpen(false); void sendChat(); }}
             style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: isDesktop ? "#0F0F0F" : "#FFFFFF", padding: isDesktop ? "12px 0 calc(12px + env(safe-area-inset-bottom))" : emojiOpen ? "12px 16px 0" : "12px 16px calc(12px + env(safe-area-inset-bottom))", borderRadius: isDesktop ? 0 : "16px 16px 0 0", boxSizing: "border-box", ...(isDesktop ? { position: "relative", flexShrink: 0, order: 5, borderTop: "1px solid #333333", pointerEvents: "auto" } : {}) }}
           >
-            {chat?.canWrite && chat.onVerifyIdentity && !chat.identityVerified && !chat.canReviewDeleted ? <button type="button" onClick={chat.onVerifyIdentity} style={{ marginBottom: 8, background: "transparent", color: isDesktop ? "#bbb" : "#555", border: 0, padding: "4px 8px", fontSize: 12, textDecoration: "underline" }}>내 글 삭제 · 카카오 본인 확인</button> : null}
             {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
             {draftEmojiCount > 0 ? (
               // 보내면 이렇게 보여요 — «:이름:» 글자 대신 그림으로 미리
-              <div aria-label="미리보기" style={{ marginBottom: "8px", padding: "8px 12px", borderRadius: "12px", background: "#F5F5F5", color: "#111111", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word" }}>
-                <ChatBodyView body={encodeEmojiTokens(draft, emojiItems).text} emojis={emojiMap} />
+              <div aria-label="미리보기" style={{ position: "relative", marginBottom: "8px", padding: "8px 44px 8px 12px", borderRadius: "12px", background: "#F5F5F5", color: "#111111", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word" }}>
+                {selectedEmoji ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={selectedEmoji.url} alt={`${selectedEmoji.name} 이모티콘 미리보기`} style={{display: "block", width: "min(112px, 20dvh)", height: "min(112px, 20dvh)", objectFit: "contain"}} />
+                ) : <ChatBodyView body={encodeEmojiTokens(draft, emojiItems).text} emojis={emojiMap} />}
+                {selectedEmoji ? <button type="button" aria-label="선택한 이모티콘 취소" onClick={() => setSelectedEmoji(null)} style={{position: "absolute", right: 0, top: 0, width: 44, height: 44, border: 0, background: "transparent", color: "#666", cursor: "pointer"}}>✕</button> : null}
               </div>
             ) : null}
             {composeHint ? <div role="status" style={{ marginBottom: "8px", fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{composeHint}</div> : null}
             {showSuggestRow && !productPickerOpen ? (
-              // 쓰고 있는 낱말에 어울리는 이모티콘 — 누르면 커서 자리에 넣음(키보드 안 내려감)
+              // Select a picture, replace its trigger, and open the keyboard-sized drawer.
               <div role="group" aria-label={`「${typedWord}」 어울리는 이모티콘`} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px", background: "#F5F5F5", borderRadius: "12px", padding: "2px 2px 2px 6px" }}>
                 <div ref={suggestRowRef} data-live-scroll="1" style={{ flex: 1, minWidth: 0, display: "flex", gap: "2px", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "none" }}>
                   {wordSuggests.map((e, index) => (
@@ -943,7 +964,7 @@ export default function LiveWatchView(props: Props) {
                       type="button"
                       onPointerDown={(ev) => ev.preventDefault()}
                       onMouseDown={(ev) => ev.preventDefault()}
-                      onClick={() => insertSuggested(e)}
+                      onClick={() => selectEmoji(e, true)}
                       onFocus={() => setKeyboardEmojiId(e.id)}
                       onBlur={() => setKeyboardEmojiId(null)}
                       onKeyDown={isDesktop ? (ev) => {
@@ -954,14 +975,11 @@ export default function LiveWatchView(props: Props) {
                         else if (ev.key === "Enter") {
                           ev.preventDefault();
                           if (sending || ev.repeat) return;
-                          const next = insertEmoji(e);
+                          selectEmoji(e, true);
                           inputRef.current?.focus();
-                          // setDraft 직후의 이전 글을 보내지 않도록 완성한 본문을 같은 전송 함수에 전달.
-                          if (next !== undefined) void sendChat(next);
                         }
                       } : undefined}
                       aria-label={`이모티콘 ${e.name} 넣기`}
-                      title={isDesktop ? `${e.name} · ← → 선택 · Enter 전송` : e.name}
                       style={{ flexShrink: 0, width: "52px", height: "52px", border: "none", borderRadius: "10px", background: keyboardEmojiId === e.id ? "#E0E7FF" : "transparent", outline: keyboardEmojiId === e.id ? "2px solid #2563EB" : undefined, outlineOffset: "-2px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -988,8 +1006,8 @@ export default function LiveWatchView(props: Props) {
                   data-live-chat-input
                   autoFocus={!isDesktop && !emojiOpen}
                   value={draft}
-                  readOnly={sending && productPickerOpen}
-                  onChange={(e) => { setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN)); if (e.target.value.trimStart().startsWith("/")) setEmojiOpen(false); rememberCaret(e.target); }}
+                  readOnly={sending}
+                  onChange={(e) => { setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN)); setEmojiSearchWord(""); if (e.target.value.trimStart().startsWith("/")) { setEmojiOpen(false); setSelectedEmoji(null); } rememberCaret(e.target); }}
                   onSelect={(e) => rememberCaret(e.currentTarget)}
                   onFocus={() => setEmojiOpen(false)}
                   onKeyDown={isDesktop ? (e) => {
@@ -1017,27 +1035,26 @@ export default function LiveWatchView(props: Props) {
                     }}
                     style={{ flexShrink: 0, width: "44px", height: "44px", border: "none", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
                   >
-                    <IconSmile color={isDesktop ? "#FFFFFF" : emojiOpen ? "#111111" : "#707072"} />
+                    {emojiOpen ? <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={isDesktop ? "#FFFFFF" : "#111111"} strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10" /></svg> : <IconSmile color={isDesktop ? "#FFFFFF" : "#707072"} />}
                   </button>
                 ) : null}
               </div>
-              <button type="submit" disabled={sending || productPickerOpen || !draft.trim()} style={{ flexShrink: 0, height: "48px", padding: "0 18px", border: "none", borderRadius: "9999px", background: isDesktop ? (sending || productPickerOpen || !draft.trim() ? "#272727" : "#FFFFFF") : sending || productPickerOpen || !draft.trim() ? "#E5E5E5" : "#111111", color: isDesktop ? (sending || productPickerOpen || !draft.trim() ? "#AAAAAA" : "#111111") : sending || productPickerOpen || !draft.trim() ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
+              <button type="submit" disabled={sending || productPickerOpen || !composedDraft.trim()} style={{ flexShrink: 0, height: "48px", padding: "0 18px", border: "none", borderRadius: "9999px", background: isDesktop ? (sending || productPickerOpen || !composedDraft.trim() ? "#272727" : "#FFFFFF") : sending || productPickerOpen || !composedDraft.trim() ? "#E5E5E5" : "#111111", color: isDesktop ? (sending || productPickerOpen || !composedDraft.trim() ? "#AAAAAA" : "#111111") : sending || productPickerOpen || !composedDraft.trim() ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
                 {sending ? "보내는 중" : "보내기"}
               </button>
             </div>
             {emojiOpen && canEmoji ? (
-              <div style={{ margin: isDesktop ? 0 : "12px -16px 0", borderTop: "1px solid #E5E5E5", ...(isDesktop ? { position: "absolute", left: 0, right: 0, bottom: "calc(100% + 8px)", zIndex: 4, background: "#FFFFFF", borderRadius: "12px", overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.4)" } : {}) }}>
+              <div data-emoji-drawer style={{ margin: isDesktop ? "8px 0 0" : "12px -16px 0", borderTop: "1px solid #E5E5E5", background: "#FFFFFF", borderRadius: "12px", overflow: "hidden" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px 0" }}>
                   <span style={{ fontSize: "13px", fontWeight: 700, color: "#111111" }}>루루동이 이모티콘</span>
-                  <span style={{ fontSize: "13px", color: "#707072" }}>{draftEmojiCount}/{EMOJI_MAX_PER_MSG}</span>
                 </div>
-                <div data-live-scroll="1" style={{ height: "232px", overflowY: "auto", overscrollBehavior: "contain", padding: "8px 12px calc(12px + env(safe-area-inset-bottom))", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))", gap: "4px", alignContent: "start" }}>
+                <div data-live-scroll="1" style={{ height: "min(232px, 35dvh)", overflowY: "auto", overscrollBehavior: "contain", padding: "8px 12px calc(12px + env(safe-area-inset-bottom))", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))", gap: "4px", alignContent: "start" }}>
                   {/* 쓰다 만 낱말이 있으면 맨 위에 어울리는 것부터(카톡 이모티콘 «검색»처럼) */}
-                  {wordSuggests.length > 0 ? (
+                  {pickerSuggests.length > 0 ? (
                     <>
-                      <div style={{ gridColumn: "1 / -1", fontSize: "13px", fontWeight: 600, color: "#707072", padding: "2px 4px 0" }}>「{typedWord}」 어울리는 이모티콘</div>
-                      {wordSuggests.map((e) => (
-                        <button key={`s-${e.id}`} type="button" onClick={() => insertEmoji(e)} aria-label={`이모티콘 ${e.name}`} title={e.name} style={{ height: "60px", border: "none", borderRadius: "12px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+                      <div style={{ gridColumn: "1 / -1", fontSize: "13px", fontWeight: 600, color: "#707072", padding: "2px 4px 0" }}>「{pickerWord}」 어울리는 이모티콘</div>
+                      {pickerSuggests.map((e) => (
+                        <button key={`s-${e.id}`} type="button" onClick={() => selectEmoji(e, true)} aria-label={`이모티콘 ${e.name}`} title={e.name} style={{ height: "60px", border: "none", borderRadius: "12px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={e.url} alt="" draggable={false} style={{ width: "48px", height: "48px", objectFit: "contain" }} />
                         </button>
@@ -1046,7 +1063,7 @@ export default function LiveWatchView(props: Props) {
                     </>
                   ) : null}
                   {emojiItems.map((e) => (
-                    <button key={e.id} type="button" onClick={() => insertEmoji(e)} aria-label={`이모티콘 ${e.name}`} title={e.name} style={{ height: "60px", border: "none", borderRadius: "12px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+                    <button key={e.id} type="button" onClick={() => selectEmoji(e)} aria-label={`이모티콘 ${e.name}`} title={e.name} style={{ height: "60px", border: "none", borderRadius: "12px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={e.url} alt="" draggable={false} style={{ width: "48px", height: "48px", objectFit: "contain" }} />
                     </button>
@@ -1200,7 +1217,7 @@ export default function LiveWatchView(props: Props) {
       <style>{`
         [data-live-notice] { max-height: 64px; overflow-y: auto; }
         @media (max-height: 500px) {
-          [data-live-greeting], [data-live-chat-heading] { display: none !important; }
+          [data-live-chat-heading] { display: none !important; }
           [data-live-notice] { max-height: 36px; }
           [data-featured-product-card] [data-featured-label] { display: none; }
           [data-featured-product-card] [data-featured-image] { height: 44px !important; width: 44px !important; }
@@ -1231,7 +1248,7 @@ export default function LiveWatchView(props: Props) {
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
           </div>
         ) : null}
-        {chat && (chat.messages.length > 0 || isDesktop) ? (
+        {chat && (chat.messages.length > 0 || isDesktop || greetOpen) ? (
           <div style={{ position: "relative", width: "100%", minHeight: 0, display: "flex", flexDirection: "column", ...(isDesktop ? { flex: 1, order: 3 } : {}) }}>
           <div
             ref={chatBoxRef}
@@ -1252,6 +1269,7 @@ export default function LiveWatchView(props: Props) {
             style={{ minHeight: 0, pointerEvents: "auto", overscrollBehavior: "contain", maxHeight: isDesktop ? "none" : CHAT_HEIGHTS[chatView.height], height: isDesktop ? "100%" : undefined, overflowY: "auto", scrollbarWidth: isDesktop ? "thin" : "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: isDesktop ? "none" : "linear-gradient(transparent, #000 24px)", WebkitMaskImage: isDesktop ? "none" : "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
           >
             <div ref={chatContentRef} style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0 }}>
+            {greetingAnchor?.afterId === null ? greetingRow : null}
             {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
               const localLine = !Number.isInteger(m.id);
@@ -1259,8 +1277,7 @@ export default function LiveWatchView(props: Props) {
               const canPress = canMod || (!m.deletedByAuthor && !m.privateCommand && Boolean(chat.ownIds?.includes(m.id)));
               const botProduct = m.badge === "bot" && !m.deletedByAuthor ? parseBotRef(m.botRef) : null;
               return (
-              <div
-                key={m.id}
+              <Fragment key={m.id}><div
                 data-chat-id={m.id}
                 onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; if (canPress && e.button === 0) startPress(m); }}
                 onPointerMove={(e) => { const d = downAt.current; if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) endPress(); }}
@@ -1294,7 +1311,7 @@ export default function LiveWatchView(props: Props) {
                     <span style={{ display: "inline", marginLeft: "6px", color: "inherit", fontSize: "1em", fontWeight: 500, textDecoration: "underline", textUnderlineOffset: "3px", whiteSpace: "nowrap" }}>‹ 담기</span>
                   ) : null}
                 </span>
-              </div>
+              </div>{greetingAnchor?.afterId === m.id ? greetingRow : null}</Fragment>
             ); })}
             </div>
           </div>
@@ -1335,17 +1352,6 @@ export default function LiveWatchView(props: Props) {
             </span>
             {/* 줄 높이 = 이모티콘 높이(2em) — 한 줄로 접혀 있어도 이모티콘 위아래가 안 잘리고, 펼쳐도 줄 높이가 같아 안 움직임 */}
             <span ref={pinTextRef} style={{ flex: 1, minWidth: 0, lineHeight: "2em", padding: "0.15em 0", fontWeight: chatView.bold ? 700 : 500, ...(pinOpen ? { wordBreak: "break-word" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}><ChatBodyView body={chat.pinned.body} emojis={emojiMap} /></span>
-          </div>
-        ) : null}
-        {chat && chat.canWrite && greetOpen ? (
-          // 실시간 채팅에서 인사하기 — 유튜브 앱과 같은 모양: [손 흔드는 그림] 글 … [보내기 흰 알약]. 「보내기」 = 👋 한 번 보냄
-          <div data-live-greeting style={{ ...(isDesktop ? { order: 4, flexShrink: 0 } : {}), pointerEvents: "auto", display: "flex", alignItems: "center", gap: "12px", width: "100%", boxSizing: "border-box", minHeight: "52px", padding: "8px 8px 8px 14px", borderRadius: "12px", background: "rgba(40,40,40,0.82)", color: "#FFFFFF" }}>
-            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: "rotate(-18deg)" }}>
-              <path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
-              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-            </svg>
-            <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>실시간 채팅에서 인사하기</span>
-            <button type="button" onClick={() => void sendGreet()} style={{ flexShrink: 0, height: "36px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>보내기</button>
           </div>
         ) : null}
         <div style={{order: isDesktop ? 4 : undefined, flexShrink: 0}}>{pinnedProductCard}</div>
@@ -1398,6 +1404,7 @@ export default function LiveWatchView(props: Props) {
             {[
               ...(props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지·쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 })),
               { key: "share", label: "공유하기", onClick: shareLive },
+              ...(chat?.canWrite && chat.onVerifyIdentity && !chat.identityVerified && !chat.canReviewDeleted ? [{ key: "identity", label: "내 채팅 본인 확인", onClick: chat.onVerifyIdentity }] : []),
               { key: "chatview", label: "채팅 설정", onClick: () => setChatViewOpen(true) },
               { key: "guide", label: "사용 방법", onClick: () => setGuideOpen(true) },
               ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp }]),
