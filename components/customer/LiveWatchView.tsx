@@ -22,6 +22,7 @@ import { EMOJI_MAX_PER_MSG, chatBodyAsText, countEmojiTokens, encodeEmojiTokens,
 import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
+import { useLiveResume } from "@/lib/useLiveResume";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 import { ChatProductPicker } from "@/components/customer/ChatProductPicker";
 import type { ChatProductSelection } from "@/lib/liveChatProductCommand";
@@ -753,6 +754,7 @@ export default function LiveWatchView(props: Props) {
   //   유튜브 재생 정보(infoDelivery)가 재생 막대와 같은 실시간 허용 범위를 벗어나면 버튼을 띄운다.
   //   실시간 이동은 막대를 끝으로 끌 때처럼 seekTo, 영상 새로고침은 별도 버튼으로 처리한다.
   const [reloadKey, setReloadKey] = useState(0);
+  const liveResume = useLiveResume(iframeRef, `${videoId}:${reloadKey}`);
   // Each entry/new player starts muted. Dismiss the large prompt only after
   // this iframe confirms unmute; a later deliberate mute keeps just the icon.
   useEffect(() => {
@@ -831,6 +833,7 @@ export default function LiveWatchView(props: Props) {
       const behind = cur.live && [1, 2, 3].includes(cur.state) && end > 0 && cur.t >= 0 &&
         (cur.atLiveHead !== null ? !cur.atLiveHead : end - cur.t >= LIVE_EDGE_TOLERANCE_SECONDS);
       setBehindLive((prev) => (prev === behind ? prev : behind));
+      if (e.origin === "https://www.youtube.com" && e.source === iframeRef.current?.contentWindow) liveResume.onInfo(info);
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
@@ -854,6 +857,7 @@ export default function LiveWatchView(props: Props) {
     const { live, d, seekableEnd } = playerInfo.current;
     const target = seekableEnd ?? Math.max(0, d - 1);
     if (!live || !Number.isFinite(target) || target <= 0) return;
+    liveResume.onAction("live");
     // 최신 재생 가능 끝으로 이동. 1초를 빼면 유튜브가 DVR 재생으로 남길 수 있다.
     sendToPlayer(youtubeCommand("seekTo", [target, true]));
     sendToPlayer(youtubeCommand("playVideo"));
@@ -861,6 +865,7 @@ export default function LiveWatchView(props: Props) {
   };
 
   const turnSoundOn = () => {
+    liveResume.onAction("playVideo");
     sendToPlayer(youtubeCommand("unMute"));
     sendToPlayer(youtubeCommand("playVideo"));
     setMuted(false);
@@ -1071,7 +1076,7 @@ export default function LiveWatchView(props: Props) {
             const d = cur.live ? (cur.seekableEnd ?? cur.d) : cur.d;
             return { t: d > 0 ? Math.min(t, d) : t, d, playing: cur.state === 1, live: cur.live, atLiveHead: cur.atLiveHead };
           }}
-          send={(func, args) => sendToPlayer(youtubeCommand(func, args || []))}
+          send={(func, args) => { liveResume.onAction(func, args); sendToPlayer(youtubeCommand(func, args || [])); }}
           onHold={(hold) => { if (hold) clearSeekTimer(); else restartSeekTimer(); }}
         />
       ) : null}
@@ -1133,9 +1138,9 @@ export default function LiveWatchView(props: Props) {
 
       {/* 돌려보는 중 → 지금 방송으로 */}
       {/* 실시간 스트림으로 건너뛰기 — 유튜브 라이브처럼 오른쪽 아래 흰 알약(돌려보기 중에도 보임) */}
-      {behindLive ? (
+      {behindLive || liveResume.needsTap ? (
         <button type="button" onClick={backToLive} style={{ position: "absolute", right: "12px", bottom: "calc(140px + env(safe-area-inset-bottom))", height: "40px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", zIndex: 2, boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
-          <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="#111111"><path d="M0 0l8 7-8 7zM9 0l8 7-8 7z" /></svg>실시간 스트림으로 건너뛰기
+          <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="#111111"><path d="M0 0l8 7-8 7zM9 0l8 7-8 7z" /></svg>{liveResume.needsTap ? "눌러서 실시간 방송 재생" : "실시간 스트림으로 건너뛰기"}
         </button>
       ) : null}
 

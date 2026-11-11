@@ -18,7 +18,7 @@ const playerInfo = {current: {t: 564, d: 3599, live: true, state: 1}};
 const calls = [];
 const {youtubeCommand} = createUiLoader()('lib/liveWatch.ts');
 const jump = vm.runInNewContext(`(${handler.getText(ast)})`, {
-  playerInfo, youtubeCommand,
+  playerInfo, youtubeCommand, liveResume: {onAction(){}},
   sendToPlayer: text => calls.push(JSON.parse(text)),
   lastTick: {current: {t: 564}},
   setBehindLive: () => calls.push('premature-live-label'),
@@ -59,6 +59,7 @@ assert.ok(listener);
 let behind = false;
 const liveModule = createUiLoader()('lib/liveWatch.ts');
 const onMsg = vm.runInNewContext(ts.transpile(`const handle = ${listener.getText(ast)}; handle;`, {target: ts.ScriptTarget.ES2022}), {
+  iframeRef: {current: null}, liveResume: {onInfo(){}},
   playerInfo, lastTick: {current: {}}, pausedRef: {current: false},
   ccOffAt: {current: Date.now()}, captionsOff() {},
   LIVE_EDGE_TOLERANCE_SECONDS: liveModule.LIVE_EDGE_TOLERANCE_SECONDS,
