@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const {chatProductPhoto}=createUiLoader()('lib/chatProductPhoto.ts');
+const items=[{id:'p',imageUrl:'parent',details:[{name:'MC-333',imageUrl:'legacy',productId:'p'},{name:'MC-335',imageUrl:'linked',productId:'s'}]},{id:'one',imageUrl:'standalone'}];
+assert.equal(chatProductPhoto(items,{productId:'p',detailName:'MC-333'}),'legacy');
+assert.equal(chatProductPhoto(items,{productId:'s',detailName:''}),'linked');
+assert.equal(chatProductPhoto(items,{productId:'one',detailName:''}),'standalone');
+assert.equal(chatProductPhoto(items,{productId:'p',detailName:'missing'}),'');
+assert.equal(chatProductPhoto(items,{productId:'missing',detailName:''}),'');
+console.log('PASS exact legacy/linked/standalone chat product photos; unknown never uses a different product');

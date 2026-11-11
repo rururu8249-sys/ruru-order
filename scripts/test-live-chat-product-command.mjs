@@ -91,3 +91,18 @@ assert.equal(writes[2].value[1].bot_ref,'p:88|');assert.match(writes[2].value[1]
 listed=[];writes=[];result=await send('/335');assert.equal(result.ok,false);assert.equal(writes.length,0);
 reset();mod=false;result=await send('mc335');assert.equal(result.ok,true);assert.equal(botCalls,1);assert.deepEqual(writes.map(w=>w.table),['live_chat_messages']);
 console.log('PASS actual chat POST: moderator guards, fresh catalog, unique/hidden/sold-out/linked targets, pin clear, guide, failures and ordinary chat');
+
+reset();products=[{id:1,product_name:'PD-509 블랙',price:100000,image_url:'https://example.test/pd.jpg'},{id:2,product_name:'BB-307 베이지',price:200000,image_url:'https://example.test/bb.jpg'}];listed=[1,2];
+result=await send('/프509, 버307');
+assert.equal(result.ok,true,'comma-separated command saves both exact products');
+assert.equal(result.privateCommand,true);assert.equal(writes[2].value.length,3,'one private receipt and two public guides');
+assert.deepEqual(JSON.parse(writes[0].value.value).targets,[{productId:'1',detailName:''},{productId:'2',detailName:''}]);
+assert.equal(writes[2].value[0].hidden_by,'command');
+assert.deepEqual(writes[2].value.slice(1).map(m=>m.bot_ref),['p:1|','p:2|']);
+writes=[];result=await send('/',{targets:[{productId:'1'},{productId:'2'}],mode:'replace'});assert.equal(result.ok,true);
+writes=[];result=await send('/',{targets:[{productId:'1'},{productId:'999'}],mode:'replace'});assert.equal(result.ok,false);assert.equal(writes.length,0,'invalid target blocks entire batch');
+writes=[];result=await send('/',{targets:[{productId:'1'},{}],mode:'replace'});assert.equal(result.ok,false);assert.equal(writes.length,0);
+writes=[];result=await send('/프509, 없는999');assert.equal(result.ok,false);assert.equal(writes.length,0,'unmatched comma term cannot partially execute');
+writes=[];result=await send('/509, 307, 509');assert.equal(result.ok,true);assert.equal(writes[2].value.length,3,'duplicate product emits one guide');
+const candidates=await apiLoad('lib/liveChatProductCommandServer.ts').loadChatCommandProducts(sb,bc);assert.equal(candidates[0].imageUrl,'https://example.test/pd.jpg');
+console.log('PASS multi POST: exact batch, private receipt, per-product guides, invalid targets, unmatched terms, deduplication and photos');

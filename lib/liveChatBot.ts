@@ -72,6 +72,8 @@ export function hasBuyIntent(body: string): boolean {
 }
 
 export type BotCandidate = {
+  /** 상품 선택 목록 표시용, 서버가 현재 상품 사진에서 읽는다. */
+  imageUrl?: string;
   productId: string;
   /** 세부상품이면 그 이름(누르면 그 세부상품이 골라진 채 옵션 창) */
   detailName: string;

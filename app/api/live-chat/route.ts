@@ -6,7 +6,7 @@
 //   새 글은 DB 트리거가 소식(Broadcast)으로 모두에게 보낸다.
 import { NextRequest, NextResponse, after } from "next/server";
 import { runLiveChatBot } from "@/lib/liveChatBotServer";
-import { parseChatProductCommand } from "@/lib/liveChatProductCommand";
+import { parseChatProductQueries, parseChatProductSelection } from "@/lib/liveChatProductCommand";
 import { runChatProductCommand } from "@/lib/liveChatProductCommandServer";
 import { getServiceClient } from "@/lib/youtube";
 import {
@@ -118,9 +118,11 @@ export async function POST(request: NextRequest) {
 
     if (body.startsWith("/")) {
       if (!role.isMod) return fail("상품 순환 명령은 채팅 관리자만 사용할 수 있어요.", 403);
-      const query = parseChatProductCommand(body);
-      const target = normalizeWidgetTarget(raw.target);
-      if (!query && !target) return fail("/335 또는 /mc335처럼 상품번호만 입력해 주세요.");
+      const query = parseChatProductQueries(body);
+      const target = raw.target && typeof raw.target === "object" && "targets" in raw.target
+        ? parseChatProductSelection(raw.target) : normalizeWidgetTarget(raw.target);
+      if (raw.target != null && !target) return fail("선택한 상품 목록을 확인해 주세요. 한 번에 20개까지 가능해요.");
+      if (!query && !target) return fail("/프509, 버307처럼 입력하거나 목록에서 상품을 골라 주세요.");
       if (bcRow.widget_card_enabled === false) return fail("방송 관리에서 상품 위젯을 먼저 켜 주세요.");
       try {
         const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null }, target ?? undefined);

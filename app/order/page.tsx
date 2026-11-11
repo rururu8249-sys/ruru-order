@@ -6739,7 +6739,7 @@ export default function OrderPage() {
           // [2026-11-10 사장님 「막102 사진이 있으면 그게 나와야지」] 세부상품 사진 = 주문서 담은 상품과 같은 규칙(resolveOrderItemPhoto), 없을 때만 예전 사진
           let detailPhoto = "";
           try { detailPhoto = resolveOrderItemPhoto(product as Record<string, unknown>, { productName: dn }).url; } catch { detailPhoto = ""; }
-          return { name: dn, imageUrl: detailPhoto || pickOrderProductImageUrl(shown) || pickOrderProductImageUrl(product), priceText: won(Number(shown.price || product.price || 0)), soldOut: isSoldOutOrderProduct(shown) };
+          return { productId: String(shown.id ?? product.id ?? ""), name: dn, imageUrl: detailPhoto || pickOrderProductImageUrl(shown) || pickOrderProductImageUrl(product), priceText: won(Number(shown.price || product.price || 0)), soldOut: isSoldOutOrderProduct(shown) };
         }) : undefined,
       };
     }).filter((it) => it.id);

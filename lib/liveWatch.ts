@@ -165,7 +165,7 @@ export type LiveWatchItem = {
   /** 검색에 쓰는 말(상품명 + 관리자가 넣은 검색어) — 주문서 검색과 같은 말 */
   searchTexts?: string[];
   /** 브랜드 묶음의 세부상품(검색하면 한 줄씩 바로 나옴) */
-  details?: Array<{ name: string; imageUrl: string; priceText: string; soldOut: boolean }>;
+  details?: Array<{ productId?: string; name: string; imageUrl: string; priceText: string; soldOut: boolean }>;
   /** 세부상품 줄이면 그 이름 — 누르면 그 세부상품이 골라진 채로 열림 */
   detailName?: string;
 };

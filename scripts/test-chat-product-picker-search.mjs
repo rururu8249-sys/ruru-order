@@ -13,10 +13,10 @@ let reads=0;
 globalThis.fetch=async()=>{reads++;return {json:async()=>({ok:true,items})};};
 const {ChatProductPicker}=createUiLoader()('components/customer/ChatProductPicker.tsx');
 let tree, selected=[];
-const props={broadcastId:'test',query:'몽',busy:false,onSelect:p=>selected.push(p.productId),onClose(){}};
+const props={broadcastId:'test',query:'몽',busy:false,onApply:ps=>selected.push(...ps.map(p=>p.productId)),onClose(){}};
 await act(async()=>{tree=Renderer.create(React.createElement(ChatProductPicker,props));});
 const options=()=>tree.root.findAllByType('button').filter(n=>n.props.role==='option');
-const names=()=>options().map(n=>n.children[0]);
+const names=()=>options().map(n=>n.props["aria-label"]);
 assert.deepEqual(names(),['MC-335 아이보리','MC-333 핑크'],'/몽 must list Moncler products even when catalog texts only contain MC codes');
 assert.equal(options()[1].props.disabled,true,'sold-out products remain disabled');
 assert.deepEqual(selected,[],'search must not select or send automatically');
@@ -28,9 +28,7 @@ for(const [query,expected] of [
 ]){await act(async()=>tree.update(React.createElement(ChatProductPicker,{...props,query})));assert.deepEqual(names(),expected,query);}
 assert.equal(reads,1,'typing filters the existing catalog without more requests');
 await act(async()=>tree.update(React.createElement(ChatProductPicker,props)));
-await act(async()=>options()[0].props.onClick());assert.deepEqual(selected,['1']);
-const press=async key=>{await act(async()=>{for(const f of keys)f({target:new HTMLInputElement(),key,preventDefault(){},stopPropagation(){}});});};
-await press('ArrowDown');await press('Enter');assert.deepEqual(selected,['1'],'keyboard cannot select sold-out item');
-await press('ArrowUp');await press('Enter');assert.deepEqual(selected,['1','1'],'keyboard still selects exact product');
+await act(async()=>options()[0].props.onClick());assert.deepEqual(selected,[], 'checking never executes');
+await act(async()=>tree.root.findByProps({'data-product-apply':'replace'}).props.onClick());assert.deepEqual(selected,['1']);
 await act(async()=>tree.unmount());assert.equal(keys.size,0);
-console.log('PASS actual chat picker: brand-only aliases, code/name search, sold-out, selection, keyboard and no typing requests');
+console.log('PASS actual chat picker: brand aliases, code/name search, sold-out, explicit apply and no typing requests');

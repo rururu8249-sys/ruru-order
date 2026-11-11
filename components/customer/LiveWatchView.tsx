@@ -24,7 +24,9 @@ import { useIsDesktop } from "@/lib/useIsDesktop";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 import { ChatProductPicker } from "@/components/customer/ChatProductPicker";
-import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
+import type { ChatProductSelection } from "@/lib/liveChatProductCommand";
+import { ChatProductThumb } from "./ChatProductThumb";
+import { chatProductPhoto } from "@/lib/chatProductPhoto";
 
 export type LiveWatchPinned = {
   productId: string;
@@ -71,7 +73,7 @@ type Props = {
     canWrite: boolean;
     /** 관리자(시험 계정·허용 번호) — 글을 길게 누르면 지우기·금지 */
     canModerate: boolean;
-    onSend: (body: string, target?: WidgetProductTarget) => Promise<{ ok: boolean; message?: string }>;
+    onSend: (body: string, target?: ChatProductSelection) => Promise<{ ok: boolean; message?: string }>;
     /** 고정 댓글(없으면 null) */
     pinned: LiveChatMessage | null;
     /** 총관리자 — 길게 눌러 채팅 관리자 지정·해제 */
@@ -560,18 +562,22 @@ export default function LiveWatchView(props: Props) {
     return () => window.clearTimeout(t);
   }, [chatHint]);
   const productPickerOpen = Boolean(chat?.canModerate && draft.trimStart().startsWith("/"));
-  const sendChat = async (bodyOverride?: string, target?: WidgetProductTarget) => {
+  const sendChat = async (bodyOverride?: string, target?: ChatProductSelection) => {
     if (!chat || sending) return;
     const body = (bodyOverride ?? draft).trim();
     if (!body) return;
-    // 누르자마자 창 닫고 글을 바로 띄운다(부모가 먼저 화면에 넣음). 실패하면 글을 되돌려 놓고 안내.
+    // Keep a batch selection visible until the server confirms it; retries retain the checks.
+    const batch = target && "targets" in target;
     setSending(true);
-    setDraft("");
-    setComposeOpen(false);
+    setComposeHint("");
+    if (!batch) { setDraft(""); setComposeOpen(false); }
     closeGreet();
     const r = await chat.onSend(body, target).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     setSending(false);
-    if (!r.ok) { setDraft(body); setChatHint(r.message || "못 보냈어요."); }
+    if (batch) {
+      if (r.ok) { setDraft(""); setComposeOpen(false); }
+      else setComposeHint(r.message || "못 보냈어요. 선택을 유지했으니 다시 눌러 주세요.");
+    } else if (!r.ok) { setDraft(body); setChatHint(r.message || "못 보냈어요."); }
   };
   // [2026-11-10 04:17 사장님] 화면 빈 곳(영상)을 누르면 «돌려보기 모드» — 채팅·카드가 흐려지고 손가락이 그대로 유튜브 막대로 감.
   //   영상은 유튜브 화면(다른 사이트)이라 누른 걸 직접 못 듣는다 → 누르면 그 화면으로 «포커스»가 넘어가는 순간(창 blur)을 보고 안다.
@@ -896,7 +902,7 @@ export default function LiveWatchView(props: Props) {
             style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: isDesktop ? "#0F0F0F" : "#FFFFFF", padding: isDesktop ? "12px 0 calc(12px + env(safe-area-inset-bottom))" : emojiOpen ? "12px 16px 0" : "12px 16px calc(12px + env(safe-area-inset-bottom))", borderRadius: isDesktop ? 0 : "16px 16px 0 0", boxSizing: "border-box", ...(isDesktop ? { position: "relative", flexShrink: 0, order: 5, borderTop: "1px solid #333333", pointerEvents: "auto" } : {}) }}
           >
             {chat?.canWrite && chat.onVerifyIdentity && !chat.identityVerified && !chat.canReviewDeleted ? <button type="button" onClick={chat.onVerifyIdentity} style={{ marginBottom: 8, background: "transparent", color: isDesktop ? "#bbb" : "#555", border: 0, padding: "4px 8px", fontSize: 12, textDecoration: "underline" }}>내 글 삭제 · 카카오 본인 확인</button> : null}
-            {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onSelect={p => { setEmojiOpen(false); void sendChat(`/${p.texts[0] || p.detailName}`.slice(0, 100), { productId: p.productId, detailName: p.detailName }); }} /> : null}
+            {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
             {draftEmojiCount > 0 ? (
               // 보내면 이렇게 보여요 — «:이름:» 글자 대신 그림으로 미리
               <div aria-label="미리보기" style={{ marginBottom: "8px", padding: "8px 12px", borderRadius: "12px", background: "#F5F5F5", color: "#111111", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word" }}>
@@ -959,6 +965,7 @@ export default function LiveWatchView(props: Props) {
                   data-live-chat-input
                   autoFocus={!isDesktop && !emojiOpen}
                   value={draft}
+                  readOnly={sending && productPickerOpen}
                   onChange={(e) => { setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN)); if (e.target.value.trimStart().startsWith("/")) setEmojiOpen(false); rememberCaret(e.target); }}
                   onSelect={(e) => rememberCaret(e.currentTarget)}
                   onFocus={() => setEmojiOpen(false)}
@@ -991,7 +998,7 @@ export default function LiveWatchView(props: Props) {
                   </button>
                 ) : null}
               </div>
-              <button type="submit" disabled={sending || !draft.trim()} style={{ flexShrink: 0, height: "48px", padding: "0 18px", border: "none", borderRadius: "9999px", background: isDesktop ? (sending || !draft.trim() ? "#272727" : "#FFFFFF") : sending || !draft.trim() ? "#E5E5E5" : "#111111", color: isDesktop ? (sending || !draft.trim() ? "#AAAAAA" : "#111111") : sending || !draft.trim() ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
+              <button type="submit" disabled={sending || productPickerOpen || !draft.trim()} style={{ flexShrink: 0, height: "48px", padding: "0 18px", border: "none", borderRadius: "9999px", background: isDesktop ? (sending || productPickerOpen || !draft.trim() ? "#272727" : "#FFFFFF") : sending || productPickerOpen || !draft.trim() ? "#E5E5E5" : "#111111", color: isDesktop ? (sending || productPickerOpen || !draft.trim() ? "#AAAAAA" : "#111111") : sending || productPickerOpen || !draft.trim() ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
                 {sending ? "보내는 중" : "보내기"}
               </button>
             </div>
@@ -1226,6 +1233,7 @@ export default function LiveWatchView(props: Props) {
                   {/* [13:44 사장님 「닉네임만 연한 색」] 닉네임만 사람마다 정해진 색을 흰색과 반쯤 섞은 연한 색(글은 흰색 그대로), 루루동이 안내는 흐린 흰색 */}
                   <span style={{ fontWeight: chatView.bold ? 700 : 400, color: m.badge === "bot" ? "rgba(255,255,255,0.8)" : softNickColor(color) }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
+                  {botProduct ? <ChatProductThumb src={chatProductPhoto(props.items, botProduct)} name="안내 상품 사진" /> : null}
                   <span style={{ marginLeft: m.badge ? "4px" : "8px", color: "#FFFFFF" /* 글은 유튜브처럼 늘 흰색 — 연한 색 글은 밝은 배경에서 안 읽힘(12:49), 닉네임만 사람 색 */ }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
                     <span style={{ display: "inline-flex", alignItems: "center", marginLeft: "8px", height: "24px", padding: "0 10px", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, textShadow: "none", verticalAlign: "middle", whiteSpace: "nowrap" }}>담기 ›</span>

@@ -3,9 +3,10 @@ import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { isExposedProductRow } from "@/lib/cartExposureServer";
 import { buildDetailChatLine, detailCode, detailProducts, parseProductNote } from "@/lib/productDetailModel";
 import { resolveBroadcastBrandProducts, type BrandProductLink } from "@/lib/productBrandLinks";
-import { widgetRotationSettingKey, widgetTargetFromProduct, widgetTargetKey, type WidgetProductTarget } from "@/lib/widgetProductLibrary";
+import { parseWidgetHistory, parseWidgetRotation, selectWidgetRotationItems, WIDGET_PRODUCT_HISTORY_SETTING_KEY, widgetRotationSettingKey, widgetTargetFromProduct, widgetTargetKey, type WidgetProductTarget, type WidgetRotationConfig } from "@/lib/widgetProductLibrary";
 import { LIVE_CHAT_BOT_KAKAO, LIVE_CHAT_BOT_NICK, botRefOfProduct, productBotText, type BotCandidate } from "@/lib/liveChatBot";
-import { matchChatProductCommand } from "@/lib/liveChatProductCommand";
+import { CHAT_PRODUCT_LIMIT, matchChatProductCommand, type ChatProductSelection } from "@/lib/liveChatProductCommand";
+import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 
 const columns = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref";
 const readFailure = () => new Error("방송 상품을 확인하지 못했어요. 잠시 후 다시 입력해 주세요.");
@@ -59,21 +60,29 @@ export async function loadChatCommandProducts(sb: SupabaseClient, bc: string): P
     const stock = Number(row.stock ?? row.total_stock);
     const soldOut = row.is_soldout === true || (note.stock_management_enabled === true &&
       (variants.length ? variants.every(v => Number(v.stock ?? 0) <= 0) : Number.isFinite(stock) && stock <= 0));
-    return { ...target, texts: [name, detailCode(name)], line: detail ? buildDetailChatLine(detail) : buildChatAnnounceText(row), soldOut, sizes: [] };
+    const imageUrl = resolveOrderItemPhoto(target.detailName ? parent ?? row : row, { productName: name }).url;
+    return { ...target, texts: [name, detailCode(name)], line: detail ? buildDetailChatLine(detail) : buildChatAnnounceText(row), soldOut, sizes: [], imageUrl };
   });
 }
 
 /** Caller has checked the existing chat moderator role, ban, broadcast and rate limit. */
-export async function runChatProductCommand(sb: SupabaseClient, bc: string, query: string, author: Record<string, unknown>, selected?: WidgetProductTarget) {
+export async function runChatProductCommand(sb: SupabaseClient, bc: string, query: string | string[], author: Record<string, unknown>, selected?: ChatProductSelection) {
   const catalog = await loadChatCommandProducts(sb, bc);
-  const matches = selected ? catalog.filter(p => widgetTargetKey(p) === widgetTargetKey(selected)) : matchChatProductCommand(query, catalog);
-  if (!matches.length) throw new Error("현재 방송에서 해당 상품번호를 찾지 못했어요.");
-  if (matches.length > 1) throw new Error("같은 번호의 상품이 여러 개예요. /mc335처럼 브랜드 코드까지 입력해 주세요.");
-  const product = matches[0];
-  if (product.soldOut) throw new Error("품절 상품은 위젯에 표시할 수 없어요.");
-  const rotation = { mode: "selected", paused: false, targets: [{ productId: product.productId, detailName: product.detailName }] };
-  const saved = await sb.from("settings").upsert({ key: widgetRotationSettingKey(bc), value: JSON.stringify(rotation), updated_at: new Date().toISOString() }, { onConflict: "key" });
-  if (saved.error) throw new Error("위젯 순환을 바꾸지 못했어요. 다시 입력해 주세요.");
+  const batch = selected && "targets" in selected ? selected : null;
+  const groups = selected
+    ? (batch ? batch.targets : [selected as WidgetProductTarget]).map(t => catalog.filter(p => widgetTargetKey(p) === widgetTargetKey(t)))
+    : (Array.isArray(query) ? query : [query]).map(q => matchChatProductCommand(q, catalog));
+  if (!groups.length || groups.length > CHAT_PRODUCT_LIMIT || groups.some(g => !g.length)) throw new Error("현재 방송에서 선택한 상품을 찾지 못했어요. 목록을 다시 확인해 주세요.");
+  if (groups.some(g => g.length > 1)) throw new Error("같은 번호의 상품이 여러 개예요. 목록에서 상품을 골라 주세요.");
+  const products = [...new Map(groups.flat().map(p => [widgetTargetKey(p), p])).values()];
+  if (products.some(p => p.soldOut)) throw new Error("품절 상품은 위젯에 표시할 수 없어요.");
+  const targets = products.map(({ productId, detailName }) => ({ productId, detailName }));
+  if (batch?.mode === "append") await appendRotation(sb, bc, catalog, targets);
+  else {
+    const rotation = { mode: "selected", paused: false, targets };
+    const saved = await sb.from("settings").upsert({ key: widgetRotationSettingKey(bc), value: JSON.stringify(rotation), updated_at: new Date().toISOString() }, { onConflict: "key" });
+    if (saved.error) throw new Error("위젯 순환을 바꾸지 못했어요. 다시 입력해 주세요.");
+  }
   // Clear the higher-priority manual pin. This also sends the existing catalog event
   // so open widgets reload without waiting for their 20-second fallback poll.
   const unpin = await sb.from("broadcasts").update({ widget_pin_mode: "auto", widget_pin_product_id: null, widget_pin_detail_name: null })
@@ -82,9 +91,39 @@ export async function runChatProductCommand(sb: SupabaseClient, bc: string, quer
   // The command is private from the moment it is inserted: public realtime
   // redacts hidden rows. Keep the audit/rate-limit row and the public guide.
   const posted = await sb.from("live_chat_messages").insert([
-    { ...author, ...(selected ? { body: `/${product.texts[0] || product.detailName}`.slice(0, 100) } : {}), broadcast_id: bc, hidden_at: new Date().toISOString(), hidden_by: "command", pinned_at: null },
-    { broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body: productBotText(product), badge: "bot", bot_ref: botRefOfProduct(product) },
+    { ...author, ...(selected ? { body: `/${batch?.mode === "append" ? "추가 " : ""}${products.map(p => p.texts[0] || p.detailName).join(", ")}`.slice(0, 100) } : {}), broadcast_id: bc, hidden_at: new Date().toISOString(), hidden_by: "command", pinned_at: null },
+    ...products.map(product => ({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body: productBotText(product), badge: "bot", bot_ref: botRefOfProduct(product) })),
   ]).select(columns);
   if (posted.error || !posted.data?.length) throw new Error("위젯은 변경됐지만 채팅 안내를 보내지 못했어요. 다시 입력하면 안내도 보낼 수 있어요.");
   return posted.data.find(row => row.badge !== "bot") ?? posted.data[0];
+}
+
+/** Compare-and-set prevents another admin's newer rotation from being overwritten by an append. */
+async function appendRotation(sb: SupabaseClient, bc: string, catalog: BotCandidate[], targets: WidgetProductTarget[]) {
+  const key = widgetRotationSettingKey(bc);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const current = await sb.from("settings").select("value").eq("key", key).maybeSingle();
+    if (current.error) throw readFailure();
+    const previous = parseWidgetRotation(current.data?.value);
+    let rotation: WidgetRotationConfig = { ...previous, paused: false };
+    if (previous.mode !== "all") {
+      const history = previous.mode === "history" ? await sb.from("settings").select("value").eq("key", WIDGET_PRODUCT_HISTORY_SETTING_KEY).maybeSingle() : null;
+      if (history?.error) throw readFailure();
+      const existing = selectWidgetRotationItems(catalog, previous, p => p, p => !p.soldOut, parseWidgetHistory(history?.data?.value));
+      rotation = { mode: "selected", paused: false, targets: [...new Map([...existing, ...targets].map(p => [widgetTargetKey(p), { productId: p.productId, detailName: p.detailName }])).values()] };
+    }
+    const value = JSON.stringify(rotation);
+    if (current.data) {
+      let update = sb.from("settings").update({ value, updated_at: new Date().toISOString() }).eq("key", key);
+      update = current.data.value == null ? update.is("value", null) : update.eq("value", current.data.value);
+      const saved = await update.select("key").maybeSingle();
+      if (saved.error) throw new Error("순환 목록에 추가하지 못했어요. 다시 시도해 주세요.");
+      if (saved.data) return;
+    } else {
+      const saved = await sb.from("settings").insert({ key, value, updated_at: new Date().toISOString() });
+      if (!saved.error) return;
+      if (saved.error.code !== "23505") throw new Error("순환 목록에 추가하지 못했어요. 다시 시도해 주세요.");
+    }
+  }
+  throw new Error("다른 관리자가 순환 목록을 바꿨어요. 다시 눌러 주세요.");
 }
