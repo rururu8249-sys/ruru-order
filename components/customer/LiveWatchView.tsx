@@ -29,6 +29,7 @@ import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { useProductIntroPlayer } from "@/lib/useProductIntroPlayer";
 import type { IntroReplayRequest } from "@/lib/productIntro";
 import { invalidateProductIntroCatalog, loadProductIntroCatalog } from "@/lib/productIntroCatalogClient";
+import { useLiveGreeting } from "@/lib/useLiveGreeting";
 import { useLiveResume } from "@/lib/useLiveResume";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 import { ChatProductPicker } from "@/components/customer/ChatProductPicker";
@@ -637,24 +638,7 @@ export default function LiveWatchView(props: Props) {
     restartSeekTimer();
   };
   useEffect(() => () => clearSeekTimer(), []);
-  // 실시간 채팅에서 인사하기(유튜브처럼)
-  //   [07:42 사장님 「한 번 나오고 안 나옴 · 유튜브와 같게」] 원인: 기록을 «유튜브 영상 번호»로 해서, 같은 라이브 주소를 계속 쓰면
-  //   예전 방송에서 한 번 쓴 기록이 남아 안 떴고, 1분 지나면 저절로 숨겼음.
-  //   이제 유튜브처럼 — «이 방송»(방송 번호)에서 아직 글을 안 쓴 손님이면 방송 화면에 들어올 때마다 뜨고, 글을 한 번 쓰면(인사 포함) 그 방송에선 안 뜸.
-  //   저절로 숨기지 않음. 새 방송이면 다시 뜸.
-  const greetKey = `ruru_live_greet_${props.broadcastId || videoId}`;
-  const [greetOpen, setGreetOpen] = useState(false);
-  useEffect(() => {
-    let done = false;
-    try { done = window.localStorage.getItem(greetKey) === "1"; } catch { /* 무시 */ }
-    if (done) { setGreetOpen(false); return; }
-    const t1 = window.setTimeout(() => setGreetOpen(true), 1500);
-    return () => { window.clearTimeout(t1); };
-  }, [greetKey]);
-  const closeGreet = () => {
-    setGreetOpen(false);
-    try { window.localStorage.setItem(greetKey, "1"); } catch { /* 무시 */ }
-  };
+  const {open: greetOpen, dismiss: closeGreet} = useLiveGreeting(props.broadcastId || videoId, Boolean(chat?.canWrite));
   const sendGreet = async () => {
     if (!chat) return;
     closeGreet();
@@ -677,6 +661,18 @@ export default function LiveWatchView(props: Props) {
   //   ②그 밖의 방송 화면(위·아래 띠 등)도 끌기는 막는다 — 단 상품 목록처럼 원래 내려 보는 칸(data-live-scroll)은 그대로
   //   ③끌기 시작하면 길게 누르기(관리) 취소 — 올려 보다가 관리 창이 뜨지 않게
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const bottomBarRef = useRef<HTMLDivElement | null>(null);
+  const [bottomBarHeight, setBottomBarHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const bar = bottomBarRef.current;
+    if (!bar || isDesktop) return;
+    const measure = () => setBottomBarHeight(Math.ceil(bar.getBoundingClientRect().height));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, [isDesktop]);
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -1221,7 +1217,7 @@ export default function LiveWatchView(props: Props) {
       {/* 13:03 사장님 유튜브 캡처 11장 실측: 유튜브도 채팅 뒤(화면 아래 약 45%)를 위에서 아래로 점점 어둡게 깖
           (흰 털 화면 밝기 206 → 맨 아래 80 ≈ 검정 60%). 채팅 칸 위부터만, 손가락 통과, 집중모드·돌려보기엔 숨김 */}
       <div aria-hidden="true" style={{ display: isDesktop || focus || seekMode ? "none" : "block", position: "absolute", left: 0, right: 0, bottom: 0, height: `calc(${CHAT_HEIGHTS[chatView.height]} + 170px + env(safe-area-inset-bottom))`, background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 30%, rgba(0,0,0,0.45) 65%, rgba(0,0,0,0.6) 100%)", pointerEvents: "none" }} />
-      <div data-live-chat-panel="1" data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: "60dvh" }) }}>
+      <div data-live-chat-panel="1" data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : bottomBarHeight === null ? "calc(78px + env(safe-area-inset-bottom))" : `${bottomBarHeight + 4}px`, flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: "60dvh" }) }}>
         {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", fontSize: "16px", fontWeight: 600 }}>실시간 채팅</div> : null}
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex", flexShrink: 0 }}>
@@ -1358,7 +1354,7 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
-      <div style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
+      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
         {/* 오늘만셀러처럼 — 지금 소개 중(없으면 첫) 상품 사진 + 오른쪽 위 숫자(고를 수 있는 상품 수, 세부상품까지) */}
         <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: isDesktop ? "208px" : "52px", height: "52px", padding: isDesktop ? "4px 12px 4px 4px" : 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer", ...(isDesktop ? { display: "flex", alignItems: "center", gap: "10px", color: "#111111" } : {}) }}>
           {thumbUrl ? (
