@@ -4,6 +4,8 @@ import Renderer, {act} from 'react-test-renderer';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 import {writeFileSync} from 'node:fs';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+let clock = 100000;
+const originalNow = Date.now; Date.now = () => clock;
 const intervals = new Map();
 globalThis.window = {innerWidth:280,innerHeight:542,location:{search:''},addEventListener(){},removeEventListener(){},setInterval(fn,ms){intervals.set(ms,fn);return ms;},clearInterval(ms){intervals.delete(ms);},setTimeout,clearTimeout};
 globalThis.document = {body:{style:{}},documentElement:{style:{}}};
@@ -48,14 +50,14 @@ for (mode of ['all','history','selected']) {
   assert.deepEqual(ranges,[],'active broadcast must not page the whole products table');
   if(mode==='all'){
     assert(rendered().includes('상품-1'));
-    await act(async()=>intervals.get(5000)());
+    await act(async()=>{clock += 5000; intervals.get(500)();});
     assert(rendered().includes('상품-4'),'must skip hidden and sold-out within broadcast');
-    await act(async()=>intervals.get(5000)());
+    await act(async()=>{clock += 5000; intervals.get(500)();});
     assert(rendered().includes('상품-1'),'must wrap inside broadcast; never expose an unlisted catalog product');
   }else {
     assert(rendered().includes('상품-4'),'history and selected retain an eligible broadcast product');
     assert.equal(rendered().includes('상품-1001'),false,'history and selected must reject a non-broadcast target');
-    assert.equal(intervals.has(5000),false,'excluded targets must not contribute to rotation or cycle into view');
+    assert.equal(intervals.has(500),false,'excluded targets must not contribute to rotation or cycle into view');
   }
   await act(async()=>tree.unmount());
 }
@@ -117,3 +119,5 @@ if (process.env.WIDGET_LAYOUT_OUTPUT) {
   writeFileSync(process.env.WIDGET_LAYOUT_OUTPUT,`<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{display:flex;gap:20px;font-family:Arial,sans-serif}section>div{position:absolute!important}[data-ruru-widget-card]{animation:none!important}</style>${cases}`);
 }
 console.log('PASS real widget component: all/history/selected confined to broadcast; unlisted targets excluded, pagination, hidden/sold-out, manual pin');
+
+Date.now = originalNow;

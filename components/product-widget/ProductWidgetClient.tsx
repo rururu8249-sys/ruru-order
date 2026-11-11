@@ -6,6 +6,7 @@
 // - 주문 들어오면 «주문 완료», 입금확인·카드결제완료면 «결제 완료» 스티커가 카드 위에 3초 (orders 실시간, 2026-11-05 기본 켬)
 // - 배경 투명(크로마키). 읽기 전용 — 돈/주문 로직 건드리지 않음.
 
+import { useWidgetRotationIndex } from "@/lib/useWidgetRotationIndex";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
@@ -394,8 +395,7 @@ export default function ProductWidgetClient() {
   const [pinned, setPinned] = useState<AnyProduct | null>(null);
   const [rotation, setRotation] = useState<AnyProduct[]>([]);
   const [rotationConfig, setRotationConfig] = useState<WidgetRotationConfig>({ mode: "all", paused: false, targets: [] });
-  const [rotIndex, setRotIndex] = useState(0);
-  const rotationSignatureRef = useRef("");
+  const rotIndex = useWidgetRotationIndex(rotationConfig, rotation.length, Boolean(pinned));
   // 이벤트 토스트 — 여러 개 동시 도착 가능 → 큐로 순서대로 3초씩 표시
   // [2026-07-06] 문자열 → 구조화(제목/닉네임/내용): 상품 카드를 살짝 덮는 축하 오버레이로 표시
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
@@ -409,11 +409,6 @@ export default function ProductWidgetClient() {
   const reloadProductsRef = useRef<null | (() => void)>(null);
 
   const applyRotation = useCallback((next: AnyProduct[]) => {
-    const signature = next.map((item) => `${String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? "")}|${String(item?.__detail_name || "").trim()}`).join(";");
-    if (signature !== rotationSignatureRef.current) {
-      rotationSignatureRef.current = signature;
-      setRotIndex(0);
-    }
     setRotation(next);
   }, []);
 
@@ -581,13 +576,7 @@ export default function ProductWidgetClient() {
 
   // 순환 자동 전환 (고정상품 없을 때만)
   const rotationAdvances = widgetRotationShouldAdvance(rotationConfig, Boolean(pinned), rotation.length);
-  useEffect(() => {
-    if (!rotationAdvances) return;
-    const timer = window.setInterval(() => {
-      setRotIndex((i) => (i + 1) % rotation.length);
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [rotation.length, rotationAdvances]);
+
 
   // 실시간 이벤트 토스트: 주문(INSERT) / 입금확인·카드결제완료(UPDATE). 실제 컬럼명 기준.
   useEffect(() => {

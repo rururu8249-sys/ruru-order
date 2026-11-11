@@ -62,16 +62,14 @@ assert.equal(result.ok,true);assert.equal(result.message.body,'/335');
 assert.equal(result.privateCommand,true,'command receipt must be explicitly private');
 assert.equal(writes[2].value[0].hidden_by,'command');
 assert.ok(writes[2].value[0].hidden_at,'command is hidden before the realtime insert event');
-assert.equal(writes[2].value[1].hidden_at,undefined,'product guide stays public');
+assert.equal(writes[2].value.length,1,'widget commands only write a private receipt');
 assert.deepEqual(writes.map(w=>w.table),['settings','broadcasts','live_chat_messages']);
-assert.deepEqual(JSON.parse(writes[0].value.value),{mode:'selected',paused:false,targets:[{productId:'77',detailName:'MC-335 아이보리'}]});
+assert.deepEqual(JSON.parse(writes[0].value.value).targets,[{productId:'77',detailName:'MC-335 아이보리'}]);
+assert.ok(JSON.parse(writes[0].value.value).startedAt > 0,'replacement starts a shared clock');
 assert.equal(writes[0].value.key,`widget_rotation_${bc}`);
 assert.deepEqual(writes[1].value,{widget_pin_mode:'auto',widget_pin_product_id:null,widget_pin_detail_name:null});
 assert.ok(writes[1].filters.some(([k,v])=>k==='status'&&v==='ON'));
-const announcement=writes[2].value[1];
-assert.equal(announcement.bot_ref,'p:77|MC-335 아이보리');
-assert.match(announcement.body,/MC-335.*190,000원.*1,2,3,4,5/);
-assert.equal(botCalls,0,'command posts exactly one guide, bypassing the ordinary bot');
+assert.equal(botCalls,0,'private widget commands bypass the ordinary bot');
 for(const [label,change] of [
  ['non-admin',()=>mod=false],['role lookup failure',()=>roleError=true],['banned',()=>banned=true],['blocked',()=>blocked=true],
  ['disabled chat',()=>enabled=false],['widget off',()=>widgetOn=false],['broadcast off',()=>broadcastOn=false],['rate limit',()=>rateLimited=true],
@@ -91,7 +89,7 @@ reset();products=[{id:77,product_name:'몽클레어',product_note:{brand_group:{
 links=[{parent_id:77,source_id:88,detail_name:'MC-335 아이보리',original_name:'원래 이름',moved_at:'2026-11-11'}];
 result=await send('/몽클-335');assert.equal(result.ok,true);
 assert.deepEqual(JSON.parse(writes[0].value.value).targets,[{productId:'88',detailName:''}]);
-assert.equal(writes[2].value[1].bot_ref,'p:88|');assert.match(writes[2].value[1].body,/MC-335/);
+assert.equal(writes[2].value.length,1,'linked product also avoids public guide');
 // A candidate from a previous request is never reused after the catalog changes.
 listed=[];writes=[];result=await send('/335');assert.equal(result.ok,false);assert.equal(writes.length,0);
 reset();mod=false;result=await send('mc335');assert.equal(result.ok,true);assert.equal(botCalls,1);assert.deepEqual(writes.map(w=>w.table),['live_chat_messages']);
@@ -100,15 +98,15 @@ console.log('PASS actual chat POST: moderator guards, fresh catalog, unique/hidd
 reset();products=[{id:1,product_name:'PD-509 블랙',price:100000,image_url:'https://example.test/pd.jpg'},{id:2,product_name:'BB-307 베이지',price:200000,image_url:'https://example.test/bb.jpg'}];listed=[1,2];
 result=await send('/프509, 버307');
 assert.equal(result.ok,true,'comma-separated command saves both exact products');
-assert.equal(result.privateCommand,true);assert.equal(writes[2].value.length,3,'one private receipt and two public guides');
+assert.equal(result.privateCommand,true);assert.equal(writes[2].value.length,1,'multiple selections write one private receipt');
 assert.deepEqual(JSON.parse(writes[0].value.value).targets,[{productId:'1',detailName:''},{productId:'2',detailName:''}]);
 assert.equal(writes[2].value[0].hidden_by,'command');
-assert.deepEqual(writes[2].value.slice(1).map(m=>m.bot_ref),['p:1|','p:2|']);
+assert.ok(writes[2].value.every(m=>m.hidden_by==='command'));
 writes=[];result=await send('/',{targets:[{productId:'1'},{productId:'2'}],mode:'replace'});assert.equal(result.ok,true);
 writes=[];result=await send('/',{targets:[{productId:'1'},{productId:'999'}],mode:'replace'});assert.equal(result.ok,false);assert.equal(writes.length,0,'invalid target blocks entire batch');
 writes=[];result=await send('/',{targets:[{productId:'1'},{}],mode:'replace'});assert.equal(result.ok,false);assert.equal(writes.length,0);
 writes=[];result=await send('/프509, 없는999');assert.equal(result.ok,false);assert.equal(writes.length,0,'unmatched comma term cannot partially execute');
-writes=[];result=await send('/509, 307, 509');assert.equal(result.ok,true);assert.equal(writes[2].value.length,3,'duplicate product emits one guide');
+writes=[];result=await send('/509, 307, 509');assert.equal(result.ok,true);assert.equal(writes[2].value.length,1,'duplicate product still writes one private receipt');
 const candidates=await apiLoad('lib/liveChatProductCommandServer.ts').loadChatCommandProducts(sb,bc);assert.equal(candidates[0].imageUrl,'https://example.test/pd.jpg');
 console.log('PASS multi POST: exact batch, private receipt, per-product guides, invalid targets, unmatched terms, deduplication and photos');
 

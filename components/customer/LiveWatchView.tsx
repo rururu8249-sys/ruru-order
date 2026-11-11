@@ -5,6 +5,9 @@
 //   이 화면은 «보여 주기·고르기»만 한다. 담기·장바구니·주문서·결제는 부모(주문 페이지)의 기존 함수가 그대로 처리한다.
 //   z-index 60: 아래 메뉴(40)·장바구니 바(39) 위, 옵션 창·주문서 창(100) 아래 → 옵션 창이 방송 위로 올라온다.
 
+import { useLiveFeaturedProducts } from "@/lib/useLiveFeaturedProducts";
+import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
+import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   LIVE_WATCH_GUIDE_SEEN_KEY,
@@ -61,6 +64,8 @@ type Props = {
   /** 방송 번호 — 인사하기를 방송마다 다시 띄우려고 */
   broadcastId?: string;
   pinned: LiveWatchPinned | null;
+  widgetEnabled?: boolean;
+  widgetPin?: WidgetProductTarget | null;
   items: LiveWatchItem[];
   cartCount: number;
   cartTotalText: string;
@@ -337,7 +342,8 @@ function BarBtn(props: { label: string; badge?: number; badgeRed?: boolean; onCl
 }
 
 export default function LiveWatchView(props: Props) {
-  const isDesktop = useIsDesktop();
+  // Live view splits by available width, including unfolded foldables and landscape phones.
+  const isDesktop = useIsDesktop(640);
   const { videoId, title, paused, pausedText, pinned, items, cartCount, cartTotalText, orderToasts } = props;
   useEffect(() => {
     if (props.broadcastId && videoId) void loadProductIntroCatalog(props.broadcastId, videoId).catch(() => {});
@@ -347,6 +353,10 @@ export default function LiveWatchView(props: Props) {
   const [muted, setMuted] = useState(true);
   const [soundPromptDone, setSoundPromptDone] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [listMode, setListMode] = useState<"all" | "featured">("all");
+  useEffect(() => { setListOpen(false); setListMode("all"); setQuery(""); }, [props.broadcastId]);
+  const featured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false, props.widgetPin ?? null);
+  const openProductList = (mode: "all" | "featured") => { setQuery(""); setListMode(mode); setListOpen(true); };
   const [query, setQuery] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
   // 영상을 누르면 유튜브 막대(돌려보기)가 나온다. 막대가 우리 위·아래 띠·채팅에 안 가리게 영상 칸을 띠 사이에만 둔다.
@@ -892,7 +902,7 @@ export default function LiveWatchView(props: Props) {
     setMuted(false);
   };
 
-  const listItems = useMemo(() => liveWatchList(items, query), [items, query]);
+  const listItems = useMemo(() => liveWatchList(listMode === "featured" ? featured.products : items, query), [items, featured.products, query, listMode]);
   const totalCount = useMemo(() => items.reduce((n, it) => n + (it.count && it.count > 0 ? it.count : 1), 0), [items]);
   const thumbUrl = (pinned?.imageUrl || items.find((it) => it.pinned)?.imageUrl || items.find((it) => it.imageUrl)?.imageUrl || "");
   const latestToast = orderToasts.length > 0 ? orderToasts[orderToasts.length - 1] : null;
@@ -900,26 +910,9 @@ export default function LiveWatchView(props: Props) {
   const closeGuide = () => { writeGuideSeen(); setGuideOpen(false); };
 
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
-  const desktopChatWidth = "max(400px, 35%)";
+  const desktopChatWidth = "clamp(280px, 35vw, 560px)";
   const videoRight = isDesktop && !focus ? desktopChatWidth : 0;
-  const pinnedProductCard = (pinned ? (
-          <div style={{ pointerEvents: "auto", background: "#FFFFFF", color: "#111111", borderRadius: "12px", padding: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <button type="button" onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} aria-label={`${pinned.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", cursor: "pointer", overflow: "hidden" }}>
-              {pinned.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={pinned.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              ) : null}
-            </button>
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#D30005" }}>지금 소개 중</span>
-              <span style={{ fontSize: "15px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pinned.name}</span>
-              <span style={{ fontSize: "15px", fontWeight: 700 }}>{pinned.priceText}</span>
-            </div>
-            <button type="button" disabled={pinned.soldOut} onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} style={{ flexShrink: 0, height: "44px", padding: "0 16px", border: "none", borderRadius: "9999px", background: pinned.soldOut ? "#E5E5E5" : "#111111", color: pinned.soldOut ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: pinned.soldOut ? "default" : "pointer" }}>
-              {pinned.soldOut ? "품절" : "상품 선택"}
-            </button>
-          </div>
-        ) : null);
+  const pinnedProductCard = <LiveFeaturedProductCard product={featured.current} count={featured.products.length} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} />;
   // 한 벌의 입력 폼을 PC 채팅 아래 또는 폰 쓰기 시트에만 렌더한다.
   const composer = (
           <form
@@ -1066,6 +1059,7 @@ export default function LiveWatchView(props: Props) {
       tabIndex={-1}
       role="region"
       aria-label="방송 보며 주문"
+      data-live-watch-root="1"
       // [07:32 사장님] 채팅 그림(이모티콘·프로필)을 꾹 눌러도 «이미지 저장» 창이 안 뜨게 — 그림에서만 막음(글자 입력칸 붙여넣기는 그대로)
       onContextMenu={(e) => { if ((e.target as HTMLElement | null)?.tagName === "IMG") e.preventDefault(); }}
       style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: LIVE_FONT, textRendering: "optimizeLegibility", overscrollBehavior: "none", outline: "none" }}
@@ -1193,22 +1187,34 @@ export default function LiveWatchView(props: Props) {
         </div>
       ) : null}
 
-      {isDesktop && !focus ? (
-        <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", maxWidth: "560px", margin: "0 auto", opacity: seekMode ? 0.06 : 1, transition: "opacity 0.2s" }}>
-          {pinnedProductCard}
-        </div>
-      ) : null}
       </div>
 
       {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
       {/* 돌려보기 모드 — 안의 모든 것이 손가락을 막지 않게(유튜브 막대로 그대로) */}
       <style>{`[data-live-seek="1"], [data-live-seek="1"] * { pointer-events: none !important; }`}</style>
       <style>{`html, body { overflow: hidden !important; overscroll-behavior: none !important; }`}</style>
+      <style>{`
+        [data-live-notice] { max-height: 64px; overflow-y: auto; }
+        @media (max-height: 500px) {
+          [data-live-greeting], [data-live-chat-heading] { display: none !important; }
+          [data-live-notice] { max-height: 36px; }
+          [data-featured-product-card] [data-featured-label] { display: none; }
+          [data-featured-product-card] [data-featured-image] { height: 44px !important; width: 44px !important; }
+        }
+        @media (min-width: 640px) and (max-width: 800px) {
+          [data-live-catalog-button] { width: 176px !important; gap: 6px !important; }
+          [data-live-catalog-button] img { width: 28px !important; height: 36px !important; }
+        }
+        @media (max-width: 639px) and (max-height: 500px) {
+          [data-live-chat-panel] { max-height: calc(100dvh - 160px) !important; }
+          [data-live-notice] { display: none; }
+        }
+      `}</style>
       {/* 13:03 사장님 유튜브 캡처 11장 실측: 유튜브도 채팅 뒤(화면 아래 약 45%)를 위에서 아래로 점점 어둡게 깖
           (흰 털 화면 밝기 206 → 맨 아래 80 ≈ 검정 60%). 채팅 칸 위부터만, 손가락 통과, 집중모드·돌려보기엔 숨김 */}
       <div aria-hidden="true" style={{ display: isDesktop || focus || seekMode ? "none" : "block", position: "absolute", left: 0, right: 0, bottom: 0, height: `calc(${CHAT_HEIGHTS[chatView.height]} + 170px + env(safe-area-inset-bottom))`, background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 30%, rgba(0,0,0,0.45) 65%, rgba(0,0,0,0.6) 100%)", pointerEvents: "none" }} />
-      <div data-live-chat-panel="1" data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : {}) }}>
-        {isDesktop ? <div style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", fontSize: "16px", fontWeight: 600 }}>실시간 채팅</div> : null}
+      <div data-live-chat-panel="1" data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: "60dvh" }) }}>
+        {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", fontSize: "16px", fontWeight: 600 }}>실시간 채팅</div> : null}
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex", flexShrink: 0 }}>
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -1217,12 +1223,12 @@ export default function LiveWatchView(props: Props) {
           </div>
         ) : null}
         {chat && chat.notice ? (
-          <div style={{ flexShrink: 0, alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45 }}>
+          <div data-live-notice style={{ flexShrink: 0, alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45 }}>
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
           </div>
         ) : null}
         {chat && (chat.messages.length > 0 || isDesktop) ? (
-          <div style={{ position: "relative", width: "100%", ...(isDesktop ? { flex: 1, minHeight: 0, order: 3 } : {}) }}>
+          <div style={{ position: "relative", width: "100%", minHeight: 0, display: "flex", flexDirection: "column", ...(isDesktop ? { flex: 1, order: 3 } : {}) }}>
           <div
             ref={chatBoxRef}
             role="log"
@@ -1239,7 +1245,7 @@ export default function LiveWatchView(props: Props) {
               if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8 || Date.now() - d.t > 450) return;
               toggleSeek();
             }}
-            style={{ pointerEvents: "auto", overscrollBehavior: "contain", maxHeight: isDesktop ? "none" : CHAT_HEIGHTS[chatView.height], height: isDesktop ? "100%" : undefined, overflowY: "auto", scrollbarWidth: isDesktop ? "thin" : "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: isDesktop ? "none" : "linear-gradient(transparent, #000 24px)", WebkitMaskImage: isDesktop ? "none" : "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
+            style={{ minHeight: 0, pointerEvents: "auto", overscrollBehavior: "contain", maxHeight: isDesktop ? "none" : CHAT_HEIGHTS[chatView.height], height: isDesktop ? "100%" : undefined, overflowY: "auto", scrollbarWidth: isDesktop ? "thin" : "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: isDesktop ? "none" : "linear-gradient(transparent, #000 24px)", WebkitMaskImage: isDesktop ? "none" : "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 0", boxSizing: "border-box", width: "100%" }}
           >
             <div ref={chatContentRef} style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0 }}>
             {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
@@ -1329,7 +1335,7 @@ export default function LiveWatchView(props: Props) {
         ) : null}
         {chat && chat.canWrite && greetOpen ? (
           // 실시간 채팅에서 인사하기 — 유튜브 앱과 같은 모양: [손 흔드는 그림] 글 … [보내기 흰 알약]. 「보내기」 = 👋 한 번 보냄
-          <div style={{ ...(isDesktop ? { order: 4, flexShrink: 0 } : {}), pointerEvents: "auto", display: "flex", alignItems: "center", gap: "12px", width: "100%", boxSizing: "border-box", minHeight: "52px", padding: "8px 8px 8px 14px", borderRadius: "12px", background: "rgba(40,40,40,0.82)", color: "#FFFFFF" }}>
+          <div data-live-greeting style={{ ...(isDesktop ? { order: 4, flexShrink: 0 } : {}), pointerEvents: "auto", display: "flex", alignItems: "center", gap: "12px", width: "100%", boxSizing: "border-box", minHeight: "52px", padding: "8px 8px 8px 14px", borderRadius: "12px", background: "rgba(40,40,40,0.82)", color: "#FFFFFF" }}>
             <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: "rotate(-18deg)" }}>
               <path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
               <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
@@ -1338,7 +1344,7 @@ export default function LiveWatchView(props: Props) {
             <button type="button" onClick={() => void sendGreet()} style={{ flexShrink: 0, height: "36px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>보내기</button>
           </div>
         ) : null}
-        {!isDesktop ? pinnedProductCard : null}
+        <div style={{order: isDesktop ? 4 : undefined, flexShrink: 0}}>{pinnedProductCard}</div>
         {isDesktop && !chat ? <div style={{ flex: 1 }} /> : null}
         {isDesktop && chat?.canWrite && !focus ? composer : null}
       </div>
@@ -1346,7 +1352,7 @@ export default function LiveWatchView(props: Props) {
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
       <div style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
         {/* 오늘만셀러처럼 — 지금 소개 중(없으면 첫) 상품 사진 + 오른쪽 위 숫자(고를 수 있는 상품 수, 세부상품까지) */}
-        <button type="button" onClick={() => setListOpen(true)} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: isDesktop ? "208px" : "52px", height: "52px", padding: isDesktop ? "4px 12px 4px 4px" : 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer", ...(isDesktop ? { display: "flex", alignItems: "center", gap: "10px", color: "#111111" } : {}) }}>
+        <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: isDesktop ? "208px" : "52px", height: "52px", padding: isDesktop ? "4px 12px 4px 4px" : 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer", ...(isDesktop ? { display: "flex", alignItems: "center", gap: "10px", color: "#111111" } : {}) }}>
           {thumbUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={thumbUrl} alt="" style={{ width: isDesktop ? "40px" : "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "10px" }} />
@@ -1359,7 +1365,7 @@ export default function LiveWatchView(props: Props) {
           </> : <span aria-hidden="true" style={{ position: "absolute", top: "-8px", right: "-8px", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "24px", textAlign: "center", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }}>{totalCount > 999 ? "999+" : totalCount}</span>}
         </button>
         {!isDesktop && chat && chat.canWrite && !focus ? (
-          <div style={{ flex: 1, minWidth: "112px", height: "52px", boxSizing: "border-box", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "9999px", background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", overflow: "hidden" }}>
+          <div style={{ flex: 1, minWidth: 0, height: "52px", boxSizing: "border-box", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "9999px", background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", overflow: "hidden" }}>
             <button type="button" onClick={() => openCompose(false)} style={{ flex: 1, minWidth: 0, height: "100%", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: canEmoji ? "0 0 0 14px" : "0 14px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>채팅 입력</span>
             </button>
@@ -1520,15 +1526,19 @@ export default function LiveWatchView(props: Props) {
 
       {/* 상품 목록 창 */}
       {listOpen ? (
-        <div role="dialog" aria-modal="true" aria-label="방송 상품" onClick={() => setListOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
+        <div role="dialog" aria-modal="true" aria-label={listMode === "featured" ? "지금 소개하는 상품" : "방송 상품"} onClick={() => setListOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", height: "72dvh", background: "#FFFFFF", color: "#111111", borderRadius: "16px 16px 0 0", display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "8px 8px 8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-                <span style={{ fontSize: "17px", fontWeight: 700 }}>방송 상품</span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "#707072" }}>총 {totalCount}개</span>
+                <span style={{ fontSize: "17px", fontWeight: 700 }}>{listMode === "featured" ? "지금 소개하는 상품" : "방송 상품"}</span>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#707072" }}>{listMode === "featured" ? `${featured.products.length}개` : `총 ${totalCount}개`}</span>
               </span>
               <button type="button" onClick={() => setListOpen(false)} aria-label="닫기" style={{ width: "44px", height: "44px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><IconClose /></button>
             </div>
+            {listMode === "featured" ? <div style={{padding: "0 16px 10px", flexShrink: 0}}>
+              <p style={{fontSize: 13, color: "#666", margin: "0 0 8px"}}>전체 {totalCount}개 중 소개 중인 상품이에요.</p>
+              <button type="button" onClick={() => openProductList("all")} style={{width: "100%", minHeight: 44, borderRadius: 10, border: "1px solid #d5d5d5", background: "#f5f5f5", color: "#111", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>전체 상품 {totalCount}개 보기 →</button>
+            </div> : null}
             <div style={{ padding: "0 16px 8px" }}>
               <input
                 type="search"
@@ -1541,7 +1551,7 @@ export default function LiveWatchView(props: Props) {
             </div>
             <div data-live-scroll="1" style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: "0 16px calc(16px + env(safe-area-inset-bottom))" }}>
               {listItems.length === 0 ? (
-                <div style={{ padding: "32px 0", textAlign: "center", fontSize: "15px", color: "#707072" }}>{query ? "찾는 상품이 없어요" : "방송 상품이 아직 없어요"}</div>
+                <div style={{ padding: "32px 0", textAlign: "center", fontSize: "15px", color: "#707072" }}>{query ? "찾는 상품이 없어요" : listMode === "featured" ? "지금 소개 중인 상품이 없어요. 전체 상품을 확인해 주세요." : "방송 상품이 아직 없어요"}</div>
               ) : listItems.map((it) => { const no = items.findIndex((x) => x.id === it.id) + 1; return (
                 <div key={`${it.id}|${it.detailName || ""}`} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "1px solid #E5E5E5" }}>
                   <button type="button" onClick={() => { if (!it.soldOut) { setListOpen(false); props.onOpenProduct(it.id, it.detailName); } }} aria-label={`${no}번 ${it.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>

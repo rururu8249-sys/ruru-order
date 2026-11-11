@@ -160,6 +160,7 @@ import {
   type OrderBankAccountSnapshot,
 } from "@/lib/orderBankAccount";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
+import { liveWatchDetailProduct } from "@/lib/liveFeaturedProducts";
 import { linkedSourceInfo, resolveDetailInfo, selectedDetailInfo } from "@/lib/productDetailInfo";
 import { buildBrandOrderCatalog, resolveBrandOrderSelection, findBrandOrderProductById } from "@/lib/productBrandOrder";
 import { loadProductBrandCatalog } from "@/lib/productBrandCatalogClient";
@@ -6776,11 +6777,11 @@ export default function OrderPage() {
         searchTexts: [String(product.product_name || ""), ...productSuggestionKeywords(product)].filter(Boolean),
         details: brand ? (readComboInfoOrderProduct(product)?.names || []).map((dn) => {
           let shown: BroadcastProduct = product;
-          try { shown = resolveBrandOrderSelection(product as unknown as Record<string, unknown>, dn) as unknown as BroadcastProduct; } catch { shown = product; }
+          try { shown = liveWatchDetailProduct(product as unknown as Record<string, unknown>, dn) as unknown as BroadcastProduct; } catch { shown = product; }
           // [2026-11-10 사장님 「막102 사진이 있으면 그게 나와야지」] 세부상품 사진 = 주문서 담은 상품과 같은 규칙(resolveOrderItemPhoto), 없을 때만 예전 사진
           let detailPhoto = "";
           try { detailPhoto = resolveOrderItemPhoto(product as Record<string, unknown>, { productName: dn }).url; } catch { detailPhoto = ""; }
-          return { productId: String(shown.id ?? product.id ?? ""), name: dn, imageUrl: detailPhoto || pickOrderProductImageUrl(shown) || pickOrderProductImageUrl(product), priceText: won(Number(shown.price || product.price || 0)), soldOut: isSoldOutOrderProduct(shown) };
+          return { productId: String(shown.id ?? product.id ?? ""), name: dn, imageUrl: detailPhoto || pickOrderProductImageUrl(shown) || pickOrderProductImageUrl(product), priceText: won(Number(shown.price ?? product.price ?? 0)), soldOut: (shown as any).is_soldout === true || isSoldOutOrderProduct(shown) };
         }) : undefined,
       };
     }).filter((it) => it.id);
@@ -8355,6 +8356,8 @@ export default function OrderPage() {
               siteViewers={liveSiteViewers}
               showSiteViewers
               pinned={liveWatchPinned}
+              widgetEnabled={broadcast?.widget_card_enabled !== false}
+              widgetPin={broadcast?.widget_pin_mode === "pin" && broadcast?.widget_pin_product_id ? { productId: String(broadcast.widget_pin_product_id), detailName: String(broadcast.widget_pin_detail_name || "") } : null}
               items={liveWatchItems}
               cartCount={liveWatchCartCount}
               cartTotalText={won(liveWatchCartTotal)}
