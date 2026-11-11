@@ -44,3 +44,12 @@ const {buildRowsForDetail}=load('lib/brandDetailTableOps.ts');
 assert.equal(buildRowsForDetail('BB-60',[],['M'],[{key:'BB-60__M',detail:'BB-60',colorOnly:'',color:'BB-60',size:'M',stock:5,manual_soldout:true}])[0].manual_soldout,true,'legacy empty color must preserve soldout when rebuilt as 없음');
 assert.equal(buildRowsForDetail('BB-60',['베이지'],['M'],[{key:'BB-60 / 베이지__M',detail:'BB-60',colorOnly:'베이지',color:'BB-60 / 베이지',size:'M',stock:0,manual_soldout:true}])[0].manual_soldout,true);
 console.log('PASS inventory OFF controls, save/reopen, restore selling, size-only, legacy brand and detail rebuild');
+{
+  const {isDetailManuallySoldOut}=load('lib/productOptionAvailability.ts');
+  const n={brand_group:{detail_options:{'PD-509 블랙':{}}},stock_variants:['38','40','42','44'].map(size=>({color:'PD-509 블랙 / 없음',size,stock:0,manual_soldout:true}))};
+  assert.equal(isDetailManuallySoldOut(n,'PD-509 블랙',['없음'],['38','40','42','44']),true,'all sizes checked = detail row soldout');
+  n.stock_variants[2].manual_soldout=false;
+  assert.equal(isDetailManuallySoldOut(n,'PD-509 블랙',['없음'],['38','40','42','44']),false,'one size open = row still selectable');
+  assert.equal(isDetailManuallySoldOut(n,'',['없음'],['38']),false);
+  console.log('detail row soldout ok');
+}

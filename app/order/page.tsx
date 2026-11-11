@@ -24,7 +24,7 @@ import ProductDiscountLabel from '@/components/order/ProductDiscountLabel';
 import CustomerPressButton from '@/components/customer/CustomerPressButton';
 import ProductColorSwatches, {ColorSwatch} from '@/components/customer/ProductColorSwatches';
 import {readProductColorSwatches, retainColorSwatches} from '@/lib/productColorSwatches';
-import { isOptionManuallySoldOut } from '@/lib/productOptionAvailability';
+import { isOptionManuallySoldOut, isDetailManuallySoldOut } from '@/lib/productOptionAvailability';
 const normalizeEmptyProductOptionValue = (value: unknown) => {
   // data-ruru-no-auto-none-option="enabled"
   // 등록상품 선택 시 색상/사이즈 옵션이 비어 있으면 고객 입력칸도 빈칸으로 유지합니다.
@@ -9576,8 +9576,17 @@ export default function OrderPage() {
                             </div>
                           );
                         }
+                        // [2026-11-11 사장님 「안에 들어가면 품절인데 밖에선 안 뜸」] 브랜드 묶음은 재고 숫자를 안 세는 상품이 많아
+                        //   목록 줄이 품절을 몰랐다 → 그 세부상품의 모든 색상×사이즈가 «품절 체크»면 줄도 품절(사이즈 칸과 같은 판정, 표시만).
+                        const manualOut = (name: string): boolean => {
+                          const cfg = registeredOptionBrandGroup?.detailOptions[name];
+                          if (!cfg || !registeredOptionSelectProduct) return false;
+                          let target: unknown = registeredOptionSelectProduct;
+                          try { target = resolveBrandOrderSelection(registeredOptionSelectProduct as unknown as Record<string,unknown>, name) ?? registeredOptionSelectProduct; } catch { /* 원래 상품 기준 */ }
+                          return isDetailManuallySoldOut((target as { product_note?: unknown } | null)?.product_note, name, cfg.colors, cfg.sizes);
+                        };
                         const sortedNames = [...list]
-                          .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return r !== null && r <= 0; })() }))
+                          .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return (r !== null && r <= 0) || manualOut(n); })() }))
                           .sort((a, b) => (a.out === b.out ? a.i - b.i : a.out ? 1 : -1))
                           .map(({ n }) => n);
                         // [2026-08-29] 같은 디자인 묶기(design_groups)는 사장님 지시로 되돌렸다.
@@ -9594,7 +9603,7 @@ export default function OrderPage() {
                         };
                         const metaOf = (name: string) => {
                           const selected = (registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor) === name;
-                          const remain = stockOf(name), soldOut = remain !== null && remain <= 0;
+                          const remain = stockOf(name), soldOut = (remain !== null && remain <= 0) || manualOut(name);
                           const plus = Math.max(0, Math.floor(Number(info.pricing[name] || 0)));
                           const gallery = Array.from(new Set([...(registeredOptionBrandGroup?.detailPhotoSets[name] || []), registeredOptionComboPhotos[name] || ""].filter(Boolean)));
                           const cfg = registeredOptionBrandGroup?.detailOptions[name];

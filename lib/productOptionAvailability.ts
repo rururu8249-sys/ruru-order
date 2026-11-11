@@ -19,3 +19,12 @@ export function isOptionManuallySoldOut(note: unknown, color: string, size: stri
       (norm(row.color) === c || (joined !== null && String(row.color ?? "").trim() === joined));
   });
 }
+
+/** [2026-11-11] 세부상품의 모든 색상×사이즈가 «품절 체크»면 true — 브랜드 묶음 세부상품 목록 줄 표시용(재고 숫자 안 봄). */
+export function isDetailManuallySoldOut(note: unknown, detailName: string, colors: string[], sizes: string[]): boolean {
+  const detail = String(detailName ?? "").trim();
+  if (!detail) return false;
+  const cs = colors.length ? colors : [""];
+  const ss = sizes.length ? sizes : [""];
+  return cs.every((c) => ss.every((s) => isOptionManuallySoldOut(note, c, s, detail)));
+}
