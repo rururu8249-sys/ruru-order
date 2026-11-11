@@ -43,3 +43,8 @@
 .rps-lobby>p{margin:4px 0;font-size:12px}.rps-card p{line-height:1.4}.rps-count{margin-bottom:4px}.rps-live-overlay .rps-admin-shortcut{min-height:32px}
 
 .rps-count{gap:8px;flex-wrap:wrap}.rps-count strong{white-space:nowrap}
+
+/* Keep the common settings in view, with an independent scroll area for extras. */
+.rps-admin-body{scroll-padding-block:12px 24px;padding-bottom:24px}
+.rps-admin-footer{padding:8px 14px}
+@media(max-width:600px){.rps-admin>header{padding:8px 14px}.rps-form{gap:8px}.rps-admin-body{padding-top:10px}.rps-mode p{margin-top:4px}}
