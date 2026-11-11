@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BotCandidate } from "@/lib/liveChatBot";
-import { brandQueryVariants, normalizeProductSearchText } from "@/lib/productSearch";
+import { brandNameCodePrefixes, brandQueryVariants, detailCodePrefix, normalizeProductSearchText } from "@/lib/productSearch";
 import { widgetTargetKey } from "@/lib/widgetProductLibrary";
 
 export function ChatProductPicker({ broadcastId, query, busy, onSelect, onClose }: {
@@ -27,7 +27,9 @@ export function ChatProductPicker({ broadcastId, query, busy, onSelect, onClose 
   const filtered = useMemo(() => {
     const q = normalizeProductSearchText(query);
     const variants = [q, ...brandQueryVariants(q)];
-    return items.filter(p => !q || variants.some(v => p.texts.some(t => normalizeProductSearchText(t).includes(v))));
+    const brandCodes = new Set(brandNameCodePrefixes(q));
+    return items.filter(p => !q || p.texts.some(t => brandCodes.has(detailCodePrefix(t)))
+      || variants.some(v => p.texts.some(t => normalizeProductSearchText(t).includes(v))));
   }, [items, query]);
   useEffect(() => setActive(0), [query, items]);
   useEffect(() => { box.current?.querySelector(`[data-product-index="${active}"]`)?.scrollIntoView({ block: "nearest" }); }, [active]);

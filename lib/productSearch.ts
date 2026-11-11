@@ -114,6 +114,21 @@ export function registerBrandSearchAliases(groups: Array<{ brandName: string; de
   }
 }
 
+/** 상품 선택 목록용: 숫자 없는 브랜드 약칭(몽·몽클 → mc). 명령 실행 판정에는 쓰지 않는다. */
+export function brandNameCodePrefixes(query: string): string[] {
+  const head = normalizeProductSearchText(query);
+  if (!head || !/^[a-z가-힣]+$/.test(head)) return [];
+  const isLatin = /^[a-z]+$/.test(head);
+  if (isLatin && head.length < 3) return [];
+  const codes = new Set<string>();
+  for (const entry of brandAliasRegistry.values()) {
+    if ([...entry.names].some(n => n.startsWith(head) || (head.length >= (isLatin ? 3 : 2) && n.includes(head)))) {
+      for (const code of entry.codes) codes.add(code);
+    }
+  }
+  return [...codes];
+}
+
 /** 검색어를 상품번호 모양으로 바꾼 후보들(원래 검색어 제외). */
 export function brandQueryVariants(normalizedQuery: string): string[] {
   const cached = variantCache.get(normalizedQuery);
