@@ -21,10 +21,12 @@
 - [x] Add picker photo/checkbox/selected chips/explicit actions; wire existing send callback, retaining draft on failure.
 - [x] Add small product thumbnails to existing product/cart bot rows via current customer product list, preserving open-product callback.
 - [x] Run actual-component, API, private-command, widget and browser tests; independent review; tsc/build BANKDA2 guards.
-- [ ] Push, verify Vercel success, prepend CLAUDE progress with feature hash and document any unchanged baseline failures.
+- [x] Push, verify Vercel success, prepend CLAUDE progress with feature hash and document any unchanged baseline failures.
 
 ## Verification notes
 - Actual POST, append CAS/all/history, shared search, picker and photo tests pass; incremental BB-30 → BB-307 auto-check regression fixed and independently re-reviewed.
 - Actual LiveWatch browser harness: PC1440x900/mobile390x844; photos, checkbox actions, failure/retry selection retention, exact batch payload, unknown-term blocking, photo opens existing product callback. No production test messages or widget mutations.
 - `npx tsc --noEmit` and production build pass; BANKDA safety guards both pass. Existing unrelated admin UI guard8 and option-split guard1 findings unchanged from HEAD.
 - Production read-only catalog check: PD-509 exists; BB-307 absent; MC-307 is white. Unknown comma terms are displayed separately, never substituted.
+
+Feature deployment: `ca538db`, Vercel success verified.
