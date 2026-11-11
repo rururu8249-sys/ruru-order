@@ -18,9 +18,9 @@ export function RpsWidget({game,publicOnly=false,onAdmin,broadcastId}:{game:RpsC
  const mine=p?.choice_round===s.round?p.choice:null;const eligible=p?.alive&&!p.winner;
  const prize=s.rewardKind==='points'?`${s.points.toLocaleString()}P`:s.rewardKind==='gift'?s.gift:'함께 즐기는 이벤트';
  const visibleWinners=publicOnly?s.winners.slice(page*10,page*10+10):s.winners;
- return <section className={`rps-card ${publicOnly?'rps-public':''}`} aria-label="가위바위보 게임">
+ return <section className={`rps-card ${publicOnly?'rps-public':game.admin?'rps-admin-game':''}`} aria-label="가위바위보 게임">
   <header className="rps-heading"><div><span className="rps-kicker">{s.test?'연습 · 실제 지급 없음':s.status==='finished'?'🎊 당첨 발표':s.round?`${s.round}라운드 · ${s.pvp?'손님끼리 결승':'루루와 대결'}`:'🎁 참가 모집'}</span><strong>{s.title}</strong></div>
-  {!publicOnly&&<div className="rps-tools"><button onClick={toggle} aria-label={sound?'게임 소리 끄기':'게임 소리 켜기'}>{sound?'🔊':'🔇'}</button></div>}</header>
+  {!publicOnly&&<div className="rps-tools"><button onClick={toggle} aria-label={sound?'게임 소리 끄기':'게임 소리 켜기'}>{sound?'🔊':'🔇'}</button>{game.admin&&<button className="rps-end-game" disabled={busy} onClick={()=>{if(window.confirm('게임을 종료할까요? 모집과 진행이 즉시 중단되고 모든 화면에서 게임이 사라집니다.'))void action('close');}}>게임 종료</button>}</div>}</header>
   <div className="rps-prize">{s.rewardKind==='none'?prize:<><b>{prize}</b> · 당첨 {s.target.toLocaleString()}명</>}{s.rewardKind==='gift'&&' · 무료 선물'}</div>
   {s.status==='finished'?<div className="rps-winner-box">
    {!!s.winners.length&&<div className="rps-confetti" aria-hidden="true">{Array.from({length:12},(_,i)=><i key={i} style={{left:`${5+i*8}%`,animationDelay:`${i%4*.12}s`,background:['#efb72c','#e97972','#75b497'][i%3]}}/>)}</div>}
@@ -45,7 +45,7 @@ export function RpsWidget({game,publicOnly=false,onAdmin,broadcastId}:{game:RpsC
   </>}
   {!publicOnly&&game.error&&<p className="rps-error" role="alert">{game.error}</p>}
   {game.admin&&!publicOnly&&<RpsHostControls game={game}/>}
-  {game.admin&&!publicOnly&&<div className="rps-host-footer">{onAdmin&&<button className="rps-admin-shortcut" onClick={onAdmin}>게임 설정</button>}<button className="rps-end-game" disabled={busy} onClick={()=>{if(window.confirm('게임을 종료할까요? 모집과 진행이 즉시 중단되고 모든 화면에서 게임이 사라집니다.'))void action('close');}}>게임 종료</button></div>}
+  {game.admin&&!publicOnly&&<div className="rps-host-footer">{onAdmin&&<button className="rps-admin-shortcut" onClick={onAdmin}>게임 설정</button>}</div>}
  </section>;
 }
 

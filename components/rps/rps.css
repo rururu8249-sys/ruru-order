@@ -50,3 +50,10 @@
 @media(max-width:600px){.rps-admin>header{padding:8px 14px}.rps-form{gap:8px}.rps-admin-body{padding-top:10px}.rps-mode p{margin-top:4px}}
 
 .rps-host-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;border-top:1px solid #eee;padding-top:4px}.rps-host-footer .rps-admin-shortcut{margin:0}.rps-end-game{min-height:36px;border:1px solid #e3b9bb;border-radius:8px;background:#fff6f6;color:#a32c37!important;padding:5px 10px;font-size:12px!important;font-weight:700}
+
+
+
+/* Only the broadcast game surface is translucent; settings and controls stay legible. */
+.rps-card,.rps-public{background:rgba(255,255,255,.9)}
+.rps-tools{align-items:center;gap:4px}.rps-tools .rps-end-game{width:auto;min-width:62px;height:36px;padding:5px 8px;border:1px solid #e3b9bb;border-radius:8px;background:#fff6f6;font-size:12px}
+.rps-live-overlay .rps-admin-game{max-height:max(140px,min(55dvh,calc(100dvh - 230px)))}
