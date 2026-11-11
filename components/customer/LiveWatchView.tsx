@@ -945,7 +945,7 @@ export default function LiveWatchView(props: Props) {
             {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
             {draftEmojiCount > 0 ? (
               // Float above the input: only the picture has a translucent backing, leaving the video visible.
-              <div aria-label="미리보기" style={{ position: "absolute", bottom: "calc(100% + 8px)", left: isDesktop ? 0 : 16, width: "fit-content", maxWidth: "calc(100% - 32px)", maxHeight: "30dvh", overflowY: "auto", boxSizing: "border-box", padding: "12px", borderRadius: "12px", background: "rgba(0,0,0,0.38)", color: "#FFFFFF", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word", zIndex: 1 }}>
+              <div aria-label="미리보기" style={{ position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", width: "fit-content", maxWidth: "calc(100% - 32px)", maxHeight: "30dvh", overflowY: "auto", boxSizing: "border-box", padding: "12px", borderRadius: "12px", background: "rgba(0,0,0,0.38)", color: "#FFFFFF", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word", zIndex: 1 }}>
                 {selectedEmoji ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={selectedEmoji.url} alt={`${selectedEmoji.name} 이모티콘 미리보기`} style={{display: "block", width: "min(88px, calc(30dvh - 24px))", height: "min(88px, calc(30dvh - 24px))", objectFit: "contain"}} />
@@ -1045,9 +1045,6 @@ export default function LiveWatchView(props: Props) {
             </div>
             {emojiOpen && canEmoji ? (
               <div data-emoji-drawer style={{ margin: isDesktop ? "8px 0 0" : "12px -16px 0", borderTop: "1px solid #E5E5E5", background: "#FFFFFF", borderRadius: "12px", overflow: "hidden" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px 0" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: "#111111" }}>루루동이 이모티콘</span>
-                </div>
                 <div data-live-scroll="1" style={{ height: "min(232px, 35dvh)", overflowY: "auto", overscrollBehavior: "contain", padding: "8px 12px calc(12px + env(safe-area-inset-bottom))", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))", gap: "4px", alignContent: "start" }}>
                   {/* 쓰다 만 낱말이 있으면 맨 위에 어울리는 것부터(카톡 이모티콘 «검색»처럼) */}
                   {pickerSuggests.length > 0 ? (
