@@ -22,6 +22,30 @@ await act(async()=>tree.root.findByProps({'aria-label':'관리 설정 닫기'}).
 assert.ok(!button('참가자 모집 시작'),'settings never duplicates recruitment controls');
 assert.ok(tree.root.findByProps({'aria-label':'모집 시간 분'}));assert.ok(tree.root.findByProps({'aria-label':'모집 시간 초'}));
 assert.ok(!text(tree.toJSON()).includes('한 분당 포인트'));assert.ok(!text(tree.toJSON()).includes('루루의 손'));
+const minutes=()=>tree.root.findByProps({'aria-label':'모집 시간 분'});
+const seconds=()=>tree.root.findByProps({'aria-label':'모집 시간 초'});
+await act(async()=>minutes().props.onChange({target:{value:''}}));
+assert.equal(minutes().props.value,'','deleting minutes leaves an editable blank');
+await act(async()=>seconds().props.onChange({target:{value:''}}));
+assert.equal(seconds().props.value,'','deleting zero seconds leaves an editable blank');
+assert.equal(button('저장').props.disabled,true,'empty duration cannot be saved as zero');
+await act(async()=>minutes().props.onChange({target:{value:'3'}}));
+await act(async()=>seconds().props.onChange({target:{value:'25'}}));
+assert.equal(String(minutes().props.value),'3');assert.equal(String(seconds().props.value),'25');
+await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
+assert.equal(calls.at(-1).data.joinSeconds,205,'replacement minutes and seconds are saved together');
+await act(async()=>minutes().props.onChange({target:{value:''}}));
+await act(async()=>seconds().props.onChange({target:{value:'30'}}));
+await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
+assert.equal(calls.at(-1).data.joinSeconds,30,'blank minutes count as zero only for saving');
+await act(async()=>seconds().props.onChange({target:{value:'60'}}));
+assert.equal(String(seconds().props.value),'60','invalid seconds are not silently moved into minutes');
+const invalidBefore=calls.length;
+await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
+assert.equal(calls.length,invalidBefore,'invalid duration does not reach the server');
+await act(async()=>minutes().props.onChange({target:{value:'5'}}));
+await act(async()=>seconds().props.onChange({target:{value:'0'}}));
+
 // A newly started room must not inherit an unsaved draft for the next game.
 await act(async()=>label('포인트').findByType('input').props.onChange({target:{value:''}}));
 await act(async()=>label('이벤트 선물').findByType('select').props.onChange({target:{value:'none'}}));
