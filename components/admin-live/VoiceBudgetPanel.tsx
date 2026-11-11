@@ -9,7 +9,7 @@ export function VoiceBudgetCard({data,busy,error,onAction,onProducts}:{data:Snap
   const [editing,setEditing]=useState(false);
   const [cap,setCap]=useState(String(data.budget?.cap_krw??DEFAULT_VOICE_CAP_KRW));
   useEffect(()=>{if(!editing)setCap(String(data.budget?.cap_krw??DEFAULT_VOICE_CAP_KRW));},[data.budget?.cap_krw,editing]);
-  const state=data.state, danger=["budget_stopped","offline","error"].includes(state), warning=state==="warning",active=["running","warning"].includes(state);
+  const state=data.state, danger=["budget_stopped","offline","error"].includes(state), warning=state==="warning",active=!!data.budget?.enabled;
   const capValue=Number(cap), invalid=!Number.isSafeInteger(capValue)||capValue<1000||capValue>1000000||capValue<(data.budget?.committed_krw??0);
   const canResume=data.ready&&!!data.budget?.worker_seen_at&&Date.now()-Date.parse(data.budget.worker_seen_at)<30000;
   const btn="min-h-10 rounded-lg border px-3 font-semibold disabled:opacity-40";

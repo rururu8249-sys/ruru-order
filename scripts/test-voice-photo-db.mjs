@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+const db=new PGlite();
+try {
+ await db.exec("create role anon; create role authenticated; create role service_role bypassrls; create table products(id bigint primary key,product_note text,detail_image_urls jsonb,image_url text); insert into products values(1,'{}','[\"cover\"]','cover'); grant select,update on products to service_role;");
+ await db.exec(await fs.readFile('supabase/migrations/20261111094041_voice_product_photo_once.sql','utf8'));
+ assert.equal((await db.query("select to_regclass('voice_product_photos') t")).rows[0].t,'voice_product_photos','cross-broadcast photo marker must exist');
+ await db.exec('set role service_role');
+ const id1='00000000-0000-4000-8000-000000000001',id2='00000000-0000-4000-8000-000000000002';
+ const claim=async(id)=>(await db.query('select voice_photo_claim(1,$1,$2) v',['',id])).rows[0].v;
+ assert.equal(await claim(id1),'capture');
+ assert.equal(await claim(id1),'busy','repeated delivery must not capture twice');
+ assert.equal(await claim(id2),'busy','concurrent command must not capture');
+ const finish=async(expected,images)=>(await db.query('select voice_photo_finish(1,$1,$2,$3,$4,$5,$6,$7) v',['',id1,'photo',expected,['cover'],expected,images])).rows[0].v;
+ assert.equal(await finish('{"edited":true}',['cover','photo']),'conflict','concurrent admin edits must survive');
+ assert.equal(await finish('{}',['cover','photo']),'saved');
+ assert.equal(await claim(id2),'exists','another day/broadcast must skip before capture');
+ assert.equal(await finish('{}',['cover','photo']),'saved','commit retries must not append twice');
+ assert.deepEqual((await db.query('select * from products')).rows[0],{id:1,product_note:'{}',detail_image_urls:['cover','photo'],image_url:'cover'});
+ await db.exec('reset role');
+ await db.query("update voice_product_photos set updated_at=now()-interval '8 days'");
+ await db.exec('set role service_role');
+ assert.equal(await claim(id2),'exists','saved marker never expires');
+ await db.exec('reset role');
+ await db.query("insert into products values(2,'{}','[\"cover2\"]','cover2')");
+ await db.exec('set role service_role');
+ const claim2=async(id)=>(await db.query('select voice_photo_claim(2,$1,$2) v',['',id])).rows[0].v;
+ assert.equal(await claim2(id1),'capture');
+ await db.query('select voice_photo_fail(2,$1,$2)',['',id1]);
+ assert.equal(await claim2(id2),'capture','failed capture allows a later request');
+ await db.exec('reset role');
+ await db.query("update voice_product_photos set updated_at=now()-interval '3 minutes' where product_id=2");
+ await db.exec('set role service_role');
+ assert.equal(await claim2(id1),'busy','timeout alone must never start a second capture/upload');
+ // Recovery only after the worker has definitively terminated this attempt.
+ await db.query('select voice_photo_fail(2,$1,$2)',['',id2]);
+ assert.equal(await claim2(id1),'capture','confirmed failed attempt can be retried');
+ const old=(await db.query('select voice_photo_finish(2,$1,$2,$3,$4,$5,$6,$7) v',['',id2,'old','{}',['cover2'],'{}',['cover2','old']])).rows[0].v;
+ assert.equal(old,'superseded','late old worker cannot write after restart');
+ assert.deepEqual((await db.query('select detail_image_urls from products where id=2')).rows[0].detail_image_urls,['cover2']);
+ await db.exec('reset role; set role anon');
+ await assert.rejects(claim(id2),/permission denied/);
+ console.log('PASS persistent photo guard: next day/week, concurrent requests, retry, existing cover, no lost edits, private access');
+}finally{await db.close()}

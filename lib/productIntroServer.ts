@@ -9,7 +9,7 @@ export function productIntroKey(bc: string, videoId: string, target: WidgetProdu
   return `product_intro_v1_${bc}_${videoId}_${digest}`;
 }
 /** Each target has an independent row; concurrent introductions cannot overwrite another product. */
-export async function saveProductIntros(sb: SupabaseClient, bc: string, targets: WidgetProductTarget[], capture: ProductIntroCapture) {
+export async function saveProductIntros(sb: SupabaseClient, bc: string, targets: WidgetProductTarget[], capture: ProductIntroCapture, policy: "replace" | "first" = "replace") {
   const recordedAt = new Date().toISOString();
   const targetsOnce = [...new Map(targets.map(t => [widgetTargetKey(t), t])).values()];
   const results = await Promise.allSettled(targetsOnce.map(async target => {
@@ -19,6 +19,9 @@ export async function saveProductIntros(sb: SupabaseClient, bc: string, targets:
       const current = await sb.from("settings").select("value").eq("key", key).maybeSingle();
       if (current.error) throw new Error("소개영상 위치를 확인하지 못했어요.");
       const previous = parseProductIntro(current.data?.value, capture.videoId);
+      // Voice automation keeps the first confirmed point. Explicit manual edits
+      // retain the existing replacement behavior.
+      if (previous && policy === "first") return;
       // Same capture is idempotent; an older request must not overwrite a newer introduction.
       if (previous && previous.capturedAt >= capture.capturedAt) return;
       if (current.data) {

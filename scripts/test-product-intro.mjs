@@ -92,3 +92,12 @@ await Promise.all([
 ]);
 assert.equal((await readProductIntro(db,bc,video,{productId:'9',detailName:''})).seconds,700);
 console.log('PASS overlapping read/update CAS and duplicate insert retry');
+const voiceTarget={productId:'99',detailName:'MC-311'};
+await saveProductIntros(db,bc,[voiceTarget],{...capture,seconds:800},'first');
+await saveProductIntros(db,bc,[voiceTarget],{...capture,seconds:900,capturedAt:now+1000},'first');
+assert.equal((await readProductIntro(db,bc,video,voiceTarget)).seconds,800,'repeated spoken introduction keeps original point');
+const nextVideo='nextVideo01';
+await saveProductIntros(db,'00000000-0000-0000-0000-000000000003',[voiceTarget],{...capture,videoId:nextVideo,seconds:10},'first');
+assert.equal(JSON.parse(rows.get(productIntroKey('00000000-0000-0000-0000-000000000003',nextVideo,voiceTarget)).value).seconds,10);
+assert.equal((await readProductIntro(db,bc,video,voiceTarget)).seconds,800,'new broadcast must preserve previous video');
+console.log('PASS auto intro: first point retained, next broadcast independent, history preserved');

@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+let impl;try{impl=createUiLoader()('lib/voiceProductPhotoServer.ts')}catch{}
+assert.ok(impl,'product photo append handler must exist');
+const row={id:1,product_note:'{}',image_url:'cover',detail_image_urls:['cover']};
+assert.deepEqual(impl.appendVoicePhoto(row,'','photo'),{note:'{}',images:['cover','photo']});
+assert.deepEqual(impl.appendVoicePhoto(row,'','cover').images,['cover'],'duplicate URL must not duplicate gallery');
+const note={combo_mode:true,combo_detail_values:['MC-311 블랙'],detail_photo_sets:{'MC-311 블랙':['cover','side']},untouched:{size:'M'}};
+const variant={...row,product_note:JSON.stringify(note)};
+const appended=impl.appendVoicePhoto(variant,'MC-311 블랙','wearing');
+assert.deepEqual(JSON.parse(appended.note).detail_photo_sets['MC-311 블랙'],['cover','side','wearing']);
+assert.deepEqual(JSON.parse(appended.note).untouched,note.untouched);
+assert.throws(()=>impl.appendVoicePhoto(variant,'없는 상품','photo'));
+let captureCalls=0,finishCalls=0,status='exists';
+const db={from(){const q={select(){return q},eq(){return q},maybeSingle:async()=>({data:row,error:null})};return q},rpc:async(name)=>{if(name==='voice_photo_claim')return {data:status,error:null};if(name==='voice_photo_finish'){finishCalls++;return {data:'saved',error:null}}return {data:null,error:null}}};
+const capture=async()=>{captureCalls++;return 'https://example.com/photo.jpg'};
+assert.equal((await impl.captureVoicePhotoOnce(db,{productId:'1',detailName:''},'request',capture)).status,'exists');
+assert.equal(captureCalls,0,'tomorrow same product skips before capture/upload');
+status='busy';await impl.captureVoicePhotoOnce(db,{productId:'1',detailName:''},'request',capture);assert.equal(captureCalls,0);
+status='capture';assert.equal((await impl.captureVoicePhotoOnce(db,{productId:'1',detailName:''},'request',capture)).status,'saved');assert.equal(captureCalls,1);assert.equal(finishCalls,1);
+console.log('PASS photo append: preserved cover/order/variant, already registered means zero capture/upload callbacks');
