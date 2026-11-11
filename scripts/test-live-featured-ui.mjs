@@ -12,10 +12,12 @@ let desktop = false;
 const products = [{id:'10',detailName:'LOE-111 블랙',name:'LOE-111 블랙',imageUrl:'https://example.com/one.jpg',priceText:'190,000원',soldOut:false,pinned:false},{id:'20',name:'가방',imageUrl:'',priceText:'20,000원',soldOut:false,pinned:false}];
 let current = products[0];
 let featured = products;
+let replay={replay:false,products:[],current:null};
 const load = createUiLoader({
  '@/components/customer/KakaoExternalOpen':{openOrderInExternalBrowser:blank},
  '@/lib/useIsDesktop':{useIsDesktop:()=>desktop},
  '@/lib/useLiveFeaturedProducts':{useLiveFeaturedProducts:()=>({products:featured,current})},
+ '@/lib/useReplayProductCard':{useReplayProductCard:()=>replay},
  '@/lib/useChatAutoScroll':{useChatAutoScroll:()=>({boxRef:{current:null},contentRef:{current:null},atBottom:true,followLatest:blank})},
  '@/lib/useLiveResume':{useLiveResume:()=>({onAction:blank,returnToLive:blank})},
  '@/lib/useProductIntroPlayer':{useProductIntroPlayer:()=>({})},
@@ -57,5 +59,18 @@ await act(async()=>tree.update(React.createElement(View,props)));
 await click(tree.root.findByProps({'aria-label':'LOE-111 블랙 상품 선택'}));
 assert.deepEqual(calls.pop(),['10','LOE-111 블랙'],'one featured product opens its exact detail directly');
 assert.equal(tree.root.findAllByProps({role:'dialog'}).length,0);
+replay={replay:true,products,current:products[0]};
+await act(async()=>tree.update(React.createElement(View,props)));
+assert.ok(text(tree.toJSON()).includes('영상 속 상품'));
+await click(tree.root.findByProps({'aria-label':'LOE-111 블랙 상품 선택'}));
+replay={replay:true,products:[products[1]],current:products[1]};
+await act(async()=>tree.update(React.createElement(View,props)));
+const replayPanel=tree.root.findAllByProps({role:'dialog'})[0];
+assert.ok(text(replayPanel).includes('LOE-111 블랙'),'open panel must retain the group being selected as playback advances');
+await click(replayPanel.findAllByType('button').find(n=>n.props['aria-label']?.includes('LOE-111 블랙 상품 선택')));
+assert.deepEqual(calls.pop(),['10','LOE-111 블랙']);
+replay={replay:true,products:[],current:null};
+await act(async()=>tree.update(React.createElement(View,props)));
+assert.equal(tree.root.findAllByProps({'data-featured-product-card':true}).length,0,'recording without a matching intro must not fall back to live rotation');
 await act(async()=>tree.unmount());
 console.log('PASS actual LiveWatchView: exact option identity, featured list, total count, full-list reset and one desktop card');

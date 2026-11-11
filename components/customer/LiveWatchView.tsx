@@ -6,6 +6,7 @@
 //   z-index 60: 아래 메뉴(40)·장바구니 바(39) 위, 옵션 창·주문서 창(100) 아래 → 옵션 창이 방송 위로 올라온다.
 
 import { useLiveFeaturedProducts } from "@/lib/useLiveFeaturedProducts";
+import { useReplayProductCard } from "@/lib/useReplayProductCard";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
 import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -355,8 +356,12 @@ export default function LiveWatchView(props: Props) {
   const [listOpen, setListOpen] = useState(false);
   const [listMode, setListMode] = useState<"all" | "featured">("all");
   useEffect(() => { setListOpen(false); setListMode("all"); setQuery(""); }, [props.broadcastId]);
-  const featured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false, props.widgetPin ?? null);
-  const openProductList = (mode: "all" | "featured") => { setQuery(""); setListMode(mode); setListOpen(true); };
+  const liveFeatured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false, props.widgetPin ?? null);
+  const [replayListSnapshot, setReplayListSnapshot] = useState<LiveWatchItem[] | null>(null);
+  const openProductList = (mode: "all" | "featured") => {
+    setReplayListSnapshot(mode === "featured" && replayFeatured.replay ? [...featured.products] : null);
+    setQuery(""); setListMode(mode); setListOpen(true);
+  };
   const [query, setQuery] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
   // 영상을 누르면 유튜브 막대(돌려보기)가 나온다. 막대가 우리 위·아래 띠·채팅에 안 가리게 영상 칸을 띠 사이에만 둔다.
@@ -779,6 +784,8 @@ export default function LiveWatchView(props: Props) {
   //   유튜브 재생 정보(infoDelivery)가 재생 막대와 같은 실시간 허용 범위를 벗어나면 버튼을 띄운다.
   //   실시간 이동은 막대를 끝으로 끌 때처럼 seekTo, 영상 새로고침은 별도 버튼으로 처리한다.
   const [reloadKey, setReloadKey] = useState(0);
+  const replayFeatured = useReplayProductCard({iframe: iframeRef, broadcastId: props.broadcastId || "", videoId, playerKey: reloadKey, paused, enabled: props.widgetEnabled !== false, items});
+  const featured = replayFeatured.replay ? replayFeatured : liveFeatured;
   const liveResume = useLiveResume(iframeRef, `${videoId}:${reloadKey}`);
   const introPlayer = useProductIntroPlayer(iframeRef, videoId, reloadKey, props.introReplay, liveResume.onAction);
   // Dismiss only this banner; keep the replay controller and playback intact.
@@ -902,7 +909,8 @@ export default function LiveWatchView(props: Props) {
     setMuted(false);
   };
 
-  const listItems = useMemo(() => liveWatchList(listMode === "featured" ? featured.products : items, query), [items, featured.products, query, listMode]);
+  const panelProducts = replayListSnapshot ?? featured.products;
+  const listItems = useMemo(() => liveWatchList(listMode === "featured" ? panelProducts : items, query), [items, panelProducts, query, listMode]);
   const totalCount = useMemo(() => items.reduce((n, it) => n + (it.count && it.count > 0 ? it.count : 1), 0), [items]);
   const thumbUrl = (pinned?.imageUrl || items.find((it) => it.pinned)?.imageUrl || items.find((it) => it.imageUrl)?.imageUrl || "");
   const latestToast = orderToasts.length > 0 ? orderToasts[orderToasts.length - 1] : null;
@@ -912,7 +920,7 @@ export default function LiveWatchView(props: Props) {
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
   const desktopChatWidth = "clamp(280px, 35vw, 560px)";
   const videoRight = isDesktop && !focus ? desktopChatWidth : 0;
-  const pinnedProductCard = <LiveFeaturedProductCard product={featured.current} count={featured.products.length} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} />;
+  const pinnedProductCard = <LiveFeaturedProductCard product={featured.current} count={featured.products.length} label={replayFeatured.replay ? "영상 속 상품" : undefined} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} />;
   // 한 벌의 입력 폼을 PC 채팅 아래 또는 폰 쓰기 시트에만 렌더한다.
   const composer = (
           <form
@@ -1531,7 +1539,7 @@ export default function LiveWatchView(props: Props) {
             <div style={{ padding: "8px 8px 8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
                 <span style={{ fontSize: "17px", fontWeight: 700 }}>{listMode === "featured" ? "지금 소개하는 상품" : "방송 상품"}</span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "#707072" }}>{listMode === "featured" ? `${featured.products.length}개` : `총 ${totalCount}개`}</span>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#707072" }}>{listMode === "featured" ? `${panelProducts.length}개` : `총 ${totalCount}개`}</span>
               </span>
               <button type="button" onClick={() => setListOpen(false)} aria-label="닫기" style={{ width: "44px", height: "44px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><IconClose /></button>
             </div>
