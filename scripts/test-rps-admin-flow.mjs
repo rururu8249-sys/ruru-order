@@ -10,7 +10,7 @@ let closed=0;let tree;await act(async()=>{tree=Renderer.create(React.createEleme
 const text=n=>typeof n==='string'?n:Array.isArray(n)?n.map(text).join(''):n?.children?.map(text).join('')??'';
 const button=s=>tree.root.findAllByType('button').find(b=>text(b)===s);
 const label=s=>tree.root.findAllByType('label').find(b=>text(b).startsWith(s));
-assert.ok(button('저장'),'settings has Save before any recruitment');
+assert.ok(button('저장'),'settings has Save before any recruitment');assert.ok(!button('게임 종료'),'termination belongs on main game widget');
 assert.ok(!button('참가자 모집 시작'),'settings cannot start recruitment');
 const points=label('포인트').findByType('input');assert.equal(points.props.value,'1,000');
 await act(async()=>points.props.onChange({target:{value:'10000'}}));assert.equal(label('포인트').findByType('input').props.value,'10,000');

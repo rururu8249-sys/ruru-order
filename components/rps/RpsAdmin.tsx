@@ -66,11 +66,6 @@ function VerifiedRpsAdmin({game,onClose}:RpsAdminProps){
  <small>첫 판 선택 시간은 8초예요. 시간 안에 선택하지 않으면 기권패 처리돼요.</small>
  {fixedPrize&&<small>게임이 시작되어 당첨 인원과 선물은 변경할 수 없어요.</small>}
  </form>
- {active&&<details className="rps-manage"><summary>게임 종료</summary>
-
- {s?.status==='paused'&&<button className="rps-secondary" disabled={busy} onClick={()=>void action('resume')}>멈춘 게임 계속하기</button>}
- <button className="rps-danger" disabled={busy} onClick={()=>{if(window.confirm('게임을 종료하고 화면에서 숨길까요? 진행 중인 판은 취소됩니다.'))void action('close');}}>게임 종료</button>
- </details>}
  <details className="rps-widget-link"><summary>유튜브·PRISM 송출</summary><button onClick={async()=>{try{await navigator.clipboard.writeText(`${location.origin}/event-rps/live`);setCopy('복사했어요');}catch{setCopy(`${location.origin}/event-rps/live`);}}}>관전 위젯 링크 복사</button>{copy&&<small>{copy}</small>}</details>
  </>}
   {tab==='winners'&&<div className="rps-winner-admin"><div className="rps-table-heading"><strong>당첨자 {winnerRows.length}명</strong><button onClick={download} disabled={!winnerRows.length}>엑셀용 저장</button></div>
