@@ -5,12 +5,13 @@ import {createUiLoader} from './admin-ui-test-loader.mjs';
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.document={body:{},activeElement:null,addEventListener(){},removeEventListener(){}};
 globalThis.localStorage={getItem(){return null;}};
-globalThis.window={confirm:()=>true};
+globalThis.window={confirm:()=>true,addEventListener(){},removeEventListener(){}};
+globalThis.location={origin:"https://example.com"};
 const posts=[];
 const catalog={ok:true,videoId:'abcdefghijk',widgetAvailable:true,items:[{productId:'77',detailName:'MC-335',texts:['MC-335'],line:'MC-335',soldOut:false,intro:{seconds:115}},{productId:'78',detailName:'MC-336',texts:['MC-336'],line:'MC-336',soldOut:false,intro:null}]};
 globalThis.fetch=async(url,opts)=>{if(opts?.method==='POST'){posts.push(JSON.parse(opts.body));return {json:async()=>({ok:true,message:'완료'})};}return {json:async()=>catalog};};
-let invalidations=0;
-const load=createUiLoader({'react-dom':{createPortal:node=>node},'@/lib/productIntroCatalogClient':{invalidateProductIntroCatalog:()=>invalidations++}});
+let invalidations=0,verifications=0;
+const load=createUiLoader({'@/lib/useLiveChatPrivate':{chatIdentityHeaders:()=>({}),verifyChatAccount:()=>verifications++},'react-dom':{createPortal:node=>node},'@/lib/productIntroCatalogClient':{invalidateProductIntroCatalog:()=>invalidations++}});
 const {ProductIntroManager}=load('components/customer/ProductIntroManager.tsx');
 let tree;await act(async()=>{tree=Renderer.create(React.createElement(ProductIntroManager,{broadcastId:'bc',onClose(){}}));});
 const buttons=()=>tree.root.findAllByType('button');
@@ -33,3 +34,9 @@ await click('소개영상 등록');assert.equal(captures,1);assert.equal(posts.a
 await click('선택 상품 고정');assert.equal(captures,1,'widget operation does not capture or overwrite intro');
 await act(async()=>tree.unmount());
 console.log('PASS manual/player time, blank numeric editing, confirmed replacement, widget-only isolation');
+
+globalThis.fetch=async()=>({status:403,json:async()=>({ok:false,message:'관리자 로그인 또는 채팅 본인 확인이 필요해요.'})});
+await act(async()=>{tree=Renderer.create(React.createElement(ProductIntroManager,{broadcastId:'bc',onClose(){}}));});
+await click('카카오로 관리자 확인');assert.equal(verifications,1,'authorization failure provides existing verification flow');
+await act(async()=>tree.unmount());
+console.log('PASS expired identity offers verification instead of a dead end');

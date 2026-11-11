@@ -5,7 +5,7 @@ import type { BotCandidate } from "@/lib/liveChatBot";
 import type { ProductIntro, ProductIntroCapture } from "@/lib/productIntro";
 import { searchChatProductGroups, CHAT_PRODUCT_LIMIT } from "@/lib/liveChatProductCommand";
 import { widgetTargetKey } from "@/lib/widgetProductLibrary";
-import { chatIdentityHeaders } from "@/lib/useLiveChatPrivate";
+import { chatIdentityHeaders, verifyChatAccount } from "@/lib/useLiveChatPrivate";
 import { invalidateProductIntroCatalog } from "@/lib/productIntroCatalogClient";
 import { ChatProductThumb } from "./ChatProductThumb";
 
@@ -23,6 +23,7 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
   const [time, setTime] = useState(["", "", ""]);
   const [status, setStatus] = useState("상품을 불러오는 중…");
   const [error, setError] = useState(false);
+  const [needsAuth, setNeedsAuth] = useState(false);
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const alive = useRef(true), saving = useRef(false);
@@ -34,7 +35,7 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
     const controller = new AbortController();
     setCatalog(null); setChosen([]); setStatus("상품을 불러오는 중…"); setError(false);
     void fetch(`/api/live-chat/product-intro/manage?${new URLSearchParams({ bc: broadcastId })}`, { headers: chatIdentityHeaders(), cache: "no-store", signal: controller.signal })
-      .then(async response => { const j = await response.json(); if (!j.ok) throw Error(j.message); return j as Catalog; })
+      .then(async response => { const j = await response.json(); if (!controller.signal.aborted) setNeedsAuth(response.status === 403); if (!j.ok) throw Error(j.message); return j as Catalog; })
       .then(j => { if (!controller.signal.aborted) { setCatalog(j); setStatus(""); } })
       .catch(e => { if (!controller.signal.aborted) { setStatus(e.message || "상품을 불러오지 못했어요."); setError(true); } });
     return () => controller.abort();
@@ -53,6 +54,12 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
     };
     document.addEventListener("keydown", key);
     return () => { document.removeEventListener("keydown", key); previous?.focus(); };
+  }, []);
+  useEffect(() => {
+    const message = (e: MessageEvent) => { if (e.origin === location.origin && e.data?.type === "ruru-chat-verified") setAttempt(v => v + 1); };
+    const storage = (e: StorageEvent) => { if (e.key === "ruru_chat_identity") setAttempt(v => v + 1); };
+    window.addEventListener("message", message); window.addEventListener("storage", storage);
+    return () => { window.removeEventListener("message", message); window.removeEventListener("storage", storage); };
   }, []);
   const selected = catalog?.items.filter(p => chosen.includes(widgetTargetKey(p))) ?? [];
   const filtered = searchChatProductGroups(query, catalog?.items ?? []).flatMap(g => g.items);
@@ -79,6 +86,7 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
       if (introAction && (!point || (mode === "manual" && !validTime))) throw Error("영상 위치를 확인하지 못했어요. 시·분·초를 직접 입력해 주세요.");
       const r = await fetch("/api/live-chat/product-intro/manage", { method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() }, body: JSON.stringify({ bc: broadcastId, videoId: catalog.videoId, targets: selected.map(({productId, detailName}) => ({productId, detailName})), action, capture: point }) });
       const j = await r.json();
+      if (alive.current && r.status === 403) setNeedsAuth(true);
       if (!j.ok) throw Error(j.message || "저장하지 못했어요.");
       if (!alive.current) return;
       setStatus(j.message);
@@ -122,6 +130,7 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
           {catalog && !catalog.widgetAvailable && <p style={{fontSize:12,color:"#666"}}>방송과 상품 위젯을 켜면 사용할 수 있어요.</p>}
         </section>
         {(status || busy) && <p role="status" style={{padding:10,borderRadius:8,background:error?"#fff0f0":"#f2f6f3",color:error?"#b42318":"#18572d",fontSize:13,overflowWrap:"anywhere"}}>{busy?"저장 중…":status}</p>}
+        {needsAuth && <button style={{...button,width:"100%"}} onClick={() => { verifyChatAccount(); setStatus("카카오 확인을 마치면 상품목록을 다시 불러와요."); }}>카카오로 관리자 확인</button>}
         {error && !catalog && <button style={button} onClick={()=>setAttempt(v=>v+1)}>다시 불러오기</button>}
       </div>
     </div>
