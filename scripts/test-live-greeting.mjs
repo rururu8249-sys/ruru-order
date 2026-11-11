@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+let now=100000, seq=0, blocked=false;
+const timers=new Map(), values=new Map(), listeners=new Map();
+const originalNow=Date.now; Date.now=()=>now;
+globalThis.window={localStorage:{getItem:k=>{if(blocked)throw Error('blocked');return values.get(k)??null;},setItem:(k,v)=>{if(blocked)throw Error('blocked');values.set(k,v);}},setTimeout:(f,ms)=>{const id=++seq;timers.set(id,{f,at:now+ms});return id;},clearTimeout:id=>timers.delete(id),addEventListener:(n,f)=>listeners.set(n,f),removeEventListener:(n,f)=>{if(listeners.get(n)===f)listeners.delete(n);}};
+const {useLiveGreeting,LIVE_GREETING_TIMING}=createUiLoader()('lib/useLiveGreeting.ts');
+let result,tree;
+function Probe({id='A',enabled=true}){result=useLiveGreeting(id,enabled);return null;}
+const mount=async(props={})=>act(async()=>{tree=Renderer.create(React.createElement(React.StrictMode,null,React.createElement(Probe,props)));});
+const unmount=async()=>act(async()=>tree.unmount());
+async function advance(ms){await act(async()=>{const end=now+ms;while(true){const due=[...timers].filter(([,v])=>v.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!due)break;now=due[1].at;timers.delete(due[0]);due[1].f();}now=end;});}
+await mount(); assert.equal(result.open,false);
+await advance(LIVE_GREETING_TIMING.delayMs);assert.equal(result.open,true,'first entry shows greeting');
+await advance(LIVE_GREETING_TIMING.visibleMs-1);assert.equal(result.open,true);
+await advance(1);assert.equal(result.open,false,'unused greeting disappears after 10 seconds');
+await advance(3600000);assert.equal(result.open,false,'continuous viewing never repeats greeting');
+await unmount(); await advance(60000);await mount();await advance(2000);assert.equal(result.open,false,'quick re-entry is quiet, even after a long viewing session');
+await unmount();await advance(LIVE_GREETING_TIMING.returnAfterMs);await mount();await advance(1500);assert.equal(result.open,true,'30 minutes outside the viewer permits a new greeting');
+await act(async()=>result.dismiss());assert.equal(result.open,false);await advance(15000);assert.equal(result.open,false,'send/dismiss cancels all timers');
+await unmount();await mount({id:'B'});await act(async()=>result.dismiss());await advance(2000);assert.equal(result.open,false,'chat sent before delayed greeting prevents it opening');
+await unmount();await mount({id:'C',enabled:false});await advance(20000);assert.equal(result.open,false,'read-only viewers have no greeting timers');
+await unmount();await mount({id:'D'});await advance(1500);assert.equal(result.open,true,'new broadcast gets its own first entry');
+await act(async()=>listeners.get('pagehide')?.());await unmount();await mount({id:'D'});await advance(1500);assert.equal(result.open,false,'page reload does not immediately repeat');
+await act(async()=>listeners.get('pagehide')?.());await advance(LIVE_GREETING_TIMING.returnAfterMs);await act(async()=>listeners.get('pageshow')?.({persisted:true}));await advance(1500);assert.equal(result.open,true,'browser back-cache restore respects return cooldown');
+await unmount();blocked=true;await mount({id:'E'});await advance(1500);assert.equal(result.open,true);await advance(10000);assert.equal(result.open,false,'storage failures do not stop expiry');await unmount();
+assert.equal(timers.size,0);assert.equal(listeners.size,0);Date.now=originalNow;
+console.log('PASS greeting: first entry, 10s expiry, 30m since exit, continuous watching, early dismissal, new broadcast, reload, StrictMode, blocked storage and cleanup');
