@@ -143,6 +143,13 @@ export async function POST(request: NextRequest) {
       return jsonError(action === "grant" ? "지급 사유를 입력해주세요." : "차감 사유를 입력해주세요.");
     }
 
+    // RPS rewards are issued by its exact-identity, exactly-once settlement path.
+    if (sourceKey?.startsWith('event_winner:')) {
+      const linked = await supabase.from('rps_players').select('id').eq('winner_id', sourceKey.slice('event_winner:'.length)).limit(1);
+      if (linked.error) return jsonError('이벤트 지급 연결을 확인하지 못했습니다.', 503);
+      if (linked.data?.length) return jsonError('가위바위보 게임의 당첨자 화면에서 보상 처리를 확인해 주세요.', 409);
+    }
+
     const { data, error } = await supabase.rpc("admin_change_customer_points", {
       p_phone: phone, p_action: action, p_amount: amount, p_reason: reason,
       p_admin_memo: adminMemo, p_nickname: youtubeNickname, p_customer_name: customerName,
