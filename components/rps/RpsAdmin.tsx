@@ -6,7 +6,7 @@ import {chatIdentityHeaders} from '@/lib/useLiveChatPrivate';
 import './rps.css';
 type HistoryRoom={id:string;title:string;status:string;revision:number;created_at:string;is_test:boolean;reward_kind:string;points:number;gift:string};
 const draftOf=(s:RpsState|null,config:RpsConfig)=>s?.id&&s.status!=='closed'?{title:s.title,winners:s.target,rewardKind:s.rewardKind,points:s.points,gift:s.gift,joinSeconds:s.joinSeconds,pickSeconds:s.round===1?config.pickSeconds:s.pickSeconds,auto:s.auto}:config;
-type RpsAdminProps={game:RpsController;onClose:()=>void;broadcastId?:string};
+type RpsAdminProps={game:RpsController;onClose:()=>void;onSaved?:()=>void;broadcastId?:string};
 // A client-side owner badge is only a navigation hint. Server verification gates
 // all settings, winner details and API actions, including after account changes.
 export function RpsAdmin(props:RpsAdminProps){
@@ -24,7 +24,7 @@ export function RpsAdmin(props:RpsAdminProps){
   </div>
  </div>;
 }
-function VerifiedRpsAdmin({game,onClose}:RpsAdminProps){
+function VerifiedRpsAdmin({game,onClose,onSaved}:RpsAdminProps){
  const [tab,setTab]=useState<'settings'|'winners'>('settings');
  const [draft,setDraft]=useState<RpsConfig>(RPS_DEFAULT_CONFIG),[dirty,setDirty]=useState(false);
  const [copy,setCopy]=useState(''),[formError,setFormError]=useState('');
@@ -44,7 +44,7 @@ function VerifiedRpsAdmin({game,onClose}:RpsAdminProps){
   if(dirty&&baseTarget.current!==(active?s?.id:'setup')){setFormError('게임 상태가 바뀌었어요. 설정을 다시 열어 확인해 주세요.');return;}
   const expected=dirty?baseRevision.current:active?s?.revision||0:setup?.revision||0;
   const data=fixedPrize?{auto:form.auto,pickSeconds:form.pickSeconds,title:form.title}:{...form,points:form.rewardKind==='points'?form.points:1000};
-  if(await action(active?'settings':'saveSetup',{...data,...(active?{_expectedRevision:expected,_roomId:s?.id}:{setupRevision:expected})})){setDirty(false);onClose();}
+  if(await action(active?'settings':'saveSetup',{...data,...(active?{_expectedRevision:expected,_roomId:s?.id}:{setupRevision:expected})})){setDirty(false);onSaved?.();onClose();}
  };
  const download=()=>{const quote=(v:string)=>'"'+(/^[=+@\-\t\r]/.test(v)?"'"+v:v).replaceAll('"','""')+'"';const text='\ufeff번호,닉네임,선물,처리 상태\r\n'+winnerRows.map((w,i)=>[String(i+1),quote(w.nickname),quote(rewardKind==='points'?`${rewardPoints.toLocaleString()}P`:rewardGift),quote(RPS_REWARD_STATUS[w.reward_status]||w.reward_status)].join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='루루-가위바위보-당첨자.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  return <div className="rps-backdrop" onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div ref={dialog} className="rps-admin" role="dialog" aria-modal="true" aria-label="가위바위보 관리자" onKeyDown={e=>{if(e.key==='Escape')onClose();if(e.key==='Tab'){const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),summary,a[href]')||[]);const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}}>

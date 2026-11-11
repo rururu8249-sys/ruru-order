@@ -7,7 +7,7 @@ const config={title:s.title,winners:10,points:1000,rewardKind:'points',gift:'',j
 const base={state:s,setup:{revision:2,config},admin:false,verified:true,player:null,now:Date.now(),winners:[],busy:false,error:'',action:async(name,data)=>calls.push({name,data}),verify:()=>verifiedCalls++};
 const text=n=>typeof n==='string'?n:Array.isArray(n)?n.map(text).join(''):n?.children?.map(text).join('')??'';
 const button=label=>tree.root.findAllByType('button').find(b=>text(b)===label);
-const render=async(game=base,publicOnly=false)=>act(async()=>{if(tree)tree.update(React.createElement(RpsWidget,{game,publicOnly,broadcastId:'broadcast',onAdmin(){}}));else tree=Renderer.create(React.createElement(RpsWidget,{game,publicOnly,broadcastId:'broadcast',onAdmin(){}}));});
+const render=async(game=base,publicOnly=false,showSetup=false)=>act(async()=>{if(tree)tree.update(React.createElement(RpsWidget,{game,publicOnly,showSetup,broadcastId:'broadcast',onAdmin(){}}));else tree=Renderer.create(React.createElement(RpsWidget,{game,publicOnly,showSetup,broadcastId:'broadcast',onAdmin(){}}));});
 try{
  for(const [seconds,label] of [[300,'5분 00초'],[299,'4분 59초'],[60,'1분 00초'],[59,'0분 59초'],[0,'0분 00초']]){
   await render({...base,now:Date.parse(s.deadline)-seconds*1000});
@@ -34,7 +34,8 @@ try{
  await render({...base,state:choosing,player:{...player,alive:false}});assert.ok(!button('✌️가위'));assert.match(text(tree.toJSON()),/탈락/);
  await render({...base,state:choosing,player:null});assert.ok(!button('✌️가위'));assert.match(text(tree.toJSON()),/관전 중/);
  await render({...base,state:choosing},true);assert.equal(tree.root.findAllByType('button').length,0);
- await render({...base,admin:true,state:{...s,status:'closed'}});assert.ok(button('참가자 모집 시작'));assert.ok(button('연습 게임 시작'));await act(async()=>button('참가자 모집 시작').props.onClick());assert.deepEqual(calls.at(-1).data,{setupRevision:2,broadcastId:'broadcast',test:false});
+ await render({...base,admin:true,state:{...s,status:'closed'}});assert.equal(tree.toJSON(),null,'closing hides the widget even with saved admin setup');
+ await render({...base,admin:true,state:{...s,status:'closed'}},false,true);assert.ok(button('참가자 모집 시작'));assert.ok(button('연습 게임 시작'));await act(async()=>button('참가자 모집 시작').props.onClick());assert.deepEqual(calls.at(-1).data,{setupRevision:2,broadcastId:'broadcast',test:false});
  await render({...base,state:{...s,status:'closed'}});assert.equal(tree.toJSON(),null);
  await render({...base,state:{...s,status:'finished',winners:Array.from({length:10},(_,i)=>({id:String(i),nickname:'당첨'+i}))}});assert.equal(tree.root.findByProps({'aria-label':'당첨자 명단'}).findAllByType('div').length,11);
  console.log('PASS participant/admin/spectator/YouTube, manual immediate start, forfeited spectator, saved setup start, 10 winners');

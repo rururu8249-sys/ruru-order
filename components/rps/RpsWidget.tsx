@@ -4,7 +4,7 @@ import {RPS_HANDS,RPS_ICON,RPS_LABEL,RPS_RESULT,rpsRemaining,type RpsHand} from 
 import type {RpsController} from './useRpsGame';
 import {useRpsAudio} from './useRpsAudio';
 import './rps.css';
-export function RpsWidget({game,publicOnly=false,onAdmin,broadcastId}:{game:RpsController;publicOnly?:boolean;onAdmin?:()=>void;broadcastId?:string}){
+export function RpsWidget({game,publicOnly=false,onAdmin,broadcastId,showSetup=false}:{game:RpsController;publicOnly?:boolean;onAdmin?:()=>void;broadcastId?:string;showSetup?:boolean}){
  const {state:s,player:p,now,busy,action}=game;const {sound,toggle}=useRpsAudio(s,publicOnly);
  const cardRef=useRef<HTMLElement>(null);
  useEffect(()=>{if(cardRef.current)cardRef.current.scrollTop=0;},[s?.status,s?.round]);
@@ -12,7 +12,7 @@ export function RpsWidget({game,publicOnly=false,onAdmin,broadcastId}:{game:RpsC
  useEffect(()=>{if(s?.status!=='choosing')return;const timer=setInterval(()=>setAnimated(i=>(i+1)%3),170);return()=>clearInterval(timer);},[s?.status]);
  useEffect(()=>{if(!publicOnly||s?.status!=='finished'||s.winners.length<=10)return;const timer=setInterval(()=>setPage(i=>(i+1)%Math.ceil(s.winners.length/10)),5000);return()=>clearInterval(timer);},[publicOnly,s?.status,s?.winners.length]);
  if(!s?.id||s.status==='closed'){
-  if(publicOnly||!game.admin||!game.setup?.revision)return null;
+  if(publicOnly||!showSetup||!game.admin||!game.setup?.revision)return null;
   const config=game.setup.config;
   return <section className="rps-card rps-ready" aria-label="가위바위보 게임"><header className="rps-heading"><div><span className="rps-kicker">관리자 · 모집 전</span><strong>{config.title}</strong></div></header><div className="rps-prize">{config.rewardKind==='points'?`${config.points.toLocaleString()}P`:config.rewardKind==='gift'?config.gift:'선물 없음'} · 당첨 {config.winners.toLocaleString()}명</div><button className="rps-primary" disabled={busy} onClick={()=>void action('create',{setupRevision:game.setup?.revision,broadcastId,test:false})}>참가자 모집 시작</button><button className="rps-secondary" disabled={busy} onClick={()=>void action('create',{setupRevision:game.setup?.revision,broadcastId,test:true})}>연습 게임 시작</button>{game.error&&<p className="rps-error" role="alert">{game.error}</p>}{onAdmin&&<button className="rps-admin-shortcut" onClick={onAdmin}>게임 설정</button>}</section>;
  }

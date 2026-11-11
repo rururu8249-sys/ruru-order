@@ -498,7 +498,10 @@ export default function LiveWatchView(props: Props) {
   const [chatHint, setChatHint] = useState("");
   const rps = useRpsGame();
   const [rpsAdminOpen, setRpsAdminOpen] = useState(false);
-  const rpsActive = (!!rps.state?.id && rps.state.status !== 'closed' && (!rps.state.broadcastId || rps.state.broadcastId === props.broadcastId)) || (rps.admin && !!rps.setup?.revision && (!rps.state?.id || rps.state.status === 'closed'));
+  const [rpsLaunchKey, setRpsLaunchKey] = useState<string | null>(null);
+  const rpsSetupKey = `${rps.state?.id ?? 'none'}:${rps.state?.revision ?? 0}`;
+  const rpsShowSetup = rpsLaunchKey === rpsSetupKey;
+  const rpsActive = (!!rps.state?.id && rps.state.status !== 'closed' && (!rps.state.broadcastId || rps.state.broadcastId === props.broadcastId)) || (rpsShowSetup && rps.admin && !!rps.setup?.revision && (!rps.state?.id || rps.state.status === 'closed'));
   const rpsOverlayRef = useRef<HTMLDivElement>(null);
   const [rpsOverlayBottom, setRpsOverlayBottom] = useState(0);
   useEffect(() => {
@@ -1375,8 +1378,8 @@ export default function LiveWatchView(props: Props) {
         {isDesktop && chat?.canWrite && !focus ? composer : null}
       </div>
 
-      {rpsActive && !focus && <div ref={rpsOverlayRef} data-live-rps-overlay className="rps-live-overlay" style={{left:isDesktop?16:12,right:isDesktop?videoRight:12,paddingRight:isDesktop?16:0}}><RpsWidget key={rps.state?.id} game={rps} broadcastId={props.broadcastId} onAdmin={() => setRpsAdminOpen(true)}/></div>}
-      {rpsAdminOpen && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onClose={() => setRpsAdminOpen(false)}/>}
+      {rpsActive && !focus && <div ref={rpsOverlayRef} data-live-rps-overlay className="rps-live-overlay" style={{left:isDesktop?16:12,right:isDesktop?videoRight:12,paddingRight:isDesktop?16:0}}><RpsWidget key={rps.state?.id} game={rps} showSetup={rpsShowSetup} broadcastId={props.broadcastId} onAdmin={() => setRpsAdminOpen(true)}/></div>}
+      {rpsAdminOpen && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onSaved={() => { if (!rps.state?.id || rps.state.status === 'closed') setRpsLaunchKey(rpsSetupKey); }} onClose={() => setRpsAdminOpen(false)}/>}
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
       <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>

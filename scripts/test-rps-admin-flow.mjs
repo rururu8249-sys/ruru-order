@@ -6,7 +6,7 @@ globalThis.document={activeElement:null};globalThis.window={confirm:()=>true};
 const calls=[];const defaults={title:'가위·바위·보 루루를 이겨라!',winners:1,rewardKind:'points',points:1000,gift:'',joinSeconds:300,pickSeconds:5,auto:true};
 const game={state:null,admin:true,verified:true,winners:[],error:'',busy:false,now:Date.now(),setup:{revision:0,config:defaults},refresh:async()=>{},action:async(name,data)=>{calls.push({name,data});if(name==='saveSetup')game.setup={revision:1,config:{...data}};return true;}};
 const {RpsAdmin}=createUiLoader({'./rps.css':{}})('components/rps/RpsAdmin.tsx');
-let closed=0;let tree;await act(async()=>{tree=Renderer.create(React.createElement(RpsAdmin,{game,onClose(){closed++;},broadcastId:'A'}));});
+let closed=0,saved=0;let tree;await act(async()=>{tree=Renderer.create(React.createElement(RpsAdmin,{game,onClose(){closed++;},onSaved(){saved++;},broadcastId:'A'}));});
 const text=n=>typeof n==='string'?n:Array.isArray(n)?n.map(text).join(''):n?.children?.map(text).join('')??'';
 const button=s=>tree.root.findAllByType('button').find(b=>text(b)===s);
 const label=s=>tree.root.findAllByType('label').find(b=>text(b).startsWith(s));
@@ -17,7 +17,8 @@ await act(async()=>points.props.onChange({target:{value:'10000'}}));assert.equal
 assert.match(text(tree.toJSON()),/무작위/);
 await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
 assert.deepEqual(calls.map(c=>c.name),['saveSetup']);assert.equal(calls[0].data.points,10000);
-assert.equal(closed,1,'save closes settings and returns to broadcast game screen');
+assert.equal(closed,1,'save closes settings and returns to broadcast game screen');assert.equal(saved,1,'explicit save prepares the launch screen');
+await act(async()=>tree.root.findByProps({'aria-label':'관리 설정 닫기'}).props.onClick());assert.equal(saved,1,'X does not prepare a game');
 assert.ok(!button('참가자 모집 시작'),'settings never duplicates recruitment controls');
 assert.ok(tree.root.findByProps({'aria-label':'모집 시간 분'}));assert.ok(tree.root.findByProps({'aria-label':'모집 시간 초'}));
 assert.ok(!text(tree.toJSON()).includes('한 분당 포인트'));assert.ok(!text(tree.toJSON()).includes('루루의 손'));
