@@ -771,6 +771,9 @@ export default function LiveWatchView(props: Props) {
   const [reloadKey, setReloadKey] = useState(0);
   const liveResume = useLiveResume(iframeRef, `${videoId}:${reloadKey}`);
   const introPlayer = useProductIntroPlayer(iframeRef, videoId, reloadKey, props.introReplay, liveResume.onAction);
+  // Dismiss only this banner; keep the replay controller and playback intact.
+  const [dismissedIntroKey, setDismissedIntroKey] = useState<number | null>(null);
+  const showIntroBanner = Boolean(props.introReplay && props.introReplay.key !== dismissedIntroKey);
   // Each entry/new player starts muted. Dismiss the large prompt only after
   // this iframe confirms unmute; a later deliberate mute keeps just the icon.
   useEffect(() => {
@@ -1098,9 +1101,12 @@ export default function LiveWatchView(props: Props) {
           onHold={(hold) => { if (hold) clearSeekTimer(); else restartSeekTimer(); }}
         />
       ) : null}
-      {props.introReplay ? (
+      {props.introReplay && showIntroBanner ? (
         <div data-product-intro-replay style={{ position: "absolute", top: "calc(84px + env(safe-area-inset-top))", left: 12, right: 12, margin: "0 auto", maxWidth: 440, borderRadius: 14, background: "rgba(17,17,17,0.92)", padding: 12, zIndex: 3, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13, color: "#FFFFFF" }}>
-          <div data-product-intro-summary style={{ flex: "1 1 100%", minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
+          <button type="button" aria-label="소개영상 배너 닫기" title="배너만 닫기 · 영상은 계속 재생" onClick={() => setDismissedIntroKey(props.introReplay!.key)} style={{ position: "absolute", top: 6, right: 6, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 10, background: "transparent", color: "#FFFFFF", cursor: "pointer" }}>
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+          <div data-product-intro-summary style={{ flex: "1 1 100%", minWidth: 0, paddingRight: 38, display: "flex", alignItems: "center", gap: 10 }}>
             {props.introReplay.imageUrl ? <img key={props.introReplay.imageUrl} data-product-intro-photo src={props.introReplay.imageUrl} alt={props.introReplay.name} width={44} height={44} onError={event => { event.currentTarget.style.display = "none"; }} style={{ width: 44, height: 44, flexShrink: 0, objectFit: "contain", borderRadius: 8, background: "#FFFFFF" }} /> : null}
             <div style={{ minWidth: 0, flex: 1, lineHeight: 1.5 }}>
               <div title={props.introReplay.name} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 700 }}>{props.introReplay.name}</div>
@@ -1162,7 +1168,7 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {!soundPromptDone && !guideOpen ? (
-        <div style={{ position: "absolute", left: "16px", right: "16px", top: props.introReplay ? "max(calc(232px + env(safe-area-inset-top)), 25%)" : "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
+        <div style={{ position: "absolute", left: "16px", right: "16px", top: showIntroBanner ? "max(calc(232px + env(safe-area-inset-top)), 25%)" : "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
           <button type="button" aria-label="방송 소리 켜기" onClick={turnSoundOn}
             style={{ minWidth: "192px", minHeight: "60px", padding: "12px 24px", border: "1px solid rgba(255,255,255,0.7)", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", boxShadow: "0 4px 24px rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "10px", fontSize: "20px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", pointerEvents: "auto" }}>
             <IconSoundOn color="#111111" />소리 켜기
@@ -1172,7 +1178,7 @@ export default function LiveWatchView(props: Props) {
 
       {/* 돌려보는 중 → 지금 방송으로 */}
       {/* 실시간 스트림으로 건너뛰기 — 유튜브 라이브처럼 오른쪽 아래 흰 알약(돌려보기 중에도 보임) */}
-      {!props.introReplay && (behindLive || liveResume.needsTap) ? (
+      {!showIntroBanner && (behindLive || liveResume.needsTap) ? (
         <button type="button" onClick={backToLive} style={{ position: "absolute", right: "12px", bottom: "calc(140px + env(safe-area-inset-bottom))", height: "40px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", zIndex: 2, boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
           <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="#111111"><path d="M0 0l8 7-8 7zM9 0l8 7-8 7z" /></svg>{liveResume.needsTap ? "눌러서 실시간 방송 재생" : "실시간 스트림으로 건너뛰기"}
         </button>
