@@ -48,6 +48,14 @@ res=await route.GET(request({token:modToken}));body=await res.json();
 assert.equal(body.canReviewDeleted,true);assert.equal(body.deletedMessages.length,1);assert.equal(body.deletedMessages[0].body,'original-3');assert.equal(body.deletedMessages[0].deletedByAuthor,true);
 assert.ok(!JSON.stringify(body).includes('kakao_id'));assert.match(res.headers.get('cache-control'),/private, no-store/);
 admin=true;res=await route.GET(request({noAuth:true}));assert.equal((await res.json()).canReviewDeleted,true);admin=false;
+rows.push(row(5,'123456','command'),row(6,'999999','command'));
+res=await route.GET(request());body=await res.json();
+assert.deepEqual(body.commandMessages.map(m=>m.id),[5],'only the verified author recovers command history');
+assert.equal(body.commandMessages[0].body,'original-5');
+res=await route.GET(request({token:modToken}));body=await res.json();
+assert.deepEqual(body.commandMessages.map(m=>m.id),[5],'moderator cannot read another admin command');
+admin=true;res=await route.GET(request({noAuth:true}));body=await res.json();
+assert.deepEqual(body.commandMessages,[],'admin cookie alone has no command author identity');admin=false;
 for(const options of [{noAuth:true},{kid:'999999'},{nonce:'forged'},{id:2},{id:9000000000001},{origin:'https://evil.test'}]) {
   writes=[];res=await route.DELETE(request(options));assert.ok(res.status>=400);assert.equal(writes.length,0);
 }

@@ -625,7 +625,7 @@ export default function LiveWatchView(props: Props) {
     if (!r.ok) setChatHint(r.message || "못 보냈어요.");
   };
   const startPress = (m: LiveChatMessage) => {
-    if (m.deletedByAuthor || (!chat?.canModerate && !chat?.ownIds?.includes(m.id))) return;
+    if (m.deletedByAuthor || m.privateCommand || (!chat?.canModerate && !chat?.ownIds?.includes(m.id))) return;
     if (pressTimer.current) window.clearTimeout(pressTimer.current);
     pressTimer.current = window.setTimeout(() => {
       if (chat?.canModerate) setModTarget(m);
@@ -1193,8 +1193,8 @@ export default function LiveWatchView(props: Props) {
             {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
               const localLine = !Number.isInteger(m.id);
-              const canMod = chat.canModerate && !localLine && !m.deletedByAuthor;
-              const canPress = canMod || (!m.deletedByAuthor && Boolean(chat.ownIds?.includes(m.id)));
+              const canMod = chat.canModerate && !localLine && !m.deletedByAuthor && !m.privateCommand;
+              const canPress = canMod || (!m.deletedByAuthor && !m.privateCommand && Boolean(chat.ownIds?.includes(m.id)));
               const botProduct = m.badge === "bot" && !m.deletedByAuthor ? parseBotRef(m.botRef) : null;
               return (
               <div
@@ -1221,6 +1221,7 @@ export default function LiveWatchView(props: Props) {
                 <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
                 <span style={{ minWidth: 0, flex: 1, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: 12, color: "#ccc", marginBottom: 3 }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
+                  {m.privateCommand ? <span style={{ display: "block", fontSize: 12, color: "#a8c7fa", marginBottom: 3 }}>나만 보이는 명령어</span> : null}
                   {/* [12:54 사장님 「유튜브랑 똑같이」] 사장님 유튜브 캡처에서 잰 값: 닉네임 흐린 흰색(약 80%)·보통 굵기, 글 흰색·보통 굵기 */}
                   {/* [13:44 사장님 「닉네임만 연한 색」] 닉네임만 사람마다 정해진 색을 흰색과 반쯤 섞은 연한 색(글은 흰색 그대로), 루루동이 안내는 흐린 흰색 */}
                   <span style={{ fontWeight: chatView.bold ? 700 : 400, color: m.badge === "bot" ? "rgba(255,255,255,0.8)" : softNickColor(color) }}>{m.nickname}</span>
@@ -1430,7 +1431,7 @@ export default function LiveWatchView(props: Props) {
             }
           }} style={{ position: "absolute", left: chatMenu.x, top: chatMenu.y, width: "220px", padding: "6px", boxSizing: "border-box", border: "1px solid #555", borderRadius: "12px", background: "#272727", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
             <button autoFocus type="button" onClick={() => void copyChatMessage()} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>글 복사하기</button>
-            {!chatMenu.message.deletedByAuthor && chat?.ownIds?.includes(chatMenu.message.id) && chat.onDeleteOwn ? <button type="button" onClick={async () => { const id = chatMenu.message.id; closeChatMenu(); const r = await chat.onDeleteOwn!(id); setChatHint(r.message || (r.ok ? "내 글을 삭제했어요." : "삭제하지 못했어요.")); }} style={{ width: "100%", minHeight: 44, border: 0, borderRadius: 8, background: "transparent", color: "#ffb4b4", textAlign: "left", padding: "10px 12px", fontSize: 15 }}>내 글 삭제하기</button> : null}
+            {!chatMenu.message.deletedByAuthor && !chatMenu.message.privateCommand && chat?.ownIds?.includes(chatMenu.message.id) && chat.onDeleteOwn ? <button type="button" onClick={async () => { const id = chatMenu.message.id; closeChatMenu(); const r = await chat.onDeleteOwn!(id); setChatHint(r.message || (r.ok ? "내 글을 삭제했어요." : "삭제하지 못했어요.")); }} style={{ width: "100%", minHeight: 44, border: 0, borderRadius: 8, background: "transparent", color: "#ffb4b4", textAlign: "left", padding: "10px 12px", fontSize: 15 }}>내 글 삭제하기</button> : null}
             {chatMenu.canManage ? <button type="button" onClick={() => { setModTarget(chatMenu.message); setBanConfirm(false); setChatMenu(null); }} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>채팅 관리</button> : null}
           </div>
         </div>

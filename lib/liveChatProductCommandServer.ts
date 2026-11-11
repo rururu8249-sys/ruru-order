@@ -79,10 +79,10 @@ export async function runChatProductCommand(sb: SupabaseClient, bc: string, quer
   const unpin = await sb.from("broadcasts").update({ widget_pin_mode: "auto", widget_pin_product_id: null, widget_pin_detail_name: null })
     .eq("id", bc).eq("status", "ON").select("id").maybeSingle();
   if (unpin.error || !unpin.data) throw new Error("순환 목록은 저장했지만 방송 화면에 반영하지 못했어요. 방송 상태를 확인한 뒤 다시 입력해 주세요.");
-  // Both chat rows are one insert: record the moderator's command (existing rate
-  // limit/audit) and send the guide even if the automatic bot cooldown is active.
+  // The command is private from the moment it is inserted: public realtime
+  // redacts hidden rows. Keep the audit/rate-limit row and the public guide.
   const posted = await sb.from("live_chat_messages").insert([
-    { ...author, ...(selected ? { body: `/${product.texts[0] || product.detailName}`.slice(0, 100) } : {}), broadcast_id: bc },
+    { ...author, ...(selected ? { body: `/${product.texts[0] || product.detailName}`.slice(0, 100) } : {}), broadcast_id: bc, hidden_at: new Date().toISOString(), hidden_by: "command", pinned_at: null },
     { broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body: productBotText(product), badge: "bot", bot_ref: botRefOfProduct(product) },
   ]).select(columns);
   if (posted.error || !posted.data?.length) throw new Error("위젯은 변경됐지만 채팅 안내를 보내지 못했어요. 다시 입력하면 안내도 보낼 수 있어요.");

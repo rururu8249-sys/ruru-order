@@ -20,18 +20,20 @@ export async function GET(request: NextRequest) {
     if (!identity && !admin) return fail("내 글 삭제와 삭제글 확인은 카카오 본인 확인 후 사용할 수 있어요.", 401);
     const sb = getServiceClient();
     const role = admin ? { isMod: true } : await verifiedChatRole(sb, identity);
-    const [own, deleted, hidden] = await Promise.all([
+    const [own, deleted, hidden, commands] = await Promise.all([
       identity ? sb.from("live_chat_messages").select("id").eq("broadcast_id", bc).eq("kakao_id", identity.sub).is("hidden_at", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
       role.isMod ? sb.from("live_chat_messages").select(columns).eq("broadcast_id", bc).eq("hidden_by", "author").not("hidden_at", "is", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
       sb.from("live_chat_messages").select("id").eq("broadcast_id", bc).not("hidden_at", "is", null).order("id", { ascending: false }).limit(200),
+      identity ? sb.from("live_chat_messages").select(columns).eq("broadcast_id", bc).eq("kakao_id", identity.sub).eq("hidden_by", "command").not("hidden_at", "is", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
     ]);
-    if (own.error || deleted.error || hidden.error) return fail("채팅 권한 정보를 불러오지 못했어요.", 503);
+    if (own.error || deleted.error || hidden.error || commands.error) return fail("채팅 권한 정보를 불러오지 못했어요.", 503);
     // Only this authenticated response may contain original deleted bodies.
     const deletedMessages = (deleted.data ?? []).map(row => {
       const message = parseChatMessage({ ...row, hidden_at: null, pinned_at: null });
       return message ? { ...message, deletedByAuthor: true } : null;
     }).filter(Boolean);
-    return json({ ok: true, verified: Boolean(identity), canReviewDeleted: role.isMod, ownIds: (own.data ?? []).map(r => r.id), hiddenIds: (hidden.data ?? []).map(r => r.id), deletedMessages });
+    const commandMessages = (commands.data ?? []).map(row => parseChatMessage({ ...row, hidden_at: null, pinned_at: null })).filter(Boolean);
+    return json({ ok: true, verified: Boolean(identity), canReviewDeleted: role.isMod, ownIds: (own.data ?? []).map(r => r.id), hiddenIds: (hidden.data ?? []).map(r => r.id), deletedMessages, commandMessages });
   } catch { return fail("채팅 권한을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.", 503); }
 }
 

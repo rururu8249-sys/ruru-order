@@ -341,7 +341,7 @@ export default function ChatViewClient() {
           ) : privateChat.displayMessages.length === 0 ? (
             <div style={{ padding: "24px", textAlign: "center", color: C.mute, fontSize: "18px" }}>아직 글이 없어요. 손님이 쓰면 바로 나와요.</div>
           ) : privateChat.displayMessages.map((m) => {
-            const isNew = !m.deletedByAuthor && recent.some((r) => r.id === m.id);
+            const isNew = !m.deletedByAuthor && !m.privateCommand && recent.some((r) => r.id === m.id);
             const b = m.badge ? BADGE[m.badge] : null;
             const avatar = m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar;
             return (
@@ -354,6 +354,7 @@ export default function ChatViewClient() {
                 )}
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
+                  {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
                   <span style={{ fontWeight: 700, color: "#C2C2C2", marginRight: "8px" }}>{m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}

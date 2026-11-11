@@ -144,6 +144,8 @@ export type LiveChatMessage = {
   botRef: string;
   /** Private, authenticated response only; never parsed from public realtime. */
   deletedByAuthor?: boolean;
+  /** Sender receipt/private author history only; never parsed from public realtime. */
+  privateCommand?: boolean;
 };
 
 /** 서버 줄 또는 소식(Broadcast) → 화면용 글. 모양이 이상하면 null. */

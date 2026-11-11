@@ -124,7 +124,8 @@ export async function POST(request: NextRequest) {
       if (bcRow.widget_card_enabled === false) return fail("방송 관리에서 상품 위젯을 먼저 켜 주세요.");
       try {
         const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null }, target ?? undefined);
-        return NextResponse.json({ ok: true, message: parseChatMessage(message) });
+        // Only the sender receives this receipt; public history/events retain the hidden flag.
+        return NextResponse.json({ ok: true, privateCommand: true, message: parseChatMessage({ ...message, hidden_at: null, pinned_at: null }) }, { headers: { "Cache-Control": "private, no-store" } });
       } catch (error) {
         return fail(error instanceof Error ? error.message : "상품 순환을 변경하지 못했어요.");
       }

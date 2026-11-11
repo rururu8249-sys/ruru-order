@@ -54,6 +54,10 @@ reset();mod=false;picked=await send('/',{productId:'77',detailName:'MC-335 아�
 reset();
 let result=await send('/335');
 assert.equal(result.ok,true);assert.equal(result.message.body,'/335');
+assert.equal(result.privateCommand,true,'command receipt must be explicitly private');
+assert.equal(writes[2].value[0].hidden_by,'command');
+assert.ok(writes[2].value[0].hidden_at,'command is hidden before the realtime insert event');
+assert.equal(writes[2].value[1].hidden_at,undefined,'product guide stays public');
 assert.deepEqual(writes.map(w=>w.table),['settings','broadcasts','live_chat_messages']);
 assert.deepEqual(JSON.parse(writes[0].value.value),{mode:'selected',paused:false,targets:[{productId:'77',detailName:'MC-335 아이보리'}]});
 assert.equal(writes[0].value.key,`widget_rotation_${bc}`);
