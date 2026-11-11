@@ -43,7 +43,7 @@ function VerifiedRpsAdmin({game,onClose}:RpsAdminProps){
  const save=async()=>{
   if(dirty&&baseTarget.current!==(active?s?.id:'setup')){setFormError('게임 상태가 바뀌었어요. 설정을 다시 열어 확인해 주세요.');return;}
   const expected=dirty?baseRevision.current:active?s?.revision||0:setup?.revision||0;
-  const data=fixedPrize?{auto:form.auto,pickSeconds:form.pickSeconds,title:form.title}:{...form,points:form.rewardKind==='points'?form.points:form.points||1000};
+  const data=fixedPrize?{auto:form.auto,pickSeconds:form.pickSeconds,title:form.title}:{...form,points:form.rewardKind==='points'?form.points:1000};
   if(await action(active?'settings':'saveSetup',{...data,...(active?{_expectedRevision:expected,_roomId:s?.id}:{setupRevision:expected})})){setDirty(false);onClose();}
  };
  const download=()=>{const quote=(v:string)=>'"'+(/^[=+@\-\t\r]/.test(v)?"'"+v:v).replaceAll('"','""')+'"';const text='\ufeff번호,닉네임,선물,처리 상태\r\n'+winnerRows.map((w,i)=>[String(i+1),quote(w.nickname),quote(rewardKind==='points'?`${rewardPoints.toLocaleString()}P`:rewardGift),quote(RPS_REWARD_STATUS[w.reward_status]||w.reward_status)].join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='루루-가위바위보-당첨자.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
