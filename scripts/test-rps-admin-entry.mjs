@@ -19,6 +19,7 @@ const load=createUiLoader({
  '@/lib/useLiveResume':{useLiveResume:()=>({onAction:blank,returnToLive:blank})},
  '@/lib/useProductIntroPlayer':{useProductIntroPlayer:()=>({})},
  '@/lib/productIntroCatalogClient':{loadProductIntroCatalog:async()=>[],invalidateProductIntroCatalog:blank},
+ '@/components/rps/RpsWidget':{RpsWidget:()=>React.createElement('div',{'data-test-rps':true},'game')},
  '@/components/rps/useRpsGame':{useRpsGame:()=>game},
  './rps.css':{},
 });
@@ -44,5 +45,12 @@ game.admin=false;
 await act(async()=>tree.update(React.createElement(View,{...props,chat:{...props.chat,canGrant:false}})));
 await act(async()=>button('더보기').props.onClick());
 assert.ok(!button('게임 · 가위바위보'),'ordinary customer or chat-only moderator has no game admin entry');
+await act(async()=>tree.update(React.createElement(View,{...props,paused:true,pausedText:'방송 휴식 안내'})));
+assert.ok(text(tree.toJSON()).includes('방송 휴식 안내'));
+game.state={id:'room',broadcastId:'A',status:'lobby'};
+await act(async()=>tree.update(React.createElement(View,{...props,paused:true,pausedText:'방송 휴식 안내'})));
+assert.ok(!text(tree.toJSON()).includes('방송 휴식 안내'),'central notice cannot bleed through game');
+assert.equal(tree.root.findAllByProps({'aria-label':'방송 소리 켜기'}).length,0,'central sound prompt hidden behind game');
+assert.equal(tree.root.findAllByProps({'aria-label':'소리 켜기'}).length,1,'top sound control remains available');
 await act(async()=>tree.unmount());
 console.log('PASS owner menu, gated verification, automatic admin view, ordinary/mod hidden, duplicate identity removed');

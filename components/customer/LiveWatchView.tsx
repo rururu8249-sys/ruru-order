@@ -1198,7 +1198,7 @@ export default function LiveWatchView(props: Props) {
           </div>
       </div>
 
-      {!soundPromptDone && !guideOpen ? (
+      {!soundPromptDone && !guideOpen && !(rpsActive && !focus) ? (
         <div style={{ position: "absolute", left: "16px", right: "16px", top: showIntroBanner ? "max(calc(232px + env(safe-area-inset-top)), 25%)" : "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
           <button type="button" aria-label="방송 소리 켜기" onClick={turnSoundOn}
             style={{ minWidth: "192px", minHeight: "60px", padding: "12px 24px", border: "1px solid rgba(255,255,255,0.7)", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", boxShadow: "0 4px 24px rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "10px", fontSize: "20px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", pointerEvents: "auto" }}>
@@ -1216,7 +1216,7 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 잠시 쉬는 중 — 주문은 그대로 */}
-      {paused ? (
+      {paused && !(rpsActive && !focus) ? (
         <div role="status" style={{ position: "absolute", left: "16px", right: "16px", top: "40%", textAlign: "center", pointerEvents: "none", opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
           <span style={{ display: "inline-block", padding: "12px 18px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "15px", fontWeight: 600, lineHeight: 1.5 }}>
             {pausedText}<br /><span style={{ fontSize: "13px", fontWeight: 400, color: "#E5E5E5" }}>상품은 지금도 담을 수 있어요</span>

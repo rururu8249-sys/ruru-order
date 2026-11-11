@@ -25,6 +25,10 @@ try{
   const before=calls.length;await act(async()=>button('게임 종료').props.onClick());assert.equal(calls.length,before,'cancel keeps game');
   confirmEnd=true;await act(async()=>button('게임 종료').props.onClick());assert.equal(calls.at(-1).name,'close');confirmEnd=false;
  }
+ await render({...base,admin:true,state:{...s,status:'ready',alive:0,total:0}});
+ assert.ok(!button('모집 마감하고 게임 시작'));assert.ok(button('참가자 다시 모집'));
+ await act(async()=>button('참가자 다시 모집').props.onClick());assert.deepEqual(calls.at(-1),{name:'lobbyTime',data:{seconds:300}});
+ assert.ok(!text(tree.toJSON()).includes('관전 중'));assert.ok(!text(tree.toJSON()).includes('고르고 있어요'));
  const choosing={...s,status:'choosing',round:1};const player={id:'me',nickname:'나',alive:true,winner:false,choice:null,choice_round:1};
  await render({...base,state:choosing,player});await act(async()=>button('✌️가위').props.onClick());assert.equal(calls.at(-1).name,'pick');
  await render({...base,state:choosing,player:{...player,alive:false}});assert.ok(!button('✌️가위'));assert.match(text(tree.toJSON()),/탈락/);
