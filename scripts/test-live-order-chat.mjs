@@ -18,7 +18,7 @@ function fakeDb(state) {
       limit() { return api; },
       maybeSingle() { const rows = (state[table] ?? []).filter((r) => q.filters.every((f) => f(r))); return Promise.resolve({ data: rows[0] ?? null }); },
       then(res) { res({ data: (state[table] ?? []).filter((r) => q.filters.every((f) => f(r))) }); },
-      insert(row) { inserted.push(row); (state.live_chat_messages ??= []).push(row); return Promise.resolve({}); },
+      insert(row) { if (state.insertError) return Promise.resolve({ error: { code: state.insertError } }); inserted.push(row); (state.live_chat_messages ??= []).push(row); return Promise.resolve({}); },
     };
     return api;
   };
@@ -67,5 +67,10 @@ const fix = (s) => { s.settings[0].key = LIVE_CHAT_KEY; s.settings[1].key = LIVE
   assert.equal(await M.announceRecentPaid(db, now), 0);
   assert.equal(db.inserted[0].bot_ref, "paid:G1");
   assert.match(db.inserted[0].body, /호롤롤로-T님 결제 완료! 감사합니다/);
+}
+{ // Unique conflict/failed storage is not reported as a successfully posted notice.
+  const s = fix(base()); s.insertError = "23505"; const db = fakeDb(s);
+  assert.equal(await M.announceRecentPaid(db, Date.parse("2026-11-10T12:53:00Z")), 0);
+  assert.equal(db.inserted.length, 0);
 }
 console.log("✅ test-live-order-chat 통과");

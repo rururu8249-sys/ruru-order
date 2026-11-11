@@ -25,8 +25,10 @@ export async function GET(request: NextRequest) {
   if (!isVercelCronRequest(request) && (!secret || provided !== secret)) {
     return NextResponse.json({ ok: false, error: { message: "인증 필요" } }, { status: 401 });
   }
-  const r = await recordLiveMetricsTick();
-  // [2026-11-10 21:54] 방송 중이면 최근 결제 완료 주문서에 「결제 완료! 감사합니다」 채팅 글(이미 올린 건 건너뜀)
-  const paidPosted = await announceRecentPaid(getServiceClient()).catch(() => 0);
+  // Immediate DB chat notification is primary; this retry must not wait for YouTube metrics.
+  const [r, paidPosted] = await Promise.all([
+    recordLiveMetricsTick(),
+    announceRecentPaid(getServiceClient()).catch(() => 0),
+  ]);
   return NextResponse.json({ ...r, paidPosted });
 }

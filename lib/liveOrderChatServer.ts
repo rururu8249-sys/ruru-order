@@ -60,8 +60,9 @@ async function postedRefs(sb: SupabaseClient, bc: string, refs: string[]): Promi
 }
 
 async function insertBot(sb: SupabaseClient, bc: string, body: string, ref: string) {
-  if (!body.trim()) return;
-  await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: ref });
+  if (!body.trim()) return false;
+  const { error } = await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: ref });
+  return !error;
 }
 
 /** 주문서 제출 직후 — 「🛒 OO님 상품 외 N종 주문 감사합니다!」(+카드면 결제 링크 안내). 주문서마다 한 번. */
@@ -107,8 +108,7 @@ export async function announceRecentPaid(sb: SupabaseClient, nowMs = Date.now(),
     for (const [g, rows] of byGroup) {
       const ref = `paid:${g}`;
       if (done.has(ref)) continue;
-      await insertBot(sb, bc.id, paidThanksText(rows), ref);
-      n += 1;
+      if (await insertBot(sb, bc.id, paidThanksText(rows), ref)) n += 1;
     }
     return n;
   } catch {
