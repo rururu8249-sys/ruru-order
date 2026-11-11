@@ -1141,6 +1141,11 @@ export default function AdminLiveDashboard() {
       onChat: (p) => {
         try { window.dispatchEvent(new CustomEvent("ruru-live-chat", { detail: p })); } catch { /* 무시 */ }
       },
+      // Share this connection with the product list; a second subscription to
+      // the same Supabase topic would reuse/remove this dashboard channel.
+      onCatalog: (event) => {
+        window.dispatchEvent(new CustomEvent("ruru-live-catalog", { detail: event }));
+      },
     });
     return () => {
       if (debounce) clearTimeout(debounce);

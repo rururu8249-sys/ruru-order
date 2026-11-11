@@ -361,6 +361,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // [2026-11-09 사장님 20:46 「순환 중 여러 개여도 특정 상품만 골라서 안내글 복사」] 순환 목록 칩을 누르면 고름 → 「고른 N개 안내글 복사」
   const [rotChipPick, setRotChipPick] = useState<Set<string>>(() => new Set());
   const widgetLibraryLoadSeqRef = useRef(0);
+  const widgetPinLoadSeqRef = useRef(0);
+  const widgetLibraryTargetRef = useRef("");
+  widgetLibraryTargetRef.current = tab === "broadcast" ? bcSelId : "";
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
   const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
   // 새 방송 만들기 모달
@@ -509,7 +512,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return json as Record<string, unknown>;
   };
 
-  const loadWidgetLibrary = async (broadcastIdValue: string) => {
+  const loadWidgetLibrary = async (broadcastIdValue: string, silent = false) => {
+    if (broadcastIdValue !== widgetLibraryTargetRef.current) return;
     const requestSeq = ++widgetLibraryLoadSeqRef.current;
     try {
       const query = broadcastIdValue ? `?broadcastId=${encodeURIComponent(broadcastIdValue)}` : "";
@@ -519,19 +523,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
       let history = parseWidgetHistory(json?.history);
       const legacy = readPinHistory();
-      if (legacy.length > 0) {
+      if (!silent && legacy.length > 0) {
         const merged = await postWidgetLibrary({ action: "merge", entries: legacy });
         history = parseWidgetHistory(merged.history);
       }
       const rotation = parseWidgetRotation(json?.rotation);
-      if (requestSeq !== widgetLibraryLoadSeqRef.current) return;
+      if (requestSeq !== widgetLibraryLoadSeqRef.current || broadcastIdValue !== widgetLibraryTargetRef.current) return;
       setWidgetHistory(history);
       setWidgetRotation(rotation);
     } catch (error) {
-      if (requestSeq !== widgetLibraryLoadSeqRef.current) return;
+      if (requestSeq !== widgetLibraryLoadSeqRef.current || broadcastIdValue !== widgetLibraryTargetRef.current || silent) return;
       // 서버 목록이 잠시 실패해도 이 컴퓨터의 기존 기록은 바로 쓸 수 있게 유지한다.
       setWidgetHistory(parseWidgetHistory(readPinHistory()));
-      setWidgetRotation({ mode: "all", paused: false, targets: [] });
       showAdminToast("자주 사용한 위젯 목록을 불러오지 못했습니다. 이 컴퓨터의 기존 기록을 표시합니다.\n\n" + (error instanceof Error ? error.message : String(error)), "warning");
     }
   };
@@ -556,7 +559,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     try {
       const json = await postWidgetLibrary({ action: "saveRotation", broadcastId: targetBroadcastId, rotation: next });
       const saved = parseWidgetRotation(json.rotation);
-      setWidgetRotation(saved);
+      if (targetBroadcastId === widgetLibraryTargetRef.current) {
+        ++widgetLibraryLoadSeqRef.current; // Ignore reads started before this save completed.
+        setWidgetRotation(saved);
+      }
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       return true;
     } catch (error) {
@@ -593,17 +599,42 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   useEffect(() => {
     if (tab !== "broadcast") return;
     const targetId = bcSelId;
+    // Last-good display belongs only to this broadcast, never to the previous selection.
+    setWidgetRotation({ mode: "all", paused: false, targets: [] });
+    setBcWidgetPin({ mode: "auto", productId: "", detailName: "" });
     queueMicrotask(() => void loadWidgetLibrary(targetId));
+    return () => { ++widgetLibraryLoadSeqRef.current; ++widgetPinLoadSeqRef.current; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, bcSelId]);
 
-  // [2026-11-07] 상품 폼에서 세부상품 이름을 바꿔 순환 목록이 서버에서 고쳐지면 다시 읽음(옛 이름으로 덮어쓰지 않게).
+  // Chat commands/other screens update the same saved rotation. Refresh only the
+  // display state; keep search, checkboxes and the product list/scroll untouched.
   useEffect(() => {
-    if (tab !== "broadcast") return;
+    if (tab !== "broadcast" || !bcSelId) return;
     const targetId = bcSelId;
-    const onRotation = () => void loadWidgetLibrary(targetId);
+    const onRotation = () => {
+      if (document.visibilityState === "hidden") return;
+      void loadWidgetLibrary(targetId, true);
+      void loadBcWidgetPin(targetId);
+    };
+    const onCatalog = (event: Event) => {
+      const table = (event as CustomEvent<{ table?: string }>).detail?.table;
+      if (table && ["broadcasts", "settings", "widget_rotation"].includes(table)) onRotation();
+    };
+    window.addEventListener("ruru-live-catalog", onCatalog);
     window.addEventListener("ruru-widget-rotation-updated", onRotation);
-    return () => window.removeEventListener("ruru-widget-rotation-updated", onRotation);
+    window.addEventListener("ruru-live-product-updated", onRotation);
+    window.addEventListener("focus", onRotation);
+    document.addEventListener("visibilitychange", onRotation);
+    const timer = window.setInterval(onRotation, 20000);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("ruru-live-catalog", onCatalog);
+      window.removeEventListener("ruru-widget-rotation-updated", onRotation);
+      window.removeEventListener("ruru-live-product-updated", onRotation);
+      window.removeEventListener("focus", onRotation);
+      document.removeEventListener("visibilitychange", onRotation);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, bcSelId]);
 
@@ -742,8 +773,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   }, [tab]);
 
   const loadBcWidgetPin = async (broadcastId: string) => {
+    if (broadcastId !== widgetLibraryTargetRef.current) return;
+    const requestSeq = ++widgetPinLoadSeqRef.current;
     if (!broadcastId) { setBcWidgetPin({ mode: "auto", productId: "", detailName: "" }); return; }
-    const { data } = await supabase.from("broadcasts").select("widget_pin_mode,widget_pin_product_id,widget_pin_detail_name").eq("id", broadcastId).maybeSingle();
+    const { data, error } = await supabase.from("broadcasts").select("widget_pin_mode,widget_pin_product_id,widget_pin_detail_name").eq("id", broadcastId).maybeSingle();
+    if (error || !data || requestSeq !== widgetPinLoadSeqRef.current || broadcastId !== widgetLibraryTargetRef.current) return;
     const row = (data || {}) as Record<string, unknown>;
     setBcWidgetPin({
       mode: String(row.widget_pin_mode || "auto") === "pin" ? "pin" : "auto",
