@@ -1,7 +1,7 @@
 // [2026-11-10 07:39 사장님] 장바구니 담음 알림 — 손님이 «새로» 담은 상품을 방송 채팅에 루루동이 글 한 줄로(모두에게).
 //   「🛍️ 루*동이님 장바구니 담음 · PD-202 블랙/M · 259,000원」 + 「담기 ›」(다른 손님이 눌러 같은 상품 옵션 창).
 //   믿는 값만 씀: 닉네임 = 회원 표(카카오 계정) · 상품 이름·판매가 = 지금 방송 상품(서버) · 옵션은 그 상품 사이즈 목록 안일 때만.
-//   읽기: broadcasts · settings · customers · 방송 상품(30초 기억) / 쓰기: live_chat_messages 봇 글 한 줄만.
+//   읽기: broadcasts · settings · customers · 방송 상품(30초 기억) / 알림: 사이트 봇 글 + 연결된 유튜브 채팅.
 //   장바구니·재고·주문·돈 무접촉. 실패해도 담기에는 영향 없음(조용히 넘어감).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LIVE_CHAT_KEY, parseLiveChatSetting } from "@/lib/liveChat";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/liveChatBot";
 import { loadCandidates } from "@/lib/liveChatBotServer";
 import { isBlockedValue } from "@/lib/assistantSearchServer";
+import { postOrderChatEverywhere, readActiveBroadcastId } from "@/lib/youtube";
 
 export type NewCartLine = { productId: string; productName: string; color: string; size: string; unitPrice: number | null };
 
@@ -82,7 +83,15 @@ export async function announceNewCartLines(sb: SupabaseClient, input: { sessionK
     lastPerson.set(person, now);
     lastBroadcast.set(bc, now);
     sweep(lastPerson, PER_PERSON_MS);
-    await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: items[0].ref });
+    const { error } = await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: items[0].ref });
+    // Existing after() task: reuse the masked site notice and the configured
+    // YouTube notification switch/main+second destinations, without blocking cart success.
+    if (!error && await readActiveBroadcastId(sb) === bc) {
+      const results = await postOrderChatEverywhere(body);
+      for (const [channel, result] of Object.entries(results)) {
+        if (!result.ok && !result.skipped) console.warn("[cart-chat] YouTube notice failed", { channel, reason: result.reason });
+      }
+    }
   } catch {
     /* 알림 실패는 담기와 무관 */
   }

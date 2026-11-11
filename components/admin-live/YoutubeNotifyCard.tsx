@@ -112,7 +112,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-black text-ink">유튜브 라이브 알림</h2>
-          <p className="mt-1 text-xs font-bold text-ink-mute">주문 제출 시 라이브 채팅에 알림</p>
+          <p className="mt-1 text-xs font-bold text-ink-mute">장바구니 담음·주문 제출 시 라이브 채팅에 알림</p>
         </div>
         <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black ${connected ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-soft"}`}>
           {loading ? "확인 중..." : connected ? "● 연결됨" : "○ 미연결"}
@@ -152,6 +152,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm font-black text-ink">자동 알림</div>
+            <div className="mt-1 text-xs font-bold text-ink-mute">장바구니 알림은 방송 채팅 설정의 「장바구니 담음 알림」도 켜져 있어야 해요.</div>
           </div>
           <button
             type="button"
@@ -162,7 +163,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
           </button>
         </div>
 
-        <div className="mt-3 text-sm font-black text-ink">알림 문구</div>
+        <div className="mt-3 text-sm font-black text-ink">주문 알림 문구</div>
         <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
           넣을 수 있는 자동값: <code>{"{{nickname}}"}</code> 닉네임 · <code>{"{{items}}"}</code> 주문요약(예: “뉴발2000 외 2건”) · <code>{"{{amount}}"}</code> 총 결제금액(택배비 포함). 개인정보 보호를 위해 닉네임만 표시됩니다.
         </div>
