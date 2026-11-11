@@ -31,11 +31,11 @@ export function useRpsGame(publicOnly=false){
  mounted.current=true;queueMicrotask(()=>{void loadPublic();void loadMe();});
  const channel=supabase.channel('ruru-rps').on('broadcast',{event:'changed'},()=>{void loadPublic();}).subscribe(status=>{if(status==='SUBSCRIBED')void loadPublic();});
  const fallback=setInterval(()=>{if(!document.hidden){void loadPublic();void loadMe();}},10000);
- const clock=setInterval(()=>setNow(Date.now()+offset.current),200);
  const resume=()=>{if(!document.hidden){void loadPublic();void loadMe();}};
  window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);
- return()=>{mounted.current=false;clearInterval(fallback);clearInterval(clock);void supabase.removeChannel(channel);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume);};
+ return()=>{mounted.current=false;clearInterval(fallback);void supabase.removeChannel(channel);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume);};
  },[loadMe,loadPublic]);
+ useEffect(()=>{if(!state?.deadline)return;const clock=setInterval(()=>setNow(Date.now()+offset.current),200);return()=>clearInterval(clock);},[state?.deadline]);
  useEffect(()=>{queueMicrotask(()=>void loadMe());},[state?.id,state?.revision,state?.status,loadMe]);
  // Recover quickly from a missed broadcast at a deadline without continuous polling.
  const second=Math.floor(now/1000);
