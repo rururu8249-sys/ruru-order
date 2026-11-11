@@ -45,7 +45,7 @@ export function RpsWidget({game,publicOnly=false,onAdmin,broadcastId}:{game:RpsC
   </>}
   {!publicOnly&&game.error&&<p className="rps-error" role="alert">{game.error}</p>}
   {game.admin&&!publicOnly&&<RpsHostControls game={game}/>}
-  {game.admin&&!publicOnly&&onAdmin&&<button className="rps-admin-shortcut" onClick={onAdmin}>게임 설정</button>}
+  {game.admin&&!publicOnly&&<div className="rps-host-footer">{onAdmin&&<button className="rps-admin-shortcut" onClick={onAdmin}>게임 설정</button>}<button className="rps-end-game" disabled={busy} onClick={()=>{if(window.confirm('게임을 종료할까요? 모집과 진행이 즉시 중단되고 모든 화면에서 게임이 사라집니다.'))void action('close');}}>게임 종료</button></div>}
  </section>;
 }
 
