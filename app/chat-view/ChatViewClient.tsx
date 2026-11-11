@@ -1,10 +1,10 @@
 "use client";
-// [2026-11-10 16:11] 어두운 화면 · 두 칸 각각 글자 크기 · 칸 켜고 끄기(하나는 늘 켜짐).
-// [2026-11-10] 채팅만 보는 화면(태블릿 가로) — 왼쪽 유튜브 채팅 / 오른쪽 사이트 채팅. 세로로 들면 위·아래.
+// 유튜브 기본 탭 · 사이트 새 글 두 개 미리보기 · 확인하면 알림 해제.
+// 탭을 숨겨도 유튜브 iframe을 유지해 재연결 없이 전환한다.
 //   지금 켜진 방송을 저절로 찾음(1분마다 다시 확인 — 새 방송이 켜지면 그 방송으로).
 //   사이트 채팅 = /api/live-chat (처음 한 번) + 소식(ruru-live chat)으로 새 글. 이모티콘 그림·왕관·AI 표시 그대로.
 //   화면 꺼짐 방지(되는 브라우저만). 글자 크기 이 기기에만 기억.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { useLiveChatPrivate } from "@/lib/useLiveChatPrivate";
 import { supabase } from "@/lib/supabase";
@@ -14,6 +14,10 @@ import { youtubeVideoIdFromUrl } from "@/lib/liveWatch";
 import type { ChatEmoji } from "@/lib/liveChatEmoji";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 import { CHAT_FONT_SIZES as SIZES, CHAT_YT_SCALES as YT_SCALES, CHAT_FONT_KEY as SIZE_KEY, CHAT_YT_SCALE_KEY as YT_SIZE_KEY, readChatViewSizeIndex } from "@/lib/chatViewSize";
+
+import {createChatViewUnread, reduceChatViewUnread} from "@/lib/chatViewUnread";
+import {ChatViewNotice} from "./ChatViewNotice";
+import "./chat-view.css";
 
 type Bc = { id: string; title: string; videoId: string; paused: boolean };
 
@@ -26,9 +30,6 @@ const BADGE: Record<string, { label: string; bg: string; fg: string }> = {
 // [16:11 사장님] 어두운 화면(눈 덜 피곤) — 유튜브 어두운 채팅과 같은 색
 const C = { page: "#000000", panel: "#0F0F0F", line: "#2A2A2A", btn: "#1F1F1F", ink: "#F1F1F1", soft: "#AAAAAA", mute: "#8A8A8A" };
 // 유튜브 확대 배율과 사이트 글자 크기는 각각 이 기기에만 기억.
-const SHOW_KEY = "ruru_chat_view_show";
-const LAYOUT_KEY = "ruru_chat_view_layout";
-type Layout = "auto" | "columns" | "rows";
 
 export default function ChatViewClient() {
   const [bc, setBc] = useState<Bc | null>(null);
@@ -38,15 +39,16 @@ export default function ChatViewClient() {
   const [emojis, setEmojis] = useState<ChatEmoji[]>([]);
   const [sizeIdx, setSizeIdx] = useState(SIZES.indexOf(20));
   const [ytSizeIdx, setYtSizeIdx] = useState(YT_SCALES.indexOf(1.5));
-  const [layout, setLayout] = useState<Layout>("auto");
+  const [tab, setTab] = useState<"yt" | "site">("yt");
+  const tabRef = useRef<"yt" | "site">("yt");
+  const [unread, dispatchUnread] = useReducer(reduceChatViewUnread, "", createChatViewUnread);
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
   const [screenError, setScreenError] = useState("");
-  const [show, setShow] = useState<{ yt: boolean; site: boolean }>({ yt: true, site: true });
   // [07:18 사장님] 유튜브 시청자 수·사이트 접속 수 — 각 칸 제목 옆(30초마다)
   const [counts, setCounts] = useState<{ yt: number | null; site: number | null }>({ yt: null, site: null });
   const emojiMap = useMemo(() => emojiMapOf(emojis), [emojis]);
-  const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(privateChat.displayMessages, `${sizeIdx}:${show.site}:${show.yt}:${layout}`, show.site);
+  const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(privateChat.displayMessages, `${sizeIdx}:${tab}`, tab === "site");
   const [recent, setRecent] = useState<Array<{ id: number; at: number }>>([]);
   const seen = useRef<{ bc: string; maxId: number } | null>(null);
 
@@ -63,13 +65,10 @@ export default function ChatViewClient() {
     screen.addEventListener("change", applySizes);
     const t = window.setTimeout(() => {
       applySizes();
-      try { const v = window.localStorage.getItem(LAYOUT_KEY); if (v === "auto" || v === "columns" || v === "rows") setLayout(v); } catch { /* 무시 */ }
-      try { const v = JSON.parse(window.localStorage.getItem(SHOW_KEY) || "null"); if (v && typeof v === "object" && (v.yt === true || v.site === true)) setShow({ yt: v.yt !== false, site: v.site !== false }); } catch { /* 무시 */ }
     }, 0);
     return () => { window.clearTimeout(t); screen.removeEventListener("change", applySizes); };
   }, []);
   const changeYtSize = (d: number) => setYtSizeIdx((v) => { const n = Math.min(YT_SCALES.length - 1, Math.max(0, v + d)); try { window.localStorage.setItem(YT_SIZE_KEY, String(YT_SCALES[n])); } catch { /* 무시 */ } return n; });
-  const setShowSaved = (next: { yt: boolean; site: boolean }) => { if (!next.yt && !next.site) return; if (next.site && !show.site) followLatest(); setShow(next); try { window.localStorage.setItem(SHOW_KEY, JSON.stringify(next)); } catch { /* 무시 */ } };
   const changeSize = (d: number) => setSizeIdx((v) => { const n = Math.min(SIZES.length - 1, Math.max(0, v + d)); try { window.localStorage.setItem(SIZE_KEY, String(SIZES[n])); } catch { /* 무시 */ } return n; });
 
   useEffect(() => {
@@ -78,10 +77,6 @@ export default function ChatViewClient() {
     document.addEventListener("fullscreenchange", changed);
     return () => document.removeEventListener("fullscreenchange", changed);
   }, []);
-  const changeLayout = (next: Layout) => {
-    setLayout(next);
-    try { window.localStorage.setItem(LAYOUT_KEY, next); } catch { /* 무시 */ }
-  };
   const toggleFullscreen = async () => {
     setScreenError("");
     try {
@@ -116,15 +111,23 @@ export default function ChatViewClient() {
   const bcId = bc?.id ?? "";
   useEffect(() => {
     setList([]);
+    dispatchUnread({type:"reset",bc:bcId});
     followLatest();
     if (!bcId) return;
     let alive = true;
+    let loading = false;
+    const changedDuringLoad = new Map<number, LiveChatMessage>();
     const load = async () => {
+      if (loading) return;
+      loading = true; changedDuringLoad.clear();
       try {
         const j = await fetch(`/api/live-chat?bc=${encodeURIComponent(bcId)}`, { cache: "no-store" }).then((r) => r.json());
         if (!alive || !j?.ok) return;
-        setList(mergeChat([], (j.messages || []).map(parseChatMessage).filter(Boolean) as LiveChatMessage[], 200));
-      } catch { /* 다음에 */ }
+        const snapshot = (j.messages || []).map(parseChatMessage).filter((m:LiveChatMessage|null) => m?.broadcastId === bcId) as LiveChatMessage[];
+        const reconciled = mergeChat(snapshot, [...changedDuringLoad.values()], 200);
+        setList(reconciled);
+        dispatchUnread({type:"snapshot",bc:bcId,messages:reconciled,read:tabRef.current === "site" && document.visibilityState === "visible"});
+      } catch { /* 다음에 */ } finally { loading = false; }
     };
     const loadEmojis = () => fetch("/api/live-chat/emoji", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (alive && j?.ok) setEmojis(Array.isArray(j.items) ? j.items : []); }).catch(() => {});
     void load();
@@ -132,7 +135,9 @@ export default function ChatViewClient() {
     const off = subscribeLiveEvents(supabase, {
       onChat: (payload) => {
         const m = parseChatMessage(payload);
-        if (!m || m.broadcastId !== bcId) return;
+        if (!alive || !m || m.broadcastId !== bcId) return;
+        if (loading) changedDuringLoad.set(m.id,m);
+        dispatchUnread({type:"event",bc:bcId,messages:[m],read:tabRef.current === "site" && document.visibilityState === "visible"});
         privateChat.onPublicMessage(m);
         setList((prev) => (m.hidden ? prev.filter((x) => x.id !== m.id) : mergeChat(prev, [m], 200)));
       },
@@ -191,7 +196,16 @@ export default function ChatViewClient() {
   // [16:11 사장님] 유튜브 채팅도 글자 크기 — 남의 화면(iframe)이라 글자를 못 바꿔 «화면째 확대»(scale). 유튜브 기본 글자 약 13px 기준.
   const ytScale = YT_SCALES[ytSizeIdx];
   const ytSrc = bc?.videoId && typeof window !== "undefined" ? `https://www.youtube.com/live_chat?v=${bc.videoId}&embed_domain=${window.location.hostname}&dark_theme=1` : "";
-  const both = show.yt && show.site;
+  const unreadMessages = unread.bc === bcId ? [...unread.unread.values()] : [];
+  const openTab = (next: "yt" | "site") => {
+    tabRef.current = next; setTab(next);
+    if (next === "site") { dispatchUnread({type:"read",bc:bcId}); followLatest(); }
+  };
+  useEffect(() => {
+    const readVisible = () => { if(document.visibilityState === "visible" && tabRef.current === "site") dispatchUnread({type:"read",bc:bcId}); };
+    document.addEventListener("visibilitychange",readVisible);
+    return () => document.removeEventListener("visibilitychange",readVisible);
+  },[bcId]);
 
   const sizeBtn = (label: string, aria: string, onClick: () => void, disabled: boolean, fs: string) => (
     <button type="button" onClick={onClick} disabled={disabled} aria-label={aria}
@@ -214,79 +228,27 @@ export default function ChatViewClient() {
       <span aria-hidden="true">%</span>
     </label>
   );
-  const toggle = (key: "yt" | "site", label: string, dot: string) => {
-    const on = show[key];
-    const last = on && !(key === "yt" ? show.site : show.yt);
-    return (
-      <button type="button" className="ruru-chat-control" role="switch" aria-label={`${label} 채팅`} aria-checked={on} disabled={last}
-        onClick={() => setShowSaved({ ...show, [key]: !on })} title={last ? "채팅은 하나 이상 표시해요" : undefined}>
-        <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: on ? dot : C.mute }} />
-        {label}<span style={{ color: C.soft, fontSize: 12 }}>{on ? "켬" : "끔"}</span>
-      </button>
-    );
-  };
 
   return (
     <div className="ruru-chat-view" style={{ position: "fixed", inset: 0, background: C.page, color: C.ink, display: "flex", flexDirection: "column", fontFamily: 'Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif', colorScheme: "dark" }}>
-      <style>{`
-.ruru-chat-view{text-size-adjust:100%;-webkit-text-size-adjust:100%}
-.ruru-chat-view *{box-sizing:border-box}
-.ruru-chat-view button{cursor:pointer;font-family:inherit}
-.ruru-chat-view button:disabled{cursor:default}
-.ruru-chat-view :is(button,select,input,[role=log]):focus-visible{outline:2px solid #A5D8FF;outline-offset:-3px}
-.ruru-chat-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-wrap:wrap;border-bottom:1px solid #2A2A2A}
-.ruru-chat-brand{display:flex;align-items:center;gap:10px;min-width:0;margin-right:auto}
-.ruru-chat-control{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 12px;border:1px solid #363636;border-radius:8px;background:#1F1F1F;color:#F1F1F1;font-size:14px;white-space:nowrap}
-.ruru-chat-control[aria-checked=false]{background:transparent;color:#AAA}
-.ruru-chat-control:hover:not(:disabled){background:#303030}
-.ruru-chat-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
-.ruru-chat-grid.rows{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
-.ruru-chat-panel{min-width:0;min-height:0;display:flex;flex-direction:column;background:#0F0F0F;border-radius:10px;overflow:hidden;border:1px solid #2A2A2A;position:relative}
-.ruru-chat-panel-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #2A2A2A;flex-wrap:wrap}
-.ruru-chat-panel-title{flex:1;min-width:100px}
-.ruru-chat-panel-title h2{margin:0;font-size:20px;font-weight:750;line-height:1.35}
-.ruru-chat-panel-meta{font-size:13px;color:#AAA;margin-top:3px;font-variant-numeric:tabular-nums}
-.ruru-chat-size{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.ruru-chat-percent{display:flex;align-items:center;gap:2px;color:#AAA;font-size:13px;font-variant-numeric:tabular-nums}
-.ruru-chat-percent input{width:50px;height:44px;padding:0 3px;border:1px solid #363636;border-radius:8px;background:#1F1F1F;color:#F1F1F1;font:inherit;text-align:center;appearance:textfield;-moz-appearance:textfield}
-.ruru-chat-percent input::-webkit-inner-spin-button,.ruru-chat-percent input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-.ruru-chat-status{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:6px 14px;border-top:1px solid #2A2A2A;font-size:12px;color:#AAA}
-@media(orientation:portrait){.ruru-chat-grid.auto{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr)}}
-.ruru-chat-grid.one{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
-@media(max-width:600px){.ruru-chat-toolbar{gap:6px;padding:6px 8px}.ruru-chat-brand{width:100%}.ruru-chat-control{padding:0 9px}.ruru-chat-panel-head{padding:6px 10px}.ruru-chat-panel-title h2{font-size:18px}.ruru-chat-panel-meta{font-size:12px}}
-@media(max-height:650px) and (orientation:landscape){
- .ruru-chat-toolbar{padding:4px 8px;gap:6px}
- .ruru-chat-panel-head{padding:4px 8px;gap:6px}
- .ruru-chat-panel-title h2{font-size:16px}
- .ruru-chat-panel-meta{font-size:11px;margin-top:1px}
- .ruru-chat-status{min-height:24px;padding:3px 8px;font-size:11px}
- .ruru-chat-log{--chat-line-height:1.45;--chat-row-padding:4px 6px;--chat-row-gap:6px}
-}
 
-.ruru-chat-row{border-radius:8px;transition:background-color .6s;box-shadow:inset 2px 0 transparent}
-.ruru-chat-new{background-color:rgba(116,192,252,.09);box-shadow:inset 2px 0 rgba(116,192,252,.42);animation:ruru-chat-arrival 1.6s ease-in-out 2}
-@keyframes ruru-chat-arrival{0%,100%{background-color:rgba(116,192,252,.09)}50%{background-color:rgba(116,192,252,.18)}}
-@media(prefers-reduced-motion:reduce){.ruru-chat-row{transition:none}.ruru-chat-new{animation:none}}`}</style>
 
       <div className="ruru-chat-toolbar">
         <div className="ruru-chat-brand">
           <h1 style={{ margin: 0, fontSize: 17, fontWeight: 750 }}>방송 채팅</h1>
           <span style={{ fontSize: 12, color: bc && !bc.paused ? "#A5D8FF" : C.soft }}>{!loaded ? "연결 중" : !bc ? "방송 대기" : bc.paused ? "방송 쉬는 중" : "방송 중"}</span>
         </div>
-        {toggle("yt", "유튜브", "#FF5555")}
-        {toggle("site", "사이트", "#74C0FC")}
-        <select className="ruru-chat-control" aria-label="채팅 배치" value={layout} onChange={(e) => changeLayout(e.target.value as Layout)}>
-          <option value="auto">자동 배치</option><option value="columns">좌우로 보기</option><option value="rows">위아래로 보기</option>
-        </select>
         {fullscreenAvailable ? <button type="button" className="ruru-chat-control" onClick={() => void toggleFullscreen()}>{fullscreen ? "전체화면 해제" : "전체화면"}</button> : null}
         <button type="button" className="ruru-chat-control" onClick={() => window.location.reload()} aria-label="채팅 화면 새로고침">새로고침</button>
       </div>
       {screenError ? <div role="status" style={{ padding: "8px 12px", fontSize: 14 }}>{screenError}</div> : null}
 
-      <div className={`ruru-chat-grid ${layout}${both ? "" : " one"}`} style={{ flex: 1, minHeight: 0, display: "grid", gap: "10px", padding: "10px", boxSizing: "border-box" }}>
+      <div role="tablist" aria-label="채팅 선택" className="ruru-chat-tabs">
+        {([["yt","유튜브 채팅"],["site","사이트 채팅"]] as const).map(([key,label])=><button key={key} type="button" role="tab" id={`chat-tab-${key}`} aria-controls={`chat-panel-${key}`} aria-selected={tab===key} onClick={()=>openTab(key)}>{label}{key==="site"&&unreadMessages.length>0&&<span className="ruru-chat-unread-badge" aria-label={`새 글 ${unreadMessages.length}개`}>{unreadMessages.length>99?'99+':unreadMessages.length}</span>}</button>)}
+      </div>
+      <div className="ruru-chat-grid one" style={{ flex: 1, minHeight: 0, display: "grid", padding: "8px", boxSizing: "border-box" }}>
       {/* 유튜브 채팅 */}
-      {show.yt ? (
-      <section className="ruru-chat-panel" aria-label="유튜브 채팅 패널" style={{ borderTop: "3px solid #FF5555" }}>
+      <section id="chat-panel-yt" role="tabpanel" aria-labelledby="chat-tab-yt" className="ruru-chat-panel" hidden={tab!=="yt"} style={{ display:tab==="yt"?"flex":"none", borderTop: "3px solid #FF5555" }}>
         <header className="ruru-chat-panel-head">
           <div className="ruru-chat-panel-title">
             <h2>유튜브 채팅</h2>
@@ -299,6 +261,7 @@ export default function ChatViewClient() {
           </div>
         </header>
         <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden", background: "#0F0F0F" }}>
+      {tab === "yt" && <ChatViewNotice messages={unreadMessages} emojis={emojiMap} onOpen={()=>openTab("site")}/>}
           {ytSrc ? (
             <iframe title="유튜브 채팅" src={ytSrc}
               style={{ position: "absolute", top: 0, left: 0, width: `${100 / ytScale}%`, height: `${100 / ytScale}%`, transform: `scale(${ytScale})`, transformOrigin: "0 0", border: 0, display: "block" }} />
@@ -309,11 +272,9 @@ export default function ChatViewClient() {
           )}
         </div>
       </section>
-      ) : null}
 
       {/* 사이트 채팅 */}
-      {show.site ? (
-      <section className="ruru-chat-panel" aria-label="사이트 채팅 패널" style={{ borderTop: "3px solid #74C0FC" }}>
+      <section id="chat-panel-site" role="tabpanel" aria-labelledby="chat-tab-site" className="ruru-chat-panel" hidden={tab!=="site"} style={{ display:tab==="site"?"flex":"none", borderTop: "3px solid #74C0FC" }}>
         <header className="ruru-chat-panel-head">
           <div className="ruru-chat-panel-title">
             <h2>사이트 채팅</h2>
@@ -376,7 +337,6 @@ export default function ChatViewClient() {
           </button>
         ) : null}
       </section>
-      ) : null}
       </div>
     </div>
   );
