@@ -1045,9 +1045,6 @@ export default function LiveWatchView(props: Props) {
             </div>
             {emojiOpen && canEmoji ? (
               <div data-emoji-drawer style={{ margin: isDesktop ? "8px 0 0" : "12px -16px 0", borderTop: "1px solid #E5E5E5", background: "#FFFFFF", borderRadius: "12px", overflow: "hidden" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px 0" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: "#111111" }}>루루동이 이모티콘</span>
-                </div>
                 <div data-live-scroll="1" style={{ height: "min(232px, 35dvh)", overflowY: "auto", overscrollBehavior: "contain", padding: "8px 12px calc(12px + env(safe-area-inset-bottom))", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))", gap: "4px", alignContent: "start" }}>
                   {/* 쓰다 만 낱말이 있으면 맨 위에 어울리는 것부터(카톡 이모티콘 «검색»처럼) */}
                   {pickerSuggests.length > 0 ? (
