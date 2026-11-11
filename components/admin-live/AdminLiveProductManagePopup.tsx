@@ -1,5 +1,6 @@
 "use client";
 
+import { ProductIntroManager } from "@/components/customer/ProductIntroManager";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
@@ -328,6 +329,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // 방송 상품 탭(broadcast)
   const [bcList, setBcList] = useState<Array<{ id: string; title: string; started_at: string; status: string }>>([]);
   const [bcSelId, setBcSelId] = useState("");
+  const [introManage, setIntroManage] = useState<{bc: string; query: string} | null>(null);
   // [2026-11-06 사장님 «방송 숨겼더니 뭘 담았는지 모르겠다»] 숨긴 방송도 따로 들고 있다가 「숨긴 방송」 펼침·되살리기·담기 창 «지난 방송»에서 쓴다
   const [bcHiddenList, setBcHiddenList] = useState<Array<{ id: string; title: string; started_at: string; status: string }>>([]);
   const [bcHiddenOpen, setBcHiddenOpen] = useState(false);
@@ -1884,6 +1886,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       style={embedded ? { width: "100%", height: "100%" } : { position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
       onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose(); }}
     >
+      {introManage ? <ProductIntroManager key={introManage.bc} broadcastId={introManage.bc} initialQuery={introManage.query} onClose={() => setIntroManage(null)} /> : null}
       <div style={embedded
         ? { width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "var(--color-surface)", overflow: "hidden" }
         : { width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
@@ -2213,10 +2216,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       ];
                       const moreItems: RowMoreMenuItem[] = isBrandFolder
                         ? [
+                            { label: "소개영상 등록 / 위젯 순환", onClick: () => setIntroManage({bc: bcSelId, query: productName(p)}) },
                             { label: "이 브랜드만 순환", title: rotationLive ? "이 브랜드 상품만 방송 화면에 돌아가게(다른 건 안 돎)" : "방송을 켜면 바꿀 수 있어요", disabled: !rotationLive || rotBusy, onClick: () => void rotateOnlyBrand(p) },
                             ...commonMore,
                           ]
                         : [
+                            { label: "소개영상 등록 / 위젯 순환", onClick: () => setIntroManage({bc: bcSelId, query: productName(p)}) },
                             parentPinned
                               ? { label: "소개 끝", title: "소개를 끝내고 방송 화면을 다시 자동 순환으로", disabled: bcPinBusy, onClick: () => void clearBroadcastPin() }
                               : { label: "소개", title: "방송 화면에 이 상품만 띄우고 안내글을 복사", disabled: bcPinBusy, onClick: () => void broadcastOneClick(p) },
@@ -2268,6 +2273,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                 const detailOn = isDetailPicked(pid, detail);
                                 const detailRotLabel = widgetRotation.mode === "all" ? "이것만 순환" : detailOn ? "순환에서 빼기" : "순환에 넣기";
                                 const detailMore: RowMoreMenuItem[] = [
+                                  { label: "소개영상 등록 / 위젯 순환", onClick: () => setIntroManage({bc: bcSelId, query: detail.detailName}) },
                                   pinned
                                     ? { label: "소개 끝", title: "소개를 끝내고 방송 화면을 다시 자동 순환으로", disabled: bcPinBusy, onClick: () => void clearBroadcastPin() }
                                     : { label: "소개", title: "방송 화면에 이 상품만 띄우고 안내글을 복사", disabled: bcPinBusy, onClick: () => void broadcastOneClick(p, detail) },

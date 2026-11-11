@@ -5,6 +5,7 @@
 //   이 화면은 «보여 주기·고르기»만 한다. 담기·장바구니·주문서·결제는 부모(주문 페이지)의 기존 함수가 그대로 처리한다.
 //   z-index 60: 아래 메뉴(40)·장바구니 바(39) 위, 옵션 창·주문서 창(100) 아래 → 옵션 창이 방송 위로 올라온다.
 
+import { ProductIntroManager } from "./ProductIntroManager";
 import { useRpsGame } from '@/components/rps/useRpsGame';
 import { RpsWidget } from '@/components/rps/RpsWidget';
 import { RpsAdmin } from '@/components/rps/RpsAdmin';
@@ -611,6 +612,7 @@ export default function LiveWatchView(props: Props) {
     const t = window.setTimeout(() => setChatHint(""), 3000);
     return () => window.clearTimeout(t);
   }, [chatHint]);
+  const [introManage, setIntroManage] = useState<string | null>(null);
   const productPickerOpen = Boolean(chat?.canModerate && draft.trimStart().startsWith("/"));
   const sendChat = async (bodyOverride?: string, target?: ChatProductSelection) => {
     if (!chat || sending) return;
@@ -1557,6 +1559,8 @@ export default function LiveWatchView(props: Props) {
         </div>
       ) : null}
 
+      {introManage !== null && chat?.canModerate && props.broadcastId ? <ProductIntroManager key={props.broadcastId} broadcastId={props.broadcastId} initialQuery={introManage} capture={introPlayer.capture} onClose={() => setIntroManage(null)} /> : null}
+
       {/* 상품 목록 창 */}
       {listOpen ? (
         <div role="dialog" aria-modal="true" aria-label={listMode === "featured" ? "지금 소개하는 상품" : "방송 상품"} onClick={() => setListOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
@@ -1568,6 +1572,7 @@ export default function LiveWatchView(props: Props) {
               </span>
               <button type="button" onClick={() => setListOpen(false)} aria-label="닫기" style={{ width: "44px", height: "44px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><IconClose /></button>
             </div>
+            {chat?.canModerate && props.broadcastId ? <div style={{padding:"0 16px 10px",flexShrink:0}}><button type="button" onClick={() => setIntroManage("")} style={{width:"100%",minHeight:44,border:"1px solid #ddd",borderRadius:10,background:"#f5f5f5",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer"}}>관리자 · 소개영상 등록 / 위젯 순환</button></div> : null}
             {listMode === "featured" ? <div style={{padding: "0 16px 10px", flexShrink: 0}}>
               <p style={{fontSize: 13, color: "#666", margin: "0 0 8px"}}>전체 {totalCount}개 중 소개 중인 상품이에요.</p>
               <button type="button" onClick={() => openProductList("all")} style={{width: "100%", minHeight: 44, borderRadius: 10, border: "1px solid #d5d5d5", background: "#f5f5f5", color: "#111", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>전체 상품 {totalCount}개 보기 →</button>

@@ -78,7 +78,20 @@ export async function runChatProductCommand(sb: SupabaseClient, bc: string, quer
   const products = [...new Map(groups.flat().map(p => [widgetTargetKey(p), p])).values()];
   if (products.some(p => p.soldOut)) throw new Error("품절 상품은 위젯에 표시할 수 없어요.");
   const targets = products.map(({ productId, detailName }) => ({ productId, detailName }));
-  if (batch?.mode === "append") await appendRotation(sb, bc, catalog, targets);
+  await applyProductRotation(sb, bc, catalog, targets, batch?.mode ?? "replace");
+  // The command is private from the moment it is inserted: public realtime
+  // redacts hidden rows. The shared product card replaces public per-product guides; keep the audit/rate-limit row.
+  const posted = await sb.from("live_chat_messages").insert([
+    { ...author, ...(selected ? { body: `/${batch?.mode === "append" ? "추가 " : ""}${products.map(p => p.texts[0] || p.detailName).join(", ")}`.slice(0, 100) } : {}), broadcast_id: bc, hidden_at: new Date().toISOString(), hidden_by: "command", pinned_at: null },
+  ]).select(columns);
+  if (posted.error || !posted.data?.length) throw new Error("위젯은 변경됐지만 관리자 작업 기록을 저장하지 못했어요.");
+  if (batch?.mode !== "append" && onIntroduced) await onIntroduced(targets);
+  return posted.data.find(row => row.badge !== "bot") ?? posted.data[0];
+}
+
+/** Targets must first be validated against the current server catalog. */
+export async function applyProductRotation(sb: SupabaseClient, bc: string, catalog: BotCandidate[], targets: WidgetProductTarget[], mode: "replace" | "append") {
+  if (mode === "append") await appendRotation(sb, bc, catalog, targets);
   else {
     const rotation = transitionRotation(null, { mode: "selected", paused: false, targets });
     const saved = await sb.from("settings").upsert({ key: widgetRotationSettingKey(bc), value: JSON.stringify(rotation), updated_at: new Date().toISOString() }, { onConflict: "key" });
@@ -89,14 +102,6 @@ export async function runChatProductCommand(sb: SupabaseClient, bc: string, quer
   const unpin = await sb.from("broadcasts").update({ widget_pin_mode: "auto", widget_pin_product_id: null, widget_pin_detail_name: null })
     .eq("id", bc).eq("status", "ON").select("id").maybeSingle();
   if (unpin.error || !unpin.data) throw new Error("순환 목록은 저장했지만 방송 화면에 반영하지 못했어요. 방송 상태를 확인한 뒤 다시 입력해 주세요.");
-  // The command is private from the moment it is inserted: public realtime
-  // redacts hidden rows. The shared product card replaces public per-product guides; keep the audit/rate-limit row.
-  const posted = await sb.from("live_chat_messages").insert([
-    { ...author, ...(selected ? { body: `/${batch?.mode === "append" ? "추가 " : ""}${products.map(p => p.texts[0] || p.detailName).join(", ")}`.slice(0, 100) } : {}), broadcast_id: bc, hidden_at: new Date().toISOString(), hidden_by: "command", pinned_at: null },
-  ]).select(columns);
-  if (posted.error || !posted.data?.length) throw new Error("위젯은 변경됐지만 관리자 작업 기록을 저장하지 못했어요.");
-  if (batch?.mode !== "append" && onIntroduced) await onIntroduced(targets);
-  return posted.data.find(row => row.badge !== "bot") ?? posted.data[0];
 }
 
 /** Compare-and-set prevents another admin's newer rotation from being overwritten by an append. */

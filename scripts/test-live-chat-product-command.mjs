@@ -20,8 +20,8 @@ let identityValid=true;
 let products,listed,links,mod,banned,blocked,enabled,widgetOn,broadcastOn,rateLimited,failTable,writes,botCalls,roleError;
 function reset(){products=[brand];listed=[77];links=[];mod=true;banned=false;blocked=false;enabled=true;widgetOn=true;broadcastOn=true;rateLimited=false;failTable='';writes=[];botCalls=0;roleError=false;}
 reset();
-const sb={from(table){let op='read',value,ids=null,start=0,end=999,columns='';const filters=[];
-  const q={select(value){columns=value||'*';return q;},eq(k,v){filters.push([k,v]);return q;},is(){return q;},order(){return q;},limit(){return q;},range(a,b){start=a;end=b;return q;},or(){return q;},maybeSingle(){return q;},single(){return q;},in(k,v){ids=v;return q;},upsert(v){op='upsert';value=v;return q;},update(v){op='update';value=v;return q;},insert(v){op='insert';value=v;return q;},then(resolve,reject){
+const sb={from(table){let op='read',value,ids=null,start=0,end=999,columns='',pattern=null;const filters=[];
+  const q={like(k,p){pattern=p;return q;},select(value){columns=value||'*';return q;},eq(k,v){filters.push([k,v]);return q;},is(){return q;},order(){return q;},limit(){return q;},range(a,b){start=a;end=b;return q;},or(){return q;},maybeSingle(){return q;},single(){return q;},in(k,v){ids=v;return q;},upsert(v){op='upsert';value=v;return q;},update(v){op='update';value=v;return q;},insert(v){op='insert';value=v;return q;},then(resolve,reject){
     if(op!=='read')writes.push({table,op,value,filters});
     // Production broadcasts has youtube_live_url only (schema checked 2026-11-11).
     const missingColumn=table==='broadcasts'&&columns.split(',').some(c=>c.trim()==='youtube_url');
@@ -30,7 +30,7 @@ const sb={from(table){let op='read',value,ids=null,start=0,end=999,columns='';co
     if(!error){
       if(op==='insert')data=(Array.isArray(value)?value:[value]).map((row,i)=>({...row,id:501+i,created_at:new Date().toISOString()}));
       else if(op==='update')data=broadcastOn?{id:bc}:null;
-      else if(table==='settings')data={value:JSON.stringify({enabled,words:[]})};
+      else if(table==='settings')data=pattern?[]:{value:JSON.stringify({enabled,words:[]})};
       else if(table==='broadcasts')data={id:bc,status:broadcastOn?'ON':'OFF',widget_card_enabled:widgetOn,youtube_live_url:'https://www.youtube.com/watch?v=abcdefghijk'};
       else if(table==='customers')data={id:'customer',youtube_nickname:'관리자',is_blocked:blocked};
       else if(table==='live_chat_bans')data=banned?[{until_at:new Date(Date.now()+60000).toISOString()}]:[];

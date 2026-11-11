@@ -101,3 +101,14 @@ await saveProductIntros(db,'00000000-0000-0000-0000-000000000003',[voiceTarget],
 assert.equal(JSON.parse(rows.get(productIntroKey('00000000-0000-0000-0000-000000000003',nextVideo,voiceTarget)).value).seconds,10);
 assert.equal((await readProductIntro(db,bc,video,voiceTarget)).seconds,800,'new broadcast must preserve previous video');
 console.log('PASS auto intro: first point retained, next broadcast independent, history preserved');
+// Ordinary manual introductions also retain the first point when the video is reattached.
+const reused='00000000-0000-0000-0000-000000000004';
+await saveProductIntros(db,reused,[voiceTarget],{...capture,seconds:1200,capturedAt:now+9000},'first');
+assert.equal((await readProductIntro(db,reused,video,voiceTarget)).seconds,800,'same video reattached must retain first point');
+const fresh={productId:'new',detailName:''};
+await Promise.all([
+ saveProductIntros(db,bc,[fresh],{...capture,seconds:1000,capturedAt:now+8000},'first'),
+ saveProductIntros(db,bc,[fresh],{...capture,seconds:1100,capturedAt:now+9000},'first'),
+]);
+assert.equal((await readProductIntro(db,bc,video,fresh)).seconds,1000,'concurrent registration must not replace first successful point');
+console.log('PASS repeated manual/reused-video and concurrent first-point retention');

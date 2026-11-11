@@ -141,8 +141,8 @@ export async function POST(request: NextRequest) {
             const identity = chatIdentityFromRequest(request);
             const verified = sameChatOrigin(request) && (await verifyAdminSessionFromRequest(request) || (identity?.sub === kakaoId && (await verifiedChatRole(sb, identity)).isMod));
             if (!verified) { introNotice = "상품 소개 완료 · 영상 연결은 채팅 본인 확인 후 사용할 수 있어요."; return; }
-            await saveProductIntros(sb, bc, targets, capture);
-            introNotice = "상품 소개 완료 · 소개영상도 연결했어요.";
+            const result = await saveProductIntros(sb, bc, targets, capture, "first");
+            introNotice = result.kept ? "상품 소개 완료 · 기존 소개영상 위치는 유지했어요." : "상품 소개 완료 · 소개영상도 연결했어요.";
           } catch { introNotice = "상품 소개 완료 · 소개영상 연결은 저장하지 못했어요."; }
         } : undefined;
         const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null }, target ?? undefined, recordIntro);
