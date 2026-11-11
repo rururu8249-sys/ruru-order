@@ -5,7 +5,7 @@ import type {RpsController} from './useRpsGame';
 import {useRpsAudio} from './useRpsAudio';
 import './rps.css';
 export function RpsWidget({game,publicOnly=false,onAdmin,broadcastId,showSetup=false}:{game:RpsController;publicOnly?:boolean;onAdmin?:()=>void;broadcastId?:string;showSetup?:boolean}){
- const {state:s,player:p,now,busy,action}=game;const {sound,toggle}=useRpsAudio(s,publicOnly);
+ const {state:s,player:p,now,busy,action}=game;const {sound,toggle}=useRpsAudio(s,publicOnly,now);
  const cardRef=useRef<HTMLElement>(null);
  useEffect(()=>{if(cardRef.current)cardRef.current.scrollTop=0;},[s?.status,s?.round]);
  const [animated,setAnimated]=useState(0),[page,setPage]=useState(0);
