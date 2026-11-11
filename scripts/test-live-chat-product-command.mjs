@@ -20,10 +20,12 @@ let identityValid=true;
 let products,listed,links,mod,banned,blocked,enabled,widgetOn,broadcastOn,rateLimited,failTable,writes,botCalls,roleError;
 function reset(){products=[brand];listed=[77];links=[];mod=true;banned=false;blocked=false;enabled=true;widgetOn=true;broadcastOn=true;rateLimited=false;failTable='';writes=[];botCalls=0;roleError=false;}
 reset();
-const sb={from(table){let op='read',value,ids=null,start=0,end=999;const filters=[];
-  const q={select(){return q;},eq(k,v){filters.push([k,v]);return q;},is(){return q;},order(){return q;},limit(){return q;},range(a,b){start=a;end=b;return q;},or(){return q;},maybeSingle(){return q;},single(){return q;},in(k,v){ids=v;return q;},upsert(v){op='upsert';value=v;return q;},update(v){op='update';value=v;return q;},insert(v){op='insert';value=v;return q;},then(resolve,reject){
+const sb={from(table){let op='read',value,ids=null,start=0,end=999,columns='';const filters=[];
+  const q={select(value){columns=value||'*';return q;},eq(k,v){filters.push([k,v]);return q;},is(){return q;},order(){return q;},limit(){return q;},range(a,b){start=a;end=b;return q;},or(){return q;},maybeSingle(){return q;},single(){return q;},in(k,v){ids=v;return q;},upsert(v){op='upsert';value=v;return q;},update(v){op='update';value=v;return q;},insert(v){op='insert';value=v;return q;},then(resolve,reject){
     if(op!=='read')writes.push({table,op,value,filters});
-    const error=failTable===`${table}:${op}`?{message:'DB failure'}:null;
+    // Production broadcasts has youtube_live_url only (schema checked 2026-11-11).
+    const missingColumn=table==='broadcasts'&&columns.split(',').some(c=>c.trim()==='youtube_url');
+    const error=missingColumn?{code:'42703',message:'column broadcasts.youtube_url does not exist'}:failTable===`${table}:${op}`?{message:'DB failure'}:null;
     let data=null;
     if(!error){
       if(op==='insert')data=(Array.isArray(value)?value:[value]).map((row,i)=>({...row,id:501+i,created_at:new Date().toISOString()}));
@@ -120,3 +122,9 @@ reset();identityValid=false;result=await send('/',introTarget);assert.equal(resu
 reset();identityValid=true;result=await send('/',{...introTarget,intro:{...introTarget.intro,videoId:'12345678901'}});assert.equal(result.ok,true);assert.match(result.introNotice,/건너뛰/);assert.equal(writes.length,3);
 reset();result=await send('/',{...introTarget,intro:null});assert.equal(result.ok,true);assert.match(result.introNotice,/건너뛰/);assert.equal(writes.length,3);
 console.log('PASS real POST verified-only video recording, mismatched/missing telemetry skips while widget+guide succeed');
+
+for (const body of ['안녕하세요','/335']) {
+ reset();failTable='broadcasts:read';result=await send(body);assert.equal(result.status,503);assert.doesNotMatch(result.message,/방송 중에만/);assert.equal(writes.length,0);
+ reset();broadcastOn=false;result=await send(body);assert.equal(result.status,403);assert.match(result.message,/방송 중에만/);assert.equal(writes.length,0);
+}
+console.log('PASS broadcast query errors distinguished from OFF for chat and commands');

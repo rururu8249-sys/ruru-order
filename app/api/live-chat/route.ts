@@ -94,15 +94,17 @@ export async function POST(request: NextRequest) {
     const [setting, role, bcRes, custRes, bansRes, lastRes] = await Promise.all([
       readSetting(sb),
       chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null, isMod: false })),
-      sb.from("broadcasts").select("id, status, widget_card_enabled, youtube_live_url, youtube_url").eq("id", bc).maybeSingle(),
+      sb.from("broadcasts").select("id, status, widget_card_enabled, youtube_live_url").eq("id", bc).maybeSingle(),
       sb.from("customers").select("id, youtube_nickname, is_blocked, kakao_profile_image").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("live_chat_bans").select("until_at, lifted_at").eq("kakao_id", kakaoId).is("lifted_at", null).order("id", { ascending: false }).limit(5),
       sb.from("live_chat_messages").select("created_at").eq("kakao_id", kakaoId).order("id", { ascending: false }).limit(1).maybeSingle(),
     ]);
     if (!setting.enabled) return fail("지금은 채팅을 쓸 수 없어요.", 403);
 
+    if (bcRes.error) return fail("방송 상태를 확인하지 못했어요. 잠시 후 다시 보내 주세요.", 503);
+
     // 방송이 켜져 있을 때만
-    const bcRow = bcRes.data as { status?: unknown; widget_card_enabled?: boolean; youtube_live_url?: string; youtube_url?: string } | null;
+    const bcRow = bcRes.data as { status?: unknown; widget_card_enabled?: boolean; youtube_live_url?: string } | null;
     if (!bcRow || String(bcRow.status ?? "") !== "ON") return fail("방송 중에만 쓸 수 있어요.", 403);
 
     // 닉네임은 회원 표에서(카카오 계정 기준, 최신 1줄)
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
         let introNotice: string | undefined;
         const rawTarget = raw.target as Record<string, unknown> | undefined;
         const wantsIntro = target && "targets" in target && target.mode === "replace" && rawTarget && "intro" in rawTarget;
-        const capture = wantsIntro ? validateIntroCapture(rawTarget.intro, youtubeVideoIdFromUrl(String(bcRow.youtube_live_url || bcRow.youtube_url || ""))) : null;
+        const capture = wantsIntro ? validateIntroCapture(rawTarget.intro, youtubeVideoIdFromUrl(String(bcRow.youtube_live_url || ""))) : null;
         const recordIntro = wantsIntro ? async (targets: import("@/lib/widgetProductLibrary").WidgetProductTarget[]) => {
           // Auxiliary recording must never turn successful widget/chat changes into a retry.
           try {

@@ -54,7 +54,7 @@ console.log('PASS independent product/detail records, replacement, broadcast/vid
 let visible=true,broadcastVideo=video,statusOn='ON';fail=false;
 const publicLoad=createUiLoader({
  'next/server':{NextResponse:{json:(data,init)=>new Response(JSON.stringify(data),init)}},
- '@/lib/youtube':{getServiceClient:()=>({from:table=>table==='broadcasts'?{select(){return this;},eq(){return this;},maybeSingle:async()=>({data:{status:statusOn,youtube_live_url:`https://www.youtube.com/watch?v=${broadcastVideo}`},error:null})}:db.from(table)})},
+ '@/lib/youtube':{getServiceClient:()=>({from:table=>table==='broadcasts'?{select(columns){this.missingColumn=columns.split(',').some(c=>c.trim()==='youtube_url');return this;},eq(){return this;},async maybeSingle(){return this.missingColumn?{data:null,error:{code:'42703'}}:{data:{status:statusOn,youtube_live_url:`https://www.youtube.com/watch?v=${broadcastVideo}`},error:null};}}:db.from(table)})},
  '@/lib/liveChatProductCommandServer':{loadChatCommandProducts:async()=>visible?[{productId:'1',detailName:'MC-310'}]:[]},
 });
 const bc='00000000-0000-0000-0000-000000000001';

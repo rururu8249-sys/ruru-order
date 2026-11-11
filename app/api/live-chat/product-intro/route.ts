@@ -14,10 +14,10 @@ export async function GET(request: NextRequest) {
   if (!/^[\da-f-]{36}$/i.test(bc) || !/^[\w-]{11}$/.test(videoId) || !target) return reply(null, 400);
   try {
     const sb = getServiceClient();
-    const broadcast = await sb.from("broadcasts").select("status,youtube_live_url,youtube_url").eq("id", bc).maybeSingle();
+    const broadcast = await sb.from("broadcasts").select("status,youtube_live_url").eq("id", bc).maybeSingle();
     if (broadcast.error) return reply(null, 503);
     const row = broadcast.data;
-    if (!row || row.status !== "ON" || youtubeVideoIdFromUrl(String(row.youtube_live_url || row.youtube_url || "")) !== videoId) return reply(null);
+    if (!row || row.status !== "ON" || youtubeVideoIdFromUrl(String(row.youtube_live_url || "")) !== videoId) return reply(null);
     const catalog = await loadChatCommandProducts(sb, bc);
     if (!catalog.some(p => widgetTargetKey(p) === widgetTargetKey(target))) return reply(null);
     return reply(await readProductIntro(sb, bc, videoId, target));
