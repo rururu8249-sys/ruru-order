@@ -30,12 +30,12 @@
 - [x] Add signed chat session helper and dedicated OAuth issuance through the existing callback URI; clear/reject mismatched accounts on private requests. Add auth tests (forgery, expiry, mismatch).
 - [x] New private history/own-delete route: verified identity, row ownership, atomic id+author+visible conditional update; hidden_by=author, pinned_at=null. Moderator reads visible + author-deleted originals only. Existing message schema retained; a narrow settings trigger protects moderator role fields from anonymous changes.
 - [x] Add optional mine/deletedByAuthor metadata; retain only authorized tombstones. Public events trigger authenticated reconciliation, never reveal originals.
-- [x] Integrate longpress/rightclick own delete and dimmed labeled originals in LiveWatch and authenticated chat-view viewers. Require session confirmation for legacy clients through existing login flow.
-- [ ] Test public/owner/moderator permissions, repeated/delete race, pinned removal, realtime/refresh and UI.
+- [x] Integrate longpress/rightclick own delete and dimmed labeled originals in LiveWatch and authenticated chat-view viewers. Verify through a dedicated OAuth flow using the existing callback URI; customer login/sync remains separate.
+- [x] Test public/owner/moderator permissions, repeated/delete race, pinned removal, realtime/refresh and UI.
 
 ## Task 3: Release
-- [ ] Independent security/functional review, necessary corrections, relevant regression suite.
-- [ ] tsc, build, push; Vercel success; CLAUDE deployment entry.
+- [x] Independent security/functional review, necessary corrections, relevant regression suite.
+- [x] tsc, build, push; Vercel success; CLAUDE deployment entry.
 
 ## Verification and release notes
 - Actual Chrome desktop/mobile: slash catalog, aliases, arrow/Enter/Escape, IME, sold-out/empty, precise target; own-only rightclick/longpress/delete failure; dimmed private originals and permission-loss menu clearing.
@@ -44,4 +44,4 @@
 - tsc and production build passed with both BANKDA guards.
 - Production trigger installed with transactional isolated temp-table tests for unchanged-role display update/upsert, owner/mod changes, key renames, deletion, unrelated settings and authenticated role. No live setting values or messages changed.
 - Browser Kakao sign-in requires the user account; external live OAuth was not performed by the agent. Existing signed admin session can review originals immediately.
-- New files and script release are pending push/deployment verification.
+- Release 23bee9e pushed; Vercel success. Production: public chat 50 messages/200 with no private fields, private unauthorized 401, catalog unauthorized 403, OAuth state redirect 307 with Secure HttpOnly cookie, order/chat-view 200.
