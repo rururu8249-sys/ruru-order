@@ -66,3 +66,19 @@ export async function readProductIntroIndex(sb: SupabaseClient, bc: string, vide
     if ((result.data ?? []).length < 1000) return records;
   }
 }
+
+/** Remove every stored point for these products in this video (including copies saved
+ * under another sales broadcast that reused the same video), so the next introduction
+ * records a fresh point. Only product_intro rows are touched. */
+export async function clearProductIntros(sb: SupabaseClient, videoId: string, targets: WidgetProductTarget[]) {
+  const escape = (s: string) => s.replace(/[\\%_]/g, "\\$&");
+  let removed = 0;
+  for (const target of new Map(targets.map(t => [widgetTargetKey(t), t])).values()) {
+    const digest = createHash("sha256").update(widgetTargetKey(target)).digest("hex");
+    const pattern = `${escape("product_intro_v1_")}%${escape(`_${videoId}_${digest}`)}`;
+    const result = await sb.from("settings").delete().like("key", pattern).select("key");
+    if (result.error) throw new Error("소개영상 위치를 지우지 못했어요.");
+    removed += (result.data ?? []).filter(row => introRecordScope(String(row.key))?.digest === digest).length;
+  }
+  return removed;
+}

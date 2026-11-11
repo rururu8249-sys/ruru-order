@@ -3,7 +3,7 @@ import { getServiceClient } from "@/lib/youtube";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
 import { loadChatCommandProducts, applyProductRotation } from "@/lib/liveChatProductCommandServer";
-import { readProductIntroIndex, productIntroKey, saveProductIntros } from "@/lib/productIntroServer";
+import { readProductIntroIndex, productIntroKey, saveProductIntros, clearProductIntros } from "@/lib/productIntroServer";
 import { validateIntroCapture } from "@/lib/productIntro";
 import { youtubeVideoIdFromUrl } from "@/lib/liveWatch";
 import { parseChatProductSelection } from "@/lib/liveChatProductCommand";
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const raw = await request.json();
     const bc = String(raw.bc || ""), action = raw.action;
     const selection = parseChatProductSelection({ targets: raw.targets, mode: "replace" });
-    if (!uuid.test(bc) || !selection || !["register", "change", "rotate", "append"].includes(action)) return fail("상품과 작업을 확인해 주세요.");
+    if (!uuid.test(bc) || !selection || !["register", "change", "rotate", "append", "clear"].includes(action)) return fail("상품과 작업을 확인해 주세요.");
     const sb = getServiceClient(), row = await broadcast(sb, bc);
     if (!row) return fail("방송을 찾지 못했어요.", 404);
     const videoId = youtubeVideoIdFromUrl(String(row.youtube_live_url || ""));
@@ -55,6 +55,11 @@ export async function POST(request: NextRequest) {
       if (selected.some(p => p?.soldOut)) return fail("품절 상품은 위젯에 표시할 수 없어요.");
       await applyProductRotation(sb, bc, catalog, selection.targets, action === "append" ? "append" : "replace");
       return reply({ ok: true, message: action === "append" ? "기존 순환에 추가했어요. 소개영상 위치는 그대로예요." : `${selection.targets.length === 1 ? "선택 상품을 고정했어요" : `선택한 ${selection.targets.length}개 상품을 순환해요`}. 소개영상 위치는 그대로예요.` });
+    }
+    if (action === "clear") {
+      if (!videoId) return fail("이 방송에 연결된 영상이 없어요.");
+      const removed = await clearProductIntros(sb, videoId, selection.targets);
+      return reply({ ok: true, removed, message: `${selection.targets.length}개 상품 소개영상 위치를 지웠어요. 다시 소개하면 그 위치로 새로 등록돼요.` });
     }
     const capture = validateIntroCapture(raw.capture, videoId);
     if (!capture) return fail("영상 위치를 확인하지 못했어요. 영상을 열거나 시·분·초를 직접 입력해 주세요.");

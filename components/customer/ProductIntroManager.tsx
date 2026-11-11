@@ -13,8 +13,8 @@ type Item = BotCandidate & { intro: ProductIntro | null };
 type Catalog = { videoId: string; widgetAvailable: boolean; items: Item[] };
 const timeText = (seconds: number) => `${Math.floor(seconds / 3600)}시간 ${Math.floor(seconds % 3600 / 60)}분 ${seconds % 60}초`;
 const button: CSSProperties = { minHeight: 44, border: "1px solid #d5d5d5", borderRadius: 10, padding: "9px 12px", font: "inherit", fontSize: 14, fontWeight: 700, color: "#111", background: "#fff", cursor: "pointer" };
-export function ProductIntroManager({ broadcastId, initialQuery = "", capture, onClose }: {
-  broadcastId: string; initialQuery?: string; capture?: () => Promise<ProductIntroCapture | null>; onClose: () => void;
+export function ProductIntroManager({ broadcastId, initialQuery = "", initialChosen, capture, onClose }: {
+  broadcastId: string; initialQuery?: string; initialChosen?: string[]; capture?: () => Promise<ProductIntroCapture | null>; onClose: () => void;
 }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [query, setQuery] = useState(initialQuery);
@@ -36,7 +36,7 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
     setCatalog(null); setChosen([]); setStatus("상품을 불러오는 중…"); setError(false);
     void fetch(`/api/live-chat/product-intro/manage?${new URLSearchParams({ bc: broadcastId })}`, { headers: chatIdentityHeaders(), cache: "no-store", signal: controller.signal })
       .then(async response => { const j = await response.json(); if (!controller.signal.aborted) setNeedsAuth(response.status === 403); if (!j.ok) throw Error(j.message); return j as Catalog; })
-      .then(j => { if (!controller.signal.aborted) { setCatalog(j); setStatus(""); } })
+      .then(j => { if (!controller.signal.aborted) { setCatalog(j); setStatus(""); if (initialChosen?.length) setChosen(prev => prev.length ? prev : initialChosen.filter(k => j.items.some(p => widgetTargetKey(p) === k)).slice(0, CHAT_PRODUCT_LIMIT)); } })
       .catch(e => { if (!controller.signal.aborted) { setStatus(e.message || "상품을 불러오지 못했어요."); setError(true); } });
     return () => controller.abort();
   }, [broadcastId, attempt]);
@@ -73,12 +73,14 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
     const key = widgetTargetKey(p);
     setChosen(prev => prev.includes(key) ? prev.filter(k => k !== key) : prev.length < CHAT_PRODUCT_LIMIT ? [...prev, key] : prev);
   }
-  async function apply(action: "register" | "change" | "rotate" | "append") {
+  async function apply(action: "register" | "change" | "rotate" | "append" | "clear") {
     if (!catalog || saving.current || !selected.length) return;
+    if (action === "clear" && !window.confirm(`선택한 상품 ${selected.length}개의 소개영상 위치를 지울까요? 지운 뒤 다시 소개하면 그 위치로 새로 등록돼요.`)) return;
     if (action === "change" && !window.confirm(`선택한 상품 ${selected.length}개의 소개영상 위치를 변경할까요? 기존 연결 위치가 바뀝니다.`)) return;
     saving.current = true; setBusy(true); setStatus(""); setError(false);
     try {
       const introAction = action === "register" || action === "change";
+      const refresh = introAction || action === "clear";
       // Event handler only: timestamp records the explicit save click, never render time.
       // eslint-disable-next-line react-hooks/purity
       const point = introAction ? mode === "player" ? await capture?.() : { videoId: catalog.videoId, seconds, capturedAt: Date.now() } : null;
@@ -90,7 +92,7 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
       if (!j.ok) throw Error(j.message || "저장하지 못했어요.");
       if (!alive.current) return;
       setStatus(j.message);
-      if (introAction) {
+      if (refresh) {
         invalidateProductIntroCatalog(broadcastId, catalog.videoId);
         // Refresh actual stored records; a different admin may have registered first.
         const fresh = await fetch(`/api/live-chat/product-intro/manage?${new URLSearchParams({bc: broadcastId})}`, {headers: chatIdentityHeaders(), cache: "no-store"}).then(r => r.json());
@@ -121,6 +123,7 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", capture, o
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
             <button disabled={!canSave} onClick={()=>void apply("register")} style={{...button,flex:"1 1 150px",background:canSave?"#111":"#eee",color:canSave?"#fff":"#888"}}>소개영상 등록</button>
             {existing > 0 && <button disabled={!canSave} onClick={()=>void apply("change")} style={{...button,flex:"1 1 150px",color:canSave?"#111":"#888",background:canSave?"#fff":"#eee"}}>소개영상 위치 변경</button>}
+            {existing > 0 && <button disabled={busy || !catalog?.videoId} onClick={()=>void apply("clear")} style={{...button,flex:"1 1 150px",color:"#D30005",background:"#fff"}}>소개영상 위치 지우기</button>}
           </div>
         </section>
         <section style={{marginTop:16,paddingTop:12,borderTop:"1px solid #ddd"}} aria-label="위젯 고정과 순환">

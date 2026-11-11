@@ -39,6 +39,7 @@ import { useLiveGreeting } from "@/lib/useLiveGreeting";
 import { useLiveResume } from "@/lib/useLiveResume";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 import { ChatProductPicker } from "@/components/customer/ChatProductPicker";
+import { widgetTargetKey } from "@/lib/widgetProductLibrary";
 import type { ChatProductSelection } from "@/lib/liveChatProductCommand";
 import { ChatProductThumb } from "./ChatProductThumb";
 import { chatProductPhoto } from "@/lib/chatProductPhoto";
@@ -616,6 +617,7 @@ export default function LiveWatchView(props: Props) {
     return () => window.clearTimeout(t);
   }, [chatHint]);
   const [introManage, setIntroManage] = useState<string | null>(null);
+  const [introChosen, setIntroChosen] = useState<string[]>([]);
   const productPickerOpen = Boolean(chat?.canModerate && draft.trimStart().startsWith("/"));
   const sendChat = async (bodyOverride?: string, target?: ChatProductSelection) => {
     if (!chat || sending) return;
@@ -990,7 +992,7 @@ export default function LiveWatchView(props: Props) {
             onSubmit={(e) => { e.preventDefault(); if (composingRef.current || productPickerOpen) return; if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } if (!selectedEmoji) setEmojiOpen(false); void sendChat(); }}
             style={{ position: "relative", width: "100%", maxWidth: "560px", margin: "0 auto", background: isDesktop ? "#0F0F0F" : "#FFFFFF", padding: isDesktop ? "12px 0 calc(12px + env(safe-area-inset-bottom))" : emojiOpen ? "12px 16px 0" : "12px 16px calc(12px + env(safe-area-inset-bottom))", borderRadius: isDesktop ? 0 : "16px 16px 0 0", boxSizing: "border-box", ...(isDesktop ? { position: "relative", flexShrink: 0, order: 5, borderTop: "1px solid #333333", pointerEvents: "auto" } : {}) }}
           >
-            {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
+            {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onIntro={chat?.canModerate ? (products) => { setIntroChosen(products.map(widgetTargetKey)); setIntroManage(products[0]?.texts[0] ?? ""); setDraft(""); } : undefined} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
             {draftEmojiCount > 0 ? (
               // Float above the input: only the picture has a translucent backing, leaving the video visible.
               <div aria-label="미리보기" style={{ position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", width: "fit-content", maxWidth: "calc(100% - 32px)", maxHeight: "30dvh", overflowY: "auto", boxSizing: "border-box", padding: "12px", borderRadius: "12px", background: "rgba(0,0,0,0.38)", color: "#FFFFFF", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word", zIndex: 1 }}>
@@ -1583,7 +1585,7 @@ export default function LiveWatchView(props: Props) {
         </div>
       ) : null}
 
-      {introManage !== null && chat?.canModerate && props.broadcastId ? <ProductIntroManager key={props.broadcastId} broadcastId={props.broadcastId} initialQuery={introManage} capture={introPlayer.capture} onClose={() => setIntroManage(null)} /> : null}
+      {introManage !== null && chat?.canModerate && props.broadcastId ? <ProductIntroManager key={props.broadcastId} broadcastId={props.broadcastId} initialQuery={introManage} initialChosen={introChosen} capture={introPlayer.capture} onClose={() => { setIntroManage(null); setIntroChosen([]); }} /> : null}
 
       {/* 상품 목록 창 */}
       {listOpen ? (
@@ -1596,7 +1598,7 @@ export default function LiveWatchView(props: Props) {
               </span>
               <button type="button" onClick={() => setListOpen(false)} aria-label="닫기" style={{ width: "44px", height: "44px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><IconClose /></button>
             </div>
-            {chat?.canModerate && props.broadcastId ? <div style={{padding:"0 16px 10px",flexShrink:0}}><button type="button" onClick={() => setIntroManage("")} style={{width:"100%",minHeight:44,border:"1px solid #ddd",borderRadius:10,background:"#f5f5f5",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer"}}>관리자 · 소개영상 등록 / 위젯 순환</button></div> : null}
+            {chat?.canModerate && props.broadcastId ? <div style={{padding:"0 16px 10px",flexShrink:0}}><button type="button" onClick={() => { setIntroChosen([]); setIntroManage(""); }} style={{width:"100%",minHeight:44,border:"1px solid #ddd",borderRadius:10,background:"#f5f5f5",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer"}}>관리자 · 소개영상 등록 / 위젯 순환</button></div> : null}
             {listMode === "featured" ? <div style={{padding: "0 16px 10px", flexShrink: 0}}>
               <p style={{fontSize: 13, color: "#666", margin: "0 0 8px"}}>전체 {totalCount}개 중 소개 중인 상품이에요.</p>
               <button type="button" onClick={() => openProductList("all")} style={{width: "100%", minHeight: 44, borderRadius: 10, border: "1px solid #d5d5d5", background: "#f5f5f5", color: "#111", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>전체 상품 {totalCount}개 보기 →</button>
