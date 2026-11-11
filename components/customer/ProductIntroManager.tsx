@@ -19,6 +19,7 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", initialCho
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [query, setQuery] = useState(initialQuery);
   const [chosen, setChosen] = useState<string[]>([]);
+  const simple = !!initialChosen?.length;
   const [mode, setMode] = useState<"player" | "manual">(capture ? "player" : "manual");
   const [time, setTime] = useState(["", "", ""]);
   const [status, setStatus] = useState("상품을 불러오는 중…");
@@ -76,7 +77,6 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", initialCho
   async function apply(action: "register" | "change" | "rotate" | "append" | "clear") {
     if (!catalog || saving.current || !selected.length) return;
     if (action === "clear" && !window.confirm(`선택한 상품 ${selected.length}개의 소개영상 위치를 지울까요? 지운 뒤 다시 소개하면 그 위치로 새로 등록돼요.`)) return;
-    if (action === "change" && !window.confirm(`선택한 상품 ${selected.length}개의 소개영상 위치를 변경할까요? 기존 연결 위치가 바뀝니다.`)) return;
     saving.current = true; setBusy(true); setStatus(""); setError(false);
     try {
       const introAction = action === "register" || action === "change";
@@ -102,9 +102,10 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", initialCho
     finally { saving.current = false; if (alive.current) setBusy(false); }
   }
   return createPortal(<div onClick={() => { if (!busy) onClose(); }} style={{position:"fixed",inset:0,zIndex:2147483646,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:10}}>
-    <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="상품 소개영상 · 위젯 관리" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:560,maxHeight:"calc(100dvh - 20px)",display:"flex",flexDirection:"column",background:"#fff",color:"#111",borderRadius:16,fontFamily:"inherit",overflow:"hidden",outline:"none"}}>
-      <header style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px 10px 16px",flexShrink:0,borderBottom:"1px solid #eee"}}><strong style={{flex:1,fontSize:17}}>상품 소개영상 · 위젯</strong><button style={button} disabled={busy} onClick={onClose} aria-label="상품 관리 닫기">✕</button></header>
+    <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label={simple ? "소개영상 위치" : "상품 소개영상 · 위젯 관리"} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:560,maxHeight:"calc(100dvh - 20px)",display:"flex",flexDirection:"column",background:"#fff",color:"#111",borderRadius:16,fontFamily:"inherit",overflow:"hidden",outline:"none"}}>
+      <header style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px 10px 16px",flexShrink:0,borderBottom:"1px solid #eee"}}><strong style={{flex:1,fontSize:17}}>{simple ? "소개영상 위치" : "상품 소개영상 · 위젯"}</strong><button style={button} disabled={busy} onClick={onClose} aria-label="상품 관리 닫기">✕</button></header>
       <div data-live-scroll="1" style={{overflowY:"auto",overscrollBehavior:"contain",minHeight:0,padding:14,paddingBottom:"calc(14px + env(safe-area-inset-bottom))"}}>
+        {simple ? <div style={{display:"grid",gap:6}}>{selected.map(p=><div key={widgetTargetKey(p)} style={{display:"flex",alignItems:"center",gap:10}}><ChatProductThumb src={p.imageUrl} name={p.texts[0]} size={44} placeholder /><span style={{minWidth:0,overflowWrap:"anywhere"}}><strong style={{fontSize:16}}>{p.texts[0]}</strong><small style={{display:"block",fontSize:13,color:"#666",marginTop:2}}>{p.intro ? `지금 저장된 위치 ${timeText(p.intro.seconds)}` : "저장된 위치 없음"}</small></span></div>)}{catalog && !selected.length && <p style={{fontSize:13,color:"#666"}}>상품을 찾지 못했어요.</p>}</div> : <>
         <input aria-label="소개할 상품 검색" value={query} onChange={e=>setQuery(e.target.value)} placeholder="상품명·번호 검색" style={{width:"100%",boxSizing:"border-box",minHeight:44,padding:"8px 12px",border:"1px solid #ccc",borderRadius:10,fontSize:16,color:"#111",background:"#fff"}} />
         <p style={{fontSize:12,color:"#666",margin:"8px 0"}}>상품 선택 {selected.length}/{CHAT_PRODUCT_LIMIT} · 여러 개 선택 가능</p>
         {selected.length > 0 && <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>{selected.map(p=><button key={widgetTargetKey(p)} disabled={busy} onClick={()=>toggle(p)} style={{...button,fontSize:12,padding:"4px 8px"}}>{p.texts[0]} ×</button>)}</div>}
@@ -114,24 +115,24 @@ export function ProductIntroManager({ broadcastId, initialQuery = "", initialCho
           </button>)}
           {catalog && !items.length && <p style={{padding:12}}>찾는 상품이 없어요.</p>}
         </div>
+        </>}
         <section style={{marginTop:14}} aria-label="소개영상 위치">
-          <strong style={{fontSize:14}}>소개영상 위치</strong>
+          {!simple && <strong style={{fontSize:14}}>소개영상 위치</strong>}
           {catalog && !catalog.videoId && <p style={{fontSize:12,color:"#b42318"}}>이 방송에 유튜브 영상을 먼저 연결해 주세요.</p>}
-          {capture && <div style={{display:"flex",gap:6,marginTop:8}}>{([['player','현재 재생 위치'],['manual','시간 직접 입력']] as const).map(([key,label])=><button key={key} disabled={busy} aria-pressed={mode===key} onClick={()=>setMode(key)} style={{...button,flex:1,background:mode===key?"#111":"#fff",color:mode===key?"#fff":"#111"}}>{label}</button>)}</div>}
-          {mode === "manual" ? <div style={{display:"flex",gap:8,marginTop:8}}>{["시","분","초"].map((label,i)=><label key={label} style={{display:"flex",alignItems:"center",gap:4,flex:1,minWidth:0}}><input aria-label={`소개영상 ${label}`} inputMode="numeric" disabled={busy} value={time[i]} placeholder="0" onChange={e=>{const v=e.target.value;if(/^\d{0,3}$/.test(v))setTime(prev=>prev.map((s,n)=>n===i?v:s));}} style={{width:"100%",minWidth:0,minHeight:44,boxSizing:"border-box",border:"1px solid #ccc",borderRadius:8,padding:8,fontSize:16,color:"#111",background:"#fff"}}/>{label}</label>)}</div> : <p style={{fontSize:12,color:"#666",margin:"8px 0"}}>등록을 누르는 순간의 영상 위치보다 5초 앞부터 연결해요.</p>}
-          <p style={{fontSize:12,color:"#666",margin:"8px 0"}}>등록된 소개 위치는 유지돼요. 바꿀 때만 ‘위치 변경’을 누르세요.</p>
-          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            <button disabled={!canSave} onClick={()=>void apply("register")} style={{...button,flex:"1 1 150px",background:canSave?"#111":"#eee",color:canSave?"#fff":"#888"}}>소개영상 등록</button>
-            {existing > 0 && <button disabled={!canSave} onClick={()=>void apply("change")} style={{...button,flex:"1 1 150px",color:canSave?"#111":"#888",background:canSave?"#fff":"#eee"}}>소개영상 위치 변경</button>}
-            {existing > 0 && <button disabled={busy || !catalog?.videoId} onClick={()=>void apply("clear")} style={{...button,flex:"1 1 150px",color:"#D30005",background:"#fff"}}>소개영상 위치 지우기</button>}
+          {mode === "manual" && <div style={{display:"flex",gap:8,marginTop:8}}>{["시","분","초"].map((label,i)=><label key={label} style={{display:"flex",alignItems:"center",gap:4,flex:1,minWidth:0}}><input aria-label={`소개영상 ${label}`} inputMode="numeric" disabled={busy} value={time[i]} placeholder="0" onChange={e=>{const v=e.target.value;if(/^\d{0,3}$/.test(v))setTime(prev=>prev.map((s,n)=>n===i?v:s));}} style={{width:"100%",minWidth:0,minHeight:44,boxSizing:"border-box",border:"1px solid #ccc",borderRadius:8,padding:8,fontSize:16,color:"#111",background:"#fff"}}/>{label}</label>)}</div>}
+          <button disabled={!canSave} onClick={()=>void apply("change")} style={{...button,width:"100%",marginTop:10,minHeight:52,fontSize:16,background:canSave?"#111":"#eee",color:canSave?"#fff":"#888"}}>{mode === "player" ? "지금 보는 장면으로 저장" : "이 시간으로 저장"}</button>
+          <div style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:6}}>
+            {capture ? <button type="button" disabled={busy} onClick={()=>setMode(mode === "player" ? "manual" : "player")} style={{background:"none",border:0,padding:"10px 4px",minHeight:44,fontSize:13,fontWeight:600,color:"#555",textDecoration:"underline",cursor:"pointer"}}>{mode === "player" ? "시간 직접 입력" : "지금 보는 장면으로"}</button> : <span />}
+            {existing > 0 && <button type="button" disabled={busy || !catalog?.videoId} onClick={()=>void apply("clear")} style={{background:"none",border:0,padding:"10px 4px",minHeight:44,fontSize:13,fontWeight:600,color:"#D30005",cursor:"pointer"}}>저장된 위치 지우기</button>}
           </div>
+          {mode === "player" && <p style={{fontSize:12,color:"#666",margin:"2px 0 0"}}>누르는 순간보다 5초 앞부터 재생돼요.</p>}
         </section>
-        <section style={{marginTop:16,paddingTop:12,borderTop:"1px solid #ddd"}} aria-label="위젯 고정과 순환">
+        {!simple && <section style={{marginTop:16,paddingTop:12,borderTop:"1px solid #ddd"}} aria-label="위젯 고정과 순환">
           <strong style={{fontSize:14}}>상품 위젯</strong>
           <p style={{fontSize:12,color:"#666",margin:"6px 0 8px"}}>1개는 고정 · 여러 개는 순환해요. 소개영상 위치는 바뀌지 않아요.</p>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}><button disabled={!canRotate} onClick={()=>void apply("rotate")} style={{...button,flex:"1 1 150px",color:canRotate?"#111":"#888",background:canRotate?"#fff":"#eee"}}>{selected.length <= 1 ? "선택 상품 고정" : `선택 ${selected.length}개 순환`}</button><button disabled={!canRotate} onClick={()=>void apply("append")} style={{...button,flex:"1 1 150px",color:canRotate?"#111":"#888",background:canRotate?"#fff":"#eee"}}>기존 순환에 추가</button></div>
           {catalog && !catalog.widgetAvailable && <p style={{fontSize:12,color:"#666"}}>방송과 상품 위젯을 켜면 사용할 수 있어요.</p>}
-        </section>
+        </section>}
         {(status || busy) && <p role="status" style={{padding:10,borderRadius:8,background:error?"#fff0f0":"#f2f6f3",color:error?"#b42318":"#18572d",fontSize:13,overflowWrap:"anywhere"}}>{busy?"저장 중…":status}</p>}
         {needsAuth && <button style={{...button,width:"100%"}} onClick={() => { verifyChatAccount(); setStatus("카카오 확인을 마치면 상품목록을 다시 불러와요."); }}>카카오로 관리자 확인</button>}
         {error && !catalog && <button style={button} onClick={()=>setAttempt(v=>v+1)}>다시 불러오기</button>}

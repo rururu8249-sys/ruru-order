@@ -17,21 +17,30 @@ let tree;await act(async()=>{tree=Renderer.create(React.createElement(ProductInt
 const buttons=()=>tree.root.findAllByType('button');
 const click=async text=>{const b=buttons().find(b=>b.children.join('')===text);assert(b,`button ${text}`);assert(!b.props.disabled,`${text} enabled`);await act(async()=>b.props.onClick());};
 await act(async()=>buttons().find(b=>b.props['aria-pressed']===false).props.onClick());
-assert(buttons().find(b=>b.children.join('')==='소개영상 등록').props.disabled,'manual blank time must not save zero implicitly');
+assert(buttons().find(b=>b.children.join('')==='이 시간으로 저장').props.disabled,'manual blank time must not save zero implicitly');
 const minute=()=>tree.root.findByProps({'aria-label':'소개영상 분'});
 await act(async()=>minute().props.onChange({target:{value:'5'}}));
 await act(async()=>minute().props.onChange({target:{value:''}}));assert.equal(minute().props.value,'','deletion remains blank');
 await act(async()=>minute().props.onChange({target:{value:'2'}}));
-await click('소개영상 등록');assert.equal(posts.at(-1).action,'register');assert.equal(posts.at(-1).capture.seconds,120);assert.equal(invalidations,1);
-window.confirm=()=>false;await click('소개영상 위치 변경');assert.equal(posts.length,1,'cancel explicit replacement');
-window.confirm=()=>true;await click('소개영상 위치 변경');assert.equal(posts.at(-1).action,'change');
+await click('이 시간으로 저장');assert.equal(posts.at(-1).action,'change','one save button replaces');assert.equal(posts.at(-1).capture.seconds,120);assert.equal(invalidations,1);
+window.confirm=()=>false;const n0=posts.length;await click('저장된 위치 지우기');assert.equal(posts.length,n0,'cancel clear');
+window.confirm=()=>true;await click('저장된 위치 지우기');assert.equal(posts.at(-1).action,'clear');
 await click('선택 상품 고정');assert.equal(posts.at(-1).action,'rotate');assert.equal(posts.at(-1).capture,null);
 await click('기존 순환에 추가');assert.equal(posts.at(-1).action,'append');
 await act(async()=>tree.unmount());
 let captures=0;await act(async()=>{tree=Renderer.create(React.createElement(ProductIntroManager,{broadcastId:'bc',capture:async()=>{captures++;return {videoId:'abcdefghijk',seconds:200,capturedAt:Date.now()};},onClose(){}}));});
 await act(async()=>buttons().find(b=>b.props['aria-pressed']===false&&b.children.some(c=>typeof c!=='string')).props.onClick());
-await click('소개영상 등록');assert.equal(captures,1);assert.equal(posts.at(-1).capture.seconds,200);
+await click('지금 보는 장면으로 저장');assert.equal(captures,1);assert.equal(posts.at(-1).capture.seconds,200);assert.equal(posts.at(-1).action,'change');
 await click('선택 상품 고정');assert.equal(captures,1,'widget operation does not capture or overwrite intro');
+await act(async()=>tree.unmount());
+// simple mode from chat picker: only the chosen product, one save button, no search/widget
+await act(async()=>{tree=Renderer.create(React.createElement(ProductIntroManager,{broadcastId:'bc',initialChosen:['77|MC-335'],capture:async()=>({videoId:'abcdefghijk',seconds:300,capturedAt:Date.now()}),onClose(){}}));});
+const key77=catalog.items[0];const {widgetTargetKey}=load('lib/widgetProductLibrary.ts');
+await act(async()=>tree.unmount());
+await act(async()=>{tree=Renderer.create(React.createElement(ProductIntroManager,{broadcastId:'bc',initialChosen:[widgetTargetKey(key77)],capture:async()=>({videoId:'abcdefghijk',seconds:300,capturedAt:Date.now()}),onClose(){}}));});
+assert.equal(tree.root.findAll(n=>n.props?.['aria-label']==='소개할 상품 검색').length,0,'simple mode hides search');
+assert(!buttons().some(b=>b.children.join('')==='선택 상품 고정'),'simple mode hides widget');
+await click('지금 보는 장면으로 저장');assert.equal(posts.at(-1).action,'change');assert.deepEqual(posts.at(-1).targets,[{productId:'77',detailName:'MC-335'}]);assert.equal(posts.at(-1).capture.seconds,300);
 await act(async()=>tree.unmount());
 console.log('PASS manual/player time, blank numeric editing, confirmed replacement, widget-only isolation');
 

@@ -64,6 +64,6 @@ export async function POST(request: NextRequest) {
     const capture = validateIntroCapture(raw.capture, videoId);
     if (!capture) return fail("영상 위치를 확인하지 못했어요. 영상을 열거나 시·분·초를 직접 입력해 주세요.");
     const result = await saveProductIntros(sb, bc, selection.targets, capture, action === "change" ? "replace" : "first");
-    return reply({ ok: true, ...result, message: `${result.saved}개 소개영상 ${action === "change" ? "위치 변경" : "등록"} 완료${result.kept ? ` · 기존 ${result.kept}개 위치 유지` : ""}` });
+    return reply({ ok: true, ...result, message: action === "change" ? `소개영상 위치를 저장했어요 (${result.saved}개)` : `${result.saved}개 소개영상 등록 완료${result.kept ? ` · 기존 ${result.kept}개 위치 유지` : ""}` });
   } catch { return fail("저장하지 못했어요. 현재 상태를 다시 확인해 주세요.", 503); }
 }

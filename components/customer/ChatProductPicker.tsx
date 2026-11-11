@@ -89,7 +89,7 @@ export function ChatProductPicker({ broadcastId, query, busy, onApply, onIntro, 
         {([['replace', '선택 상품으로 순환'], ['append', '기존 순환에 추가']] as const).map(([mode, label]) => <button key={mode} type="button" data-product-apply={mode} disabled={!canApply} onClick={() => { if (canApply) onApply(selected, mode); }} style={{ flex: 1, minHeight: 44, border: "1px solid #666", borderRadius: 8, padding: "6px 8px", background: mode === "replace" ? "#fff" : "#303030", color: mode === "replace" ? "#111" : "#fff", opacity: canApply ? 1 : 0.45, fontSize: 12, fontWeight: 700 }}>{busy ? "적용 중…" : label}</button>)}
       </div>
       <div style={{ color: "#aaa", fontSize: 11, marginTop: 6 }}>선택 상품이 유튜브 위젯과 사이트 상품 카드에 함께 표시돼요.</div>
-      {onIntro && <button type="button" disabled={busy || selected.length === 0} onClick={() => onIntro(selected)} style={{ width: "100%", minHeight: 44, marginTop: 8, border: "1px solid #666", borderRadius: 8, background: "transparent", color: "#fff", opacity: busy || selected.length === 0 ? 0.45 : 1, fontSize: 12, fontWeight: 700 }}>소개영상 위치 다시 정하기 · 지우기</button>}
+      {onIntro && <button type="button" disabled={busy || selected.length === 0} onClick={() => onIntro(selected)} style={{ width: "100%", minHeight: 44, marginTop: 8, border: "1px solid #666", borderRadius: 8, background: "transparent", color: "#fff", opacity: busy || selected.length === 0 ? 0.45 : 1, fontSize: 12, fontWeight: 700 }}>소개영상 위치 바꾸기</button>}
     </div>
   </section>;
 }
