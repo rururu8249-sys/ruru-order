@@ -838,7 +838,7 @@ export default function LiveWatchView(props: Props) {
         else if (nowMs - cur.d0at > 4000 && info.duration - cur.d0 >= 2) cur.live = true; // 4초 넘게 지나 길이가 2초 넘게 늘었음 = 라이브
       }
       const vd = info.videoData as { isLive?: unknown } | undefined;
-      if (vd && vd.isLive === true) cur.live = true;
+      if (typeof vd?.isLive === "boolean") cur.live = vd.isLive;
       if (typeof info.playerState === "number") { cur.state = info.playerState; pausedRef.current = info.playerState === 2; }
       // 실제 라이브 응답에서 duration(5767초)과 이동 가능한 끝(2170초)이 달랐다.
       // progressState는 현재 DVR 범위와 실제 실시간 도착 여부. 부분 응답에서도 마지막 값을 유지한다.
@@ -1099,10 +1099,10 @@ export default function LiveWatchView(props: Props) {
         />
       ) : null}
       {props.introReplay ? (
-        <div data-product-intro-replay style={{ position: "absolute", top: "calc(84px + env(safe-area-inset-top))", left: 12, right: 12, margin: "0 auto", maxWidth: 440, borderRadius: 12, background: "rgba(17,17,17,0.9)", padding: "8px 12px", zIndex: 3, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0 12px", fontSize: 13 }}>
+        <div data-product-intro-replay style={{ position: "absolute", top: "calc(84px + env(safe-area-inset-top))", left: 12, right: 12, margin: "0 auto", maxWidth: 440, borderRadius: 14, background: "rgba(17,17,17,0.92)", padding: 12, zIndex: 3, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13, color: "#FFFFFF" }}>
           <div role="status" style={{ flex: "1 1 100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{introPlayer.status === "loading" ? "소개영상으로 이동 중…" : introPlayer.status === "unavailable" ? "지금은 이 소개영상 구간을 재생할 수 없어요." : `${props.introReplay.name} · 소개영상 보는 중`}</div>
-          <button type="button" onClick={props.onReturnToProduct} style={{ minHeight: 44, border: 0, background: "transparent", color: "#FFFFFF", font: "inherit", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>상품 선택으로</button>
-          <button type="button" onClick={backToLive} style={{ minHeight: 44, border: 0, background: "transparent", color: "#FFFFFF", font: "inherit", cursor: "pointer" }}>실시간으로</button>
+          <button type="button" onClick={props.onReturnToProduct} style={{ flex: "1 1 0", minWidth: 0, minHeight: 44, alignSelf: "stretch", wordBreak: "keep-all", padding: "8px 10px", lineHeight: 1.35, borderRadius: 10, border: "1px solid #FFFFFF", background: "#FFFFFF", color: "#111111", font: "inherit", fontWeight: 700, cursor: "pointer" }}><span aria-hidden="true">← </span>상품 선택으로 돌아가기</button>
+          {behindLive ? <button type="button" onClick={backToLive} style={{ flex: "1 1 0", minWidth: 0, minHeight: 44, alignSelf: "stretch", wordBreak: "keep-all", padding: "8px 10px", lineHeight: 1.35, borderRadius: 10, border: "1px solid #999999", background: "#333333", color: "#FFFFFF", font: "inherit", fontWeight: 600, cursor: "pointer" }}><span aria-hidden="true">● </span>실시간 방송으로 돌아가기</button> : null}
         </div>
       ) : null}
       <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
@@ -1153,7 +1153,7 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {!soundPromptDone && !guideOpen ? (
-        <div style={{ position: "absolute", left: "16px", right: "16px", top: "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
+        <div style={{ position: "absolute", left: "16px", right: "16px", top: props.introReplay ? "max(calc(208px + env(safe-area-inset-top)), 25%)" : "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
           <button type="button" aria-label="방송 소리 켜기" onClick={turnSoundOn}
             style={{ minWidth: "192px", minHeight: "60px", padding: "12px 24px", border: "1px solid rgba(255,255,255,0.7)", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", boxShadow: "0 4px 24px rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "10px", fontSize: "20px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", pointerEvents: "auto" }}>
             <IconSoundOn color="#111111" />소리 켜기
@@ -1163,7 +1163,7 @@ export default function LiveWatchView(props: Props) {
 
       {/* 돌려보는 중 → 지금 방송으로 */}
       {/* 실시간 스트림으로 건너뛰기 — 유튜브 라이브처럼 오른쪽 아래 흰 알약(돌려보기 중에도 보임) */}
-      {behindLive || liveResume.needsTap ? (
+      {!props.introReplay && (behindLive || liveResume.needsTap) ? (
         <button type="button" onClick={backToLive} style={{ position: "absolute", right: "12px", bottom: "calc(140px + env(safe-area-inset-bottom))", height: "40px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", zIndex: 2, boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
           <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="#111111"><path d="M0 0l8 7-8 7zM9 0l8 7-8 7z" /></svg>{liveResume.needsTap ? "눌러서 실시간 방송 재생" : "실시간 스트림으로 건너뛰기"}
         </button>

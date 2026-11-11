@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const source=fs.readFileSync('app/order/page.tsx','utf8');
+const ast=ts.createSourceFile('order.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const declarations=new Map();
+function visit(n){if(ts.isVariableDeclaration(n)&&ts.isIdentifier(n.name))declarations.set(n.name.text,n.initializer);ts.forEachChild(n,visit);}visit(ast);
+const replay={videoId:'abcdefghijk',name:'LOE-111 버건디',key:1};
+const state={introReplay:replay};const context={introReplay:replay,fetchCartReservations(){},setPresenceActivity(){},introProductReturnRef:{current:null}};
+for(const name of source.matchAll(/\b(setRegisteredOption\w+|setIntroOptionsSuspended|setIntroReplay)\b/g)){
+ const key=name[1].slice(3);context[name[1]]=value=>{state[key[0].toLowerCase()+key.slice(1)]=value;};
+}
+const run=name=>vm.runInNewContext(ts.transpile(`(${declarations.get(name).getText(ast)})`,{target:ts.ScriptTarget.ES2022}),{...context});
+run('closeRegisteredOptionSelectSheet')();
+assert.equal(state.introReplay,replay,'Closing the product sheet must not erase the ongoing replay');
+run('openRegisteredOptionSelectSheet')({id:'other',product_name:'다른 상품'},'다른 색상');
+assert.equal(state.introReplay,replay,'Browsing another product must not erase or change the playing introduction');
+console.log('PASS actual order sheet open/close handlers preserve replay');
+const selection={registeredOptionSelectProduct:{id:'748'},registeredOptionEditIndex:null,registeredOptionDetail:'MC-335 아이보리',registeredOptionColor:'아이보리',registeredOptionSize:'2',registeredOptionCustomerDetail:'',registeredOptionQty:2,registeredOptionManualPrice:0,registeredOptionComboSearch:'',registeredOptionDetailCategory:'전체',registeredOptionHeroPhoto:'photo',registeredOptionHeroCollapsed:false};
+context.introProductReturnRef={current:null};Object.assign(context,selection);
+run('rememberIntroProductSelection')();
+Object.assign(context,{registeredOptionSelectProduct:{id:'745'},registeredOptionDetail:'PD-507',registeredOptionColor:'베이지'});
+run('returnToIntroProduct')();
+for(const [key,value] of Object.entries(selection))assert.deepEqual(state[key],value,`Returning must restore the original replay product: ${key}`);
+assert.equal(state.introOptionsSuspended,false);
+assert.equal(state.introReplay,replay,'Returning to shopping must not seek or end the introduction');
+Object.assign(context,selection);state.registeredOptionSize='3';run('returnToIntroProduct')();
+assert.equal(state.registeredOptionSize,'3','Reopening the same product preserves a newly selected size');
+console.log('PASS return from a different product restores original options; same product preserves edits');

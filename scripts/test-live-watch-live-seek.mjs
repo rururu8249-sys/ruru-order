@@ -104,3 +104,6 @@ onMsg({origin: 'https://www.youtube.com', data: {event: 'infoDelivery', info: {
 }}});
 assert.equal(behind, false, 'Only real live-head confirmation clears the button');
 console.log('PASS captured live telemetry: inflated/stale duration, exact edge, 7s DVR, paused return and real arrival');
+onMsg({origin:'https://www.youtube.com',data:{event:'infoDelivery',info:{currentTime:100,videoData:{isLive:false}}}});
+assert.equal(behind,false,'When YouTube reports recorded playback, a formerly live player must clear live-return visibility');
+console.log('PASS live to recorded transition clears stale live-return state');

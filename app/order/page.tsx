@@ -1926,6 +1926,7 @@ export default function OrderPage() {
   const [directInputTargetIndex, setDirectInputTargetIndex] = useState(0);
   const [introReplay, setIntroReplay] = useState<IntroReplayRequest | null>(null);
   const [introOptionsSuspended, setIntroOptionsSuspended] = useState(false);
+  const introProductReturnRef = useRef<{ productId: string; detail: string; color: string; restore: () => void } | null>(null);
   const [registeredOptionSelectProduct, setRegisteredOptionSelectProduct] = useState<BroadcastProduct | null>(null);
   // [2026-08-14] 주문서 확인에서 「옵션 변경」 — null이면 새로 담기, 숫자면 그 줄을 교체
   const [registeredOptionEditIndex, setRegisteredOptionEditIndex] = useState<number | null>(null);
@@ -4882,7 +4883,6 @@ export default function OrderPage() {
   //   값이 없으면 예전과 완전히 같다(기존 호출부 무변경).
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct, preselectDetail?: string) => {
     setIntroOptionsSuspended(false);
-    setIntroReplay(null);
     void fetchCartReservations(); // 담기 직전 — 다른 고객이 방금 담은 것까지 반영해 품절을 정확히 보여준다
     setPresenceActivity("option", String(product?.product_name || "").trim()); // [2026-11-09] 관리자 「지금 접속」 표시용(신호만)
     setRegisteredOptionSelectProduct(product);
@@ -4899,8 +4899,10 @@ export default function OrderPage() {
   };
 
   const closeRegisteredOptionSelectSheet = () => {
+    // Closing shopping UI must not end an introduction that the player still shows.
+    const target = introProductReturnRef.current;
+    if (introReplay && target && String(registeredOptionSelectProduct?.id) === target.productId && registeredOptionDetail === target.detail && registeredOptionColor === target.color) rememberIntroProductSelection();
     setIntroOptionsSuspended(false);
-    setIntroReplay(null);
     setRegisteredOptionEditIndex(null);
     setRegisteredOptionSelectProduct(null);
     setRegisteredOptionColor("");
@@ -4913,6 +4915,34 @@ export default function OrderPage() {
     setRegisteredOptionDetailCategory("전체");
     setRegisteredOptionHeroPhoto("");
     setRegisteredOptionHeroCollapsed(false);
+  };
+
+  const rememberIntroProductSelection = () => {
+    if (!registeredOptionSelectProduct) return;
+    introProductReturnRef.current = {
+      productId: String(registeredOptionSelectProduct.id), detail: registeredOptionDetail, color: registeredOptionColor,
+      restore: () => {
+        setRegisteredOptionSelectProduct(registeredOptionSelectProduct);
+        // Returning from another/closed sheet starts a new selection, not a stale cart edit.
+        setRegisteredOptionEditIndex(null);
+        setRegisteredOptionDetail(registeredOptionDetail);
+        setRegisteredOptionColor(registeredOptionColor);
+        setRegisteredOptionSize(registeredOptionSize);
+        setRegisteredOptionCustomerDetail(registeredOptionCustomerDetail);
+        setRegisteredOptionQty(registeredOptionQty);
+        setRegisteredOptionManualPrice(registeredOptionManualPrice);
+        setRegisteredOptionComboSearch(registeredOptionComboSearch);
+        setRegisteredOptionDetailCategory(registeredOptionDetailCategory);
+        setRegisteredOptionHeroPhoto(registeredOptionHeroPhoto);
+        setRegisteredOptionHeroCollapsed(registeredOptionHeroCollapsed);
+      },
+    };
+  };
+  const returnToIntroProduct = () => {
+    const target = introProductReturnRef.current;
+    if (!target) return;
+    if (String(registeredOptionSelectProduct?.id) !== target.productId || registeredOptionDetail !== target.detail || registeredOptionColor !== target.color) target.restore();
+    setIntroOptionsSuspended(false);
   };
 
   // 동일 상품 + 동일 옵션(색상/사이즈)으로 이미 제출된 주문이 있는지 확인.
@@ -6573,7 +6603,7 @@ export default function OrderPage() {
   const liveWatchShown = liveWatchUsable && liveViewOn === true;
   const privateChat = useLiveChatPrivate(String(broadcast?.id || ""), liveWatchShown && liveChatEnabled, liveChatMessages);
   useEffect(() => {
-    if (!liveWatchShown || (introReplay && introReplay.videoId !== liveWatchVideoId)) { setIntroReplay(null); setIntroOptionsSuspended(false); }
+    if (!liveWatchShown || (introReplay && introReplay.videoId !== liveWatchVideoId)) { setIntroReplay(null); setIntroOptionsSuspended(false); introProductReturnRef.current = null; }
   }, [liveWatchShown, liveWatchVideoId, broadcast?.id, introReplay]);
   // A slow request must not reveal home and then jump to live a few seconds later.
   useEffect(() => {
@@ -8315,8 +8345,8 @@ export default function OrderPage() {
             <LiveWatchView
               videoId={liveWatchVideoId}
               introReplay={introReplay}
-              onReturnToProduct={() => setIntroOptionsSuspended(false)}
-              onEndIntroReplay={() => setIntroReplay(null)}
+              onReturnToProduct={returnToIntroProduct}
+              onEndIntroReplay={() => { setIntroReplay(null); introProductReturnRef.current = null; }}
               broadcastId={broadcast?.id ? String(broadcast.id) : ""}
               title={String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
               paused={isBroadcastPaused}
@@ -9174,6 +9204,7 @@ export default function OrderPage() {
                 productId={registeredOptionIntroTarget.productId}
                 detailName={registeredOptionIntroTarget.detailName}
                 onWatch={intro => {
+                  rememberIntroProductSelection();
                   setIntroReplay({ ...intro, key: Date.now(), name: registeredOptionIntroTarget.detailName || registeredOptionPhotoTitle });
                   setIntroOptionsSuspended(true);
                   chooseLiveView(true);
