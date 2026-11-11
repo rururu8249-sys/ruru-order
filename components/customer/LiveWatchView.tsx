@@ -5,6 +5,9 @@
 //   이 화면은 «보여 주기·고르기»만 한다. 담기·장바구니·주문서·결제는 부모(주문 페이지)의 기존 함수가 그대로 처리한다.
 //   z-index 60: 아래 메뉴(40)·장바구니 바(39) 위, 옵션 창·주문서 창(100) 아래 → 옵션 창이 방송 위로 올라온다.
 
+import { useRpsGame } from '@/components/rps/useRpsGame';
+import { RpsWidget } from '@/components/rps/RpsWidget';
+import { RpsAdmin } from '@/components/rps/RpsAdmin';
 import { useLiveFeaturedProducts } from "@/lib/useLiveFeaturedProducts";
 import { useReplayProductCard } from "@/lib/useReplayProductCard";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
@@ -493,6 +496,9 @@ export default function LiveWatchView(props: Props) {
   useEffect(() => { if (!composeHint) return; const t = window.setTimeout(() => setComposeHint(""), 2500); return () => window.clearTimeout(t); }, [composeHint]);
   const [sending, setSending] = useState(false);
   const [chatHint, setChatHint] = useState("");
+  const rps = useRpsGame();
+  const [rpsAdminOpen, setRpsAdminOpen] = useState(false);
+  const rpsActive = !!rps.state?.id && rps.state.status !== 'closed' && (!rps.state.broadcastId || rps.state.broadcastId === props.broadcastId);
   const [moreOpen, setMoreOpen] = useState(false);
   const [focus, setFocus] = useState(false);
   const [chatViewOpen, setChatViewOpen] = useState(false);
@@ -1230,7 +1236,8 @@ export default function LiveWatchView(props: Props) {
       {/* 13:03 사장님 유튜브 캡처 11장 실측: 유튜브도 채팅 뒤(화면 아래 약 45%)를 위에서 아래로 점점 어둡게 깖
           (흰 털 화면 밝기 206 → 맨 아래 80 ≈ 검정 60%). 채팅 칸 위부터만, 손가락 통과, 집중모드·돌려보기엔 숨김 */}
       <div aria-hidden="true" style={{ display: isDesktop || focus || seekMode ? "none" : "block", position: "absolute", left: 0, right: 0, bottom: 0, height: `calc(${CHAT_HEIGHTS[chatView.height]} + 170px + env(safe-area-inset-bottom))`, background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 30%, rgba(0,0,0,0.45) 65%, rgba(0,0,0,0.6) 100%)", pointerEvents: "none" }} />
-      <div data-live-chat-panel="1" data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : bottomBarHeight === null ? "calc(78px + env(safe-area-inset-bottom))" : `${bottomBarHeight + 4}px`, flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: "60dvh" }) }}>
+      <div data-live-chat-panel="1" data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : bottomBarHeight === null ? "calc(78px + env(safe-area-inset-bottom))" : `${bottomBarHeight + 4}px`, flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: rpsActive ? "calc(100dvh - 130px)" : "60dvh" }) }}>
+        {rpsActive && !isDesktop && <div style={{flexShrink:0,pointerEvents:'auto'}}><RpsWidget key={rps.state?.id} game={rps} onAdmin={() => setRpsAdminOpen(true)}/></div>}
         {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", fontSize: "16px", fontWeight: 600 }}>실시간 채팅</div> : null}
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex", flexShrink: 0 }}>
@@ -1350,10 +1357,13 @@ export default function LiveWatchView(props: Props) {
             <span ref={pinTextRef} style={{ flex: 1, minWidth: 0, lineHeight: "2em", padding: "0.15em 0", fontWeight: chatView.bold ? 700 : 500, ...(pinOpen ? { wordBreak: "break-word" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}><ChatBodyView body={chat.pinned.body} emojis={emojiMap} /></span>
           </div>
         ) : null}
-        <div style={{order: isDesktop ? 4 : undefined, flexShrink: 0}}>{pinnedProductCard}</div>
+        <div style={{order: isDesktop ? 4 : undefined, flexShrink: 0}}>{rpsActive ? null : pinnedProductCard}</div>
         {isDesktop && !chat ? <div style={{ flex: 1 }} /> : null}
         {isDesktop && chat?.canWrite && !focus ? composer : null}
       </div>
+
+      {rpsActive && isDesktop && !focus && <div style={{position:'absolute',left:16,right:videoRight,top:'18%',paddingRight:16,pointerEvents:'none',zIndex:3}}><RpsWidget key={rps.state?.id} game={rps} onAdmin={() => setRpsAdminOpen(true)}/></div>}
+      {rpsAdminOpen && rps.admin && <RpsAdmin game={rps} broadcastId={props.broadcastId} onClose={() => setRpsAdminOpen(false)}/>}
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
       <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
@@ -1398,6 +1408,7 @@ export default function LiveWatchView(props: Props) {
         <div role="dialog" aria-modal="true" aria-label="더보기" onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.55)" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: isDesktop ? undefined : "12px", ...(isDesktop ? { left: `calc((100% - ${videoRight || "0px"}) / 2)`, transform: "translateX(-50%)", width: "328px" } : {}), bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
             {[
+              ...(rps.admin ? [{ key: 'rps', label: '게임 · 가위바위보', onClick: () => setRpsAdminOpen(true) }] : []),
               ...(props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지·쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 })),
               { key: "share", label: "공유하기", onClick: shareLive },
               ...(chat?.canWrite && chat.onVerifyIdentity && !chat.identityVerified && !chat.canReviewDeleted ? [{ key: "identity", label: "내 채팅 본인 확인", onClick: chat.onVerifyIdentity }] : []),

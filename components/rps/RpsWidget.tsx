@@ -1,0 +1,47 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {RPS_HANDS,RPS_ICON,RPS_LABEL,RPS_RESULT,rpsRemaining} from '@/lib/rps';
+import type {RpsController} from './useRpsGame';
+import {useRpsAudio} from './useRpsAudio';
+import './rps.css';
+export function RpsWidget({game,publicOnly=false,onAdmin}:{game:RpsController;publicOnly?:boolean;onAdmin?:()=>void}){
+ const {state:s,player:p,now,busy,action}=game;const {sound,toggle}=useRpsAudio(s,publicOnly);
+ const [animated,setAnimated]=useState(0),[page,setPage]=useState(0),[collapsed,setCollapsed]=useState(false);
+ useEffect(()=>{if(s?.status!=='choosing')return;const timer=setInterval(()=>setAnimated(i=>(i+1)%3),170);return()=>clearInterval(timer);},[s?.status]);
+ useEffect(()=>{if(!publicOnly||s?.status!=='finished'||s.winners.length<=10)return;const timer=setInterval(()=>setPage(i=>(i+1)%Math.ceil(s.winners.length/10)),5000);return()=>clearInterval(timer);},[publicOnly,s?.status,s?.winners.length]);
+ if(!s?.id||s.status==='closed')return null;
+ const remaining=rpsRemaining(s.deadline,now);const choosing=s.status==='choosing';const revealed=s.status==='reveal'||s.status==='finished';
+ const mine=p?.choice_round===s.round?p.choice:null;const eligible=p?.alive&&!p.winner;
+ const prize=s.rewardKind==='points'?`${s.points.toLocaleString()}P`:s.rewardKind==='gift'?s.gift:'함께 즐기는 이벤트';
+ const visibleWinners=publicOnly?s.winners.slice(page*10,page*10+10):s.winners;
+ return <section className={`rps-card ${publicOnly?'rps-public':''}`} aria-label="가위바위보 게임">
+  <header className="rps-heading"><div><span className="rps-kicker">{s.test?'연습 · 실제 지급 없음':s.status==='finished'?'🎊 당첨 발표':s.round?`${s.round}라운드 · ${s.pvp?'손님끼리 결승':'루루와 대결'}`:'🎁 참가 모집'}</span><strong>{s.title}</strong></div>
+  {!publicOnly&&<div className="rps-tools"><button onClick={toggle} aria-label={sound?'게임 소리 끄기':'게임 소리 켜기'}>{sound?'🔊':'🔇'}</button><button aria-label={collapsed?'게임 펼치기':'게임 접기'} onClick={()=>setCollapsed(v=>!v)}>{collapsed?'⌄':'−'}</button></div>}</header>
+  {collapsed?<button className="rps-expand" onClick={()=>setCollapsed(false)}>{s.status==='finished'?`당첨자 ${s.winners.length}명 보기`:`생존 ${s.alive}명 · 게임 보기`}</button>:<>
+  <div className="rps-prize">{s.rewardKind==='none'?prize:<>한 분당 <b>{prize}</b> · {s.target}명</>}{s.rewardKind==='gift'&&' · 무료 선물'}</div>
+  {s.status==='finished'?<div className="rps-winner-box">
+   {!!s.winners.length&&<div className="rps-confetti" aria-hidden="true">{Array.from({length:12},(_,i)=><i key={i} style={{left:`${5+i*8}%`,animationDelay:`${i%4*.12}s`,background:['#efb72c','#e97972','#75b497'][i%3]}}/>)}</div>}
+   <strong className="rps-win-title">{s.winners.length?`🎉 ${s.winners.length}명 당첨!`:'이번 게임은 당첨자가 없어요'}</strong>
+   {!publicOnly&&<p className={p?.winner?'rps-mine-notice':'rps-congrats'}>{p?.winner?`${p.nickname}님, 당첨됐어요!`:'함께해 주셔서 감사합니다!'}</p>}
+   <div className={`rps-names ${s.winners.length<=3?'rps-few':''}`} role="region" aria-label="당첨자 명단" tabIndex={0}>
+    {visibleWinners.map(w=><div key={w.id} className={w.id===p?.id?'rps-my-name':''}>{w.nickname}{!publicOnly&&w.id===p?.id&&<small>나</small>}</div>)}
+   </div>
+   {publicOnly&&s.winners.length>10?<small>{page*10+1}–{Math.min((page+1)*10,s.winners.length)} / {s.winners.length}명 · 5초마다 다음 명단</small>:!publicOnly&&s.winners.length>6&&<small>↕ 명단을 내려서 모두 확인하세요</small>}
+   {!publicOnly&&p?.winner&&<small className="rps-reward-note">{s.test?'연습 게임으로 실제 지급하지 않아요.':p.reward_status==='done'?s.rewardKind==='gift'?'0원 선물 주문이 접수됐어요.':s.rewardKind==='none'?'축하합니다!':'포인트 지급이 완료됐어요.':p.reward_status==='needs_info'?p.reward_message:'당첨 보상을 자동 처리하고 있어요.'}</small>}
+   {!publicOnly&&p?.winner&&p.reward_status==='needs_info'&&<div className="rps-reward-actions"><button onClick={game.verify}>카카오 다시 확인</button><button disabled={busy} onClick={()=>void action('claim')}>내정보 수정 완료 · 보상 받기</button></div>}
+  </div>:s.status==='lobby'?<div className="rps-lobby"><div className="rps-count"><strong>{remaining}<small>초</small></strong><span>{s.total}명 참가 중</span></div>
+   {!publicOnly&&!game.admin?<button className="rps-primary" disabled={busy||!!p||remaining===0} onClick={()=>game.verified?void action('join'):game.verify()}>{p?'✓ 참가 완료 · 잠시 기다려 주세요':game.verified?'참가하기':'카카오 본인 확인 후 참가'}</button>:<p>참가 모집 중 · 휴대폰에서 참가하기</p>}
+  </div>:<>
+   <div className="rps-scoreline"><b>생존 {s.alive}명</b><span>{s.status==='paused'?'잠시 멈춤':s.status==='ready'?'루루가 손을 고르고 있어요':choosing?remaining?`${remaining}초 안에 선택`:'선택 마감 · 결과 확인 중':'결과 공개'}</span></div>
+   <div className="rps-versus"><div><span className="rps-hand">{!publicOnly&&p?(mine?RPS_ICON[mine]:'❔'):s.alive<=4?'🏁':'👥'}</span><small>{!publicOnly&&p?'나':s.pvp?'결승 진출자':`시청자 ${s.alive}명`}</small></div><b>VS</b><div><span className="rps-hand">{choosing?RPS_ICON[RPS_HANDS[animated]]:revealed&&s.hostHand&&s.hostHand!=='pvp'?RPS_ICON[s.hostHand]:s.pvp?'👥':'❔'}</span><small>{s.pvp?'서로 대결':'루루'}</small></div></div>
+   {choosing&&!publicOnly&&eligible&&<div className="rps-choices">{RPS_HANDS.map(hand=><button key={hand} aria-pressed={mine===hand} disabled={busy||remaining===0} onClick={()=>void action('pick',{hand})}><span>{RPS_ICON[hand]}</span>{RPS_LABEL[hand]}{mine===hand&&<small>✓ 선택</small>}</button>)}</div>}
+   {!publicOnly&&<p className="rps-personal" aria-live="polite">{p?.winner?'🎉 당첨 확정! 남은 경기를 지켜보세요.':revealed&&p?RPS_RESULT[p.result||'']||'함께 관전해요':!p?'관전 중 · 다음 게임에 참가해 주세요':!eligible?'탈락했지만 끝까지 함께 관전해요!':choosing?mine?'✓ 선택 완료 · 마감 전 바꿀 수 있어요':'시간 안에 고르지 않으면 기권패예요.':''}</p>}
+   {revealed&&<div className="rps-stats">승 {s.stats.win||0} · 무 {s.stats.draw||0} · 패 {s.stats.lose||0} · 기권 {s.stats.forfeit||0}</div>}
+   {!!s.finals.length&&s.alive<=4&&<div className="rps-finalists">{s.finals.map(f=><div key={f.id}><b>{f.nickname}</b><span>{revealed&&f.hand?RPS_ICON[f.hand]:'❔'} {revealed?RPS_RESULT[f.result||'']||'':''}</span></div>)}</div>}
+   {s.note&&<small className="rps-note">{s.note}</small>}
+  </>}
+  </>}
+  {!publicOnly&&game.error&&<p className="rps-error" role="alert">{game.error}</p>}
+  {game.admin&&!publicOnly&&onAdmin&&<button className="rps-admin-shortcut" onClick={onAdmin}>관리자 · 게임 진행</button>}
+ </section>;
+}
