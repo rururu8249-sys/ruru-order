@@ -142,6 +142,8 @@ export type LiveChatMessage = {
   avatar: string;
   /** 루루동이AI 글이면 표시(p:상품id|세부상품 = 누르면 옵션 창) */
   botRef: string;
+  /** Private, authenticated response only; never parsed from public realtime. */
+  deletedByAuthor?: boolean;
 };
 
 /** 서버 줄 또는 소식(Broadcast) → 화면용 글. 모양이 이상하면 null. */

@@ -34,6 +34,7 @@ export const CUSTOMER_STORAGE_KEYS = [
   //   가족 공용 폰에서 로그아웃해도 앞사람 카카오가 남아, 다음 사람의 저장이
   //   앞사람 회원 줄로 들어갈 수 있었다(회원 식별이 카카오 우선이 되면서 위험 격상).
   "ruru_kakao_id",
+  "ruru_chat_identity",
   "ruru_kakao_nickname",
   "ruru_kakao_profile_image",
 ] as const;
@@ -69,6 +70,8 @@ export const getCustomerGreetingName = (info: SavedCustomerInfo) => {
 
 export const clearSavedCustomerInfo = () => {
   if (typeof window === "undefined") return;
+  void fetch("/api/live-chat/session", { method: "DELETE", keepalive: true }).catch(() => {});
+  window.dispatchEvent(new Event("ruru-chat-logout"));
 
   CUSTOMER_STORAGE_KEYS.forEach((key) => {
     window.localStorage.removeItem(key);

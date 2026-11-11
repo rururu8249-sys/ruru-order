@@ -28,6 +28,9 @@ import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { chatBodyWithoutEmoji, encodeEmojiTokens } from "@/lib/liveChatEmoji";
 import { canUseChatEmoji, readEmojiSetting } from "@/lib/liveChatEmojiServer";
 import { chatRoleOfKakao, moderateChatMessage, pinChatMessage, setChatManager } from "@/lib/liveChatServer";
+import { normalizeWidgetTarget } from "@/lib/widgetProductLibrary";
+import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
+import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -116,10 +119,11 @@ export async function POST(request: NextRequest) {
     if (body.startsWith("/")) {
       if (!role.isMod) return fail("상품 순환 명령은 채팅 관리자만 사용할 수 있어요.", 403);
       const query = parseChatProductCommand(body);
-      if (!query) return fail("/335 또는 /mc335처럼 상품번호만 입력해 주세요.");
+      const target = normalizeWidgetTarget(raw.target);
+      if (!query && !target) return fail("/335 또는 /mc335처럼 상품번호만 입력해 주세요.");
       if (bcRow.widget_card_enabled === false) return fail("방송 관리에서 상품 위젯을 먼저 켜 주세요.");
       try {
-        const message = await runChatProductCommand(sb, bc, query, { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null });
+        const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null }, target ?? undefined);
         return NextResponse.json({ ok: true, message: parseChatMessage(message) });
       } catch (error) {
         return fail(error instanceof Error ? error.message : "상품 순환을 변경하지 못했어요.");
@@ -169,6 +173,10 @@ export async function PATCH(request: NextRequest) {
     let r: { ok: boolean; message: string; status?: number };
     if (action === "grant" || action === "revoke") {
       if (!role.isOwner) return fail("총관리자만 할 수 있어요.", 403);
+      // A raw account ID must never grant the role that can read private deleted originals.
+      if (!sameChatOrigin(request)) return fail("잘못된 요청입니다.", 403);
+      const verifiedOwner = await verifyAdminSessionFromRequest(request) || (await verifiedChatRole(sb, chatIdentityFromRequest(request))).isOwner;
+      if (!verifiedOwner) return fail("채팅 본인 확인 후 관리자 권한을 변경할 수 있어요.", 401);
       r = await setChatManager(sb, messageId, action === "grant");
     } else if (action === "pin" || action === "unpin") {
       // 고정 댓글은 왕관 표시 두 사람(금색·분홍 왕관)만 — 사장님 11/10 04:12

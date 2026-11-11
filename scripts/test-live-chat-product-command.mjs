@@ -46,7 +46,12 @@ const apiLoad=createUiLoader({
   '@/lib/liveChatBotServer':{runLiveChatBot:async()=>{botCalls++;}},
 });
 const route=apiLoad('app/api/live-chat/route.ts');
-const send=async body=>{const res=await route.POST({json:async()=>({kakao_id:'test-actor',bc,body})});return {status:res.status,...await res.json()};};
+const send=async (body,target)=>{const res=await route.POST({json:async()=>({kakao_id:'test-actor',bc,body,target})});return {status:res.status,...await res.json()};};
+let picked=await send('/',{productId:'77',detailName:'MC-335 아이보리'});
+assert.equal(picked.ok,true,'slash picker selects exact broadcast target');
+reset();picked=await send('/',{productId:'999',detailName:''});assert.equal(picked.ok,false);assert.equal(writes.length,0);
+reset();mod=false;picked=await send('/',{productId:'77',detailName:'MC-335 아이보리'});assert.equal(picked.ok,false);assert.equal(writes.length,0);
+reset();
 let result=await send('/335');
 assert.equal(result.ok,true);assert.equal(result.message.body,'/335');
 assert.deepEqual(writes.map(w=>w.table),['settings','broadcasts','live_chat_messages']);

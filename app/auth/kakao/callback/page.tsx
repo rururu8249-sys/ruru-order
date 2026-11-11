@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CUSTOMER_SESSION_VERSION_KEY, REQUIRED_CUSTOMER_SESSION_VERSION } from "@/lib/customer/customerSession";
 
@@ -13,6 +13,7 @@ const setIfValue = (key: string, value: unknown) => {
 };
 
 export default function KakaoCallbackPage() {
+  const chatVerificationStarted = useRef(false);
   const [message, setMessage] = useState("카카오톡에서 정보를 받아오고 있어요. 잠시만요!");
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
@@ -20,6 +21,24 @@ export default function KakaoCallbackPage() {
     const login = async () => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
+
+      if (params.get("state")?.startsWith("ruru_chat_")) {
+        if (chatVerificationStarted.current) return;
+        chatVerificationStarted.current = true;
+        try {
+          const response = await fetch("/api/live-chat/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, state: params.get("state") }) });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw new Error(result.message || "본인 확인에 실패했어요.");
+          const saved = localStorage.getItem("ruru_kakao_id");
+          if (saved && saved !== result.sub) throw new Error("현재 사이트 로그인 계정과 카카오 계정이 달라요. 같은 계정으로 확인해 주세요. 기존 회원 정보는 변경하지 않았어요.");
+          // A separate chat identity also lets an authenticated tablet moderator review deletions.
+          localStorage.setItem("ruru_chat_identity", JSON.stringify({ sub: result.sub, nonce: result.nonce }));
+          window.opener?.postMessage({ type: "ruru-chat-verified" }, window.location.origin);
+          if (window.opener) { window.close(); setStatus("success"); setMessage("채팅 본인 확인이 완료됐어요. 방송 화면으로 돌아가 주세요."); }
+          else window.location.replace(result.returnTo === "/chat-view" ? "/chat-view" : "/order");
+        } catch (error) { setStatus("error"); setMessage(error instanceof Error ? error.message : "본인 확인에 실패했어요."); }
+        return;
+      }
 
       if (!code) {
         setStatus("error");

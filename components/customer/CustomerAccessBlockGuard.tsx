@@ -49,6 +49,8 @@ function readStoredCustomerPhone() {
 
 function clearCustomerLoginStorage() {
   if (typeof window === "undefined") return;
+  void fetch("/api/live-chat/session", { method: "DELETE", keepalive: true }).catch(() => {});
+  window.dispatchEvent(new Event("ruru-chat-logout"));
 
   [
     "ruru_customer_session",
@@ -59,6 +61,7 @@ function clearCustomerLoginStorage() {
     "ruru_customer_address",
     "ruru_customer_detail_address",
     "ruru_kakao_id",
+    "ruru_chat_identity",
     "ruru_kakao_nickname",
     "ruru_customer_session_version",
     "ruru_youtube_nickname_confirm_version",

@@ -6,6 +6,7 @@
 //   화면 꺼짐 방지(되는 브라우저만). 글자 크기 이 기기에만 기억.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
+import { useLiveChatPrivate } from "@/lib/useLiveChatPrivate";
 import { supabase } from "@/lib/supabase";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
@@ -33,6 +34,7 @@ export default function ChatViewClient() {
   const [bc, setBc] = useState<Bc | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [list, setList] = useState<LiveChatMessage[]>([]);
+  const privateChat = useLiveChatPrivate(bc?.id || "", Boolean(bc), list);
   const [emojis, setEmojis] = useState<ChatEmoji[]>([]);
   const [sizeIdx, setSizeIdx] = useState(SIZES.indexOf(20));
   const [ytSizeIdx, setYtSizeIdx] = useState(YT_SCALES.indexOf(1.5));
@@ -44,7 +46,7 @@ export default function ChatViewClient() {
   // [07:18 사장님] 유튜브 시청자 수·사이트 접속 수 — 각 칸 제목 옆(30초마다)
   const [counts, setCounts] = useState<{ yt: number | null; site: number | null }>({ yt: null, site: null });
   const emojiMap = useMemo(() => emojiMapOf(emojis), [emojis]);
-  const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(list, `${sizeIdx}:${show.site}:${show.yt}:${layout}`, show.site);
+  const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(privateChat.displayMessages, `${sizeIdx}:${show.site}:${show.yt}:${layout}`, show.site);
   const [recent, setRecent] = useState<Array<{ id: number; at: number }>>([]);
   const seen = useRef<{ bc: string; maxId: number } | null>(null);
 
@@ -131,6 +133,7 @@ export default function ChatViewClient() {
       onChat: (payload) => {
         const m = parseChatMessage(payload);
         if (!m || m.broadcastId !== bcId) return;
+        privateChat.onPublicMessage(m);
         setList((prev) => (m.hidden ? prev.filter((x) => x.id !== m.id) : mergeChat(prev, [m], 200)));
       },
     });
@@ -314,6 +317,7 @@ export default function ChatViewClient() {
         <header className="ruru-chat-panel-head">
           <div className="ruru-chat-panel-title">
             <h2>사이트 채팅</h2>
+            {!privateChat.canReviewDeleted ? <button type="button" onClick={privateChat.verify} style={{ border: 0, background: "transparent", color: C.soft, fontSize: 12 }}>관리자 본인 확인</button> : <span style={{ color: C.soft, fontSize: 12 }}>삭제글 확인 중</span>}
             <div className="ruru-chat-panel-meta">접속 {bc && counts.site != null ? `${counts.site.toLocaleString("ko-KR")}명` : "—"}</div>
           </div>
           <div className="ruru-chat-size">
@@ -334,10 +338,10 @@ export default function ChatViewClient() {
           <div ref={contentRef}>
           {!bc ? (
             <div style={{ padding: "24px", textAlign: "center", color: C.mute, fontSize: "18px" }}>{loaded ? "지금 켜진 방송이 없어요." : "불러오는 중…"}</div>
-          ) : list.length === 0 ? (
+          ) : privateChat.displayMessages.length === 0 ? (
             <div style={{ padding: "24px", textAlign: "center", color: C.mute, fontSize: "18px" }}>아직 글이 없어요. 손님이 쓰면 바로 나와요.</div>
-          ) : list.map((m) => {
-            const isNew = recent.some((r) => r.id === m.id);
+          ) : privateChat.displayMessages.map((m) => {
+            const isNew = !m.deletedByAuthor && recent.some((r) => r.id === m.id);
             const b = m.badge ? BADGE[m.badge] : null;
             const avatar = m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar;
             return (
@@ -348,7 +352,8 @@ export default function ChatViewClient() {
                 ) : (
                   <span aria-hidden="true" style={{ width: "1.6em", height: "1.6em", borderRadius: "9999px", background: "#3A3A3A", color: C.soft, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.75em", fontWeight: 700, flexShrink: 0 }}>{Array.from(m.nickname)[0] || "?"}</span>
                 )}
-                <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink }}>
+                <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
+                  {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   <span style={{ fontWeight: 700, color: "#C2C2C2", marginRight: "8px" }}>{m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}

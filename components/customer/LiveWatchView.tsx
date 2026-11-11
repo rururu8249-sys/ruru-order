@@ -23,6 +23,8 @@ import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
+import { ChatProductPicker } from "@/components/customer/ChatProductPicker";
+import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
 
 export type LiveWatchPinned = {
   productId: string;
@@ -69,7 +71,7 @@ type Props = {
     canWrite: boolean;
     /** 관리자(시험 계정·허용 번호) — 글을 길게 누르면 지우기·금지 */
     canModerate: boolean;
-    onSend: (body: string) => Promise<{ ok: boolean; message?: string }>;
+    onSend: (body: string, target?: WidgetProductTarget) => Promise<{ ok: boolean; message?: string }>;
     /** 고정 댓글(없으면 null) */
     pinned: LiveChatMessage | null;
     /** 총관리자 — 길게 눌러 채팅 관리자 지정·해제 */
@@ -81,6 +83,11 @@ type Props = {
     emojis?: ChatEmoji[];
     /** 이 손님이 이모티콘을 쓸 수 있는지(서버 판정) — 아니면 입력칸 웃는 얼굴 표시가 안 보임 */
     canEmoji?: boolean;
+    ownIds?: number[];
+    identityVerified?: boolean;
+    canReviewDeleted?: boolean;
+    onVerifyIdentity?: () => void;
+    onDeleteOwn?: (id: number) => Promise<{ ok: boolean; message?: string }>;
   } | null;
 };
 
@@ -506,6 +513,9 @@ export default function LiveWatchView(props: Props) {
   };
   const [modTarget, setModTarget] = useState<LiveChatMessage | null>(null);
   const [chatMenu, setChatMenu] = useState<{ message: LiveChatMessage; x: number; y: number; canManage: boolean } | null>(null);
+  useEffect(() => {
+    if (!chat?.canReviewDeleted) setChatMenu(prev => prev?.message.deletedByAuthor ? null : prev);
+  }, [chat?.canReviewDeleted]);
   const chatMenuFocus = useRef<HTMLElement | null>(null);
   const closeChatMenu = () => {
     setChatMenu(null);
@@ -549,7 +559,8 @@ export default function LiveWatchView(props: Props) {
     const t = window.setTimeout(() => setChatHint(""), 3000);
     return () => window.clearTimeout(t);
   }, [chatHint]);
-  const sendChat = async (bodyOverride?: string) => {
+  const productPickerOpen = Boolean(chat?.canModerate && draft.trimStart().startsWith("/"));
+  const sendChat = async (bodyOverride?: string, target?: WidgetProductTarget) => {
     if (!chat || sending) return;
     const body = (bodyOverride ?? draft).trim();
     if (!body) return;
@@ -558,7 +569,7 @@ export default function LiveWatchView(props: Props) {
     setDraft("");
     setComposeOpen(false);
     closeGreet();
-    const r = await chat.onSend(body).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
+    const r = await chat.onSend(body, target).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     setSending(false);
     if (!r.ok) { setDraft(body); setChatHint(r.message || "못 보냈어요."); }
   };
@@ -614,9 +625,12 @@ export default function LiveWatchView(props: Props) {
     if (!r.ok) setChatHint(r.message || "못 보냈어요.");
   };
   const startPress = (m: LiveChatMessage) => {
-    if (!chat?.canModerate) return;
+    if (m.deletedByAuthor || (!chat?.canModerate && !chat?.ownIds?.includes(m.id))) return;
     if (pressTimer.current) window.clearTimeout(pressTimer.current);
-    pressTimer.current = window.setTimeout(() => setModTarget(m), 500);
+    pressTimer.current = window.setTimeout(() => {
+      if (chat?.canModerate) setModTarget(m);
+      else openChatMenu(m, downAt.current?.x ?? 16, downAt.current?.y ?? window.innerHeight - 160, false);
+    }, 500);
   };
   const endPress = () => { if (pressTimer.current) { window.clearTimeout(pressTimer.current); pressTimer.current = null; } };
 
@@ -878,9 +892,11 @@ export default function LiveWatchView(props: Props) {
   const composer = (
           <form
             onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => { e.preventDefault(); if (isDesktop && composingRef.current) return; if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } setEmojiOpen(false); void sendChat(); }}
+            onSubmit={(e) => { e.preventDefault(); if (composingRef.current || productPickerOpen) return; if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } setEmojiOpen(false); void sendChat(); }}
             style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: isDesktop ? "#0F0F0F" : "#FFFFFF", padding: isDesktop ? "12px 0 calc(12px + env(safe-area-inset-bottom))" : emojiOpen ? "12px 16px 0" : "12px 16px calc(12px + env(safe-area-inset-bottom))", borderRadius: isDesktop ? 0 : "16px 16px 0 0", boxSizing: "border-box", ...(isDesktop ? { position: "relative", flexShrink: 0, order: 5, borderTop: "1px solid #333333", pointerEvents: "auto" } : {}) }}
           >
+            {chat?.canWrite && chat.onVerifyIdentity && !chat.identityVerified && !chat.canReviewDeleted ? <button type="button" onClick={chat.onVerifyIdentity} style={{ marginBottom: 8, background: "transparent", color: isDesktop ? "#bbb" : "#555", border: 0, padding: "4px 8px", fontSize: 12, textDecoration: "underline" }}>내 글 삭제 · 카카오 본인 확인</button> : null}
+            {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onSelect={p => { setEmojiOpen(false); void sendChat(`/${p.texts[0] || p.detailName}`.slice(0, 100), { productId: p.productId, detailName: p.detailName }); }} /> : null}
             {draftEmojiCount > 0 ? (
               // 보내면 이렇게 보여요 — «:이름:» 글자 대신 그림으로 미리
               <div aria-label="미리보기" style={{ marginBottom: "8px", padding: "8px 12px", borderRadius: "12px", background: "#F5F5F5", color: "#111111", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word" }}>
@@ -888,7 +904,7 @@ export default function LiveWatchView(props: Props) {
               </div>
             ) : null}
             {composeHint ? <div role="status" style={{ marginBottom: "8px", fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{composeHint}</div> : null}
-            {showSuggestRow ? (
+            {showSuggestRow && !productPickerOpen ? (
               // 쓰고 있는 낱말에 어울리는 이모티콘 — 누르면 커서 자리에 넣음(키보드 안 내려감)
               <div role="group" aria-label={`「${typedWord}」 어울리는 이모티콘`} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px", background: "#F5F5F5", borderRadius: "12px", padding: "2px 2px 2px 6px" }}>
                 <div ref={suggestRowRef} data-live-scroll="1" style={{ flex: 1, minWidth: 0, display: "flex", gap: "2px", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "none" }}>
@@ -943,7 +959,7 @@ export default function LiveWatchView(props: Props) {
                   data-live-chat-input
                   autoFocus={!isDesktop && !emojiOpen}
                   value={draft}
-                  onChange={(e) => { setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN)); rememberCaret(e.target); }}
+                  onChange={(e) => { setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN)); if (e.target.value.trimStart().startsWith("/")) setEmojiOpen(false); rememberCaret(e.target); }}
                   onSelect={(e) => rememberCaret(e.currentTarget)}
                   onFocus={() => setEmojiOpen(false)}
                   onKeyDown={isDesktop ? (e) => {
@@ -1177,16 +1193,18 @@ export default function LiveWatchView(props: Props) {
             {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
               const localLine = !Number.isInteger(m.id);
-              const canMod = chat.canModerate && !localLine;
-              const botProduct = m.badge === "bot" ? parseBotRef(m.botRef) : null;
+              const canMod = chat.canModerate && !localLine && !m.deletedByAuthor;
+              const canPress = canMod || (!m.deletedByAuthor && Boolean(chat.ownIds?.includes(m.id)));
+              const botProduct = m.badge === "bot" && !m.deletedByAuthor ? parseBotRef(m.botRef) : null;
               return (
               <div
                 key={m.id}
                 data-chat-id={m.id}
-                onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; if (canMod && e.button === 0) startPress(m); }}
-                onPointerUp={canMod ? endPress : undefined}
-                onPointerLeave={canMod ? endPress : undefined}
-                onPointerCancel={canMod ? endPress : undefined}
+                onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; if (canPress && e.button === 0) startPress(m); }}
+                onPointerMove={(e) => { const d = downAt.current; if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) endPress(); }}
+                onPointerUp={canPress ? endPress : undefined}
+                onPointerLeave={canPress ? endPress : undefined}
+                onPointerCancel={canPress ? endPress : undefined}
                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openChatMenu(m, e.clientX, e.clientY, canMod); }}
                 onClick={botProduct ? (e) => {
                   e.stopPropagation(); // 「담기 ›」 줄은 상품 창만(재생 막대 안 띄움)
@@ -1201,7 +1219,8 @@ export default function LiveWatchView(props: Props) {
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
                 <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
-                <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ minWidth: 0, flex: 1, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
+                  {m.deletedByAuthor ? <span style={{ display: "block", fontSize: 12, color: "#ccc", marginBottom: 3 }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {/* [12:54 사장님 「유튜브랑 똑같이」] 사장님 유튜브 캡처에서 잰 값: 닉네임 흐린 흰색(약 80%)·보통 굵기, 글 흰색·보통 굵기 */}
                   {/* [13:44 사장님 「닉네임만 연한 색」] 닉네임만 사람마다 정해진 색을 흰색과 반쯤 섞은 연한 색(글은 흰색 그대로), 루루동이 안내는 흐린 흰색 */}
                   <span style={{ fontWeight: chatView.bold ? 700 : 400, color: m.badge === "bot" ? "rgba(255,255,255,0.8)" : softNickColor(color) }}>{m.nickname}</span>
@@ -1411,6 +1430,7 @@ export default function LiveWatchView(props: Props) {
             }
           }} style={{ position: "absolute", left: chatMenu.x, top: chatMenu.y, width: "220px", padding: "6px", boxSizing: "border-box", border: "1px solid #555", borderRadius: "12px", background: "#272727", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
             <button autoFocus type="button" onClick={() => void copyChatMessage()} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>글 복사하기</button>
+            {!chatMenu.message.deletedByAuthor && chat?.ownIds?.includes(chatMenu.message.id) && chat.onDeleteOwn ? <button type="button" onClick={async () => { const id = chatMenu.message.id; closeChatMenu(); const r = await chat.onDeleteOwn!(id); setChatHint(r.message || (r.ok ? "내 글을 삭제했어요." : "삭제하지 못했어요.")); }} style={{ width: "100%", minHeight: 44, border: 0, borderRadius: 8, background: "transparent", color: "#ffb4b4", textAlign: "left", padding: "10px 12px", fontSize: 15 }}>내 글 삭제하기</button> : null}
             {chatMenu.canManage ? <button type="button" onClick={() => { setModTarget(chatMenu.message); setBanConfirm(false); setChatMenu(null); }} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>채팅 관리</button> : null}
           </div>
         </div>

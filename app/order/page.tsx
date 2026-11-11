@@ -48,6 +48,7 @@ import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText }
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, chatBadgeOf, isChatOwnerPhone, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
 import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@/components/customer/LiveWatchView";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
+import { chatIdentityHeaders, useLiveChatPrivate } from "@/lib/useLiveChatPrivate";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { CHAT_TEMP_ID_BASE, isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
 import { encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
@@ -3515,6 +3516,9 @@ export default function OrderPage() {
   };
 
   const logoutCustomerInfo = () => {
+    void fetch("/api/live-chat/session", { method: "DELETE", keepalive: true }).catch(() => {});
+    localStorage.removeItem("ruru_chat_identity");
+    window.dispatchEvent(new Event("ruru-chat-logout"));
 
     [
       "ruru_customer_phone",
@@ -6559,6 +6563,7 @@ export default function OrderPage() {
     viewerPhone: customerPhone,
   });
   const liveWatchShown = liveWatchUsable && liveViewOn === true;
+  const privateChat = useLiveChatPrivate(String(broadcast?.id || ""), liveWatchShown && liveChatEnabled, liveChatMessages);
   // A slow request must not reveal home and then jump to live a few seconds later.
   useEffect(() => {
     if (!liveBootCover) return;
@@ -6676,6 +6681,7 @@ export default function OrderPage() {
       onChat: (payload) => {
         const m = parseChatMessage(payload);
         if (!m || m.broadcastId !== String(bid)) return;
+        privateChat.onPublicMessage(m);
         if (m.hidden) setLiveChatMessages((prev) => prev.filter((x) => x.id !== m.id));
         else setLiveChatMessages((prev) => mergeChat(prev, [m]));
         // 고정 댓글 — 고정되면 그 글로, 그 글이 고정 해제·지워지면 비움
@@ -8317,7 +8323,16 @@ export default function OrderPage() {
               ]}
               chat={liveChatEnabled && broadcast?.id ? {
                 // [08:10] 내가 담은 «장바구니 담음» 공개 글은 내 화면에선 숨김(담은 사람 지문 = 이 화면 장바구니 열쇠) — 개인 문구만
-                messages: liveChatMessages.filter((m) => !m.botRef || !m.botRef.startsWith("c:") || cartRefOwner(m.botRef) !== cartOwnerTag(getCartSessionKey())),
+                messages: privateChat.displayMessages.filter((m) => !m.botRef || !m.botRef.startsWith("c:") || cartRefOwner(m.botRef) !== cartOwnerTag(getCartSessionKey())),
+                ownIds: privateChat.ownIds,
+                identityVerified: privateChat.verified,
+                canReviewDeleted: privateChat.canReviewDeleted,
+                onVerifyIdentity: privateChat.verify,
+                onDeleteOwn: async (id) => {
+                  const r = await privateChat.deleteOwn(id);
+                  if (r.ok) { setLiveChatMessages(prev => prev.filter(m => m.id !== id)); setLiveChatPinned(prev => prev?.id === id ? null : prev); }
+                  return r;
+                },
                 notice: liveChatNotice,
                 pinned: liveChatPinned,
                 canGrant: isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)),
@@ -8326,25 +8341,26 @@ export default function OrderPage() {
                 canModerate: operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null,
                 emojis: liveChatEmojis,
                 canEmoji: liveChatCanEmoji,
-                onSend: async (body) => {
+                onSend: async (body, target) => {
                   // 누르자마자 화면에 먼저 띄움(임시 번호) — 서버 답이 오면 진짜 글로 바꿈, 실패하면 뺌
                   const tempId = CHAT_TEMP_ID_BASE + Date.now();
                   const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body: liveChatCanEmoji ? encodeEmojiTokens(body, liveChatEmojis).text : body, createdAt: new Date().toISOString(), hidden: false, badge: chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false, botRef: "", avatar: (() => { try { return cleanKakaoPhotoUrl(window.localStorage.getItem("ruru_kakao_profile_image")); } catch { return ""; } })() };
                   setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {
-                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body }) });
+                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body, target }) });
                     const json = await res.json().catch(() => null);
                     if (json?.ok && json.message) {
                       const m = parseChatMessage(json.message);
                       setLiveChatMessages((prev) => mergeChat(prev.filter((x) => x.id !== tempId), m ? [m] : []));
+                      privateChat.refresh();
                     } else dropTemp();
                     return { ok: Boolean(json?.ok), message: json?.message && typeof json.message === "string" ? json.message : undefined };
                   } catch { dropTemp(); return { ok: false, message: "못 보냈어요. 다시 눌러 주세요." }; }
                 },
                 onModerate: async (messageId: number, action: LiveChatAction) => {
                   try {
-                    const res = await fetch("/api/live-chat", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), messageId, action }) });
+                    const res = await fetch("/api/live-chat", { method: "PATCH", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), messageId, action }) });
                     const json = await res.json().catch(() => null);
                     if (json?.ok && isPenaltyAction(action)) {
                       setLiveChatMessages((prev) => prev.filter((x) => x.id !== messageId));
