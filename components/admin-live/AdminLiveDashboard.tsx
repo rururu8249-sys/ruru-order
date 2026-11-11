@@ -1215,7 +1215,7 @@ export default function AdminLiveDashboard() {
     if (!activeBroadcast) return;
     setBroadcastTitle(activeBroadcast.public_title || "루루동이LIVE");
     setBroadcastYoutubeUrl(activeBroadcast.youtube_live_url || "");
-  }, [activeBroadcast?.id]);
+  }, [activeBroadcast?.id, activeBroadcast?.youtube_live_url]);
 
   // 등록/수정 폼 닫힘 → 상품관리 팝업 자동 복귀
   useEffect(() => {
@@ -1610,7 +1610,7 @@ export default function AdminLiveDashboard() {
   const saveBroadcast = async (input: { title: string; youtubeUrl?: string }) => {
     if (!activeBroadcast) {
       showAdminToast("수정할 현재 방송이 없습니다. 먼저 방송을 시작해주세요.", "warning");
-      return;
+      return false;
     }
 
     setSavingBroadcast(true);
@@ -1620,10 +1620,13 @@ export default function AdminLiveDashboard() {
         broadcastId: activeBroadcast.id,
         title: input.title,
         youtubeUrl: input.youtubeUrl,
+        expectedUrl: String(activeBroadcast.youtube_live_url || ""),
       });
       await loadBroadcasts();
+      return true;
     } catch (error) {
       showAdminToast("방송 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+      return false;
     } finally {
       setSavingBroadcast(false);
     }

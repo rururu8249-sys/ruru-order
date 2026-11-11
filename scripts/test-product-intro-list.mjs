@@ -10,7 +10,7 @@ const sb={from(table){
  if(table==='broadcasts')return {select(){return this;},eq(){return this;},async maybeSingle(){return {data:{status,youtube_live_url:`https://www.youtube.com/watch?v=${broadcastVideo}`},error:null};}};
  assert.equal(table,'settings');return {
   select(columns){assert.equal(columns,'key,value');return this;},
-  like(key,pattern){assert.equal(key,'key');assert.equal(pattern,`product_intro_v1_${bc}_${video}_`.replace(/[\\%_]/g,'\\$&')+'%');return this;},
+  like(key,pattern){assert.equal(key,'key');assert.equal(pattern,'product_intro_v1_'.replace(/[\\%_]/g,'\\$&')+'%'+`_${video}_`.replace(/[\\%_]/g,'\\$&')+'%');return this;},
   order(key){assert.equal(key,'key');return this;},
   async range(from,to){pages.push([from,to]);return {data:rows.slice(from,to+1),error:fail?{message:'offline'}:null};},
  };

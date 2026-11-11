@@ -38,24 +38,24 @@ console.log('PASS capture validation, video binding, ready/arrival/expired DVR/t
 const {saveProductIntros,readProductIntro,productIntroKey}=load('lib/productIntroServer.ts');
 let rows=new Map(),fail=false;
 const db={from(table){assert.equal(table,'settings');let op='read',values;const filters=[];
- const q={select(){return q;},eq(k,v){filters.push([k,v]);return q;},is(k,v){filters.push([k,v]);return q;},maybeSingle(){return q;},insert(v){op='insert';values=v;return q;},update(v){op='update';values=v;return q;},then(resolve,reject){
+ const q={select(){return q;},like(k,p){filters.push([k,p,'like']);return q;},order(){return q;},range(){return Promise.resolve({data:[...rows.values()].filter(r=>filters.every(([k,v,op])=>op==='like'?r[k].includes(video):r[k]===v)),error:fail?{message:'offline'}:null});},eq(k,v){filters.push([k,v]);return q;},is(k,v){filters.push([k,v]);return q;},maybeSingle(){return q;},insert(v){op='insert';values=v;return q;},update(v){op='update';values=v;return q;},then(resolve,reject){
   if(fail)return Promise.resolve({error:{message:'offline'},data:null}).then(resolve,reject);
   const key=op==='insert'?values.key:filters.find(([k])=>k==='key')?.[1];let data=rows.get(key)||null,error=null;
   if(op==='insert'){if(data)error={code:'23505'};else {data=values;rows.set(key,values);}}
   if(op==='update'){if(data&&filters.every(([k,v])=>data[k]===v)){data={...data,...values};rows.set(key,data);}else data=null;}
   return Promise.resolve({data,error}).then(resolve,reject);
  }};return q;}};
-await saveProductIntros(db,'bc',[{productId:'1',detailName:'MC-310'},{productId:'1',detailName:'MC-311'}],capture);
+await saveProductIntros(db,'00000000-0000-0000-0000-000000000002',[{productId:'1',detailName:'MC-310'},{productId:'1',detailName:'MC-311'}],capture);
 assert.equal(rows.size,2);
-await saveProductIntros(db,'bc',[{productId:'1',detailName:'MC-310'}],{...capture,seconds:200,capturedAt:now+1000});
-assert.equal((await readProductIntro(db,'bc',video,{productId:'1',detailName:'MC-310'})).seconds,200);
-assert.equal((await readProductIntro(db,'bc',video,{productId:'1',detailName:'MC-311'})).seconds,115);
-assert.equal(await readProductIntro(db,'bc','12345678901',{productId:'1',detailName:'MC-310'}),null);
-assert.notEqual(productIntroKey('bc',video,{productId:'1',detailName:'MC-310'}),productIntroKey('bc2',video,{productId:'1',detailName:'MC-310'}));
-fail=true;await assert.rejects(()=>saveProductIntros(db,'bc',[{productId:'1',detailName:'MC-310'}],capture));
+await saveProductIntros(db,'00000000-0000-0000-0000-000000000002',[{productId:'1',detailName:'MC-310'}],{...capture,seconds:200,capturedAt:now+1000});
+assert.equal((await readProductIntro(db,'00000000-0000-0000-0000-000000000002',video,{productId:'1',detailName:'MC-310'})).seconds,200);
+assert.equal((await readProductIntro(db,'00000000-0000-0000-0000-000000000002',video,{productId:'1',detailName:'MC-311'})).seconds,115);
+assert.equal(await readProductIntro(db,'00000000-0000-0000-0000-000000000002','12345678901',{productId:'1',detailName:'MC-310'}),null);
+assert.notEqual(productIntroKey('00000000-0000-0000-0000-000000000002',video,{productId:'1',detailName:'MC-310'}),productIntroKey('bc2',video,{productId:'1',detailName:'MC-310'}));
+fail=true;await assert.rejects(()=>saveProductIntros(db,'00000000-0000-0000-0000-000000000002',[{productId:'1',detailName:'MC-310'}],capture));
 console.log('PASS independent product/detail records, replacement, broadcast/video isolation, persistence failure');
 
-let visible=true,broadcastVideo=video,statusOn='ON';fail=false;
+let visible=true,broadcastVideo=video,statusOn='ON';fail=false;rows=new Map();
 const publicLoad=createUiLoader({
  'next/server':{NextResponse:{json:(data,init)=>new Response(JSON.stringify(data),init)}},
  '@/lib/youtube':{getServiceClient:()=>({from:table=>table==='broadcasts'?{select(columns){this.missingColumn=columns.split(',').some(c=>c.trim()==='youtube_url');return this;},eq(){return this;},async maybeSingle(){return this.missingColumn?{data:null,error:{code:'42703'}}:{data:{status:statusOn,youtube_live_url:`https://www.youtube.com/watch?v=${broadcastVideo}`},error:null};}}:db.from(table)})},

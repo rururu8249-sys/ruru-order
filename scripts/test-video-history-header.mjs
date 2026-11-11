@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+globalThis.fetch=async()=>({ok:true,json:async()=>({})});
+const db={from(){const q={select(){return q;},eq(){return q;},maybeSingle(){return Promise.resolve({data:null,error:null});}};return q;}};
+const Header=createUiLoader({'@/lib/supabase':{supabase:db}})('components/admin-live/LiveHeader.tsx').default;
+let saves=[],tree;
+const current='https://youtu.be/abcdefghijk',draft='https://youtu.be/12345678901';
+await act(async()=>{tree=Renderer.create(React.createElement(Header,{activeBroadcast:{id:'bc',public_title:'오늘',youtube_live_url:current},title:'수정 제목',youtubeUrl:draft,onSaveBroadcast:async input=>{saves.push(input);return true;},onTitleChange(){},onYoutubeUrlChange(){}}));});
+await act(async()=>tree.root.findAllByType('button').find(b=>b.props.children==='저장').props.onClick());
+assert.equal(saves[0].youtubeUrl,current,'title save preserves playing video despite staged history choice');
+await act(async()=>tree.root.findAllByType('button').find(b=>b.props.children==='적용').props.onClick());
+assert.equal(saves[1].youtubeUrl,draft,'only Apply commits staged video');
+await act(async()=>tree.unmount());
+console.log('PASS title-only save preserves video; Apply uses staged history selection');

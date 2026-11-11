@@ -43,6 +43,7 @@ export type UpdateBroadcastInput = {
   broadcastId: string;
   title: string;
   youtubeUrl?: string;
+  expectedUrl: string;
 };
 
 export async function loadAdminLiveBroadcasts() {
@@ -211,24 +212,16 @@ export async function updateAdminLiveBroadcast(input: UpdateBroadcastInput) {
     throw new Error("방송 제목을 입력해주세요.");
   }
 
-  const { data, error } = await adminCatalogWrite({
-    table: "broadcasts",
-    op: "update",
-    values: {
-      public_title: title,
-      youtube_live_url: youtubeUrl,
-      youtube_live_enabled: Boolean(youtubeUrl),
-    },
-    filters: [{ type: "eq", col: "id", val: input.broadcastId }],
-    select: "*",
-    single: true,
+  const response = await fetch("/api/admin-live/video-history", {
+    method: "POST", headers: {"Content-Type":"application/json"}, cache: "no-store",
+    body: JSON.stringify({broadcastId: input.broadcastId, title, youtubeUrl, expectedUrl: input.expectedUrl}),
   });
-
-  if (error) throw error;
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.data) throw new Error(result?.error || "방송을 저장하지 못했어요.");
 
   await safeUpsertSetting("current_broadcast_name", title);
 
-  return data as AdminLiveBroadcast;
+  return result.data as AdminLiveBroadcast;
 }
 
 // [2026-07-12 사장님 지침] 위젯 상품카드 ON/OFF — 방송 중 위젯의 상품카드만 숨기고 싶을 때.

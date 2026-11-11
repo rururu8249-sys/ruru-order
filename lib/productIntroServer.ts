@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { widgetTargetKey, type WidgetProductTarget } from "./widgetProductLibrary";
 import { parseProductIntro, type ProductIntroCapture, type ProductIntro } from "./productIntro";
+import { introRecordScope } from "./broadcastVideoHistory";
 
 export function productIntroKey(bc: string, videoId: string, target: WidgetProductTarget) {
   const digest = createHash("sha256").update(widgetTargetKey(target)).digest("hex");
@@ -37,22 +38,25 @@ export async function saveProductIntros(sb: SupabaseClient, bc: string, targets:
   if (results.some(result => result.status === "rejected")) throw new Error("일부 소개영상 위치를 저장하지 못했어요.");
 }
 export async function readProductIntro(sb: SupabaseClient, bc: string, videoId: string, target: WidgetProductTarget): Promise<ProductIntro | null> {
-  const result = await sb.from("settings").select("value").eq("key", productIntroKey(bc, videoId, target)).maybeSingle();
-  if (result.error) throw new Error("소개영상을 확인하지 못했어요.");
-  return parseProductIntro(result.data?.value, videoId);
+  return (await readProductIntroIndex(sb, bc, videoId)).get(productIntroKey(bc, videoId, target)) ?? null;
 }
 
-/** Internal index only. The public route filters these keys through the visible catalog. */
+/** A timestamp belongs to a video, even when that video is reattached to another
+ * sales broadcast. Only the public route's current, visible exact targets are exposed. */
 export async function readProductIntroIndex(sb: SupabaseClient, bc: string, videoId: string) {
-  const prefix = `product_intro_v1_${bc}_${videoId}_`;
-  const pattern = prefix.replace(/[\\%_]/g, "\\$&") + "%";
+  const escape = (s: string) => s.replace(/[\\%_]/g, "\\$&");
+  const pattern = `${escape("product_intro_v1_")}%${escape(`_${videoId}_`)}%`;
   const records = new Map<string, ProductIntro>();
   for (let offset = 0; ; offset += 1000) {
     const result = await sb.from("settings").select("key,value").like("key", pattern).order("key").range(offset, offset + 999);
     if (result.error) throw new Error("소개영상을 확인하지 못했어요.");
     for (const row of result.data ?? []) {
+      const source = introRecordScope(String(row.key));
+      if (!source || source.videoId !== videoId) continue;
       const intro = parseProductIntro(row.value, videoId);
-      if (intro && String(row.key).startsWith(prefix)) records.set(row.key, intro);
+      const key = `product_intro_v1_${bc}_${videoId}_${source.digest}`;
+      const previous = records.get(key);
+      if (intro && (!previous || intro.capturedAt > previous.capturedAt)) records.set(key, intro);
     }
     if ((result.data ?? []).length < 1000) return records;
   }

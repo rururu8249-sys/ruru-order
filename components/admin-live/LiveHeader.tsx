@@ -10,7 +10,8 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX } from "@/lib/livePausedText";
-import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, type LiveWatchSetting } from "@/lib/liveWatch";
+import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, youtubeVideoIdFromUrl, type LiveWatchSetting } from "@/lib/liveWatch";
+import BroadcastVideoHistoryPicker from "./BroadcastVideoHistoryPicker";
 import { LIVE_CHAT_KEY, LIVE_CHAT_DEFAULT, parseLiveChatSetting, serializeLiveChatSetting, type LiveChatSetting } from "@/lib/liveChat";
 import { LIVE_CHAT_EMOJI_KEY, emojiAccessText, parseChatEmojiSetting, type ChatEmojiSetting } from "@/lib/liveChatEmoji";
 import ChatEmojiManagerModal from "./ChatEmojiManagerModal";
@@ -28,7 +29,7 @@ type Props = {
   savingBroadcast?: boolean;
   onStartBroadcast: (input: { title: string; youtubeUrl?: string }) => Promise<void> | void;
   onEndBroadcast: () => Promise<void> | void;
-  onSaveBroadcast: (input: { title: string; youtubeUrl?: string }) => Promise<void> | void;
+  onSaveBroadcast: (input: { title: string; youtubeUrl?: string }) => Promise<boolean> | boolean;
   title: string;
   onTitleChange: (value: string) => void;
   youtubeUrl: string;
@@ -559,12 +560,13 @@ export default function LiveHeader({
   }, [activeBroadcast]);
 
   const saveCurrentBroadcast = async () => {
-    await onSaveBroadcast({ title, youtubeUrl });
+    if (!await onSaveBroadcast({ title, youtubeUrl: activeBroadcast?.youtube_live_url || "" })) return;
     setTitleSavedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
   };
 
   const applyYoutubeUrl = async () => {
-    await onSaveBroadcast({ title, youtubeUrl });
+    setUrlAppliedAt("");
+    if (!await onSaveBroadcast({ title, youtubeUrl })) return;
     setUrlAppliedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
   };
 
@@ -602,10 +604,12 @@ export default function LiveHeader({
             <input value={title} onChange={(event) => onTitleChange(event.target.value)} disabled={!activeBroadcast} placeholder={activeBroadcast ? "" : "방송 시작 때 정해요"} className={fieldCls} />
             <button type="button" disabled={savingBroadcast || !activeBroadcast} onClick={saveCurrentBroadcast} className={primaryCls}>저장</button>
           </FormRow>
-          <FormRow label="유튜브 라이브 주소" hint={urlAppliedAt ? `적용 ${urlAppliedAt}` : ""}>
+          <FormRow label="유튜브 영상 주소" hint={youtubeUrl !== (activeBroadcast?.youtube_live_url || "") ? "선택한 영상을 보여주려면 적용을 눌러 주세요" : urlAppliedAt ? `적용 ${urlAppliedAt}` : "라이브·일부공개 다시보기 모두 가능"}>
             <input value={youtubeUrl} onChange={(event) => onYoutubeUrlChange(event.target.value)} disabled={!activeBroadcast} placeholder="https://www.youtube.com/watch?v=..." className={fieldCls} />
             <button type="button" disabled={savingBroadcast || !activeBroadcast} onClick={applyYoutubeUrl} className={primaryCls}>적용</button>
           </FormRow>
+          <BroadcastVideoHistoryPicker disabled={savingBroadcast || !activeBroadcast} selectedVideoId={youtubeVideoIdFromUrl(youtubeUrl)} onSelect={url => {onYoutubeUrlChange(url);setUrlAppliedAt("");}} />
+          <p className="text-[12px] leading-relaxed text-ink-mute">영상마다 상품 소개 지점을 보관해요. 다시보기로 계속 판매하려면 방송을 「잠시 멈춤」으로 유지해 주세요.</p>
           {secondOpen || secondUrl.trim() ? (
             <FormRow label="두 번째 채널 주소" hint={secondState || "주문 알림 채팅만 같이 올림 · 비우고 적용하면 끔"}>
               <input value={secondUrl} disabled={!activeBroadcast} onChange={(event) => setSecondUrl(event.target.value)} placeholder="동시 방송하는 다른 채널 라이브 주소" className={fieldCls} />
