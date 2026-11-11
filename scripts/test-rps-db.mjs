@@ -16,6 +16,7 @@ try {
  create function admin_change_customer_points(p_phone text,p_action text,p_amount int,p_reason text,p_admin_memo text,p_nickname text,p_customer_name text,p_customer_visible boolean,p_source_key text) returns jsonb language plpgsql as $$ begin insert into customer_point_ledger values(p_source_key,p_amount) on conflict do nothing; return '{"ok":true}'::jsonb; end $$;
  `);
  await db.exec(sql.split('-- HOSTED CLOCK')[0]);
+ await db.exec(await fs.readFile('supabase/migrations/20261111155009_rps_saved_setup.sql','utf8'));
  const call=async(name,...args)=>(await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args)).rows[0].result;
  const state=async()=>(await db.query('select payload from rps_public where id=1')).rows[0].payload;
  const admin=async(action,data={})=>call('rps_admin',action,JSON.stringify(data),(await state())?.revision??0);
@@ -55,5 +56,17 @@ try {
  assert.ok(!JSON.stringify(s).includes('kakao_id'));assert.ok(!JSON.stringify(s).includes('01011111111'));
  await assert.rejects(call('rps_admin','close','{}',-1),/다른 관리자/);
  await db.exec('set role anon'); await assert.rejects(db.query('select * from rps_players'),/permission denied/);await assert.rejects(db.query("select rps_tick()"),/permission denied/);await db.query('select payload from rps_public');await db.exec('reset role');
+ await admin('close');
+ const config={title:'설정 테스트',winners:1,rewardKind:'none',points:1000,gift:'',joinSeconds:300,pickSeconds:5,auto:false};
+ await call('rps_save_setup',JSON.stringify(config),0);
+ await call('rps_create_saved_setup',JSON.stringify({test:true}),(await state()).revision,1);
+ s=await state(); const oldDeadline=s.deadline;
+ await call('rps_update_settings',JSON.stringify({...config,_roomId:s.id,title:'제목 수정'}),s.revision);
+ s=await state();assert.equal(s.deadline,oldDeadline,'unchanged recruitment time retains original deadline');
+ const stale=s.revision;
+ await call('rps_update_settings',JSON.stringify({...config,_roomId:s.id,joinSeconds:90}),s.revision);
+ s=await state();assert.equal(s.joinSeconds,90);assert.ok(Math.abs(Date.parse(s.deadline)-Date.now()-90000)<3000);
+ await assert.rejects(call('rps_update_settings',JSON.stringify({...config,_roomId:s.id,joinSeconds:120}),stale),/다른 관리자/);
+ assert.equal((await state()).joinSeconds,90,'stale save cannot change deadline');
  console.log('PASS RPS: identity dedupe, deadline/round guards, hidden commitment, forfeit, undershoot, all-loss/all-forfeit, 1000 rows, admin conflict, anon grants');
 } finally {await db.close();}

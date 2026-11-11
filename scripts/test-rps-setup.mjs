@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+const db=new PGlite();
+try{
+ await db.exec(`create role anon;create role authenticated;create role service_role;create schema realtime;
+ create function realtime.send(jsonb,text,text,boolean) returns void language sql as $$select$$;
+ create table rps_rooms(id int,status text,round int,join_seconds int);
+ create table launches(config jsonb);
+ create function rps_admin(text,jsonb,bigint) returns jsonb language plpgsql as $$begin insert into launches values($2);return '{"status":"lobby"}';end$$;`);
+ await db.exec(await fs.readFile('supabase/migrations/20261111155009_rps_saved_setup.sql','utf8'));
+ const call=async(name,...args)=>(await db.query(`select ${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args)).rows[0].result;
+ const cfg={title:'가위·바위·보 루루를 이겨라!',winners:10,rewardKind:'points',points:1000,gift:'',joinSeconds:300,pickSeconds:5,auto:true};
+ let saved=await call('rps_save_setup',JSON.stringify(cfg),0);
+ assert.equal(saved.revision,1);assert.equal(saved.config.points,1000);
+ assert.equal((await db.query('select count(*)::int n from launches')).rows[0].n,0,'save must not start a game');
+ await assert.rejects(call('rps_save_setup',JSON.stringify({...cfg,points:2000}),0),/다른 관리자/);
+ await assert.rejects(call('rps_create_saved_setup','{}',0,0),/다른 관리자/);
+ await assert.rejects(call('rps_save_setup',JSON.stringify({...cfg,points:-1}),1),/설정/);
+ await assert.rejects(call('rps_save_setup',JSON.stringify({...cfg,auto:'no'}),1),/설정/);
+ await call('rps_create_saved_setup',JSON.stringify({test:true,points:99999}),0,1);
+ let launched=(await db.query('select config from launches')).rows[0].config;
+ assert.equal(launched.points,1000,'creation uses stored config, not forged overrides');assert.equal(launched.test,true);
+ await db.exec("insert into rps_rooms(id,status) values(1,'lobby')");
+ await assert.rejects(call('rps_save_setup',JSON.stringify(cfg),1),/진행 중/);
+ await db.exec('set role anon');
+ await assert.rejects(db.query('select * from rps_setup'),/permission denied/);
+ await assert.rejects(call('rps_save_setup',JSON.stringify(cfg),1),/permission denied/);
+ console.log('PASS setup save has no game side effects, concurrent version guard, validation, saved-value start, private access');
+}finally{await db.close();}

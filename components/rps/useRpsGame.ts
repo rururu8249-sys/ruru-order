@@ -1,11 +1,12 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {supabase} from '@/lib/supabase';
-import {chatIdentityHeaders,verifyChatAccount} from '@/lib/useLiveChatPrivate';
-import type {RpsPlayer,RpsRewardRow,RpsState} from '@/lib/rps';
+import {chatIdentityHeaders} from '@/lib/useLiveChatPrivate';
+import type {RpsPlayer,RpsRewardRow,RpsState,RpsSetup} from '@/lib/rps';
 export function useRpsGame(publicOnly=false){
  const [state,setState]=useState<RpsState|null>(null);const [player,setPlayer]=useState<RpsPlayer|null>(null);
  const [admin,setAdmin]=useState(false);const [verified,setVerified]=useState(false);const [winners,setWinners]=useState<RpsRewardRow[]>([]);
+ const [setup,setSetup]=useState<RpsSetup|null>(null);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [now,setNow]=useState(()=>Date.now());
  const offset=useRef(0),room=useRef<string|undefined>(undefined),loading=useRef(false),mounted=useRef(true),lastSuccess=useRef(0),privateRequest=useRef(0),phase=useRef(''),latest=useRef<RpsState|null>(null);
  const accept=useCallback((next:RpsState)=>{
@@ -24,12 +25,12 @@ export function useRpsGame(publicOnly=false){
  const loadMe=useCallback(async()=>{
  if(publicOnly)return;
  try{const requestId=++privateRequest.current;const requestedPhase=phase.current;const headers=chatIdentityHeaders();const requestedRoom=room.current;const response=await fetch(`/api/rps/me${requestedRoom?'?room='+encodeURIComponent(requestedRoom):''}`,{headers,cache:'no-store'});const data=await response.json();
- if(data.ok&&mounted.current&&room.current===requestedRoom&&requestId===privateRequest.current&&phase.current===requestedPhase&&JSON.stringify(headers)===JSON.stringify(chatIdentityHeaders())){setAdmin(data.admin);setVerified(data.verified);setPlayer(data.player);setWinners(data.winners);if(data.state)accept(data.state);}}
+ if(data.ok&&mounted.current&&room.current===requestedRoom&&requestId===privateRequest.current&&phase.current===requestedPhase&&JSON.stringify(headers)===JSON.stringify(chatIdentityHeaders())){setAdmin(data.admin);setVerified(data.verified);setPlayer(data.player);setWinners(data.winners);setSetup(data.setup??null);if(data.state)accept(data.state);}}
  catch{/* Preserve prior state during reconnection. */}
  },[publicOnly,accept]);
  useEffect(()=>{
  mounted.current=true;queueMicrotask(()=>{void loadPublic();void loadMe();});
- const channel=supabase.channel('ruru-rps').on('broadcast',{event:'changed'},()=>{void loadPublic();}).subscribe(status=>{if(status==='SUBSCRIBED')void loadPublic();});
+ const channel=supabase.channel('ruru-rps').on('broadcast',{event:'changed'},({payload})=>{if(payload?.setup)void loadMe();else void loadPublic();}).subscribe(status=>{if(status==='SUBSCRIBED')void loadPublic();});
  const fallback=setInterval(()=>{if(!document.hidden){void loadPublic();void loadMe();}},10000);
  const resume=()=>{if(!document.hidden){void loadPublic();void loadMe();}};
  window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);
@@ -39,7 +40,7 @@ export function useRpsGame(publicOnly=false){
  // Clear private state before rechecking so another account cannot inherit controls.
  useEffect(()=>{
  if(publicOnly)return;
- const changed=()=>{++privateRequest.current;setAdmin(false);setVerified(false);setPlayer(null);setWinners([]);void loadMe();};
+ const changed=()=>{++privateRequest.current;setAdmin(false);setVerified(false);setPlayer(null);setWinners([]);setSetup(null);void loadMe();};
  const message=(event:MessageEvent)=>{if(event.origin===location.origin&&event.data?.type==='ruru-chat-verified')changed();};
  const storage=(event:StorageEvent)=>{if(!event.key||['ruru_chat_identity','ruru_kakao_id'].includes(event.key))changed();};
  window.addEventListener('message',message);window.addEventListener('storage',storage);window.addEventListener('ruru-chat-logout',changed);
@@ -59,6 +60,6 @@ export function useRpsGame(publicOnly=false){
  }catch{setError('전송 결과를 확인하지 못했어요. 다시 연결해 확인해 주세요.');return false;}
  finally{setBusy(false);void loadMe();}
  },[state,busy,accept,loadMe,loadPublic]);
- return {state,player,admin,verified,winners,error,busy,now,action,verify:verifyChatAccount,refresh:loadMe};
+ return {state,player,admin,verified,winners,setup,error,busy,now,action,verify:()=>window.location.assign('/api/live-chat/session?returnTo=/order'),refresh:loadMe};
 }
 export type RpsController=ReturnType<typeof useRpsGame>;

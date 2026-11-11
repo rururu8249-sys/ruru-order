@@ -4,7 +4,7 @@ import {sameChatOrigin} from '@/lib/liveChatSession';
 import {rpsAccess,uuid} from '@/lib/rpsServer';
 export const dynamic='force-dynamic';
 const reply=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
-const actions=new Set(['create','close','start','next','lobbyTime','pause','resume','settings','pvp','retry']);
+const actions=new Set(['create','saveSetup','close','start','next','lobbyTime','pause','resume','settings','pvp','retry']);
 export async function POST(req:NextRequest){
  if(!sameChatOrigin(req))return reply({ok:false,message:'잘못된 요청입니다.'},403);
  try {
@@ -31,7 +31,13 @@ export async function POST(req:NextRequest){
  const bc=await sb.from('broadcasts').select('id').eq('id',data.broadcastId).eq('status','ON').maybeSingle();
  if(bc.error||!bc.data)return reply({ok:false,message:'현재 방송을 확인하지 못했어요.'},409);
  }
- result=await sb.rpc('rps_admin',{p_action:raw.action,p_data:data,p_expected:raw.revision});
+ if(raw.action==='saveSetup'||raw.action==='create'){
+ if(!Number.isSafeInteger(data.setupRevision))return reply({ok:false,message:'게임 설정을 새로 열어 확인해 주세요.'},409);
+ result=raw.action==='saveSetup'
+ ?await sb.rpc('rps_save_setup',{p_config:data,p_expected:data.setupRevision})
+ :await sb.rpc('rps_create_saved_setup',{p_context:data,p_expected:raw.revision,p_setup_expected:data.setupRevision});
+ }else if(raw.action==='settings')result=await sb.rpc('rps_update_settings',{p_config:data,p_expected:raw.revision});
+ else result=await sb.rpc('rps_admin',{p_action:raw.action,p_data:data,p_expected:raw.revision});
  }
  if(result.error){const message=result.error.message;return reply({ok:false,message:/[가-힣]/.test(message)?message:'설정값을 확인한 후 다시 시도해 주세요.'},409);}
  return reply({ok:true,result:result.data});

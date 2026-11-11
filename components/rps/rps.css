@@ -4,3 +4,40 @@
 .rps-reward-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.rps-reward-actions button{min-height:40px;padding:6px 10px;border-radius:10px;background:#e6f5ed;color:#174b32}
 
 .rps-winner-box{position:relative}.rps-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}.rps-confetti i{position:absolute;top:-12px;width:6px;height:10px;opacity:0;animation:rps-confetti-fall 2.1s ease-out 2}@keyframes rps-confetti-fall{0%{opacity:1;transform:translateY(0) rotate(0)}85%{opacity:1}100%{opacity:0;transform:translateY(240px) rotate(480deg)}}
+
+/* The game has its own upper-middle area; chat uses the measured space below. */
+.rps-live-overlay{position:absolute;top:clamp(76px,16%,140px);pointer-events:none;z-index:3}
+.rps-live-overlay .rps-card{max-height:max(96px,min(40dvh,calc(100dvh - 260px)))}
+.rps-admin>header,.rps-admin>nav,.rps-admin-footer{flex-shrink:0}
+.rps-admin-body{flex:1 1 auto;padding-bottom:18px}
+.rps-admin-footer{padding:12px 14px;border-top:1px solid #e4e8e5;background:#fff}
+.rps-admin-footer small{display:block;font-size:12px;color:#806625;margin-bottom:6px}
+.rps-mode,.rps-duration{border:0;padding:0;margin:0;min-width:0}
+.rps-mode legend,.rps-duration legend{padding:0;margin-bottom:5px;font-size:12px;font-weight:700}
+.rps-mode>div,.rps-duration>div{display:flex;gap:8px}
+.rps-mode button{flex:1;min-height:44px;border:1px solid #cbd0cc;background:#fff;border-radius:10px}
+.rps-mode button[aria-pressed=true]{background:#e8f4e9;border:2px solid #26744f;font-weight:800}
+.rps-mode p{font-size:12px;color:#53645a;margin:6px 0 0;line-height:1.5}
+.rps-duration label{display:flex;flex-direction:row;align-items:center;gap:6px;flex:1;min-width:0}
+.rps-duration input{min-width:0;flex:1}
+.rps-duration small{display:block;margin-top:6px}
+.rps-manage{margin-top:16px;border-top:1px solid #eee;padding-top:10px}
+.rps-manage summary,.rps-widget-link summary{cursor:pointer;font-size:12px;padding:8px 0;color:#526257}
+.rps-host-controls .rps-primary{margin-top:8px}
+.rps-host-controls p{font-size:12px;margin:6px 0}
+.rps-host-controls>small{display:block;text-align:center;font-size:11px;margin-top:5px;color:#666}
+.rps-ready .rps-secondary{font-size:13px}
+@media(max-height:500px){.rps-backdrop{padding:6px}.rps-admin{max-height:calc(100dvh - 12px)}.rps-admin>header{padding:6px 12px}.rps-admin-footer{padding:8px 12px}}
+
+/* Match the approved white/black/pink design, including the pale prize strip. */
+.rps-card,.rps-admin{color:#19191b;background:#fff}
+.rps-kicker{color:#b82c55}
+.rps-primary{background:#1d1b20}
+.rps-prize{background:#fff4d7;border-radius:8px;padding:6px 9px;color:#714d0c;margin:8px 0}
+.rps-versus{background:#f7f4f6}
+.rps-choices button{border-color:#e7e1e4;background:#faf9f9;color:#292429}
+.rps-choices button[aria-pressed=true],.rps-mode button[aria-pressed=true]{border-color:#e52f66;background:#fff0f5}
+.rps-admin nav button[aria-pressed=true]{background:#fff0f5;color:#b82c55;border-bottom-color:#e52f66}
+.rps-mode p,.rps-manage summary,.rps-widget-link summary{color:#6f626a}
+.rps-public{background:#fff}
+.rps-lobby>p{margin:4px 0;font-size:12px}.rps-card p{line-height:1.4}.rps-count{margin-bottom:4px}.rps-live-overlay .rps-admin-shortcut{min-height:32px}
