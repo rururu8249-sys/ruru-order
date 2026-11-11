@@ -948,7 +948,7 @@ export default function LiveWatchView(props: Props) {
               <div aria-label="미리보기" style={{ position: "absolute", bottom: "calc(100% + 8px)", left: isDesktop ? 0 : 16, width: "fit-content", maxWidth: "calc(100% - 32px)", maxHeight: "30dvh", overflowY: "auto", boxSizing: "border-box", padding: "16px", borderRadius: "12px", background: "rgba(0,0,0,0.38)", color: "#FFFFFF", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word", zIndex: 1 }}>
                 {selectedEmoji ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selectedEmoji.url} alt={`${selectedEmoji.name} 이모티콘 미리보기`} style={{display: "block", width: "min(112px, 20dvh)", height: "min(112px, 20dvh)", objectFit: "contain"}} />
+                  <img src={selectedEmoji.url} alt={`${selectedEmoji.name} 이모티콘 미리보기`} style={{display: "block", width: "min(144px, calc(30dvh - 32px))", height: "min(144px, calc(30dvh - 32px))", objectFit: "contain"}} />
                 ) : <ChatBodyView body={encodeEmojiTokens(draft, emojiItems).text} emojis={emojiMap} />}
                 {selectedEmoji ? <button type="button" aria-label="선택한 이모티콘 취소" onClick={() => setSelectedEmoji(null)} style={{position: "absolute", right: 0, top: 0, width: 44, height: 44, border: 0, background: "transparent", color: "#FFFFFF", cursor: "pointer"}}>✕</button> : null}
               </div>
