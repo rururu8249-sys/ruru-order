@@ -38,6 +38,8 @@ assert.equal(calls.length,0,'multiple featured products open the explicit filter
 assert.equal(tree.root.findAllByProps({role:'dialog'})[0].props['aria-label'],'지금 소개하는 상품');
 assert.ok(text(tree.toJSON()).includes('전체 153개 중 소개 중인 상품이에요.'));
 assert.ok(text(tree.toJSON()).includes('LOE-111 블랙'));
+const featuredPanel = tree.root.findAllByProps({role:'dialog'})[0];
+assert.ok(featuredPanel.findAllByType('button').every(n => !/^\d+번 /.test(n.props['aria-label'] ?? '')), 'featured photos must not inherit parent catalog numbers');
 await act(async()=>tree.root.findByProps({'aria-label':'방송 상품 찾기'}).props.onChange({target:{value:'없는 상품'}}));
 await click(button('전체 상품 153개 보기 →'));
 assert.equal(tree.root.findByProps({'aria-label':'방송 상품 찾기'}).props.value,'');
