@@ -803,7 +803,7 @@ export default function LiveHeader({
             </button>
             <button type="button" disabled={!activeBroadcast} onClick={() => onToggleWidgetCard?.()} className={secondaryCls} aria-pressed={widgetCardOn}
               title={activeBroadcast ? "방송 화면 상품 카드를 켜고 끔(반영 최대 20초)" : "방송 중에만"}>
-              방송 화면 상품 카드 {widgetCardOn ? "켜짐" : "꺼짐"}
+              상품 카드 (유튜브·사이트) {widgetCardOn ? "켜짐" : "꺼짐"}
             </button>
             <button type="button" disabled={Boolean(activeBroadcast)} onClick={() => onToggleShopOpen?.()} className={secondaryCls} aria-pressed={shopOpen}
               title={activeBroadcast ? "방송 중에는 바꿀 수 없어요" : "쇼핑몰 열기/닫기"}>

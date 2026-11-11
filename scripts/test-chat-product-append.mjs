@@ -22,7 +22,7 @@ const sb={from(table){let op='read',value;const filters=[];const q={select(){ret
  return Promise.resolve({data,error}).then(resolve,reject);
  }};return q;}};
 const apply=targets=>runChatProductCommand(sb,bc,'',{nickname:'admin',body:'/'},{targets,mode:'append'});
-reset({mode:'selected',paused:true,targets:[target(1)]});await apply([target(2),target(1)]);assert.deepEqual(JSON.parse(state),{mode:'selected',paused:false,targets:[target(1),target(2)]});assert.equal(writes.at(-1).value.length,3);
+reset({mode:'selected',paused:true,targets:[target(1)]});await apply([target(2),target(1)]);assert.deepEqual(JSON.parse(state).targets,[target(1),target(2)]);assert.equal(JSON.parse(state).paused,false);assert.ok(Number.isFinite(JSON.parse(state).startedAt));assert.equal(writes.at(-1).value.length,1);
 reset({mode:'selected',paused:false,targets:[target(1)]});conflicts=1;await apply([target(2)]);assert.deepEqual(JSON.parse(state).targets,[target(3),target(2)],'retry preserves the other admin’s newer list');
 reset({mode:'selected',paused:false,targets:[target(1)]});conflicts=4;await assert.rejects(()=>apply([target(2)]),/다른 관리자/);assert.ok(writes.every(w=>w.table==='settings'),'failed CAS never posts guides or unpins');
 reset({mode:'all',paused:true,targets:[]});await apply([target(2)]);assert.equal(JSON.parse(state).mode,'all','append to all retains all');assert.equal(JSON.parse(state).paused,false);

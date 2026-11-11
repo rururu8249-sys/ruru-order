@@ -1,3 +1,4 @@
+import { transitionRotation } from "@/lib/widgetRotationClock";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -86,8 +87,10 @@ export async function POST(request: NextRequest) {
 
     const sb = getSupabaseAdmin();
     if (parsed.action === "saveRotation") {
-      await writeSetting(sb, widgetRotationSettingKey(parsed.broadcastId), parsed.rotation);
-      return NextResponse.json({ ok: true, rotation: parsed.rotation });
+      const key = widgetRotationSettingKey(parsed.broadcastId);
+      const rotation = transitionRotation(await readSetting(sb, key), parsed.rotation);
+      await writeSetting(sb, key, rotation);
+      return NextResponse.json({ ok: true, rotation });
     }
 
     if (parsed.action === "renameRotationDetail") {

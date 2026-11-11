@@ -15,6 +15,8 @@ export type WidgetRotationConfig = {
   mode: "all" | "history" | "selected";
   paused: boolean;
   targets: WidgetProductTarget[];
+  startedAt?: number;
+  pausedAt?: number;
 };
 
 export type WidgetHistorySort = "recent" | "frequent" | "name";
@@ -218,6 +220,8 @@ export function parseWidgetRotation(value: unknown): WidgetRotationConfig {
     mode,
     paused: parsed.paused === true,
     targets: mode === "selected" ? normalizeTargets(parsed.targets) : [],
+    ...(typeof parsed.startedAt === "number" && Number.isFinite(parsed.startedAt) && parsed.startedAt >= 0 ? { startedAt: parsed.startedAt } : {}),
+    ...(typeof parsed.pausedAt === "number" && Number.isFinite(parsed.pausedAt) && parsed.pausedAt >= 0 ? { pausedAt: parsed.pausedAt } : {}),
   };
 }
 
@@ -234,7 +238,7 @@ export function selectWidgetRotationItems<T>(
 ): T[] {
   const config = parseWidgetRotation(configInput);
   const availableItems = items.filter(isAvailable);
-  if (config.mode === "all") return availableItems;
+  if (config.mode === "all") return availableItems.sort((a, b) => widgetTargetKey(targetOf(a)).localeCompare(widgetTargetKey(targetOf(b)), "en", { numeric: true }));
 
   const byTarget = new Map<string, T>();
   for (const item of availableItems) {

@@ -1,10 +1,11 @@
+import { transitionRotation } from "@/lib/widgetRotationClock";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { isExposedProductRow } from "@/lib/cartExposureServer";
 import { buildDetailChatLine, detailCode, detailProducts, parseProductNote } from "@/lib/productDetailModel";
 import { resolveBroadcastBrandProducts, type BrandProductLink } from "@/lib/productBrandLinks";
 import { parseWidgetHistory, parseWidgetRotation, selectWidgetRotationItems, WIDGET_PRODUCT_HISTORY_SETTING_KEY, widgetRotationSettingKey, widgetTargetFromProduct, widgetTargetKey, type WidgetProductTarget, type WidgetRotationConfig } from "@/lib/widgetProductLibrary";
-import { LIVE_CHAT_BOT_KAKAO, LIVE_CHAT_BOT_NICK, botRefOfProduct, productBotText, type BotCandidate } from "@/lib/liveChatBot";
+import { type BotCandidate } from "@/lib/liveChatBot";
 import { CHAT_PRODUCT_LIMIT, matchChatProductCommand, type ChatProductSelection } from "@/lib/liveChatProductCommand";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 
@@ -79,7 +80,7 @@ export async function runChatProductCommand(sb: SupabaseClient, bc: string, quer
   const targets = products.map(({ productId, detailName }) => ({ productId, detailName }));
   if (batch?.mode === "append") await appendRotation(sb, bc, catalog, targets);
   else {
-    const rotation = { mode: "selected", paused: false, targets };
+    const rotation = transitionRotation(null, { mode: "selected", paused: false, targets });
     const saved = await sb.from("settings").upsert({ key: widgetRotationSettingKey(bc), value: JSON.stringify(rotation), updated_at: new Date().toISOString() }, { onConflict: "key" });
     if (saved.error) throw new Error("위젯 순환을 바꾸지 못했어요. 다시 입력해 주세요.");
   }
@@ -89,12 +90,11 @@ export async function runChatProductCommand(sb: SupabaseClient, bc: string, quer
     .eq("id", bc).eq("status", "ON").select("id").maybeSingle();
   if (unpin.error || !unpin.data) throw new Error("순환 목록은 저장했지만 방송 화면에 반영하지 못했어요. 방송 상태를 확인한 뒤 다시 입력해 주세요.");
   // The command is private from the moment it is inserted: public realtime
-  // redacts hidden rows. Keep the audit/rate-limit row and the public guide.
+  // redacts hidden rows. The shared product card replaces public per-product guides; keep the audit/rate-limit row.
   const posted = await sb.from("live_chat_messages").insert([
     { ...author, ...(selected ? { body: `/${batch?.mode === "append" ? "추가 " : ""}${products.map(p => p.texts[0] || p.detailName).join(", ")}`.slice(0, 100) } : {}), broadcast_id: bc, hidden_at: new Date().toISOString(), hidden_by: "command", pinned_at: null },
-    ...products.map(product => ({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body: productBotText(product), badge: "bot", bot_ref: botRefOfProduct(product) })),
   ]).select(columns);
-  if (posted.error || !posted.data?.length) throw new Error("위젯은 변경됐지만 채팅 안내를 보내지 못했어요. 다시 입력하면 안내도 보낼 수 있어요.");
+  if (posted.error || !posted.data?.length) throw new Error("위젯은 변경됐지만 관리자 작업 기록을 저장하지 못했어요.");
   if (batch?.mode !== "append" && onIntroduced) await onIntroduced(targets);
   return posted.data.find(row => row.badge !== "bot") ?? posted.data[0];
 }
@@ -113,7 +113,7 @@ async function appendRotation(sb: SupabaseClient, bc: string, catalog: BotCandid
       const existing = selectWidgetRotationItems(catalog, previous, p => p, p => !p.soldOut, parseWidgetHistory(history?.data?.value));
       rotation = { mode: "selected", paused: false, targets: [...new Map([...existing, ...targets].map(p => [widgetTargetKey(p), { productId: p.productId, detailName: p.detailName }])).values()] };
     }
-    const value = JSON.stringify(rotation);
+    const value = JSON.stringify(transitionRotation(previous, rotation));
     if (current.data) {
       let update = sb.from("settings").update({ value, updated_at: new Date().toISOString() }).eq("key", key);
       update = current.data.value == null ? update.is("value", null) : update.eq("value", current.data.value);
