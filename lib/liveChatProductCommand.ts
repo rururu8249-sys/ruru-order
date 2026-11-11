@@ -4,7 +4,7 @@ import type { BotCandidate } from "@/lib/liveChatBot";
 import { normalizeWidgetTarget, widgetTargetKey, type WidgetProductTarget } from "@/lib/widgetProductLibrary";
 
 export const CHAT_PRODUCT_LIMIT = 20;
-export type ChatProductBatch = { targets: WidgetProductTarget[]; mode: "replace" | "append" };
+export type ChatProductBatch = { targets: WidgetProductTarget[]; mode: "replace" | "append"; intro?: import("./productIntro").ProductIntroCapture | null };
 export type ChatProductSelection = WidgetProductTarget | ChatProductBatch;
 
 export function parseChatProductSelection(raw: unknown): ChatProductBatch | null {

@@ -48,6 +48,8 @@ import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText }
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, chatBadgeOf, isChatOwnerPhone, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
 import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@/components/customer/LiveWatchView";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
+import { ProductIntroLink } from "@/components/customer/ProductIntroLink";
+import { introTargetForOptions, type IntroReplayRequest } from "@/lib/productIntro";
 import { chatIdentityHeaders, useLiveChatPrivate } from "@/lib/useLiveChatPrivate";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { CHAT_TEMP_ID_BASE, isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
@@ -1922,6 +1924,8 @@ export default function OrderPage() {
   const [directInputKeyboardInset, setDirectInputKeyboardInset] = useState(0);
   const [directInputProductSearchMode, setDirectInputProductSearchMode] = useState(false);
   const [directInputTargetIndex, setDirectInputTargetIndex] = useState(0);
+  const [introReplay, setIntroReplay] = useState<IntroReplayRequest | null>(null);
+  const [introOptionsSuspended, setIntroOptionsSuspended] = useState(false);
   const [registeredOptionSelectProduct, setRegisteredOptionSelectProduct] = useState<BroadcastProduct | null>(null);
   // [2026-08-14] 주문서 확인에서 「옵션 변경」 — null이면 새로 담기, 숫자면 그 줄을 교체
   const [registeredOptionEditIndex, setRegisteredOptionEditIndex] = useState<number | null>(null);
@@ -4877,6 +4881,8 @@ export default function OrderPage() {
   // [2026-08-29] preselectDetail — 목록에서 세부상품을 직접 눌러 들어온 경우 1단계를 건너뛴다.
   //   값이 없으면 예전과 완전히 같다(기존 호출부 무변경).
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct, preselectDetail?: string) => {
+    setIntroOptionsSuspended(false);
+    setIntroReplay(null);
     void fetchCartReservations(); // 담기 직전 — 다른 고객이 방금 담은 것까지 반영해 품절을 정확히 보여준다
     setPresenceActivity("option", String(product?.product_name || "").trim()); // [2026-11-09] 관리자 「지금 접속」 표시용(신호만)
     setRegisteredOptionSelectProduct(product);
@@ -4893,6 +4899,8 @@ export default function OrderPage() {
   };
 
   const closeRegisteredOptionSelectSheet = () => {
+    setIntroOptionsSuspended(false);
+    setIntroReplay(null);
     setRegisteredOptionEditIndex(null);
     setRegisteredOptionSelectProduct(null);
     setRegisteredOptionColor("");
@@ -6564,6 +6572,9 @@ export default function OrderPage() {
   });
   const liveWatchShown = liveWatchUsable && liveViewOn === true;
   const privateChat = useLiveChatPrivate(String(broadcast?.id || ""), liveWatchShown && liveChatEnabled, liveChatMessages);
+  useEffect(() => {
+    if (!liveWatchShown || (introReplay && introReplay.videoId !== liveWatchVideoId)) { setIntroReplay(null); setIntroOptionsSuspended(false); }
+  }, [liveWatchShown, liveWatchVideoId, broadcast?.id, introReplay]);
   // A slow request must not reveal home and then jump to live a few seconds later.
   useEffect(() => {
     if (!liveBootCover) return;
@@ -6946,6 +6957,10 @@ export default function OrderPage() {
   const registeredOptionPrice = registeredOptionResolvedProduct ? Number(registeredOptionResolvedProduct.price || 0) : 0;
   // [조합형 옵션] 시트 표시/선택금액 — 선택한 세부상품 추가금 반영(조합형 아니면 plus=0 → 기존 동일)
   const registeredOptionComboInfo = registeredOptionSelectProduct ? readComboInfoOrderProduct(registeredOptionSelectProduct) : null;
+  const registeredOptionIntroTarget = registeredOptionSelectProduct && registeredOptionResolvedProduct ? introTargetForOptions({
+    productId: String(registeredOptionResolvedProduct.id), parentId: String(registeredOptionSelectProduct.id),
+    detail: registeredOptionDetail, color: registeredOptionColor, hasAxes: Boolean(registeredOptionAxes3), hasCombo: Boolean(registeredOptionComboInfo),
+  }) : null;
   const registeredOptionComboPlus = registeredOptionComboInfo && registeredOptionResolvedProduct === registeredOptionSelectProduct
     ? comboPlusOfOrderProduct(registeredOptionSelectProduct, registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor)
     : 0;
@@ -8299,6 +8314,9 @@ export default function OrderPage() {
           {liveWatchShown ? (
             <LiveWatchView
               videoId={liveWatchVideoId}
+              introReplay={introReplay}
+              onReturnToProduct={() => setIntroOptionsSuspended(false)}
+              onEndIntroReplay={() => setIntroReplay(null)}
               broadcastId={broadcast?.id ? String(broadcast.id) : ""}
               title={String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
               paused={isBroadcastPaused}
@@ -8349,7 +8367,7 @@ export default function OrderPage() {
                   if (!body.trimStart().startsWith("/")) setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {
-                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body, target }) });
+                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body, target }) });
                     const json = await res.json().catch(() => null);
                     if (json?.ok && json.message) {
                       const m = parseChatMessage(json.message);
@@ -8357,7 +8375,7 @@ export default function OrderPage() {
                       else setLiveChatMessages((prev) => mergeChat(prev.filter((x) => x.id !== tempId), m ? [m] : []));
                       privateChat.refresh();
                     } else dropTemp();
-                    return { ok: Boolean(json?.ok), message: json?.message && typeof json.message === "string" ? json.message : undefined };
+                    return { ok: Boolean(json?.ok), message: typeof json?.introNotice === "string" ? json.introNotice : json?.message && typeof json.message === "string" ? json.message : undefined };
                   } catch { dropTemp(); return { ok: false, message: "못 보냈어요. 다시 눌러 주세요." }; }
                 },
                 onModerate: async (messageId: number, action: LiveChatAction) => {
@@ -9079,7 +9097,7 @@ export default function OrderPage() {
             });
             return (
           <CustomerBottomSheet
-            open
+            open={!introOptionsSuspended}
             size={optionSheetHalf ? "half" : "full"}
             onClose={closeRegisteredOptionSelectSheet}
             ariaLabel="옵션 선택"
@@ -9150,11 +9168,22 @@ export default function OrderPage() {
                 ) : null}
               </div>
             )}
-            headerBelow={optionNoticePresentation.message ? (
+            headerBelow={<>
+              {liveWatchUsable && broadcast?.id && registeredOptionIntroTarget && !registeredOptionBrandPickStage ? <ProductIntroLink
+                broadcastId={String(broadcast.id)} videoId={liveWatchVideoId}
+                productId={registeredOptionIntroTarget.productId}
+                detailName={registeredOptionIntroTarget.detailName}
+                onWatch={intro => {
+                  setIntroReplay({ ...intro, key: Date.now(), name: registeredOptionIntroTarget.detailName || registeredOptionPhotoTitle });
+                  setIntroOptionsSuspended(true);
+                  chooseLiveView(true);
+                }}
+              /> : null}
+              {optionNoticePresentation.message ? (
               <div data-product-order-notice-message style={sv({ borderBottom: "1px solid #F0EAE0", background: "#FDF1E7", padding: "7px 16px", color: "#8A4B1A", fontSize: "11.5px", fontWeight: 800, lineHeight: 1.4, wordBreak: "keep-all" })}>
                 {optionNoticePresentation.message}
               </div>
-            ) : undefined}
+            ) : null}</>}
             footer={(
               <>
                 {registeredOptionBrandCartEntries.length > 0 ? (

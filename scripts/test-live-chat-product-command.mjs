@@ -16,6 +16,7 @@ console.log('PASS brand aliases and exact slash command matching');
 // Exercise the real POST route and command service against an isolated DB double.
 const bc='00000000-0000-0000-0000-000000000001';
 const brand={id:77,product_name:'몽클레어',price:190000,status:'active',product_note:{brand_group:{enabled:true,detail_options:{'MC-335 아이보리':{sizes:['1','2','3','4','5']}}}},color_options:['MC-335 아이보리']};
+let identityValid=true;
 let products,listed,links,mod,banned,blocked,enabled,widgetOn,broadcastOn,rateLimited,failTable,writes,botCalls,roleError;
 function reset(){products=[brand];listed=[77];links=[];mod=true;banned=false;blocked=false;enabled=true;widgetOn=true;broadcastOn=true;rateLimited=false;failTable='';writes=[];botCalls=0;roleError=false;}
 reset();
@@ -28,7 +29,7 @@ const sb={from(table){let op='read',value,ids=null,start=0,end=999;const filters
       if(op==='insert')data=(Array.isArray(value)?value:[value]).map((row,i)=>({...row,id:501+i,created_at:new Date().toISOString()}));
       else if(op==='update')data=broadcastOn?{id:bc}:null;
       else if(table==='settings')data={value:JSON.stringify({enabled,words:[]})};
-      else if(table==='broadcasts')data={id:bc,status:broadcastOn?'ON':'OFF',widget_card_enabled:widgetOn};
+      else if(table==='broadcasts')data={id:bc,status:broadcastOn?'ON':'OFF',widget_card_enabled:widgetOn,youtube_live_url:'https://www.youtube.com/watch?v=abcdefghijk'};
       else if(table==='customers')data={id:'customer',youtube_nickname:'관리자',is_blocked:blocked};
       else if(table==='live_chat_bans')data=banned?[{until_at:new Date(Date.now()+60000).toISOString()}]:[];
       else if(table==='live_chat_messages')data=rateLimited?{created_at:new Date().toISOString()}:null;
@@ -40,6 +41,8 @@ const sb={from(table){let op='read',value,ids=null,start=0,end=999;const filters
   }};return q;
 }};
 const apiLoad=createUiLoader({
+  '@/lib/liveChatSession': {sameChatOrigin:()=>true,chatIdentityFromRequest:()=>identityValid?{sub:'test-actor'}:null,verifiedChatRole:async()=>({isMod:identityValid})},
+  '@/lib/admin-auth': {verifyAdminSessionFromRequest:async()=>false},
   'next/server':{NextResponse:{json:(data,init)=>new Response(JSON.stringify(data),{status:init?.status??200})},after:fn=>fn()},
   '@/lib/youtube':{getServiceClient:()=>sb},
   '@/lib/liveChatServer':{chatRoleOfKakao:async()=>{if(roleError)throw Error('offline');return {isMod:mod,badge:mod?'mod':null};}},
@@ -106,3 +109,14 @@ writes=[];result=await send('/프509, 없는999');assert.equal(result.ok,false);
 writes=[];result=await send('/509, 307, 509');assert.equal(result.ok,true);assert.equal(writes[2].value.length,3,'duplicate product emits one guide');
 const candidates=await apiLoad('lib/liveChatProductCommandServer.ts').loadChatCommandProducts(sb,bc);assert.equal(candidates[0].imageUrl,'https://example.test/pd.jpg');
 console.log('PASS multi POST: exact batch, private receipt, per-product guides, invalid targets, unmatched terms, deduplication and photos');
+
+reset();
+const introTarget={targets:[{productId:'77',detailName:'MC-335 아이보리'}],mode:'replace',intro:{videoId:'abcdefghijk',seconds:120,capturedAt:Date.now()}};
+result=await send('/',introTarget);
+assert.equal(result.ok,true);assert.match(result.introNotice,/소개영상도 연결/);
+assert.equal(writes.filter(w=>w.table==='settings'&&w.op==='update').length,1);
+assert.equal(JSON.parse(writes.at(-1).value.value).seconds,120);
+reset();identityValid=false;result=await send('/',introTarget);assert.equal(result.ok,true);assert.match(result.introNotice,/본인 확인/);assert.equal(writes.length,3);
+reset();identityValid=true;result=await send('/',{...introTarget,intro:{...introTarget.intro,videoId:'12345678901'}});assert.equal(result.ok,true);assert.match(result.introNotice,/건너뛰/);assert.equal(writes.length,3);
+reset();result=await send('/',{...introTarget,intro:null});assert.equal(result.ok,true);assert.match(result.introNotice,/건너뛰/);assert.equal(writes.length,3);
+console.log('PASS real POST verified-only video recording, mismatched/missing telemetry skips while widget+guide succeed');

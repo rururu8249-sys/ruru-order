@@ -18,7 +18,7 @@ const playerInfo = {current: {t: 564, d: 3599, live: true, state: 1}};
 const calls = [];
 const {youtubeCommand} = createUiLoader()('lib/liveWatch.ts');
 const jump = vm.runInNewContext(`(${handler.getText(ast)})`, {
-  playerInfo, youtubeCommand, liveResume: {onAction(){}},
+  playerInfo, youtubeCommand, liveResume: {onAction(){}}, introPlayer: {cancel(){}}, props: {},
   sendToPlayer: text => calls.push(JSON.parse(text)),
   lastTick: {current: {t: 564}},
   setBehindLive: () => calls.push('premature-live-label'),

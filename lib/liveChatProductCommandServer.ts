@@ -66,7 +66,7 @@ export async function loadChatCommandProducts(sb: SupabaseClient, bc: string): P
 }
 
 /** Caller has checked the existing chat moderator role, ban, broadcast and rate limit. */
-export async function runChatProductCommand(sb: SupabaseClient, bc: string, query: string | string[], author: Record<string, unknown>, selected?: ChatProductSelection) {
+export async function runChatProductCommand(sb: SupabaseClient, bc: string, query: string | string[], author: Record<string, unknown>, selected?: ChatProductSelection, onIntroduced?: (targets: WidgetProductTarget[]) => Promise<void>) {
   const catalog = await loadChatCommandProducts(sb, bc);
   const batch = selected && "targets" in selected ? selected : null;
   const groups = selected
@@ -95,6 +95,7 @@ export async function runChatProductCommand(sb: SupabaseClient, bc: string, quer
     ...products.map(product => ({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body: productBotText(product), badge: "bot", bot_ref: botRefOfProduct(product) })),
   ]).select(columns);
   if (posted.error || !posted.data?.length) throw new Error("위젯은 변경됐지만 채팅 안내를 보내지 못했어요. 다시 입력하면 안내도 보낼 수 있어요.");
+  if (batch?.mode !== "append" && onIntroduced) await onIntroduced(targets);
   return posted.data.find(row => row.badge !== "bot") ?? posted.data[0];
 }
 

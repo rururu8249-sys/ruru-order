@@ -7,6 +7,9 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { runLiveChatBot } from "@/lib/liveChatBotServer";
 import { parseChatProductQueries, parseChatProductSelection } from "@/lib/liveChatProductCommand";
+import { validateIntroCapture } from "@/lib/productIntro";
+import { saveProductIntros } from "@/lib/productIntroServer";
+import { youtubeVideoIdFromUrl } from "@/lib/liveWatch";
 import { runChatProductCommand } from "@/lib/liveChatProductCommandServer";
 import { getServiceClient } from "@/lib/youtube";
 import {
@@ -91,7 +94,7 @@ export async function POST(request: NextRequest) {
     const [setting, role, bcRes, custRes, bansRes, lastRes] = await Promise.all([
       readSetting(sb),
       chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null, isMod: false })),
-      sb.from("broadcasts").select("id, status, widget_card_enabled").eq("id", bc).maybeSingle(),
+      sb.from("broadcasts").select("id, status, widget_card_enabled, youtube_live_url, youtube_url").eq("id", bc).maybeSingle(),
       sb.from("customers").select("id, youtube_nickname, is_blocked, kakao_profile_image").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("live_chat_bans").select("until_at, lifted_at").eq("kakao_id", kakaoId).is("lifted_at", null).order("id", { ascending: false }).limit(5),
       sb.from("live_chat_messages").select("created_at").eq("kakao_id", kakaoId).order("id", { ascending: false }).limit(1).maybeSingle(),
@@ -99,7 +102,7 @@ export async function POST(request: NextRequest) {
     if (!setting.enabled) return fail("지금은 채팅을 쓸 수 없어요.", 403);
 
     // 방송이 켜져 있을 때만
-    const bcRow = bcRes.data as { status?: unknown; widget_card_enabled?: boolean } | null;
+    const bcRow = bcRes.data as { status?: unknown; widget_card_enabled?: boolean; youtube_live_url?: string; youtube_url?: string } | null;
     if (!bcRow || String(bcRow.status ?? "") !== "ON") return fail("방송 중에만 쓸 수 있어요.", 403);
 
     // 닉네임은 회원 표에서(카카오 계정 기준, 최신 1줄)
@@ -125,9 +128,24 @@ export async function POST(request: NextRequest) {
       if (!query && !target) return fail("/프509, 버307처럼 입력하거나 목록에서 상품을 골라 주세요.");
       if (bcRow.widget_card_enabled === false) return fail("방송 관리에서 상품 위젯을 먼저 켜 주세요.");
       try {
-        const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null }, target ?? undefined);
+        let introNotice: string | undefined;
+        const rawTarget = raw.target as Record<string, unknown> | undefined;
+        const wantsIntro = target && "targets" in target && target.mode === "replace" && rawTarget && "intro" in rawTarget;
+        const capture = wantsIntro ? validateIntroCapture(rawTarget.intro, youtubeVideoIdFromUrl(String(bcRow.youtube_live_url || bcRow.youtube_url || ""))) : null;
+        const recordIntro = wantsIntro ? async (targets: import("@/lib/widgetProductLibrary").WidgetProductTarget[]) => {
+          // Auxiliary recording must never turn successful widget/chat changes into a retry.
+          try {
+            if (!capture) { introNotice = "상품 소개 완료 · 실시간 영상 위치를 확인하지 못해 영상 연결은 건너뛰었어요."; return; }
+            const identity = chatIdentityFromRequest(request);
+            const verified = sameChatOrigin(request) && (await verifyAdminSessionFromRequest(request) || (identity?.sub === kakaoId && (await verifiedChatRole(sb, identity)).isMod));
+            if (!verified) { introNotice = "상품 소개 완료 · 영상 연결은 채팅 본인 확인 후 사용할 수 있어요."; return; }
+            await saveProductIntros(sb, bc, targets, capture);
+            introNotice = "상품 소개 완료 · 소개영상도 연결했어요.";
+          } catch { introNotice = "상품 소개 완료 · 소개영상 연결은 저장하지 못했어요."; }
+        } : undefined;
+        const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null }, target ?? undefined, recordIntro);
         // Only the sender receives this receipt; public history/events retain the hidden flag.
-        return NextResponse.json({ ok: true, privateCommand: true, message: parseChatMessage({ ...message, hidden_at: null, pinned_at: null }) }, { headers: { "Cache-Control": "private, no-store" } });
+        return NextResponse.json({ ok: true, privateCommand: true, introNotice, message: parseChatMessage({ ...message, hidden_at: null, pinned_at: null }) }, { headers: { "Cache-Control": "private, no-store" } });
       } catch (error) {
         return fail(error instanceof Error ? error.message : "상품 순환을 변경하지 못했어요.");
       }

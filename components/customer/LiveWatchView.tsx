@@ -22,6 +22,8 @@ import { EMOJI_MAX_PER_MSG, chatBodyAsText, countEmojiTokens, encodeEmojiTokens,
 import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
+import { useProductIntroPlayer } from "@/lib/useProductIntroPlayer";
+import type { IntroReplayRequest } from "@/lib/productIntro";
 import { useLiveResume } from "@/lib/useLiveResume";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 import { ChatProductPicker } from "@/components/customer/ChatProductPicker";
@@ -45,6 +47,9 @@ export type LiveWatchOrderToast = { key: string; nickname: string };
 type Props = {
   videoId: string;
   title: string;
+  introReplay?: IntroReplayRequest | null;
+  onReturnToProduct?: () => void;
+  onEndIntroReplay?: () => void;
   paused: boolean;
   pausedText: string;
   /** [2026-11-10] 유튜브 동시 시청자 수(1분마다 갱신) — 없으면 숫자 안 보임 */
@@ -573,8 +578,10 @@ export default function LiveWatchView(props: Props) {
     setComposeHint("");
     if (!batch) { setDraft(""); setComposeOpen(false); }
     closeGreet();
-    const r = await chat.onSend(body, target).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
+    const commandTarget = batch && target.mode === "replace" ? { ...target, intro: introPlayer.capture() } : target;
+    const r = await chat.onSend(body, commandTarget).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     setSending(false);
+    if (r.ok && r.message) setChatHint(r.message);
     if (batch) {
       if (r.ok) { setDraft(""); setComposeOpen(false); }
       else setComposeHint(r.message || "못 보냈어요. 선택을 유지했으니 다시 눌러 주세요.");
@@ -755,6 +762,7 @@ export default function LiveWatchView(props: Props) {
   //   실시간 이동은 막대를 끝으로 끌 때처럼 seekTo, 영상 새로고침은 별도 버튼으로 처리한다.
   const [reloadKey, setReloadKey] = useState(0);
   const liveResume = useLiveResume(iframeRef, `${videoId}:${reloadKey}`);
+  const introPlayer = useProductIntroPlayer(iframeRef, videoId, reloadKey, props.introReplay, liveResume.onAction);
   // Each entry/new player starts muted. Dismiss the large prompt only after
   // this iframe confirms unmute; a later deliberate mute keeps just the icon.
   useEffect(() => {
@@ -799,7 +807,7 @@ export default function LiveWatchView(props: Props) {
   const lastTick = useRef<{ t: number; at: number; state: number }>({ t: 0, at: 0, state: -1 });
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
-      if (!String(e.origin || "").includes("youtube.com")) return;
+      if (e.origin !== "https://www.youtube.com" || e.source !== iframeRef.current?.contentWindow) return;
       let data: { event?: string; info?: Record<string, unknown> } | null = null;
       try { data = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
       if (!data || data.event !== "infoDelivery" || !data.info) return;
@@ -857,6 +865,8 @@ export default function LiveWatchView(props: Props) {
     const { live, d, seekableEnd } = playerInfo.current;
     const target = seekableEnd ?? Math.max(0, d - 1);
     if (!live || !Number.isFinite(target) || target <= 0) return;
+    introPlayer.cancel();
+    props.onEndIntroReplay?.();
     liveResume.onAction("live");
     // 최신 재생 가능 끝으로 이동. 1초를 빼면 유튜브가 DVR 재생으로 남길 수 있다.
     sendToPlayer(youtubeCommand("seekTo", [target, true]));
@@ -1079,6 +1089,13 @@ export default function LiveWatchView(props: Props) {
           send={(func, args) => { liveResume.onAction(func, args); sendToPlayer(youtubeCommand(func, args || [])); }}
           onHold={(hold) => { if (hold) clearSeekTimer(); else restartSeekTimer(); }}
         />
+      ) : null}
+      {props.introReplay ? (
+        <div data-product-intro-replay style={{ position: "absolute", top: "calc(84px + env(safe-area-inset-top))", left: 12, right: 12, margin: "0 auto", maxWidth: 440, borderRadius: 12, background: "rgba(17,17,17,0.9)", padding: "8px 12px", zIndex: 3, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0 12px", fontSize: 13 }}>
+          <div role="status" style={{ flex: "1 1 100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{introPlayer.status === "loading" ? "소개영상으로 이동 중…" : introPlayer.status === "unavailable" ? "지금은 이 소개영상 구간을 재생할 수 없어요." : `${props.introReplay.name} · 소개영상 보는 중`}</div>
+          <button type="button" onClick={props.onReturnToProduct} style={{ minHeight: 44, border: 0, background: "transparent", color: "#FFFFFF", font: "inherit", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>상품 선택으로</button>
+          <button type="button" onClick={backToLive} style={{ minHeight: 44, border: 0, background: "transparent", color: "#FFFFFF", font: "inherit", cursor: "pointer" }}>실시간으로</button>
+        </div>
       ) : null}
       <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
         {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
