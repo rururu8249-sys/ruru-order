@@ -1,6 +1,6 @@
 export type ProductIntroCapture = { videoId: string; seconds: number; capturedAt: number };
 export type ProductIntro = ProductIntroCapture & { recordedAt: string };
-export type IntroReplayRequest = ProductIntro & { key: number; name: string };
+export type IntroReplayRequest = ProductIntro & { key: number; name: string; imageUrl?: string; priceText?: string };
 export type IntroReplayStatus = "loading" | "playing" | "unavailable";
 export type IntroPlayerSample = { videoId: string; t: number; edge: number; start: number; at: number; state: number; live: boolean; atLiveHead: boolean | null };
 const videoPattern = /^[\w-]{11}$/;

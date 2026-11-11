@@ -1100,7 +1100,16 @@ export default function LiveWatchView(props: Props) {
       ) : null}
       {props.introReplay ? (
         <div data-product-intro-replay style={{ position: "absolute", top: "calc(84px + env(safe-area-inset-top))", left: 12, right: 12, margin: "0 auto", maxWidth: 440, borderRadius: 14, background: "rgba(17,17,17,0.92)", padding: 12, zIndex: 3, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13, color: "#FFFFFF" }}>
-          <div role="status" style={{ flex: "1 1 100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{introPlayer.status === "loading" ? "소개영상으로 이동 중…" : introPlayer.status === "unavailable" ? "지금은 이 소개영상 구간을 재생할 수 없어요." : `${props.introReplay.name} · 소개영상 보는 중`}</div>
+          <div data-product-intro-summary style={{ flex: "1 1 100%", minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
+            {props.introReplay.imageUrl ? <img key={props.introReplay.imageUrl} data-product-intro-photo src={props.introReplay.imageUrl} alt={props.introReplay.name} width={44} height={44} onError={event => { event.currentTarget.style.display = "none"; }} style={{ width: 44, height: 44, flexShrink: 0, objectFit: "contain", borderRadius: 8, background: "#FFFFFF" }} /> : null}
+            <div style={{ minWidth: 0, flex: 1, lineHeight: 1.5 }}>
+              <div title={props.introReplay.name} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 700 }}>{props.introReplay.name}</div>
+              <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 8 }}>
+                {props.introReplay.priceText ? <strong data-product-intro-price style={{ whiteSpace: "nowrap" }}>{props.introReplay.priceText}</strong> : null}
+                <span role="status" style={{ fontSize: 12, color: "#DDDDDD" }}>{introPlayer.status === "loading" ? "소개영상으로 이동 중…" : introPlayer.status === "unavailable" ? "소개영상 재생 불가" : "소개영상 보는 중"}</span>
+              </div>
+            </div>
+          </div>
           <button type="button" onClick={props.onReturnToProduct} style={{ flex: "1 1 0", minWidth: 0, minHeight: 44, alignSelf: "stretch", wordBreak: "keep-all", padding: "8px 10px", lineHeight: 1.35, borderRadius: 10, border: "1px solid #FFFFFF", background: "#FFFFFF", color: "#111111", font: "inherit", fontWeight: 700, cursor: "pointer" }}><span aria-hidden="true">← </span>상품 선택으로 돌아가기</button>
           {behindLive ? <button type="button" onClick={backToLive} style={{ flex: "1 1 0", minWidth: 0, minHeight: 44, alignSelf: "stretch", wordBreak: "keep-all", padding: "8px 10px", lineHeight: 1.35, borderRadius: 10, border: "1px solid #999999", background: "#333333", color: "#FFFFFF", font: "inherit", fontWeight: 600, cursor: "pointer" }}><span aria-hidden="true">● </span>실시간 방송으로 돌아가기</button> : null}
         </div>
@@ -1153,7 +1162,7 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {!soundPromptDone && !guideOpen ? (
-        <div style={{ position: "absolute", left: "16px", right: "16px", top: props.introReplay ? "max(calc(208px + env(safe-area-inset-top)), 25%)" : "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
+        <div style={{ position: "absolute", left: "16px", right: "16px", top: props.introReplay ? "max(calc(232px + env(safe-area-inset-top)), 25%)" : "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
           <button type="button" aria-label="방송 소리 켜기" onClick={turnSoundOn}
             style={{ minWidth: "192px", minHeight: "60px", padding: "12px 24px", border: "1px solid rgba(255,255,255,0.7)", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", boxShadow: "0 4px 24px rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "10px", fontSize: "20px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", pointerEvents: "auto" }}>
             <IconSoundOn color="#111111" />소리 켜기

@@ -9205,7 +9205,13 @@ export default function OrderPage() {
                 detailName={registeredOptionIntroTarget.detailName}
                 onWatch={intro => {
                   rememberIntroProductSelection();
-                  setIntroReplay({ ...intro, key: Date.now(), name: registeredOptionIntroTarget.detailName || registeredOptionPhotoTitle });
+                  setIntroReplay({
+                    ...intro,
+                    key: Date.now(),
+                    name: registeredOptionIntroTarget.detailName || registeredOptionPhotoTitle,
+                    imageUrl: registeredOptionHeroPhoto || registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct),
+                    priceText: registeredOptionNeedsManualPrice && registeredOptionUnitPrice < 1 ? undefined : won(registeredOptionUnitPrice),
+                  });
                   setIntroOptionsSuspended(true);
                   chooseLiveView(true);
                 }}
