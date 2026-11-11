@@ -1241,7 +1241,7 @@ export default function LiveWatchView(props: Props) {
                   {botProduct ? <ChatProductThumb src={chatProductPhoto(props.items, botProduct)} name="안내 상품 사진" /> : null}
                   <span style={{ marginLeft: m.badge ? "4px" : "8px", color: "#FFFFFF" /* 글은 유튜브처럼 늘 흰색 — 연한 색 글은 밝은 배경에서 안 읽힘(12:49), 닉네임만 사람 색 */ }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", marginLeft: "8px", height: "24px", padding: "0 10px", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, textShadow: "none", verticalAlign: "middle", whiteSpace: "nowrap" }}>담기 ›</span>
+                    <span style={{ display: "inline", marginLeft: "6px", color: "inherit", fontSize: "1em", fontWeight: 500, textDecoration: "underline", textUnderlineOffset: "3px", whiteSpace: "nowrap" }}>담기 ›</span>
                   ) : null}
                 </span>
               </div>
