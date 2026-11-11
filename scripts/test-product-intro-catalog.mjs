@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const realNow=Date.now;let now=1800000000000;Date.now=()=>now;
+const pending=[];globalThis.fetch=()=>new Promise(resolve=>pending.push(resolve));
+const {loadProductIntroCatalog,peekProductIntro,invalidateProductIntroCatalog}=createUiLoader()('lib/productIntroCatalogClient.ts');
+const bc='00000000-0000-0000-0000-000000000001',video='abcdefghijk',target={productId:'1',detailName:'MC-335'};
+const intro={videoId:video,seconds:120,capturedAt:now,recordedAt:new Date(now).toISOString()};
+const reply=(index,items,status=200)=>pending[index]({ok:status===200,json:async()=>({items})});
+try {
+ assert.equal(peekProductIntro(bc,video,target),undefined);
+ const first=loadProductIntroCatalog(bc,video),same=loadProductIntroCatalog(bc,video);
+ assert.equal(first,same);assert.equal(pending.length,1);
+ reply(0,[{...target,intro}]);await first;
+ assert.equal(peekProductIntro(bc,video,target).seconds,120);
+ assert.equal(peekProductIntro(bc,video,{...target,detailName:'missing'}),null);
+ await loadProductIntroCatalog(bc,video);assert.equal(pending.length,1,'prefetch reused on opening a product');
+ assert.equal(peekProductIntro('other',video,target),undefined);
+ assert.equal(peekProductIntro(bc,'otherVideo1',target),undefined);
+ now+=31000;const refreshing=loadProductIntroCatalog(bc,video);
+ assert.equal(peekProductIntro(bc,video,target).seconds,120,'known button remains during refresh');
+ invalidateProductIntroCatalog(bc,video);assert.equal(peekProductIntro(bc,video,target),undefined);
+ reply(1,[{...target,intro}]);await refreshing;
+ assert.equal(peekProductIntro(bc,video,target),undefined,'old in-flight completion cannot undo invalidation');
+ const failed=loadProductIntroCatalog(bc,video);reply(2,[],503);await assert.rejects(failed);
+ const retry=loadProductIntroCatalog(bc,video);reply(3,[{...target,intro:{...intro,seconds:300}}]);await retry;
+ assert.equal(peekProductIntro(bc,video,target).seconds,300);
+ now+=6000;const missingRefresh=loadProductIntroCatalog(bc,video,{...target,detailName:'missing'});
+ assert.equal(pending.length,5,'missing links refresh after five seconds');
+ reply(4,[{...target,intro:{...intro,seconds:300}}]);await missingRefresh;
+ now+=121000;assert.equal(peekProductIntro(bc,video,target),undefined,'old data is bounded');
+ console.log('PASS prefetched catalog, request deduplication, immediate cached lookup, scope, refresh, invalidation race, retry and expiry');
+}finally{Date.now=realNow;}

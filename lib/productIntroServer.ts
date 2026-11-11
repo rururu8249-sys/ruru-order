@@ -41,3 +41,19 @@ export async function readProductIntro(sb: SupabaseClient, bc: string, videoId: 
   if (result.error) throw new Error("소개영상을 확인하지 못했어요.");
   return parseProductIntro(result.data?.value, videoId);
 }
+
+/** Internal index only. The public route filters these keys through the visible catalog. */
+export async function readProductIntroIndex(sb: SupabaseClient, bc: string, videoId: string) {
+  const prefix = `product_intro_v1_${bc}_${videoId}_`;
+  const pattern = prefix.replace(/[\\%_]/g, "\\$&") + "%";
+  const records = new Map<string, ProductIntro>();
+  for (let offset = 0; ; offset += 1000) {
+    const result = await sb.from("settings").select("key,value").like("key", pattern).order("key").range(offset, offset + 999);
+    if (result.error) throw new Error("소개영상을 확인하지 못했어요.");
+    for (const row of result.data ?? []) {
+      const intro = parseProductIntro(row.value, videoId);
+      if (intro && String(row.key).startsWith(prefix)) records.set(row.key, intro);
+    }
+    if ((result.data ?? []).length < 1000) return records;
+  }
+}

@@ -24,6 +24,7 @@ import { useIsDesktop } from "@/lib/useIsDesktop";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { useProductIntroPlayer } from "@/lib/useProductIntroPlayer";
 import type { IntroReplayRequest } from "@/lib/productIntro";
+import { invalidateProductIntroCatalog, loadProductIntroCatalog } from "@/lib/productIntroCatalogClient";
 import { useLiveResume } from "@/lib/useLiveResume";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 import { ChatProductPicker } from "@/components/customer/ChatProductPicker";
@@ -338,6 +339,9 @@ function BarBtn(props: { label: string; badge?: number; badgeRed?: boolean; onCl
 export default function LiveWatchView(props: Props) {
   const isDesktop = useIsDesktop();
   const { videoId, title, paused, pausedText, pinned, items, cartCount, cartTotalText, orderToasts } = props;
+  useEffect(() => {
+    if (props.broadcastId && videoId) void loadProductIntroCatalog(props.broadcastId, videoId).catch(() => {});
+  }, [props.broadcastId, videoId]);
   const noticeBadge = props.menu?.find((m) => m.key === "notice")?.badge || 0;
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [muted, setMuted] = useState(true);
@@ -580,6 +584,10 @@ export default function LiveWatchView(props: Props) {
     closeGreet();
     const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
     const r = await chat.onSend(body, commandTarget).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
+    if (r.ok && batch && target.mode === "replace" && props.broadcastId) {
+      invalidateProductIntroCatalog(props.broadcastId, videoId);
+      void loadProductIntroCatalog(props.broadcastId, videoId).catch(() => {});
+    }
     setSending(false);
     if (r.ok && r.message) setChatHint(r.message);
     if (batch) {
