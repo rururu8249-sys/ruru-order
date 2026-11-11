@@ -1603,6 +1603,29 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     clearRotCheck();
   };
 
+  // [2026-11-12 사장님] 방송 보며 주문 화면의 「지금 소개하는 상품」 카드만 켬/끔(유튜브 위젯·순환 무변경). settings 한 줄.
+  const [siteCard, setSiteCard] = useState<{ bc: string; off: boolean } | null>(null);
+  const [siteCardBusy, setSiteCardBusy] = useState(false);
+  useEffect(() => {
+    if (!bcSelId) return;
+    let alive = true;
+    void fetch(`/api/live-chat/site-card?bc=${encodeURIComponent(bcSelId)}`, { cache: "no-store" }).then((r) => r.json()).then((j) => { if (alive && j?.ok) setSiteCard({ bc: bcSelId, off: j.off === true }); }).catch(() => {});
+    return () => { alive = false; };
+  }, [bcSelId]);
+  const siteCardOff = siteCard?.bc === bcSelId && siteCard.off;
+  const toggleSiteCard = async () => {
+    if (!bcSelId || siteCardBusy) return;
+    const off = !siteCardOff;
+    setSiteCardBusy(true);
+    try {
+      const r = await fetch("/api/live-chat/site-card", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bc: bcSelId, off }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { setSiteCard({ bc: bcSelId, off }); showAdminToast(off ? "손님 화면의 상품 카드를 껐어요 (유튜브 위젯은 그대로)" : "손님 화면의 상품 카드를 켰어요", "success"); }
+      else showAdminToast(j.message || "저장하지 못했어요.", "error");
+    } catch { showAdminToast("저장하지 못했어요.", "error"); }
+    finally { setSiteCardBusy(false); }
+  };
+
   const toggleWidgetLibraryPause = async () => {
     const next = { ...widgetRotation, paused: !widgetRotation.paused };
     if (await saveWidgetRotation(next)) {
@@ -2085,6 +2108,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <button type="button" disabled={!rotationLive || rotBusy} onClick={() => { setRotChipPick(new Set()); void rotationUseAll(); }} title="순환 목록을 한 번에 비우고 방송 상품 전부가 돌게 해요" style={{ ...rowBtn, height: "36px", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>{`순환 전부 해제 ${rotationChips.length}개`}</button>
                         ) : null}
                         <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} style={{ ...(widgetRotation.paused ? rowBtnPrimary : rowBtn), height: "36px", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "다시 돌리기" : "멈춤"}</button>
+                        <button type="button" disabled={siteCardBusy} onClick={() => void toggleSiteCard()} title="방송 보며 주문 화면 채팅 위 「지금 소개하는 상품」 카드만 켜고 꺼요. 유튜브 위젯은 그대로예요." style={{ ...(siteCardOff ? rowBtnPrimary : rowBtn), height: "36px" }}>{siteCardOff ? "사이트 카드 꺼짐 · 켜기" : "사이트 카드 끄기"}</button>
                       </div>
                       {widgetRotation.mode !== "all" && rotationChips.length > 0 ? (() => {
                         const picked = rotationChips.filter((c) => rotChipPick.has(c.key));

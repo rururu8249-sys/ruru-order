@@ -12,6 +12,7 @@ import { RpsAdmin } from '@/components/rps/RpsAdmin';
 import { useLiveFeaturedProducts } from "@/lib/useLiveFeaturedProducts";
 import { useReplayProductCard } from "@/lib/useReplayProductCard";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
+import { chatIdentityHeaders, verifyChatAccount } from "@/lib/useLiveChatPrivate";
 import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
 import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
 import {
@@ -497,6 +498,8 @@ export default function LiveWatchView(props: Props) {
   useEffect(() => { if (!composeHint) return; const t = window.setTimeout(() => setComposeHint(""), 2500); return () => window.clearTimeout(t); }, [composeHint]);
   const [sending, setSending] = useState(false);
   const [chatHint, setChatHint] = useState("");
+  const [cardOffLocal, setCardOffLocal] = useState<{ bc: string; off: boolean } | null>(null);
+  const [cardBusy, setCardBusy] = useState(false);
   const rps = useRpsGame();
   const [rpsAdminOpen, setRpsAdminOpen] = useState(false);
   const [rpsLaunchKey, setRpsLaunchKey] = useState<string | null>(null);
@@ -946,7 +949,28 @@ export default function LiveWatchView(props: Props) {
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
   const desktopChatWidth = "clamp(280px, 35vw, 560px)";
   const videoRight = isDesktop && !focus ? desktopChatWidth : 0;
-  const pinnedProductCard = <LiveFeaturedProductCard product={featured.current} count={featured.products.length} label={replayFeatured.replay ? "지금 보는 상품" : undefined} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} />;
+  // [2026-11-12 사장님] 사이트 상품 카드 켬/끔 — 채팅 관리자만(서버가 다시 확인). 유튜브 위젯·순환은 그대로.
+  const cardAdmin = Boolean(chat?.canModerate && props.broadcastId);
+  const siteCardOff = cardOffLocal && cardOffLocal.bc === props.broadcastId ? cardOffLocal.off : liveFeatured.siteCardOff;
+  const setSiteCard = async (off: boolean) => {
+    if (!props.broadcastId || cardBusy) return;
+    setCardBusy(true);
+    const bc = props.broadcastId;
+    try {
+      const r = await fetch("/api/live-chat/site-card", { method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() }, body: JSON.stringify({ bc, off }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { setCardOffLocal({ bc, off }); setChatHint(j.message || (off ? "사이트 상품 카드를 껐어요" : "사이트 상품 카드를 켰어요")); }
+      else if (r.status === 403) { setChatHint("카카오 본인 확인 후 다시 눌러 주세요."); verifyChatAccount(); }
+      else setChatHint(j.message || "저장하지 못했어요.");
+    } catch { setChatHint("저장하지 못했어요. 다시 시도해 주세요."); }
+    finally { setCardBusy(false); }
+  };
+  const pinnedProductCard = siteCardOff
+    ? (cardAdmin ? <button type="button" onClick={() => void setSiteCard(false)} disabled={cardBusy} aria-label="사이트 상품 카드 켜기 (관리자)"
+        style={{ pointerEvents: "auto", width: "100%", minHeight: 40, borderRadius: 12, border: "1px dashed rgba(255,255,255,0.5)", background: "rgba(0,0,0,0.45)", color: "#FFFFFF", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
+        상품 카드 꺼짐 · 손님에게 안 보여요 · <span style={{ textDecoration: "underline" }}>켜기</span>
+      </button> : null)
+    : <LiveFeaturedProductCard product={featured.current} count={featured.products.length} label={replayFeatured.replay ? "지금 보는 상품" : undefined} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} onHide={cardAdmin ? () => void setSiteCard(true) : undefined} />;
   // 한 벌의 입력 폼을 PC 채팅 아래 또는 폰 쓰기 시트에만 렌더한다.
   const greetingRow = chat?.canWrite && greetOpen ? (
           // Local row at the entry position; new chat pushes it up naturally.

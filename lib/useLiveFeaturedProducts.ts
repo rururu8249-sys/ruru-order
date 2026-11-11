@@ -6,10 +6,11 @@ import {parseWidgetHistory, parseWidgetRotation, WIDGET_PRODUCT_HISTORY_SETTING_
 import {featuredProducts} from './liveFeaturedProducts';
 import {useWidgetRotationIndex} from './useWidgetRotationIndex';
 import type {LiveWatchItem} from './liveWatch';
+import {SITE_PRODUCT_CARD_OFF_KEY, isSiteProductCardOff} from './liveSiteProductCard';
 
 const EMPTY: WidgetRotationConfig = {mode: 'selected', paused: false, targets: []};
 export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchItem[], enabled: boolean, pin: WidgetProductTarget | null) {
-  const [state, setState] = useState<{id: string; config: WidgetRotationConfig; history: WidgetProductTarget[]} | null>(null);
+  const [state, setState] = useState<{id: string; config: WidgetRotationConfig; history: WidgetProductTarget[]; siteCardOff: boolean} | null>(null);
   useEffect(() => {
     setState(null);
     if (!broadcastId || !enabled) return;
@@ -20,11 +21,12 @@ export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchIte
       const request = ++revision;
       try {
         const key = widgetRotationSettingKey(broadcastId);
-        const {data, error} = await supabase.from('settings').select('key,value').in('key', [key, WIDGET_PRODUCT_HISTORY_SETTING_KEY]);
+        const {data, error} = await supabase.from('settings').select('key,value').in('key', [key, WIDGET_PRODUCT_HISTORY_SETTING_KEY, SITE_PRODUCT_CARD_OFF_KEY]);
         if (error) throw error;
         if (alive && request === revision) setState({id: broadcastId,
           config: parseWidgetRotation(data?.find(r => r.key === key)?.value),
-          history: parseWidgetHistory(data?.find(r => r.key === WIDGET_PRODUCT_HISTORY_SETTING_KEY)?.value)});
+          history: parseWidgetHistory(data?.find(r => r.key === WIDGET_PRODUCT_HISTORY_SETTING_KEY)?.value),
+          siteCardOff: isSiteProductCardOff(data?.find(r => r.key === SITE_PRODUCT_CARD_OFF_KEY)?.value, broadcastId)});
       } catch { if (alive && request === revision) setState(null); }
     };
     const schedule = () => {
@@ -44,5 +46,5 @@ export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchIte
   const config = valid ? state.config : EMPTY;
   const products = useMemo(() => featuredProducts(items, config, valid ? state.history : [], Boolean(valid), pin), [items, config, state, valid, pin?.productId, pin?.detailName]);
   const index = useWidgetRotationIndex(config, products.length, Boolean(pin) && products.length === 1);
-  return {products, current: products[index] ?? null};
+  return {products, current: products[index] ?? null, siteCardOff: Boolean(valid && state.siteCardOff)};
 }
