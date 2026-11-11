@@ -7,7 +7,25 @@ import './rps.css';
 type HistoryRoom={id:string;title:string;status:string;revision:number;created_at:string;is_test:boolean;reward_kind:string;points:number;gift:string};
 const defaults={title:'가위·바위·보 루루를 이겨라!',winners:1,rewardKind:'points',points:1000,gift:'',joinSeconds:300,pickSeconds:5,auto:true};
 const draftOf=(s:RpsState|null)=>s?.id&&s.status!=='closed'?{title:s.title,winners:s.target,rewardKind:s.rewardKind,points:s.points,gift:s.gift,joinSeconds:s.joinSeconds,pickSeconds:s.round===1?5:s.pickSeconds,auto:s.auto}:defaults;
-export function RpsAdmin({game,onClose,broadcastId}:{game:RpsController;onClose:()=>void;broadcastId?:string}){
+type RpsAdminProps={game:RpsController;onClose:()=>void;broadcastId?:string};
+// A client-side owner badge is only a navigation hint. Server verification gates
+// all settings, winner details and API actions, including after account changes.
+export function RpsAdmin(props:RpsAdminProps){
+ const {game,onClose}=props;
+ const verifyButton=useRef<HTMLButtonElement>(null);
+ useEffect(()=>{if(!game.admin)verifyButton.current?.focus();},[game.admin]);
+ if(game.admin)return <VerifiedRpsAdmin {...props}/>;
+ return <div className="rps-backdrop" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+  <div className="rps-admin" role="dialog" aria-modal="true" aria-label="게임 관리자 확인" onKeyDown={e=>{
+   if(e.key==='Escape')onClose();
+   if(e.key==='Tab'){const buttons=Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button'));const first=buttons[0],last=buttons.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}
+  }}>
+   <header><div><small>관리자</small><strong>가위·바위·보</strong></div><button className="rps-close" aria-label="관리 설정 닫기" onClick={onClose}>×</button></header>
+   <div className="rps-admin-body"><p>{game.verified?'현재 확인된 계정에는 게임 관리 권한이 없어요. 관리자 카카오 계정으로 확인해 주세요.':'카카오 계정을 확인하면 게임 설정이 열려요.'}</p><button ref={verifyButton} className="rps-primary" onClick={game.verify}>카카오로 관리자 확인</button></div>
+  </div>
+ </div>;
+}
+function VerifiedRpsAdmin({game,onClose,broadcastId}:RpsAdminProps){
  const [tab,setTab]=useState<'run'|'settings'|'winners'>('run');const [draft,setDraft]=useState(defaults),[dirty,setDirty]=useState(false),[hand,setHand]=useState<RpsHand>('rock');
  const [seconds,setSeconds]=useState(300),[copy,setCopy]=useState('');const baseRevision=useRef(0),dialog=useRef<HTMLDivElement>(null);
  const [history,setHistory]=useState<HistoryRoom[]>([]),[historyId,setHistoryId]=useState(''),[historyWinners,setHistoryWinners]=useState<RpsRewardRow[]>([]),[historyRefresh,setHistoryRefresh]=useState(0);

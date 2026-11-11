@@ -1363,7 +1363,7 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {rpsActive && isDesktop && !focus && <div style={{position:'absolute',left:16,right:videoRight,top:'18%',paddingRight:16,pointerEvents:'none',zIndex:3}}><RpsWidget key={rps.state?.id} game={rps} onAdmin={() => setRpsAdminOpen(true)}/></div>}
-      {rpsAdminOpen && rps.admin && <RpsAdmin game={rps} broadcastId={props.broadcastId} onClose={() => setRpsAdminOpen(false)}/>}
+      {rpsAdminOpen && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onClose={() => setRpsAdminOpen(false)}/>}
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
       <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
@@ -1408,10 +1408,9 @@ export default function LiveWatchView(props: Props) {
         <div role="dialog" aria-modal="true" aria-label="더보기" onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.55)" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: isDesktop ? undefined : "12px", ...(isDesktop ? { left: `calc((100% - ${videoRight || "0px"}) / 2)`, transform: "translateX(-50%)", width: "328px" } : {}), bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
             {[
-              ...(rps.admin ? [{ key: 'rps', label: '게임 · 가위바위보', onClick: () => setRpsAdminOpen(true) }] : []),
+              ...((rps.admin || chat?.canGrant) ? [{ key: 'rps', label: '게임 · 가위바위보', onClick: () => setRpsAdminOpen(true) }] : []),
               ...(props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지·쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 })),
               { key: "share", label: "공유하기", onClick: shareLive },
-              ...(chat?.canWrite && chat.onVerifyIdentity && !chat.identityVerified && !chat.canReviewDeleted ? [{ key: "identity", label: "내 채팅 본인 확인", onClick: chat.onVerifyIdentity }] : []),
               { key: "chatview", label: "채팅 설정", onClick: () => setChatViewOpen(true) },
               { key: "guide", label: "사용 방법", onClick: () => setGuideOpen(true) },
               ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp }]),

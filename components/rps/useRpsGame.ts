@@ -35,6 +35,16 @@ export function useRpsGame(publicOnly=false){
  window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);
  return()=>{mounted.current=false;clearInterval(fallback);void supabase.removeChannel(channel);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume);};
  },[loadMe,loadPublic]);
+ // Verification happens in a popup; refresh immediately, not on the 10s fallback.
+ // Clear private state before rechecking so another account cannot inherit controls.
+ useEffect(()=>{
+ if(publicOnly)return;
+ const changed=()=>{++privateRequest.current;setAdmin(false);setVerified(false);setPlayer(null);setWinners([]);void loadMe();};
+ const message=(event:MessageEvent)=>{if(event.origin===location.origin&&event.data?.type==='ruru-chat-verified')changed();};
+ const storage=(event:StorageEvent)=>{if(!event.key||['ruru_chat_identity','ruru_kakao_id'].includes(event.key))changed();};
+ window.addEventListener('message',message);window.addEventListener('storage',storage);window.addEventListener('ruru-chat-logout',changed);
+ return()=>{window.removeEventListener('message',message);window.removeEventListener('storage',storage);window.removeEventListener('ruru-chat-logout',changed);};
+ },[loadMe,publicOnly]);
  useEffect(()=>{if(!state?.deadline)return;const clock=setInterval(()=>setNow(Date.now()+offset.current),200);return()=>clearInterval(clock);},[state?.deadline]);
  useEffect(()=>{queueMicrotask(()=>void loadMe());},[state?.id,state?.revision,state?.status,loadMe]);
  // Recover quickly from a missed broadcast at a deadline without continuous polling.
