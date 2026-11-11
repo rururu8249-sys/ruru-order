@@ -6781,10 +6781,23 @@ export default function OrderPage() {
           // [2026-11-10 사장님 「막102 사진이 있으면 그게 나와야지」] 세부상품 사진 = 주문서 담은 상품과 같은 규칙(resolveOrderItemPhoto), 없을 때만 예전 사진
           let detailPhoto = "";
           try { detailPhoto = resolveOrderItemPhoto(product as Record<string, unknown>, { productName: dn }).url; } catch { detailPhoto = ""; }
-          return { productId: String(shown.id ?? product.id ?? ""), name: dn, imageUrl: detailPhoto || pickOrderProductImageUrl(shown) || pickOrderProductImageUrl(product), priceText: won(Number(shown.price ?? product.price ?? 0)), soldOut: (shown as any).is_soldout === true || isSoldOutOrderProduct(shown) };
+          // [2026-11-11 사장님 「방송 상품 목록에도 품절이 안 뜸」] 옵션 창 세부상품 줄과 같은 판정 — 모든 색상×사이즈가 품절 체크면 품절(표시만)
+          let manualOut = false;
+          try {
+            const cfg = brand.detailOptions[dn];
+            if (cfg) {
+              let target: unknown = product;
+              try { target = resolveBrandOrderSelection(product as unknown as Record<string, unknown>, dn) ?? product; } catch { /* 원래 상품 기준 */ }
+              manualOut = isDetailManuallySoldOut((target as { product_note?: unknown } | null)?.product_note, dn, cfg.colors, cfg.sizes);
+            }
+          } catch { manualOut = false; }
+          return { productId: String(shown.id ?? product.id ?? ""), name: dn, imageUrl: detailPhoto || pickOrderProductImageUrl(shown) || pickOrderProductImageUrl(product), priceText: won(Number(shown.price ?? product.price ?? 0)), soldOut: (shown as any).is_soldout === true || isSoldOutOrderProduct(shown) || manualOut };
         }) : undefined,
       };
-    }).filter((it) => it.id);
+    })
+      // 브랜드 묶음은 세부상품이 전부 품절이면 묶음 줄도 품절
+      .map((it) => (it.brand && it.details && it.details.length > 0 && it.details.every((d) => d.soldOut) ? { ...it, soldOut: true } : it))
+      .filter((it) => it.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveWatchUsable, quickGroupBuyProducts, livePinnedProductId]);
   // 「지금 소개 중」 카드 — 유튜브 영상이 실제보다 몇 초 늦어서, 관리자가 바꾼 뒤 1.5초 늦게 바꾼다
@@ -9586,7 +9599,7 @@ export default function OrderPage() {
                           return isDetailManuallySoldOut((target as { product_note?: unknown } | null)?.product_note, name, cfg.colors, cfg.sizes);
                         };
                         const sortedNames = [...list]
-                          .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return (r !== null && r <= 0) || manualOut(n); })() }))
+                          .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return r !== null && r <= 0; })() })) // [2026-11-11 사장님] 품절 체크한 상품은 자리 그대로(아래로 안 내림)
                           .sort((a, b) => (a.out === b.out ? a.i - b.i : a.out ? 1 : -1))
                           .map(({ n }) => n);
                         // [2026-08-29] 같은 디자인 묶기(design_groups)는 사장님 지시로 되돌렸다.
