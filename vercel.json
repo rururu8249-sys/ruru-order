@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node scripts/voice-preview-build.mjs",
   "functions": {
     "app/api/live-chat/route.ts": {
       "regions": [
