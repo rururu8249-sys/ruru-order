@@ -61,7 +61,7 @@ assert.deepEqual(calls.pop(),['10','LOE-111 블랙'],'one featured product opens
 assert.equal(tree.root.findAllByProps({role:'dialog'}).length,0);
 replay={replay:true,products,current:products[0]};
 await act(async()=>tree.update(React.createElement(View,props)));
-assert.ok(text(tree.toJSON()).includes('영상 속 상품'));
+assert.ok(text(tree.toJSON()).includes('지금 보는 상품'));
 await click(tree.root.findByProps({'aria-label':'LOE-111 블랙 상품 선택'}));
 replay={replay:true,products:[products[1]],current:products[1]};
 await act(async()=>tree.update(React.createElement(View,props)));

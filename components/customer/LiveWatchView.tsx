@@ -920,7 +920,7 @@ export default function LiveWatchView(props: Props) {
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
   const desktopChatWidth = "clamp(280px, 35vw, 560px)";
   const videoRight = isDesktop && !focus ? desktopChatWidth : 0;
-  const pinnedProductCard = <LiveFeaturedProductCard product={featured.current} count={featured.products.length} label={replayFeatured.replay ? "영상 속 상품" : undefined} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} />;
+  const pinnedProductCard = <LiveFeaturedProductCard product={featured.current} count={featured.products.length} label={replayFeatured.replay ? "지금 보는 상품" : undefined} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} />;
   // 한 벌의 입력 폼을 PC 채팅 아래 또는 폰 쓰기 시트에만 렌더한다.
   const composer = (
           <form
