@@ -578,7 +578,7 @@ export default function LiveWatchView(props: Props) {
     setComposeHint("");
     if (!batch) { setDraft(""); setComposeOpen(false); }
     closeGreet();
-    const commandTarget = batch && target.mode === "replace" ? { ...target, intro: introPlayer.capture() } : target;
+    const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
     const r = await chat.onSend(body, commandTarget).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     setSending(false);
     if (r.ok && r.message) setChatHint(r.message);

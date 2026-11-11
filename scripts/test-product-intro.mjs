@@ -5,7 +5,11 @@ const {captureProductIntro,parseProductIntro,validateIntroCapture,createIntroRep
 const now=1800000000000,video='abcdefghijk';
 const sample={videoId:video,t:120,state:1,live:true,edge:121,start:0,at:now-200,atLiveHead:true};
 assert.deepEqual(captureProductIntro(sample,video,now),{videoId:video,seconds:115,capturedAt:now});
-for(const patch of [{at:now-6000},{at:now+100},{t:NaN},{t:0},{state:2},{live:false},{videoId:'12345678901'},{edge:190,atLiveHead:false}]) assert.equal(captureProductIntro({...sample,...patch},video,now),null,JSON.stringify(patch));
+for(const patch of [{state:2},{live:false},{live:false,state:2},{edge:190,atLiveHead:false}]) assert.deepEqual(captureProductIntro({...sample,...patch},video,now),{videoId:video,seconds:115,capturedAt:now},JSON.stringify(patch));
+assert.equal(captureProductIntro({...sample,t:0,state:2,live:false},video,now)?.seconds,0);
+assert.equal(captureProductIntro({...sample,state:2,live:false,at:now-60000},video,now)?.seconds,115,'paused VOD keeps its last confirmed position');
+assert.equal(captureProductIntro({...sample,start:118},video,now)?.seconds,118,'pre-roll stays inside available range');
+for(const patch of [{at:now-6000},{at:now+100},{at:NaN},{t:NaN},{t:-1},{state:3},{state:-1},{videoId:'12345678901'},{edge:100},{edge:NaN},{start:130},{start:NaN}]) assert.equal(captureProductIntro({...sample,...patch},video,now),null,JSON.stringify(patch));
 const capture={videoId:video,seconds:115,capturedAt:now};
 assert.deepEqual(validateIntroCapture(capture,video,now),capture);
 for(const patch of [{seconds:-1},{seconds:'5'},{seconds:Infinity},{capturedAt:now-20000},{capturedAt:now+20000},{videoId:'12345678901'}]) assert.equal(validateIntroCapture({...capture,...patch},video,now),null);

@@ -11,7 +11,9 @@ export function validateIntroCapture(raw: unknown, videoId: string, now = Date.n
   return { videoId, seconds: Math.floor(p.seconds), capturedAt: p.capturedAt };
 }
 export function captureProductIntro(p: IntroPlayerSample, videoId: string, now = Date.now()): ProductIntroCapture | null {
-  if (p.videoId !== videoId || !p.live || p.state !== 1 || now - p.at > 5000 || now < p.at || !Number.isFinite(p.t) || p.t <= 0 || !Number.isFinite(p.edge) || p.edge <= 0 || p.edge - p.t > 15 || p.t > p.edge + 2 || p.atLiveHead === false) return null;
+  // A paused position stays valid until the player reports a seek/state change.
+  // YouTube stops periodic position packets while paused, including on recordings.
+  if (p.videoId !== videoId || ![1, 2].includes(p.state) || !Number.isFinite(p.at) || p.at <= 0 || (p.state !== 2 && now - p.at > 5000) || now < p.at || !Number.isFinite(p.t) || p.t < 0 || !Number.isFinite(p.edge) || p.edge <= 0 || !Number.isFinite(p.start) || p.start < 0 || p.t < p.start || p.t > p.edge + 2) return null;
   return validateIntroCapture({ videoId, seconds: Math.max(p.start, Math.floor(p.t) - 5), capturedAt: now }, videoId, now);
 }
 export function parseProductIntro(raw: unknown, videoId: string): ProductIntro | null {

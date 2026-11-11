@@ -119,8 +119,8 @@ assert.equal(result.ok,true);assert.match(result.introNotice,/소개영상도 �
 assert.equal(writes.filter(w=>w.table==='settings'&&w.op==='update').length,1);
 assert.equal(JSON.parse(writes.at(-1).value.value).seconds,120);
 reset();identityValid=false;result=await send('/',introTarget);assert.equal(result.ok,true);assert.match(result.introNotice,/본인 확인/);assert.equal(writes.length,3);
-reset();identityValid=true;result=await send('/',{...introTarget,intro:{...introTarget.intro,videoId:'12345678901'}});assert.equal(result.ok,true);assert.match(result.introNotice,/건너뛰/);assert.equal(writes.length,3);
-reset();result=await send('/',{...introTarget,intro:null});assert.equal(result.ok,true);assert.match(result.introNotice,/건너뛰/);assert.equal(writes.length,3);
+reset();identityValid=true;result=await send('/',{...introTarget,intro:{...introTarget.intro,videoId:'12345678901'}});assert.equal(result.ok,true);assert.match(result.introNotice,/현재 영상 위치를 확인하지 못/);assert.equal(writes.length,3);
+reset();result=await send('/',{...introTarget,intro:null});assert.equal(result.ok,true);assert.match(result.introNotice,/현재 영상 위치를 확인하지 못/);assert.equal(writes.length,3);
 console.log('PASS real POST verified-only video recording, mismatched/missing telemetry skips while widget+guide succeed');
 
 for (const body of ['안녕하세요','/335']) {

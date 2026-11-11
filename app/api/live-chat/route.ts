@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         const recordIntro = wantsIntro ? async (targets: import("@/lib/widgetProductLibrary").WidgetProductTarget[]) => {
           // Auxiliary recording must never turn successful widget/chat changes into a retry.
           try {
-            if (!capture) { introNotice = "상품 소개 완료 · 실시간 영상 위치를 확인하지 못해 영상 연결은 건너뛰었어요."; return; }
+            if (!capture) { introNotice = "상품 소개 완료 · 현재 영상 위치를 확인하지 못했어요. 영상이 열린 상태에서 다시 선택해 주세요."; return; }
             const identity = chatIdentityFromRequest(request);
             const verified = sameChatOrigin(request) && (await verifyAdminSessionFromRequest(request) || (identity?.sub === kakaoId && (await verifiedChatRole(sb, identity)).isMod));
             if (!verified) { introNotice = "상품 소개 완료 · 영상 연결은 채팅 본인 확인 후 사용할 수 있어요."; return; }
