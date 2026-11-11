@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const {emptyYoutubeViewer,mergeYoutubeViewer,publicYoutubeViewer}=createUiLoader({})('lib/youtubeViewer.ts');
+const item=(id,body,channel='customer')=>({id,snippet:{type:'textMessageEvent',displayMessage:body},authorDetails:{channelId:channel,displayName:'닉네임'}});
+let s=mergeYoutubeViewer(emptyYoutubeViewer('abcdefghijk'),[item('1','카드결제 요청했어요'),item('2','🛍️ 홍*님 장바구니 담음 · 옷','bot'),item('3','🛒 홍님 주문 감사합니다!','bot'),item('4','💗 홍님 결제 완료! 감사합니다','bot')],'bc','bot');
+assert.deepEqual(s.messages.map(m=>m.sourceId),['1','3']);
+assert.equal(s.initialized,true);
+s=mergeYoutubeViewer(s,[item('1','카드결제 요청했어요'),item('5','안녕하세요')],'bc','bot');assert.equal(s.messages.length,3);
+s=mergeYoutubeViewer(s,[{id:'delete',snippet:{type:'messageDeletedEvent',messageDeletedDetails:{deletedMessageId:'1'}}}],'bc','bot');assert.equal(s.messages[0].hidden,true);assert.equal(s.messages[0].body,'');
+s=mergeYoutubeViewer(s,[{id:'ban',snippet:{type:'userBannedEvent',userBannedDetails:{bannedUserDetails:{channelId:'customer'}}}}],'bc','bot');assert.equal(s.messages.at(-1).hidden,true);
+const response=publicYoutubeViewer({...s,pageToken:'private-cursor',chatId:'private-chat'});assert.equal(JSON.stringify(response).includes('private-'),false);assert.equal(JSON.stringify(response).includes('authorChannelId'),false);
+console.log('PASS YouTube filtering, deduplication, moderation, public response allowlist');

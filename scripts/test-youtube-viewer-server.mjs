@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const {readYoutubeViewer}=createUiLoader({'@/lib/youtube':{readSetting:async()=> 'bot',readRefreshToken:async()=> 'test',getAccessToken:async()=> 'test'}})('lib/youtubeViewerServer.ts');
+let row=null,now=100000,calls=0;
+const db={from(){let operation='read',values,filters=[];const q={select(){return q},eq(k,v){filters.push(r=>r[k]===v);return q},lte(k,v){filters.push(r=>r[k]<=v);return q},maybeSingle(){return Promise.resolve({data:row,error:null})},upsert(v){if(!row)row={state:{},version:0,lease_until:new Date(0).toISOString(),next_poll_at:new Date(0).toISOString(),...v};return Promise.resolve({error:null})},update(v){operation='update';values=v;return q},then(resolve){if(operation==='update'&&row&&filters.every(f=>f(row))){row={...row,...values};return Promise.resolve({data:[row],error:null}).then(resolve)}return Promise.resolve({data:[],error:null}).then(resolve)}};return q}};
+let mode='live';
+const request=async path=>{calls++;if(path.startsWith('videos?'))return{ok:true,status:200,json:{items:[{liveStreamingDetails:{activeLiveChatId:'chat'}}]}};if(mode==='quota')return{ok:false,status:403,json:{error:{errors:[{reason:'quotaExceeded'}]}}};return{ok:true,status:200,json:{items:[{id:'m1',snippet:{type:'textMessageEvent',displayMessage:'안녕하세요'}}],nextPageToken:'cursor',pollingIntervalMillis:30000}}};
+const options={now:()=>now,request};
+const [a,b]=await Promise.all([readYoutubeViewer(db,'bc','abcdefghijk',options),readYoutubeViewer(db,'bc','abcdefghijk',options)]);
+assert.equal(calls,2,'one claimant makes one video + one chat API request');assert.ok([a,b].some(s=>s.messages.length===1));
+await readYoutubeViewer(db,'bc','abcdefghijk',options);assert.equal(calls,2,'cache suppresses calls before polling deadline');
+now+=21000;await readYoutubeViewer(db,'bc','abcdefghijk',options);assert.equal(calls,2,'honors Google 30s interval');
+now+=10000;await readYoutubeViewer(db,'bc','abcdefghijk',options);assert.equal(calls,3,'resumes after allowed interval');assert.equal(row.state.messages.length,1,'duplicate page is not duplicated');
+now+=31000;mode='quota';const error=await readYoutubeViewer(db,'bc','abcdefghijk',options);assert.equal(error.status,'unavailable');now+=60000;await readYoutubeViewer(db,'bc','abcdefghijk',options);assert.equal(calls,4,'quota error backs off');
+mode='live';await readYoutubeViewer(db,'bc','newvideo123',options);assert.equal(calls,6,'video switch resets old cursor and cache');assert.equal(row.state.videoId,'newvideo123');
+console.log('PASS shared lease concurrency, cache, Google polling interval, quota backoff, video reset');

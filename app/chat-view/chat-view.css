@@ -48,3 +48,7 @@
 @media(prefers-reduced-motion:reduce){.ruru-chat-row{transition:none}.ruru-chat-new{animation:none}}
 @keyframes ruru-notice-glow{0%,100%{box-shadow:0 2px 10px #0005}50%{box-shadow:0 0 0 2px #83cfff,0 0 18px #83cfff66}}
 @media(prefers-reduced-motion:reduce){.ruru-chat-notice{animation:none}}
+
+.ruru-chat-notice[data-source=youtube]{background:rgba(66,24,31,.9);border-color:#b46573;border-left-color:#ff8195}
+.ruru-chat-notice[data-source=youtube] .ruru-chat-notice-heading,.ruru-chat-notice[data-source=youtube] .ruru-chat-notice-row>b{color:#ffc5d0}
+.ruru-chat-notice[data-source=youtube] .ruru-chat-notice-open{color:#ffe0e6}

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import {NextRequest} from 'next/server.js';import {createUiLoader} from './admin-ui-test-loader.mjs';
+let called=0,bc={id:'11111111-1111-4111-8111-111111111111',status:'ON',is_deleted:false,youtube_live_url:'https://www.youtube.com/watch?v=abcdefghijk'};
+const sb={from:()=>({select(){return this},eq(){return this},maybeSingle:async()=>({data:bc,error:null})})};
+const {GET}=createUiLoader({'@/lib/youtube':{getServiceClient:()=>sb},'@/lib/youtubeViewerServer':{readYoutubeViewer:async(_sb,id,videoId)=>{called++;assert.equal(id,bc.id);assert.equal(videoId,'abcdefghijk');return{videoId,initialized:true,status:'live',chatId:'secret-chat',pageToken:'secret-cursor',messages:[]}}}})('app/api/chat-view/youtube/route.ts');
+const req=id=>new NextRequest('https://ruru-order.vercel.app/api/chat-view/youtube?bc='+id);
+assert.equal((await GET(req('bad'))).status,400);assert.equal(called,0);
+let response=await GET(req(bc.id));assert.equal(response.status,200);assert.equal((await response.text()).includes('secret'),false);assert.equal(called,1);
+bc={...bc,status:'OFF'};assert.equal((await GET(req(bc.id))).status,404);assert.equal(called,1,'off broadcast does not call YouTube');
+bc={...bc,status:'ON',is_deleted:true};assert.equal((await GET(req(bc.id))).status,404);assert.equal(called,1);
+console.log('PASS invalid/off/deleted broadcasts make zero calls; exact video; no private cursor in public response');

@@ -18,6 +18,8 @@ import { CHAT_FONT_SIZES as SIZES, CHAT_YT_SCALES as YT_SCALES, CHAT_FONT_KEY as
 import {createChatViewUnread, reduceChatViewUnread} from "@/lib/chatViewUnread";
 import {ChatViewNotice} from "./ChatViewNotice";
 import "./chat-view.css";
+import {includeChatViewMessage} from "@/lib/chatViewFilter";
+import {useYoutubeChatNotice} from "@/lib/useYoutubeChatNotice";
 
 type Bc = { id: string; title: string; videoId: string; paused: boolean };
 
@@ -35,7 +37,9 @@ export default function ChatViewClient() {
   const [bc, setBc] = useState<Bc | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [list, setList] = useState<LiveChatMessage[]>([]);
-  const privateChat = useLiveChatPrivate(bc?.id || "", Boolean(bc), list);
+  const visibleList = useMemo(()=>list.filter(includeChatViewMessage),[list]);
+  const privateChat = useLiveChatPrivate(bc?.id || "", Boolean(bc), visibleList);
+  const displayMessages = useMemo(()=>privateChat.displayMessages.filter(includeChatViewMessage),[privateChat.displayMessages]);
   const [emojis, setEmojis] = useState<ChatEmoji[]>([]);
   const [sizeIdx, setSizeIdx] = useState(SIZES.indexOf(20));
   const [ytSizeIdx, setYtSizeIdx] = useState(YT_SCALES.indexOf(1.5));
@@ -48,7 +52,7 @@ export default function ChatViewClient() {
   // [07:18 사장님] 유튜브 시청자 수·사이트 접속 수 — 각 칸 제목 옆(30초마다)
   const [counts, setCounts] = useState<{ yt: number | null; site: number | null }>({ yt: null, site: null });
   const emojiMap = useMemo(() => emojiMapOf(emojis), [emojis]);
-  const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(privateChat.displayMessages, `${sizeIdx}:${tab}`, tab === "site");
+  const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(displayMessages, `${sizeIdx}:${tab}`, tab === "site");
   const [recent, setRecent] = useState<Array<{ id: number; at: number }>>([]);
   const seen = useRef<{ bc: string; maxId: number } | null>(null);
 
@@ -109,6 +113,7 @@ export default function ChatViewClient() {
 
   // 사이트 채팅 — 방송이 정해지면 최근 글 + 소식
   const bcId = bc?.id ?? "";
+  const youtubeNotice=useYoutubeChatNotice(bcId,bc?.videoId||"",tab==="site");
   useEffect(() => {
     setList([]);
     dispatchUnread({type:"reset",bc:bcId});
@@ -126,7 +131,7 @@ export default function ChatViewClient() {
         const snapshot = (j.messages || []).map(parseChatMessage).filter((m:LiveChatMessage|null) => m?.broadcastId === bcId) as LiveChatMessage[];
         const reconciled = mergeChat(snapshot, [...changedDuringLoad.values()], 200);
         setList(reconciled);
-        dispatchUnread({type:"snapshot",bc:bcId,messages:reconciled,read:tabRef.current === "site" && document.visibilityState === "visible"});
+        dispatchUnread({type:"snapshot",bc:bcId,messages:reconciled.map(m=>includeChatViewMessage(m)?m:{...m,hidden:true}),read:tabRef.current === "site" && document.visibilityState === "visible"});
       } catch { /* 다음에 */ } finally { loading = false; }
     };
     const loadEmojis = () => fetch("/api/live-chat/emoji", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (alive && j?.ok) setEmojis(Array.isArray(j.items) ? j.items : []); }).catch(() => {});
@@ -137,7 +142,7 @@ export default function ChatViewClient() {
         const m = parseChatMessage(payload);
         if (!alive || !m || m.broadcastId !== bcId) return;
         if (loading) changedDuringLoad.set(m.id,m);
-        dispatchUnread({type:"event",bc:bcId,messages:[m],read:tabRef.current === "site" && document.visibilityState === "visible"});
+        dispatchUnread({type:"event",bc:bcId,messages:[includeChatViewMessage(m)?m:{...m,hidden:true}],read:tabRef.current === "site" && document.visibilityState === "visible"});
         privateChat.onPublicMessage(m);
         setList((prev) => (m.hidden ? prev.filter((x) => x.id !== m.id) : mergeChat(prev, [m], 200)));
       },
@@ -244,7 +249,7 @@ export default function ChatViewClient() {
       {screenError ? <div role="status" style={{ padding: "8px 12px", fontSize: 14 }}>{screenError}</div> : null}
 
       <div role="tablist" aria-label="채팅 선택" className="ruru-chat-tabs">
-        {([["yt","유튜브 채팅"],["site","사이트 채팅"]] as const).map(([key,label])=><button key={key} type="button" role="tab" id={`chat-tab-${key}`} aria-controls={`chat-panel-${key}`} aria-selected={tab===key} onClick={()=>openTab(key)}>{label}{key==="site"&&unreadMessages.length>0&&<span className="ruru-chat-unread-badge" aria-label={`새 글 ${unreadMessages.length}개`}>{unreadMessages.length>99?'99+':unreadMessages.length}</span>}</button>)}
+        {([["yt","유튜브 채팅"],["site","사이트 채팅"]] as const).map(([key,label])=><button key={key} type="button" role="tab" id={`chat-tab-${key}`} aria-controls={`chat-panel-${key}`} aria-selected={tab===key} onClick={()=>openTab(key)}>{label}{(key==="site"?unreadMessages:youtubeNotice.messages).length>0&&<span className="ruru-chat-unread-badge" aria-label={`새 글 ${(key==="site"?unreadMessages:youtubeNotice.messages).length}개`}>{Math.min(99,(key==="site"?unreadMessages:youtubeNotice.messages).length)}{(key==="site"?unreadMessages:youtubeNotice.messages).length>99?"+":""}</span>}</button>)}
       </div>
       <div className="ruru-chat-grid one" style={{ flex: 1, minHeight: 0, display: "grid", padding: "8px", boxSizing: "border-box" }}>
       {/* 유튜브 채팅 */}
@@ -287,6 +292,8 @@ export default function ChatViewClient() {
             {sizeBtn("가+", "사이트 채팅 글자 크게", () => changeSize(1), sizeIdx === SIZES.length - 1, "18px")}
           </div>
         </header>
+        <div style={{flex:1,minHeight:0,position:"relative",display:"flex",flexDirection:"column"}}>
+        {tab==="site"&&<ChatViewNotice source="youtube" messages={youtubeNotice.messages} emojis={emojiMap} onOpen={()=>openTab("yt")}/>}
         <div
           ref={boxRef}
           role="log"
@@ -299,9 +306,9 @@ export default function ChatViewClient() {
           <div ref={contentRef}>
           {!bc ? (
             <div style={{ padding: "24px", textAlign: "center", color: C.mute, fontSize: "18px" }}>{loaded ? "지금 켜진 방송이 없어요." : "불러오는 중…"}</div>
-          ) : privateChat.displayMessages.length === 0 ? (
+          ) : displayMessages.length === 0 ? (
             <div style={{ padding: "24px", textAlign: "center", color: C.mute, fontSize: "18px" }}>아직 글이 없어요. 손님이 쓰면 바로 나와요.</div>
-          ) : privateChat.displayMessages.map((m) => {
+          ) : displayMessages.map((m) => {
             const isNew = !m.deletedByAuthor && !m.privateCommand && recent.some((r) => r.id === m.id);
             const b = m.badge ? BADGE[m.badge] : null;
             const avatar = m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar;
@@ -326,9 +333,10 @@ export default function ChatViewClient() {
           })}
           </div>
         </div>
+        </div>
         <div className="ruru-chat-status">
           <span style={{ color: atBottom ? "#A5D8FF" : "#FFD43B" }}>{atBottom ? "● 최신 글 따라가는 중" : "지난 글 읽는 중"}</span>
-          <span>새 글 최대 3개 강조</span>
+          <span>{youtubeNotice.status==="unavailable"?"유튜브 새 글 확인 지연 중":"새 글 최대 3개 강조"}</span>
         </div>
         {!atBottom ? (
           <button type="button" onClick={followLatest}
