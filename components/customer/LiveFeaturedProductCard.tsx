@@ -1,8 +1,9 @@
 'use client';
 import type {LiveWatchItem} from '@/lib/liveWatch';
 
-export function LiveFeaturedProductCard({product, count, onOpen, onShowProducts}: {
+export function LiveFeaturedProductCard({product, count, label = '지금 소개하는 상품', onOpen, onShowProducts}: {
   product: LiveWatchItem | null; count: number;
+  label?: string;
   onOpen: (id: string, detailName?: string) => void;
   onShowProducts: () => void;
 }) {
@@ -15,7 +16,7 @@ export function LiveFeaturedProductCard({product, count, onOpen, onShowProducts}
         {product.imageUrl ? <img src={product.imageUrl} alt="" style={{width: '100%', height: '100%', objectFit: 'contain'}} /> : null}
       </span>
       <span style={{minWidth: 0, flex: 1, display: 'grid', gap: 2}}>
-        <span data-featured-label style={{fontSize: 11, color: '#9b3600', fontWeight: 700}}>지금 소개하는 상품</span>
+        <span data-featured-label style={{fontSize: 11, color: '#9b3600', fontWeight: 700}}>{label}</span>
         <span style={{fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{product.name}</span>
         <span style={{fontSize: 15, fontWeight: 800}}>{product.priceText}</span>
       </span>
