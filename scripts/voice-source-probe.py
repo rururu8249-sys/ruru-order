@@ -41,7 +41,21 @@ def source_mode(info):
 
 def safe_failure(error):
     # yt-dlp exceptions can contain signed source URLs. Never log exception text.
-    return {'status': 'failed', 'error_type': type(error).__name__}
+    result = {'status': 'failed', 'error_type': type(error).__name__}
+    message = str(error).lower()
+    categories = [
+        ('not a bot', 'youtube_bot_check'),
+        ('http error 403', 'http_forbidden'),
+        ('http error 429', 'http_rate_limited'),
+        ('video is private', 'video_private'),
+        ('requested format is not available', 'format_unavailable'),
+        ('timed out', 'network_timeout'),
+    ]
+    for fragment, reason in categories:
+        if fragment in message:
+            result['reason'] = reason
+            break
+    return result
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):

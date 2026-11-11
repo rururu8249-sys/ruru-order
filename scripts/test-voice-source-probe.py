@@ -37,6 +37,19 @@ class SourceProbeTests(unittest.TestCase):
         result = probe.safe_failure(RuntimeError('https://x?sig=secret sk-testcredential'))
         self.assertEqual(result, {'status': 'failed', 'error_type': 'RuntimeError'})
 
+    def test_known_failure_categories_do_not_expose_error_text(self):
+        for message, reason in [
+            ("Sign in to confirm you’re not a bot https://x?sig=secret", 'youtube_bot_check'),
+            ('HTTP Error 403: Forbidden https://x?token=secret', 'http_forbidden'),
+            ('HTTP Error 429: Too Many Requests', 'http_rate_limited'),
+            ('This video is private', 'video_private'),
+            ('Requested format is not available', 'format_unavailable'),
+            ('The read operation timed out', 'network_timeout'),
+        ]:
+            result = probe.safe_failure(RuntimeError(message))
+            self.assertEqual(result.get('reason'), reason)
+            self.assertNotIn('secret', str(result))
+
 
 if __name__ == '__main__':
     unittest.main()
