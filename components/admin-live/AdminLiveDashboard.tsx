@@ -65,6 +65,7 @@ import type { DepositRow, OrderGroup, OrderRow } from "@/lib/admin-v2/types";
 import { ADMIN_LIVE_SUB_TABS, getAdminLiveTopMenu, isAdminLiveMenuKey, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 // [2026-09-08 5단계 · 레이아웃 B] 오른쪽 접이식 방송 레일
 import AdminLiveBroadcastRail from "./AdminLiveBroadcastRail";
+import VoiceBudgetPanel from "./VoiceBudgetPanel";
 import AdminLiveBottomNav from "./AdminLiveBottomNav";
 import VisitStatsView from "./VisitStatsView";
 import type { LiveOrder } from "./types";
@@ -1810,6 +1811,7 @@ export default function AdminLiveDashboard() {
         />
 
         <main className="flex min-w-0 flex-1 flex-col px-4 pb-20 pt-3 md:px-4 md:py-3">
+          {activeBroadcast?.id && <VoiceBudgetPanel key={activeBroadcast.id} broadcastId={activeBroadcast.id} onProducts={()=>setActiveMenu("products")} />}
           {/* [2026-10-22 폰] 햄버거 「메뉴」 버튼 삭제 — 폰은 하단 5칸 메뉴(AdminLiveBottomNav), 「더보기」가 옛 사이드바 서랍을 연다 */}
 
           {/* [2026-09-08 5단계 · 레이아웃 B] 왼쪽 = 큰 메뉴 화면(통째로 전환) / 오른쪽 = 접이식 방송·채팅 레일 */}

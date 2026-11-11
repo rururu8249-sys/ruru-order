@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+let authenticated=false,rpcCalls=0,fail=false;
+const db={from(){const chain={select(){return chain},eq(){return chain},order(){return chain},limit(){return chain},maybeSingle:async()=>({data:null,error:fail?{message:'down'}:null}),then(resolve){return Promise.resolve({data:[],error:null}).then(resolve)}};return chain},rpc:async()=>{rpcCalls++;return {data:{cap_krw:40000},error:null}}};
+let route;
+try {route=createUiLoader({'@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>authenticated},'@/lib/youtube':{getServiceClient:()=>db}})('app/api/admin-live/voice-budget/route.ts');}catch{}
+assert.ok(route,'authenticated voice budget endpoint must exist');
+const id='00000000-0000-4000-8000-000000000001';
+const get={nextUrl:new URL('https://example.com/api/admin-live/voice-budget?broadcastId='+id)};
+const post=(body)=>({headers:new Headers({origin:'https://example.com'}),nextUrl:new URL('https://example.com/api/admin-live/voice-budget'),json:async()=>body});
+assert.equal((await route.GET(get)).status,401);
+assert.equal((await route.POST(post({}))).status,401);assert.equal(rpcCalls,0);
+authenticated=true;
+assert.equal((await route.GET(get)).status,200);
+assert.equal((await route.POST(post({broadcastId:id,action:'save',capKrw:NaN}))).status,400);
+assert.equal((await route.POST(post({broadcastId:id,action:'resume',capKrw:40000}))).status,409,'unconfigured provider must not enable paid worker');
+assert.equal((await route.POST(post({broadcastId:id,action:'save',capKrw:40000}))).status,200);
+assert.equal(rpcCalls,1);
+fail=true;assert.equal((await route.GET(get)).status,503);
+console.log('PASS voice budget API: auth, validation, fail-closed readiness, unavailable DB');
