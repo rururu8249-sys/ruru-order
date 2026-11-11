@@ -9,6 +9,12 @@ const text=n=>typeof n==='string'?n:Array.isArray(n)?n.map(text).join(''):n?.chi
 const button=label=>tree.root.findAllByType('button').find(b=>text(b)===label);
 const render=async(game=base,publicOnly=false)=>act(async()=>{if(tree)tree.update(React.createElement(RpsWidget,{game,publicOnly,broadcastId:'broadcast',onAdmin(){}}));else tree=Renderer.create(React.createElement(RpsWidget,{game,publicOnly,broadcastId:'broadcast',onAdmin(){}}));});
 try{
+ for(const [seconds,label] of [[300,'5분 00초'],[299,'4분 59초'],[60,'1분 00초'],[59,'0분 59초'],[0,'0분 00초']]){
+  await render({...base,now:Date.parse(s.deadline)-seconds*1000});
+  assert.ok(tree.root.findByProps({'aria-label':`모집 마감까지 ${label}`}));
+  if(seconds===0)assert.equal(button('참가하기').props.disabled,true);
+ }
+
  await render();assert.ok(!tree.root.findAllByType('button').some(b=>/접기|펼치기/.test(b.props['aria-label']||'')));assert.ok(button('참가하기'));await act(async()=>button('참가하기').props.onClick());assert.equal(calls.at(-1).name,'join');
  await render({...base,verified:false});assert.ok(button('참가하기'));await act(async()=>button('참가하기').props.onClick());assert.equal(verifiedCalls,1);
  await render(base,true);assert.equal(tree.root.findAllByType('button').length,0);assert.match(text(tree.toJSON()),/참가자 모집 중/);assert.ok(!text(tree.toJSON()).includes('휴대폰에서'));

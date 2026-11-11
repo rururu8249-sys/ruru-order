@@ -41,3 +41,5 @@
 .rps-mode p,.rps-manage summary,.rps-widget-link summary{color:#6f626a}
 .rps-public{background:#fff}
 .rps-lobby>p{margin:4px 0;font-size:12px}.rps-card p{line-height:1.4}.rps-count{margin-bottom:4px}.rps-live-overlay .rps-admin-shortcut{min-height:32px}
+
+.rps-count{gap:8px;flex-wrap:wrap}.rps-count strong{white-space:nowrap}

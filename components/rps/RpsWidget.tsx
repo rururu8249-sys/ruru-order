@@ -32,7 +32,7 @@ export function RpsWidget({game,publicOnly=false,onAdmin,broadcastId}:{game:RpsC
    {publicOnly&&s.winners.length>10?<small>{page*10+1}–{Math.min((page+1)*10,s.winners.length)} / {s.winners.length}명 · 5초마다 다음 명단</small>:!publicOnly&&s.winners.length>6&&<small>↕ 명단을 내려서 모두 확인하세요</small>}
    {!publicOnly&&p?.winner&&<small className="rps-reward-note">{s.test?'연습 게임으로 실제 지급하지 않아요.':p.reward_status==='done'?s.rewardKind==='gift'?'0원 선물 주문이 접수됐어요.':s.rewardKind==='none'?'축하합니다!':'포인트 지급이 완료됐어요.':p.reward_status==='needs_info'?p.reward_message:'당첨 보상을 자동 처리하고 있어요.'}</small>}
    {!publicOnly&&p?.winner&&p.reward_status==='needs_info'&&<div className="rps-reward-actions"><button onClick={game.verify}>카카오 다시 확인</button><button disabled={busy} onClick={()=>void action('claim')}>내정보 수정 완료 · 보상 받기</button></div>}
-  </div>:s.status==='lobby'?<div className="rps-lobby"><div className="rps-count"><strong>{remaining}<small>초</small></strong><span>{s.total}명 참가 중</span></div>
+  </div>:s.status==='lobby'?<div className="rps-lobby"><div className="rps-count"><strong aria-label={`모집 마감까지 ${Math.floor(remaining/60)}분 ${String(remaining%60).padStart(2,'0')}초`}>{Math.floor(remaining/60)}<small>분</small>{' '}{String(remaining%60).padStart(2,'0')}<small>초</small></strong><span>{s.total}명 참가 중</span></div>
    {!publicOnly&&!game.admin?<button className="rps-primary" disabled={busy||!!p||remaining===0} onClick={()=>game.verified?void action('join'):game.verify()}>{p?'✓ 참가 완료 · 잠시 기다려 주세요':'참가하기'}</button>:<p>참가자 모집 중</p>}
   </div>:<>
    <div className="rps-scoreline"><b>생존 {s.alive}명</b><span>{s.status==='paused'?'잠시 멈춤':s.status==='ready'?'루루가 가위·바위·보를 고르고 있어요':choosing?remaining?`${remaining}초 안에 선택`:'선택 마감 · 결과 확인 중':'결과 공개'}</span></div>
