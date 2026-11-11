@@ -31,3 +31,20 @@ export function featuredProducts(items: LiveWatchItem[], config: WidgetRotationC
   }
   return selectWidgetRotationItems(pool, config, p => p.target, () => true, history);
 }
+
+/**
+ * [2026-11-12] 서버가 위젯과 같은 규칙으로 정한 순환 목록(targets)을 손님 화면 상품 줄로 바꾼다.
+ * 품절 판정은 서버(위젯 기준)가 이미 했으므로 여기서는 거르지 않는다 — 목록 길이·순서를 위젯과 똑같이 유지.
+ */
+export function featuredFromTargets(items: LiveWatchItem[], targets: WidgetProductTarget[]): Array<LiveWatchItem | null> {
+  const byKey = new Map<string, LiveWatchItem>();
+  for (const item of items) {
+    const rows: Featured[] = item.brand ? (item.details ?? []).map(d => ({
+      ...item, name: d.name, imageUrl: d.imageUrl, priceText: d.priceText, soldOut: false,
+      brand: false, count: 1, details: undefined, detailName: d.name, searchTexts: [d.name],
+      target: {productId: d.productId || item.id, detailName: d.productId && d.productId !== item.id ? '' : d.name},
+    })) : [{...item, soldOut: false, target: {productId: item.id, detailName: item.detailName || ''}}];
+    for (const row of rows) if (!byKey.has(widgetTargetKey(row.target))) byKey.set(widgetTargetKey(row.target), row);
+  }
+  return targets.map(t => byKey.get(widgetTargetKey(t)) ?? null);
+}

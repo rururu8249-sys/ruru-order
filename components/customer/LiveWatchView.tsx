@@ -363,7 +363,7 @@ export default function LiveWatchView(props: Props) {
   const [listOpen, setListOpen] = useState(false);
   const [listMode, setListMode] = useState<"all" | "featured">("all");
   useEffect(() => { setListOpen(false); setListMode("all"); setQuery(""); }, [props.broadcastId]);
-  const liveFeatured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false, props.widgetPin ?? null);
+  const liveFeatured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false);
   const [replayListSnapshot, setReplayListSnapshot] = useState<LiveWatchItem[] | null>(null);
   const openProductList = (mode: "all" | "featured") => {
     setReplayListSnapshot(mode === "featured" && replayFeatured.replay ? [...featured.products] : null);

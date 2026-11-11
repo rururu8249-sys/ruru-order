@@ -2,15 +2,21 @@
 import {useEffect, useMemo, useState} from 'react';
 import {supabase} from './supabase';
 import {subscribeLiveEvents} from './liveEvents';
-import {parseWidgetHistory, parseWidgetRotation, WIDGET_PRODUCT_HISTORY_SETTING_KEY, widgetRotationSettingKey, type WidgetProductTarget, type WidgetRotationConfig} from './widgetProductLibrary';
-import {featuredProducts} from './liveFeaturedProducts';
+import {parseWidgetRotation, type WidgetProductTarget, type WidgetRotationConfig} from './widgetProductLibrary';
+import {featuredFromTargets} from './liveFeaturedProducts';
 import {useWidgetRotationIndex} from './useWidgetRotationIndex';
 import type {LiveWatchItem} from './liveWatch';
-import {SITE_PRODUCT_CARD_OFF_KEY, isSiteProductCardOff} from './liveSiteProductCard';
 
-const EMPTY: WidgetRotationConfig = {mode: 'selected', paused: false, targets: []};
-export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchItem[], enabled: boolean, pin: WidgetProductTarget | null) {
-  const [state, setState] = useState<{id: string; config: WidgetRotationConfig; history: WidgetProductTarget[]; siteCardOff: boolean} | null>(null);
+/**
+ * [2026-11-12 사장님 「소개 카드가 지맘대로 바뀌고 위젯이랑 다르게 나옴」]
+ * 예전엔 손님 화면이 자기 상품 목록으로 순환을 따로 계산해 목록 길이가 위젯과 달라 다른 상품을 보였다.
+ * 이제 서버(/api/live-watch/featured)가 위젯과 같은 함수로 만든 목록을 받아 같은 시계로 고른다.
+ */
+type State = {id: string; config: WidgetRotationConfig; targets: WidgetProductTarget[]; pinned: boolean; siteCardOff: boolean};
+const EMPTY: WidgetRotationConfig = {mode: 'all', paused: false, targets: []};
+
+export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchItem[], enabled: boolean) {
+  const [state, setState] = useState<State | null>(null);
   useEffect(() => {
     setState(null);
     if (!broadcastId || !enabled) return;
@@ -20,20 +26,18 @@ export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchIte
     const load = async () => {
       const request = ++revision;
       try {
-        const key = widgetRotationSettingKey(broadcastId);
-        const {data, error} = await supabase.from('settings').select('key,value').in('key', [key, WIDGET_PRODUCT_HISTORY_SETTING_KEY, SITE_PRODUCT_CARD_OFF_KEY]);
-        if (error) throw error;
-        if (alive && request === revision) setState({id: broadcastId,
-          config: parseWidgetRotation(data?.find(r => r.key === key)?.value),
-          history: parseWidgetHistory(data?.find(r => r.key === WIDGET_PRODUCT_HISTORY_SETTING_KEY)?.value),
-          siteCardOff: isSiteProductCardOff(data?.find(r => r.key === SITE_PRODUCT_CARD_OFF_KEY)?.value, broadcastId)});
-      } catch { if (alive && request === revision) setState(null); }
+        const res = await fetch(`/api/live-watch/featured?bc=${encodeURIComponent(broadcastId)}`, {cache: 'no-store'});
+        const j = await res.json();
+        if (!res.ok || !j?.ok) throw new Error('featured');
+        if (!alive || request !== revision) return;
+        setState({id: broadcastId, config: j.enabled ? parseWidgetRotation(j.config) : EMPTY,
+          targets: j.enabled && Array.isArray(j.targets) ? j.targets : [], pinned: j.pinned === true, siteCardOff: j.siteCardOff === true});
+      } catch { if (alive && request === revision) setState(null); /* 틀린 상품을 남기지 않게 카드를 비움 */ }
     };
     const schedule = () => {
-      // Invalidate in-flight older settings before the debounce fires.
       revision++;
       window.clearTimeout(scheduled);
-      scheduled = window.setTimeout(() => void load(), 200);
+      scheduled = window.setTimeout(() => void load(), 300);
     };
     const unsubscribe = subscribeLiveEvents(supabase, {onCatalog: schedule});
     void load();
@@ -42,9 +46,11 @@ export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchIte
     document.addEventListener('visibilitychange', visible);
     return () => { alive = false; revision++; unsubscribe(); window.clearTimeout(scheduled); window.clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
   }, [broadcastId, enabled]);
-  const valid = state?.id === broadcastId && enabled;
-  const config = valid ? state.config : EMPTY;
-  const products = useMemo(() => featuredProducts(items, config, valid ? state.history : [], Boolean(valid), pin), [items, config, state, valid, pin?.productId, pin?.detailName]);
-  const index = useWidgetRotationIndex(config, products.length, Boolean(pin) && products.length === 1);
-  return {products, current: products[index] ?? null, siteCardOff: Boolean(valid && state.siteCardOff)};
+  const valid = Boolean(state && state.id === broadcastId && enabled);
+  const config = valid && state ? state.config : EMPTY;
+  const targets = useMemo(() => (valid && state ? state.targets : []), [valid, state]);
+  const mapped = useMemo(() => featuredFromTargets(items, targets), [items, targets]);
+  const products = useMemo(() => mapped.filter((p): p is LiveWatchItem => Boolean(p)), [mapped]);
+  const index = useWidgetRotationIndex(config, targets.length, Boolean(valid && state?.pinned));
+  return {products, current: mapped[index] ?? null, siteCardOff: Boolean(valid && state?.siteCardOff)};
 }
