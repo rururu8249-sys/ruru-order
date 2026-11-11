@@ -60,5 +60,17 @@ assert.equal(tree.root.findAllByProps({'data-live-greeting':true}).length,1,'emp
 await act(async()=>tree.root.findAllByType('button').find(b=>text(b)==='채팅 입력').props.onClick());await change('ㅋㅋㅋ');await click('이모티콘 웃음 넣기');
 assert.equal(tree.root.findAllByProps({'aria-label':'키보드'}).length,1,'emoji drawer switches back via explicit keyboard control');
 assert.equal(tree.root.findAllByProps({'aria-label':'채팅 쓰기'}).length,1);
+await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
+assert.equal(tree.root.findAllByProps({'aria-label':'채팅 쓰기'}).length,1,'failed emoji send keeps composer available for retry');
+assert.equal(tree.root.findAllByProps({alt:'웃음 이모티콘 미리보기'}).length,1);
+fail=false;
+await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
+assert.equal(tree.root.findAllByProps({'aria-label':'채팅 쓰기'}).length,0,'successful emoji send closes composer just like text');
+assert.equal(tree.root.findAllByProps({'data-emoji-drawer':true}).length,0,'successful emoji send closes emoji drawer');
+await act(async()=>tree.root.findAllByType('button').find(b=>text(b)==='채팅 입력').props.onClick());
+assert.equal(input().props.value,'');
+assert.equal(tree.root.findAllByProps({alt:'웃음 이모티콘 미리보기'}).length,0,'reopening cannot retain the sent image');
+await change('일반 글');await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
+assert.equal(tree.root.findAllByProps({'aria-label':'채팅 쓰기'}).length,0,'text send still closes composer');
 await act(async()=>tree.unmount());
 console.log('PASS actual composer: exact/extended keyword, caret, image preview, explicit send, failure retention, drawer/keyboard, no auth clutter, greeting scroll ordering and empty mobile chat');

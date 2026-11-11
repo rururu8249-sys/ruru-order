@@ -597,15 +597,14 @@ export default function LiveWatchView(props: Props) {
     const batch = target && "targets" in target;
     setSending(true);
     setComposeHint("");
-    const previousDraft = draft, previousEmoji = selectedEmoji;
-    const keepPicker = !isDesktop && emojiOpen && Boolean(selectedEmoji) && bodyOverride === undefined;
-    if (!batch) { setDraft(""); setSelectedEmoji(null); if (!keepPicker) setComposeOpen(false); }
+    const previousDraft = draft, previousEmoji = selectedEmoji, previousEmojiOpen = emojiOpen;
+    if (!batch) { setDraft(""); setSelectedEmoji(null); setEmojiOpen(false); setComposeOpen(false); }
     closeGreet();
     const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
     const r = await chat.onSend(body, commandTarget).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     if (!r.ok && !batch) {
-      setDraft(previousDraft); setSelectedEmoji(previousEmoji);
-      if (!isDesktop) { setComposeOpen(true); setEmojiOpen(Boolean(previousEmoji)); }
+      setDraft(previousDraft); setSelectedEmoji(previousEmoji); setEmojiOpen(previousEmojiOpen);
+      if (!isDesktop) setComposeOpen(true);
     }
     if (r.ok && batch && target.mode === "replace" && props.broadcastId) {
       invalidateProductIntroCatalog(props.broadcastId, videoId);
