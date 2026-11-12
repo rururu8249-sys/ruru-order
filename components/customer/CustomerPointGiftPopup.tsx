@@ -1,171 +1,152 @@
 "use client";
 
 // components/customer/CustomerPointGiftPopup.tsx
-// 목적: 고객 포인트 선물/지급 알림 팝업
-// 주의: customer_point_ledger.customer_seen_at 확인 시각만 저장합니다.
+// 목적: 고객 포인트 선물/지급 알림 — [2026-11-12 사장님 「그립처럼 작게」] 작은 카드 + 폭죽, 3초 뒤 저절로 닫힘.
+// 주의: customer_point_ledger.customer_seen_at 확인 시각만 저장합니다(닫힐 때 — 눌러서든 저절로든).
 // 주문금액/입금/정산/배송/포인트 잔액/포인트 차감/포인트 사용 로직 없음.
 
-import { useEffect, useState } from "react";
-// [2026-09-20] 가운데 확인창 «한 벌» 틀 — ✕·배경·뒤로가기도 「확인했어요」와 같은 closeGift(확인 기록). 지급 로직 무관.
-import CustomerDialog from "./CustomerDialog";
-import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { POINT_GIFT_REFRESH_EVENT } from "@/lib/welcomePoint";
 
 type PointGift = {
   id: string;
   amount: number;
-  amount_text: string;
-  balance_after: number;
-  balance_after_text: string;
   reason?: string;
-  created_at?: string | null;
 };
 
-type GiftState = {
-  loading: boolean;
-  gift: PointGift | null;
-  closing: boolean;
-};
+const AUTO_CLOSE_MS = 3000;
+const CONFETTI = ["#D30005", "#FFC83D", "#7B61FF", "#FF8FA3", "#3DA5FF", "#FFC83D", "#D30005", "#7BD389", "#FF8FA3", "#7B61FF", "#3DA5FF", "#FFC83D", "#D30005", "#7BD389", "#FF8FA3", "#3DA5FF", "#7B61FF", "#FFC83D", "#D30005", "#3DA5FF", "#FF8FA3", "#7BD389", "#7B61FF", "#FFC83D"];
 
-function normalizePhone(value: unknown): string {
-  return String(value ?? "").replace(/[^0-9]/g, "");
-}
-
-function fallbackMoney(value: unknown): string {
-  const amount = Math.max(0, Math.floor(Number(value || 0)));
-
-  if (!Number.isFinite(amount)) {
-    return "0원";
+function readPhone(): string {
+  try {
+    return String(window.localStorage.getItem("ruru_customer_phone") || "").replace(/[^0-9]/g, "");
+  } catch {
+    return "";
   }
-
-  return `${amount.toLocaleString("ko-KR")}원`;
 }
 
 export default function CustomerPointGiftPopup() {
-  // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
-  const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5", { keepShadow: true });
-  const [giftState, setGiftState] = useState<GiftState>({
-    loading: false,
-    gift: null,
-    closing: false,
-  });
+  const [gift, setGift] = useState<PointGift | null>(null);
+  const [reduce, setReduce] = useState(false);
+  const shown = useRef(new Set<string>()); // 확인 저장이 실패해도 같은 선물을 계속 띄우지 않게
 
-  useEffect(() => {
-    let alive = true;
-
-    const phone = normalizePhone(window.localStorage.getItem("ruru_customer_phone") || "");
-
-    if (phone.length < 9) {
-      return () => {
-        alive = false;
-      };
+  const loadGift = useCallback(async () => {
+    const phone = readPhone();
+    if (phone.length < 9) return;
+    try {
+      const response = await fetch(`/api/customer-point-gifts?phone=${encodeURIComponent(phone)}`, { method: "GET", cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+      const g = payload?.ok ? payload.gift : null;
+      if (!g || !g.id || shown.current.has(String(g.id))) return;
+      shown.current.add(String(g.id));
+      setGift({ id: String(g.id), amount: Math.max(0, Math.floor(Number(g.amount) || 0)), reason: String(g.reason || "").trim() });
+    } catch {
+      // 조회 실패는 화면 사용을 막지 않음
     }
-
-    const loadGift = async () => {
-      setGiftState((current) => ({ ...current, loading: true }));
-
-      try {
-        const response = await fetch(`/api/customer-point-gifts?phone=${encodeURIComponent(phone)}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const payload = await response.json().catch(() => null);
-
-        if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.message || "포인트 선물 조회 실패");
-        }
-
-        if (!alive) return;
-
-        setGiftState({
-          loading: false,
-          gift: payload.gift || null,
-          closing: false,
-        });
-      } catch {
-        if (!alive) return;
-
-        setGiftState({
-          loading: false,
-          gift: null,
-          closing: false,
-        });
-      }
-    };
-
-    void loadGift();
-
-    return () => {
-      alive = false;
-    };
   }, []);
 
-  const closeGift = async () => {
-    const phone = normalizePhone(window.localStorage.getItem("ruru_customer_phone") || "");
-    const gift = giftState.gift;
+  useEffect(() => {
+    setReduce(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true);
+    void loadGift();
+    const onRefresh = () => { void loadGift(); };
+    window.addEventListener(POINT_GIFT_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(POINT_GIFT_REFRESH_EVENT, onRefresh);
+  }, [loadGift]);
 
-    if (!gift || !gift.id || phone.length < 9) {
-      setGiftState({ loading: false, gift: null, closing: false });
-      return;
-    }
-
-    setGiftState((current) => ({ ...current, closing: true }));
-
-    try {
-      await fetch("/api/customer-point-gifts", {
+  const closeGift = useCallback(() => {
+    const current = gift;
+    setGift(null);
+    if (!current) return;
+    const phone = readPhone();
+    if (phone.length >= 9) {
+      void fetch("/api/customer-point-gifts", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({
-          phone,
-          gift_id: gift.id,
-        }),
-      });
-    } catch {
-      // 알림 확인 저장 실패가 주문서/고객 화면 사용을 막으면 안 됩니다.
-    } finally {
-      setGiftState({ loading: false, gift: null, closing: false });
+        body: JSON.stringify({ phone, gift_id: current.id }),
+      })
+        .catch(() => {})
+        .finally(() => { void loadGift(); }); // 쌓인 다음 선물이 있으면 이어서
     }
-  };
+  }, [gift, loadGift]);
 
-  if (!giftState.gift) {
-    return null;
-  }
+  useEffect(() => {
+    if (!gift) return;
+    const t = window.setTimeout(closeGift, AUTO_CLOSE_MS);
+    return () => window.clearTimeout(t);
+  }, [gift, closeGift]);
 
-  const amountText = giftState.gift.amount_text || fallbackMoney(giftState.gift.amount);
-  const balanceText = giftState.gift.balance_after_text || fallbackMoney(giftState.gift.balance_after);
-  const reasonText = String(giftState.gift.reason || "").trim();
+  if (!gift) return null;
+  const amountText = `${gift.amount.toLocaleString("ko-KR")}P`;
 
   return (
-    <CustomerDialog
-      open
-      onClose={closeGift}
-      closeDisabled={giftState.closing}
-      title={v5 ? "포인트 선물이 도착했어요!" : "🎁 포인트 선물이 도착했어요!"}
-      ariaLabel="포인트 선물 알림"
-      hideCancel
-      primary={{ label: giftState.closing ? "확인 저장중" : "확인했어요", onClick: closeGift, disabled: giftState.closing }}
+    <div
+      role="status"
+      aria-live="polite"
+      style={{ position: "fixed", inset: 0, zIndex: 130, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "28vh", pointerEvents: "none" }}
     >
-      <p style={s5({ fontSize: "13px", fontWeight: 700, color: "#666" })}>{v5 ? "루루동이님이 보낸 선물 · 감사합니다" : "루루동이님이 보낸 선물 · 감사합니다 💝"}</p>
-      <div style={s5({ marginTop: "10px", borderRadius: "16px", border: "1px solid #D9C5CC", background: "#F5E6EB", padding: "14px", textAlign: "center" })}>
-        <div style={s5({ fontSize: "13px", fontWeight: 800, color: "#7B2D43" })}>지급 포인트</div>
-        <div style={s5({ marginTop: "4px", fontSize: "28px", fontWeight: 800, lineHeight: 1.2, color: "#7B2D43" })}>{amountText}</div>
-      </div>
-      <div style={s5({ marginTop: "10px", borderRadius: "14px", background: "#FAF6F2", padding: "10px 16px", textAlign: "center" })}>
-        <div style={s5({ fontSize: "12px", fontWeight: 800, color: "#888" })}>현재 보유 포인트</div>
-        <div style={s5({ marginTop: "2px", fontSize: "18px", fontWeight: 800, color: "#222" })}>{balanceText}</div>
-      </div>
-      {reasonText ? (
-        <div style={s5({ marginTop: "10px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "10px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#666" })}>
-          {reasonText}
+      <style>{`
+        @keyframes ruruGiftPop { 0% { transform: scale(.7); opacity: 0 } 60% { transform: scale(1.05); opacity: 1 } 100% { transform: scale(1) } }
+        @keyframes ruruGiftOut { 0%,85% { opacity: 1 } 100% { opacity: 0 } }
+        @keyframes ruruConfetti { 0% { transform: translate(0,0) rotate(0); opacity: 1; animation-timing-function: cubic-bezier(.2,.7,.3,1) } 45% { transform: translate(var(--dx), var(--dy)) rotate(calc(var(--rot) / 2)); opacity: 1; animation-timing-function: ease-in } 100% { transform: translate(var(--dx), calc(var(--dy) + 120px)) rotate(var(--rot)); opacity: 0 } }
+      `}</style>
+      {/* [2026-11-12 사장님 「그립처럼 쿠폰 느낌」] 양옆이 파인 쿠폰 모양. 카드만 누를 수 있음(누르면 바로 닫힘) — 바깥은 그대로 눌려서 방송·주문을 막지 않음 */}
+      <div
+        onClick={closeGift}
+        style={{
+          pointerEvents: "auto",
+          cursor: "pointer",
+          position: "relative",
+          width: "min(300px, calc(100vw - 48px))",
+          filter: "drop-shadow(0 10px 24px rgba(0,0,0,0.30))",
+          animation: reduce ? undefined : `ruruGiftPop .35s ease-out, ruruGiftOut ${AUTO_CLOSE_MS}ms linear forwards`,
+        }}
+      >
+        {reduce ? null : (
+          <span aria-hidden style={{ position: "absolute", left: "50%", top: "45%", width: 0, height: 0 }}>
+            {CONFETTI.map((c, i) => {
+              const ang = (i / CONFETTI.length) * Math.PI * 2 + (i % 2 ? 0.2 : 0);
+              const dist = 130 + (i % 4) * 30;
+              return (
+                <span
+                  key={i}
+                  style={{
+                    position: "absolute",
+                    width: i % 2 ? 9 : 12,
+                    height: i % 2 ? 12 : 9,
+                    borderRadius: 2,
+                    background: c,
+                    ["--dx" as string]: `${Math.round(Math.cos(ang) * dist)}px`,
+                    ["--dy" as string]: `${Math.round(Math.sin(ang) * dist * 0.85 + 40)}px`,
+                    ["--rot" as string]: `${(i % 2 ? 1 : -1) * (180 + i * 30)}deg`,
+                    animation: `ruruConfetti 2.2s linear ${i * 10}ms forwards`,
+                  } as React.CSSProperties}
+                />
+              );
+            })}
+          </span>
+        )}
+        <div
+          style={{
+            boxSizing: "border-box",
+            padding: "22px 24px 18px",
+            borderRadius: 16,
+            background: "linear-gradient(135deg, #FFFFFF 0%, #FCF0F4 55%, #EEF0FA 100%)",
+            color: "#111111",
+            textAlign: "center",
+            // 양옆 가운데를 동그랗게 파냄(쿠폰 모양)
+            WebkitMaskImage: "radial-gradient(circle 11px at 0 50%, transparent 10px, #000 11px), radial-gradient(circle 11px at 100% 50%, transparent 10px, #000 11px)",
+            WebkitMaskComposite: "source-in",
+            maskImage: "radial-gradient(circle 11px at 0 50%, transparent 10px, #000 11px), radial-gradient(circle 11px at 100% 50%, transparent 10px, #000 11px)",
+            maskComposite: "intersect",
+          }}
+        >
+          <div style={{ fontSize: 15, lineHeight: "20px", fontWeight: 700, color: "#111111" }}>{gift.reason || "포인트 선물"}</div>
+          <div style={{ marginTop: 6, fontSize: 40, lineHeight: "46px", fontWeight: 800, color: "#D30005", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>{amountText}</div>
+          <div style={{ marginTop: 6, fontSize: 13, lineHeight: "18px", fontWeight: 600, color: "#333333" }}>주문서 제출할 때 바로 써요</div>
+          <div style={{ margin: "12px 0 0", paddingTop: 10, borderTop: "1px dashed #D9D9DE", fontSize: 13, lineHeight: "16px", fontWeight: 700, letterSpacing: "2px", color: "#8E8E93" }}>RURUDONGI</div>
         </div>
-      ) : null}
-      {/* [2026-09-20] 예전 문구 「아직 주문 결제에 자동 차감되지 않아요·별도 안내 후 적용」은 사실과 달라 정정 — 주문서에서 바로 쓸 수 있다. */}
-      <p style={s5({ marginTop: "10px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#999" })}>
-        주문서 확인 화면의 「포인트 전부 쓰기」로 바로 쓸 수 있어요.
-      </p>
-    </CustomerDialog>
+      </div>
+    </div>
   );
 }

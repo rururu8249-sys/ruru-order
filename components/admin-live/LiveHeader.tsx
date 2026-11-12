@@ -1,5 +1,6 @@
 "use client";
 
+import WelcomePointSettings from "./WelcomePointSettings";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
@@ -650,6 +651,7 @@ export default function LiveHeader({
             </div>
             <Switch on={liveWatch.features.carousel} disabled={liveWatchSaving} label="상품 카드 여러 장 넘겨 보기" onChange={(v) => void saveLiveWatch({ ...liveWatch, features: { ...liveWatch.features, carousel: v } }, v ? "상품 카드 넘겨 보기를 켰어요. 손님 화면은 새로고침하면 바로 바뀌어요." : "상품 카드 넘겨 보기를 껐어요.")} />
           </div>
+          <WelcomePointSettings />
           {liveWatch.audience === "admin" ? (
             <div>
               <div className="flex items-center justify-between gap-2">

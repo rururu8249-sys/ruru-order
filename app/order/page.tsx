@@ -101,6 +101,7 @@ import ProductPhotoCarousel from "@/components/order/ProductPhotoCarousel";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import CustomerNoteUnreadBadge from "@/components/customer/CustomerNoteUnreadBadge";
 import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
+import { POINT_GIFT_REFRESH_EVENT } from "@/lib/welcomePoint";
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
 // [2026-09-20 사장님] 바텀시트 «한 벌» 틀 — 손님 시트 전부 같은 높이·헤더·✕·닫기 5종
 import CustomerBottomSheet, { CS_SHEET_Z_STACKED, csPrimaryButtonStyle, csCancelButtonStyle } from "@/components/customer/CustomerBottomSheet";
@@ -4123,9 +4124,13 @@ export default function OrderPage() {
     };
 
     void loadCustomerPoints();
+    // [2026-11-12] 방송 시청 선물 등으로 포인트가 새로 들어오면 다시 읽기(읽기만 — 사용·차감 로직 무접촉)
+    const onPointGift = () => { void loadCustomerPoints(); };
+    window.addEventListener(POINT_GIFT_REFRESH_EVENT, onPointGift);
 
     return () => {
       alive = false;
+      window.removeEventListener(POINT_GIFT_REFRESH_EVENT, onPointGift);
     };
   }, [customerPhone]);
 

@@ -46,6 +46,7 @@ import { widgetTargetKey } from "@/lib/widgetProductLibrary";
 import type { ChatProductSelection } from "@/lib/liveChatProductCommand";
 import { ChatProductThumb } from "./ChatProductThumb";
 import { chatProductPhoto } from "@/lib/chatProductPhoto";
+import { LiveWelcomeChip } from "./LiveWelcomeChip";
 
 export type LiveWatchPinned = {
   productId: string;
@@ -1214,7 +1215,7 @@ export default function LiveWatchView(props: Props) {
           {behindLive ? <button type="button" onClick={backToLive} style={{ flex: "1 1 0", minWidth: 0, minHeight: 44, alignSelf: "stretch", wordBreak: "keep-all", padding: "8px 10px", lineHeight: 1.35, borderRadius: 10, border: "1px solid #999999", background: "#333333", color: "#FFFFFF", font: "inherit", fontWeight: 600, cursor: "pointer" }}><span aria-hidden="true">● </span>실시간 방송으로 돌아가기</button> : null}
         </div>
       ) : null}
-      <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
+      <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s", zIndex: 4 }}>
         {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0 }}>
           {/* [07:05 사장님] LIVE + 시청자 수(유튜브 동시 시청자) — 오늘만셀러처럼 한 알약 */}
@@ -1242,6 +1243,9 @@ export default function LiveWatchView(props: Props) {
             ) : null}
           </span>
           <span style={{ maxWidth: "100%", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>{title || "라이브 방송"}</span>
+          {/* [2026-11-12] 처음/다시 오신 선물 — 받을 손님에게만 보임(서버 설정 꺼지면 안 보임) */}
+          {/* 소개영상 안내 띠가 뜰 땐 겹치지 않게 숨김(초 세기·상태는 유지) */}
+          <span style={{ display: showIntroBanner ? "none" : "contents" }}><LiveWelcomeChip /></span>
         </div>
           {/* 오른쪽 위 — 오늘만셀러처럼 그림만: 새로고침 · 소리 · 닫기(X = 상품 사진으로 보는 쇼핑몰 화면) */}
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0, pointerEvents: "auto", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
