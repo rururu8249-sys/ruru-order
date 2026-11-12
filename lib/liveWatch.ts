@@ -207,7 +207,8 @@ export function liveWatchList(items: LiveWatchItem[], query: string): LiveWatchI
   }
   const pinned = out.filter((it) => it.pinned && !it.detailName);
   const rest = out.filter((it) => !(it.pinned && !it.detailName));
-  return [...pinned, ...rest];
+  // [2026-11-12 사장님 「품절 상품은 밑으로 내려줘 기본으로」] 품절은 받은 순서 그대로 맨 아래(표시만)
+  return [...pinned, ...rest.filter((it) => !it.soldOut), ...rest.filter((it) => it.soldOut)];
 }
 
 /** 처음 안내(한 번만) 저장 키 */

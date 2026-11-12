@@ -403,6 +403,12 @@ export default function LiveWatchView(props: Props) {
     if (props.cartCount > cartCountSeen.current) setListOpen(false);
     cartCountSeen.current = props.cartCount;
   }, [props.cartCount]);
+  // [2026-11-12] 빈 주문서 「방송 상품 보기」 → 상품 목록 열기
+  useEffect(() => {
+    const open = () => { setQuery(""); setListMode("all"); setListOpen(true); };
+    window.addEventListener("ruru-live-open-list", open);
+    return () => window.removeEventListener("ruru-live-open-list", open);
+  }, []);
   const openProductList = (mode: "all" | "featured") => {
     setReplayListSnapshot(mode === "featured" && replayFeatured.replay ? [...featured.products] : null);
     setQuery(""); setListMode(mode); setListOpen(true);
@@ -1280,9 +1286,9 @@ export default function LiveWatchView(props: Props) {
         </div>
           {/* 오른쪽 위 — 오늘만셀러처럼 그림만: 새로고침 · 소리 · 닫기(X = 상품 사진으로 보는 쇼핑몰 화면) */}
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0, pointerEvents: "auto", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
-            {/* 집중모드 — 채팅·버튼을 숨기고 방송만(오늘만셀러 눈 그림) */}
-            <button type="button" onClick={() => { const next = !focus; setFocus(next); setChatHint(next ? "집중모드 — 채팅을 숨겼어요. 눈을 다시 누르면 보여요." : "채팅을 다시 보여 드려요."); }} aria-label={focus ? "집중모드 끄기" : "집중모드 켜기"} aria-pressed={focus} style={TOP_ICON_BTN}>
-              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" />{focus ? <path d="M4 4l16 16" /> : null}</svg>
+            {/* 채팅 숨기기 — [2026-11-12] 왼쪽 위 시청자 수(눈)와 헷갈려 눈 그림 → 말풍선 그림 */}
+            <button type="button" onClick={() => { const next = !focus; setFocus(next); setChatHint(next ? "채팅을 숨겼어요. 말풍선을 다시 누르면 보여요." : "채팅을 다시 보여 드려요."); }} aria-label={focus ? "채팅 보이기" : "채팅 숨기기"} aria-pressed={focus} style={TOP_ICON_BTN}>
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12a7.5 7.5 0 01-11 6.6L4 20l1.4-4.2A7.5 7.5 0 1120 12z" />{focus ? <path d="M4 4l16 16" /> : null}</svg>
             </button>
             <button type="button" onClick={reloadPlayer} aria-label="방송 새로고침" style={TOP_ICON_BTN}>
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0014.3 4.9L20 16" /><path d="M20 20v-4h-4" /></svg>
@@ -1786,7 +1792,7 @@ export default function LiveWatchView(props: Props) {
             <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>방송 보면서 바로 담아요</div>
             {([
               ["1", <>방송에서 마음에 드는 상품이 나오면 왼쪽 아래 <b>「상품」</b>을 눌러요</>],
-              ["2", <>그 상품의 <b>「상품 선택」</b>을 누르고 사이즈를 골라 담아요</>],
+              ["2", <>그 상품의 <b>「상품 선택」</b>을 누르고 원하는 옵션을 고르거나 적어서 담아요</>],
               ["3", <>다 담았으면 오른쪽 아래 <b>「주문서」</b>를 눌러 제출하고 입금하면 끝</>],
             ] as [string, ReactNode][]).map(([n, t]) => (
               <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>

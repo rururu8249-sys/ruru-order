@@ -8647,6 +8647,8 @@ export default function OrderPage() {
               <div style={s3s({ padding: "40px 18px", textAlign: "center" })}>
                 <p style={s3s({ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" })}>아직 담은 상품이 없습니다.</p>
                 <p style={s3s({ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#6E655E", lineHeight: 1.6 })}>상품 목록에서 [담기]를 눌러 담아 주세요.</p>
+                {/* [2026-11-12] 빈 주문서 — 글만 있던 것 → 상품 보러 가는 버튼(방송 화면이면 방송 상품 목록, 아니면 주문서만 닫음). 표시·이동만 */}
+                <button type="button" onClick={() => { setOrderSheetOpen(false); if (liveWatchShown) { try { window.dispatchEvent(new Event("ruru-live-open-list")); } catch { /* 무시 */ } } }} style={s3s({ marginTop: "16px", height: "48px", padding: "0 24px", borderRadius: "9999px", border: "none", background: "#111111", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" })}>{liveWatchShown ? "방송 상품 보기" : "상품 보러 가기"}</button>
               </div>
             ) : (
               <div>
@@ -9609,7 +9611,7 @@ export default function OrderPage() {
                           return isDetailManuallySoldOut((target as { product_note?: unknown } | null)?.product_note, name, cfg.colors, cfg.sizes);
                         };
                         const sortedNames = [...list]
-                          .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return r !== null && r <= 0; })() })) // [2026-11-11 사장님] 품절 체크한 상품은 자리 그대로(아래로 안 내림)
+                          .map((n, i) => ({ n, i, out: (() => { const r = stockOf(n); return (r !== null && r <= 0) || manualOut(n); })() })) // [2026-11-12 사장님 「품절 상품은 밑으로 내려줘 기본으로」] 품절 체크 상품도 아래로(11/11 «자리 그대로» 대체)
                           .sort((a, b) => (a.out === b.out ? a.i - b.i : a.out ? 1 : -1))
                           .map(({ n }) => n);
                         // [2026-08-29] 같은 디자인 묶기(design_groups)는 사장님 지시로 되돌렸다.
