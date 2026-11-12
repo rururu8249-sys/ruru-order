@@ -397,27 +397,10 @@ export default function LiveWatchView(props: Props) {
   const [streamDelayMs, setStreamDelayMs] = useState(0);
   const liveFeatured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false, streamDelayMs);
   const [replayListSnapshot, setReplayListSnapshot] = useState<LiveWatchItem[] | null>(null);
-  // [2026-11-12 23:29] 상품을 눌러도 목록은 뒤에 그대로 — 옵션 창을 그냥 닫으면 목록으로 돌아와 다른 상품을 바로 볼 수 있음.
-  //   담으면(장바구니 수가 늘면) 목록을 닫아 방송 화면으로 돌아감.
-  const cartCountSeen = useRef(props.cartCount);
-  const listOpenRef = useRef(false);
-  useEffect(() => { listOpenRef.current = listOpen; }, [listOpen]);
-  useEffect(() => {
-    if (props.cartCount > cartCountSeen.current) {
-      if (listOpenRef.current) setListLinger(true);
-      setListOpen(false);
-    }
-    cartCountSeen.current = props.cartCount;
-  }, [props.cartCount]);
-  // [2026-11-13 사장님 「상품 목록 불편한 점」] 폰 «뒤로» → 사이트에서 나가지 말고 상품 목록만 닫힘(옵션 창과 같은 방문 기록 규칙).
-  //   담아서 닫힐 땐 옵션 창이 자기 기록을 먼저 치우도록 0.5초 뒤에 목록 기록을 치움(빈 기록이 남아 뒤로를 두 번 누르는 일 방지).
-  const [listLinger, setListLinger] = useState(false);
-  useEffect(() => {
-    if (!listLinger) return;
-    const t = window.setTimeout(() => setListLinger(false), 500);
-    return () => window.clearTimeout(t);
-  }, [listLinger]);
-  useCustomerOverlayClose({ open: listOpen || listLinger, onClose: () => { setListOpen(false); setListLinger(false); } });
+  // [2026-11-13 00:46 사장님 「별로인 작동 방식이면 수정보완」] 담아도 상품 목록은 그대로(검색어·보던 자리 유지) — 여러 개 담는 손님이
+  //   매번 「상품」을 다시 누르지 않게. 담은 게 있으면 목록 맨 아래 검정 「주문서 보기 · N개」 버튼. (11/12 «담으면 방송 화면으로» 대체)
+  // 폰 «뒤로» → 사이트에서 나가지 말고 상품 목록만 닫힘(옵션 창과 같은 방문 기록 규칙).
+  useCustomerOverlayClose({ open: listOpen, onClose: () => setListOpen(false) });
   // [2026-11-12] 빈 주문서 「방송 상품 보기」 → 상품 목록 열기
   useEffect(() => {
     const open = () => { setQuery(""); setListMode("all"); setListOpen(true); };
@@ -585,6 +568,10 @@ export default function LiveWatchView(props: Props) {
   const [focus, setFocus] = useState(false);
   const [chatViewOpen, setChatViewOpen] = useState(false);
   const [installHintOpen, setInstallHintOpen] = useState(false);
+  // [2026-11-13] 폰 «뒤로» → 사이트에서 나가지 않고 열려 있는 창만 닫힘(상품 목록과 같은 규칙)
+  useCustomerOverlayClose({ open: moreOpen, onClose: () => setMoreOpen(false) });
+  useCustomerOverlayClose({ open: chatViewOpen, onClose: () => setChatViewOpen(false) });
+  useCustomerOverlayClose({ open: installHintOpen, onClose: () => setInstallHintOpen(false) });
   const [chatView, setChatView] = useState<ChatView>(CHAT_VIEW_DEFAULT);
   const [standalone, setStandalone] = useState(false);
   useEffect(() => {
@@ -1015,6 +1002,7 @@ export default function LiveWatchView(props: Props) {
   const latestToast = orderToasts.length > 0 ? orderToasts[orderToasts.length - 1] : null;
 
   const closeGuide = () => { writeGuideSeen(); setGuideOpen(false); };
+  useCustomerOverlayClose({ open: guideOpen, onClose: closeGuide });
 
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
   // [2026-11-12 사장님 22:34] 관리자(채팅 관리 권한)는 넓은 PC에서 유튜브 채팅창을 사이트 채팅 옆에 나란히 — 두 칸이면 조금 좁게
@@ -1303,7 +1291,7 @@ export default function LiveWatchView(props: Props) {
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0, pointerEvents: "auto", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
             {/* 채팅 숨기기 — [2026-11-12] 왼쪽 위 시청자 수(눈)와 헷갈려 눈 그림 → 말풍선 그림 */}
             <button type="button" onClick={() => { const next = !focus; setFocus(next); setChatHint(next ? "채팅을 숨겼어요. 말풍선을 다시 누르면 보여요." : "채팅을 다시 보여 드려요."); }} aria-label={focus ? "채팅 보이기" : "채팅 숨기기"} aria-pressed={focus} style={TOP_ICON_BTN}>
-              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12a7.5 7.5 0 01-11 6.6L4 20l1.4-4.2A7.5 7.5 0 1120 12z" />{focus ? <path d="M4 4l16 16" /> : null}</svg>
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12a7.5 7.5 0 01-11 6.6L4 20l1.4-4.2A7.5 7.5 0 1120 12z" /><g fill="#FFFFFF" stroke="none"><circle cx="9" cy="12" r="1.2" /><circle cx="12.5" cy="12" r="1.2" /><circle cx="16" cy="12" r="1.2" /></g>{focus ? <path d="M4 4l16 16" /> : null}</svg>
             </button>
             <button type="button" onClick={reloadPlayer} aria-label="방송 새로고침" style={TOP_ICON_BTN}>
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0014.3 4.9L20 16" /><path d="M20 20v-4h-4" /></svg>
@@ -1796,6 +1784,13 @@ export default function LiveWatchView(props: Props) {
                 </div>
               ); })}
             </div>
+            {cartCount > 0 ? (
+              <div style={{ flexShrink: 0, padding: "10px 16px calc(10px + env(safe-area-inset-bottom))", borderTop: "1px solid #E5E5E5", background: "#FFFFFF" }}>
+                <button type="button" onClick={() => { setListOpen(false); props.onOpenCart(); }} style={{ width: "100%", height: "52px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
+                  주문서 보기 · {cartCount}개 담김{cartTotalText ? ` · ${cartTotalText}` : ""}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
