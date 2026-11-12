@@ -1,6 +1,6 @@
 "use client";
 // [2026-11-12] 방송 시청 선물 포인트 설정 — 방송 관리 창 › 방송 보며 주문 아래.
-//   처음 오신 선물(결제한 적 없는 손님) / 다시 오신 선물(N일 넘게 안 산 손님) 켬·끔·금액, 몇 초 보면, 하루 최대 인원.
+//   처음 오신 선물(결제한 적 없는 손님) / 오랜만에 오신 선물(N일 넘게 안 산 손님) 켬·끔·금액, 몇 초 보면, 하루 최대 인원.
 //   저장 = /api/admin-live/welcome-point(관리자만, 비공개 저장소). 지급 자체는 손님 화면 → 서버가 조건 확인 후 기존 포인트 지급 RPC.
 import { useEffect, useState } from "react";
 import WelcomeRecipientList from "@/components/admin-live/WelcomeRecipientList";
@@ -81,10 +81,10 @@ export default function WelcomePointSettings() {
       {cfg.first.on ? <NumField label="금액" value={cfg.first.amount} unit="P" min={0} max={WELCOME_LIMITS.amountMax} onChange={(n) => setCfg({ ...cfg, first: { ...cfg.first, amount: n } })} /> : null}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[13px] font-bold text-ink">다시 오신 선물</div>
+          <div className="text-[13px] font-bold text-ink">오랜만에 오신 선물</div>
           <div className="text-[12px] text-ink-mute">마지막 결제 뒤 {cfg.back.days}일 넘게 안 산 손님</div>
         </div>
-        <Switch on={cfg.back.on} disabled={busy} label="다시 오신 선물" onChange={(v) => setCfg({ ...cfg, back: { ...cfg.back, on: v } })} />
+        <Switch on={cfg.back.on} disabled={busy} label="오랜만에 오신 선물" onChange={(v) => setCfg({ ...cfg, back: { ...cfg.back, on: v } })} />
       </div>
       {cfg.back.on ? (
         <div className="flex flex-wrap gap-x-4 gap-y-2">

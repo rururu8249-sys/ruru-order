@@ -1243,7 +1243,7 @@ export default function LiveWatchView(props: Props) {
             ) : null}
           </span>
           <span style={{ maxWidth: "100%", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>{title || "라이브 방송"}</span>
-          {/* [2026-11-12] 처음/다시 오신 선물 — 받을 손님에게만 보임(서버 설정 꺼지면 안 보임) */}
+          {/* [2026-11-12] 처음/오랜만에 오신 선물 — 받을 손님에게만 보임(서버 설정 꺼지면 안 보임) */}
           {/* 소개영상 안내 띠가 뜰 땐 겹치지 않게 숨김(초 세기·상태는 유지) */}
           <span style={{ display: showIntroBanner ? "none" : "contents" }}><LiveWelcomeChip /></span>
         </div>

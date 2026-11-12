@@ -28,10 +28,10 @@ assert.deepEqual(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, la
 assert.equal(W.decideWelcome({ ...cfg, first: { on: false, amount: 2000 } }, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now), null);
 // 최근에 산 손님 → 없음
 assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 3, lastPaidAt: new Date(now - 10 * day).toISOString(), lastPaidKey: "G1" }, now), null);
-// 61일 전 마지막 결제 → 다시 오신 선물(그 마지막 주문서마다 한 번)
+// 61일 전 마지막 결제 → 오랜만에 오신 선물(그 마지막 주문서마다 한 번)
 const back = W.decideWelcome(cfg, "c1", { paidCount: 3, lastPaidAt: new Date(now - 61 * day).toISOString(), lastPaidKey: "G1" }, now);
 assert.deepEqual(back, { kind: "back", amount: 1000, sourceKey: "welcome_back:c1:G1" });
-// 다시 오신 선물 꺼짐 → 없음
+// 오랜만에 오신 선물 꺼짐 → 없음
 assert.equal(W.decideWelcome({ ...cfg, back: { ...cfg.back, on: false } }, "c1", { paidCount: 3, lastPaidAt: new Date(now - 61 * day).toISOString(), lastPaidKey: "G1" }, now), null);
 // 회원 id 없음 → 없음
 assert.equal(W.decideWelcome(cfg, "", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now), null);
@@ -45,8 +45,10 @@ assert.equal(W.kstDayStartIso(Date.parse("2026-11-11T16:00:00Z")), "2026-11-11T1
 // 설명 문구
 const h = W.welcomeHelpLines("first", 2000, 30);
 assert.equal(h.title, "처음 오신 분께 드리는 선물이에요");
-assert.deepEqual(h.lines, ["방송을 30초 보시면 2,000P가 자동으로 들어와요", "주문서 제출할 때 바로 쓸 수 있어요", "한 분께 한 번만 드려요"]);
-assert.equal(W.welcomeHelpLines("back", 1000, 0).lines[0], "1,000P가 자동으로 들어와요");
+assert.deepEqual(h.lines, ["방송을 30초 이상 보시면 2,000P를 드려요", "주문서 제출할 때 바로 쓸 수 있어요", "한 분께 한 번만 드려요"]);
+assert.equal(W.welcomeHelpLines("back", 1000, 0).lines[0], "1,000P를 드려요");
+assert.equal(W.welcomeHelpLines("back", 1000, 30).title, "오랜만에 오신 분께 드리는 선물이에요");
+assert.equal(W.welcomeHelpLines("back", 1000, 30).lines[2], "오랜만에 오실 때마다 한 번씩 드려요");
 
 // ── 가짜 DB ──
 function fakeDb(tables) {
@@ -183,12 +185,12 @@ fresh(); { const w = world({ cfg: ON });
 // 4) 남의 번호를 넣으면(카카오 계정과 번호가 다른 회원) → 안 줌
 fresh(); { const w = world({ cfg: ON });
   assert.equal((await S.claimWelcome(w.db, "500", "01060006000", NOW)).ok, false); assert.equal(w.calls.length, 0); }
-// 5) 최근에 산 단골 → 안 줌 / 100일 넘게 쉰 손님 → 다시 오신 선물 1,000P
+// 5) 최근에 산 단골 → 안 줌 / 100일 넘게 쉰 손님 → 오랜만에 오신 선물 1,000P
 fresh(); { const w = world({ cfg: ON });
   assert.equal((await S.claimWelcome(w.db, "700", "01070007000", NOW)).ok, false);
   const r = await S.claimWelcome(w.db, "600", "01060006000", NOW);
   assert.deepEqual(r, { ok: true, granted: true, amount: 1000, kind: "back" });
-  assert.equal(w.calls[0].a.p_source_key, "welcome_back:o1:OG1"); assert.equal(w.calls[0].a.p_reason, "다시 오신 선물");
+  assert.equal(w.calls[0].a.p_source_key, "welcome_back:o1:OG1"); assert.equal(w.calls[0].a.p_reason, "오랜만에 오신 선물");
   assert.equal((await S.claimWelcome(w.db, "600", "01060006000", NOW)).ok, false); assert.equal(w.calls.length, 1); }
 // 6) 오늘 최대 인원 다 참 → 안 줌
 fresh(); { const w = world({ cfg: { ...ON, dailyCap: 1 }, ledger: [{ id: 1, customer_phone: "01099990000", source_key: "welcome_first:zz", created_at: "2026-11-12T01:00:00Z" }] });

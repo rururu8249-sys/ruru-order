@@ -1,6 +1,6 @@
 // [2026-11-12 사장님 「그립처럼 처음 온 손님 선물」] 방송 시청 선물 포인트 — 순수 계산만(서버·화면 공용).
 //   처음 오신 선물 = 결제완료 주문이 한 번도 없는 손님(카카오 계정·지금 전화번호 둘 다)
-//   다시 오신 선물 = 마지막 결제완료 주문이 N일 넘게 지난 손님(그 «잠든 기간»마다 한 번)
+//   오랜만에 오신 선물 = 마지막 결제완료 주문이 N일 넘게 지난 손님(그 «잠든 기간»마다 한 번)
 //   지급은 기존 관리자 포인트 지급 RPC(admin_change_customer_points) + 중복 방지 키(source_key)만 쓴다.
 
 /** 포인트가 새로 들어왔을 때 화면들이 다시 읽게 하는 소식(선물 카드·주문서 포인트) */
@@ -60,7 +60,7 @@ export function parseWelcomePointConfig(raw: unknown): WelcomePointConfig {
 
 export const WELCOME_REASON: Record<WelcomeKind, string> = {
   first: "처음 오신 선물",
-  back: "다시 오신 선물",
+  back: "오랜만에 오신 선물",
 };
 
 export type PaidHistory = {
@@ -101,11 +101,11 @@ export function kstDayStartIso(nowMs: number): string {
 export function welcomeHelpLines(kind: WelcomeKind, amount: number, watchSec: number): { title: string; lines: string[] } {
   const amt = `${Math.max(0, Math.floor(amount)).toLocaleString("ko-KR")}P`;
   return {
-    title: kind === "first" ? "처음 오신 분께 드리는 선물이에요" : "다시 오신 분께 드리는 선물이에요",
+    title: kind === "first" ? "처음 오신 분께 드리는 선물이에요" : "오랜만에 오신 분께 드리는 선물이에요",
     lines: [
-      watchSec > 0 ? `방송을 ${watchSec}초 보시면 ${amt}가 자동으로 들어와요` : `${amt}가 자동으로 들어와요`,
+      watchSec > 0 ? `방송을 ${watchSec}초 이상 보시면 ${amt}를 드려요` : `${amt}를 드려요`,
       "주문서 제출할 때 바로 쓸 수 있어요",
-      "한 분께 한 번만 드려요",
+      kind === "first" ? "한 분께 한 번만 드려요" : "오랜만에 오실 때마다 한 번씩 드려요",
     ],
   };
 }
