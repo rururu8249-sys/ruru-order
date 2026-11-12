@@ -8370,6 +8370,7 @@ export default function OrderPage() {
               showSiteViewers
               pinned={liveWatchPinned}
               widgetEnabled={broadcast?.widget_card_enabled !== false}
+              features={liveWatchSetting.features}
               widgetPin={broadcast?.widget_pin_mode === "pin" && broadcast?.widget_pin_product_id ? { productId: String(broadcast.widget_pin_product_id), detailName: String(broadcast.widget_pin_detail_name || "") } : null}
               items={liveWatchItems}
               cartCount={liveWatchCartCount}

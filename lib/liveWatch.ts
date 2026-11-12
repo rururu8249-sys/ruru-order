@@ -19,24 +19,38 @@ export type LiveWatchSetting = {
   mods: string[];
   /** [2026-11-10] 총관리자 — 채팅 관리 + 다른 손님을 채팅 관리자로 지정·해제. badge = 닉네임 뒤 표시 */
   owners: LiveChatOwner[];
+  /** [2026-11-12 사장님 「그립처럼 좋은 건 따라 하고 껐다 켰다」] 방송 화면 부가 기능 켬/끔 */
+  features: LiveWatchFeatures;
 };
+
+/** 방송 화면 부가 기능 — 하나씩 껐다 켬. 저장값이 없으면 기본값. */
+export type LiveWatchFeatures = {
+  /** 채팅 위 상품 카드를 여러 장 옆으로 넘겨 보기(끄면 지금 소개하는 상품 1장만) */
+  carousel: boolean;
+};
+export const LIVE_WATCH_FEATURES_DEFAULT: LiveWatchFeatures = { carousel: true };
+export function parseLiveWatchFeatures(raw: unknown): LiveWatchFeatures {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const flag = (k: keyof LiveWatchFeatures) => (typeof o[k] === "boolean" ? (o[k] as boolean) : LIVE_WATCH_FEATURES_DEFAULT[k]);
+  return { carousel: flag("carousel") };
+}
 
 /** 채팅 닉네임 뒤 표시 — crown: 금색 왕관 / crown_pink: 분홍 왕관 / mod: R 동그라미(채팅 관리자) */
 export type LiveChatBadge = "crown" | "crown_pink" | "mod";
 export type LiveChatOwner = { phone: string; badge: LiveChatBadge };
 export const LIVE_CHAT_BADGES: LiveChatBadge[] = ["crown", "crown_pink", "mod"];
 
-export const LIVE_WATCH_DEFAULT: LiveWatchSetting = { audience: "off", firstView: "live", phones: [], mods: [], owners: [] };
+export const LIVE_WATCH_DEFAULT: LiveWatchSetting = { audience: "off", firstView: "live", phones: [], mods: [], owners: [], features: { ...LIVE_WATCH_FEATURES_DEFAULT } };
 
 /** settings 값(JSON 글자 또는 객체) → 설정. 이상하면 기본값(꺼짐). */
 export function parseLiveWatchSetting(raw: unknown): LiveWatchSetting {
   let v: unknown = raw;
   if (typeof v === "string") {
     const t = v.trim();
-    if (!t) return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [] };
-    try { v = JSON.parse(t); } catch { return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [] }; }
+    if (!t) return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [], features: { ...LIVE_WATCH_FEATURES_DEFAULT } };
+    try { v = JSON.parse(t); } catch { return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [], features: { ...LIVE_WATCH_FEATURES_DEFAULT } }; }
   }
-  if (!v || typeof v !== "object") return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [] };
+  if (!v || typeof v !== "object") return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [], features: { ...LIVE_WATCH_FEATURES_DEFAULT } };
   const o = v as Record<string, unknown>;
   const audience: LiveWatchAudience = o.audience === "all" ? "all" : o.audience === "admin" ? "admin" : "off";
   const firstView: LiveWatchFirstView = o.firstView === "shop" ? "shop" : "live";
@@ -53,7 +67,7 @@ export function parseLiveWatchSetting(raw: unknown): LiveWatchSetting {
       owners.push({ phone, badge });
     }
   }
-  return { audience, firstView, phones: digits(o.phones), mods: digits(o.mods), owners };
+  return { audience, firstView, phones: digits(o.phones), mods: digits(o.mods), owners, features: parseLiveWatchFeatures(o.features) };
 }
 
 /** 이 번호의 채팅 표시 — 총관리자면 그 표시, 채팅 관리자(mods)면 R, 아니면 null */
