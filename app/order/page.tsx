@@ -170,6 +170,7 @@ import { resolveSizeChart, sizeColumnIndex } from "@/lib/sizeChart";
 import { EMPTY_PAID_SHIPPING_GROUPS, anyPaidShippingGroup, hasOverseasBadge, assignRowShippingFees, calculateShippingBreakdown, normalizePaidShippingGroups, resolveShippingGroup, shippingFeeByGroup, type PaidShippingGroups as PaidShippingGroupsLib, type ShippingGroup } from "@/lib/shippingGroups";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
+import { sameCartDraftItems } from "@/lib/cartDraftSync";
 import { CART_SEQ_NEW, readCartSeqField } from "@/lib/cartClearMarks";
 import {
   CUSTOMER_DETAIL_NAME_MAX_LENGTH,
@@ -2052,6 +2053,28 @@ export default function OrderPage() {
       savedAt: Date.now(),
     });
   }, [orderDraftRestored, items, paymentMethod, requestMemo, pointUseInput, done]);
+
+  // [2026-11-13] 같은 브라우저의 «다른 탭»이 장바구니를 바꾸면 이 탭도 그 목록으로 맞춘다.
+  //   탭마다 목록이 다르면, 빈 탭이 서버 선점을 빈 목록으로 덮어써 제출이 거절됐다(운영 실측).
+  //   storage 이벤트는 다른 탭이 바꿨을 때만 온다. 같은 목록이면 아무것도 안 함(서로 덮어쓰기 방지).
+  const itemsForDraftSyncRef = useRef(items);
+  itemsForDraftSyncRef.current = items;
+  useEffect(() => {
+    if (!orderDraftRestored || done) return;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== ORDER_DRAFT_STORAGE_KEY) return;
+      if (submitInFlightRef.current) return; // 제출 중엔 안 바꿈
+      const draft = readOrderDraftData();
+      const nextItems = draft
+        ? normalizeOrderDraftItems(draft.items)
+        : [{ ...emptyItem }];
+      const mine = normalizeOrderDraftItems(itemsForDraftSyncRef.current.map((it) => (it.cart_seq === undefined ? { ...it, cart_seq: CART_SEQ_NEW } : it)));
+      if (sameCartDraftItems(mine as unknown as Record<string, unknown>[], nextItems as unknown as Record<string, unknown>[])) return;
+      setItems(nextItems.map((it) => (it.cart_seq === CART_SEQ_NEW ? { ...it, cart_seq: undefined } : it)));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [orderDraftRestored, done]);
 
   const isRemoteAreaShippingAddress = isRemoteAreaAddress(zipcode, address, detailAddress);
   // 배송비 기준은 관리자 설정값(settings.default_shipping_fee)을 우선 적용합니다.
@@ -5586,12 +5609,15 @@ export default function OrderPage() {
       const cleanPhone = normalizePhone(customerPhone);
       // 운영자 테스트 계정이라도 "테스트 주문" 체크를 풀었으면 실제 주문으로 접수한다.
       //   (일반 손님은 rawOperatorTestOrderFlags.isTestOrder 가 항상 false → 아래 분기와 무관)
-      const rawOperatorTestOrderFlags = await getOperatorTestOrderFlags(cleanPhone);
+      // [2026-11-13] 두 확인은 서로 무관한 읽기라 같이 보냄(기다리는 시간만 줄임 — 값·판정 그대로).
+      const [rawOperatorTestOrderFlags, paidShippingGroupsBeforeSubmit] = await Promise.all([
+        getOperatorTestOrderFlags(cleanPhone),
+        checkAlreadyPaidShippingGroups(cleanPhone),
+      ]);
       const operatorTestOrderFlags =
         rawOperatorTestOrderFlags.isTestOrder && !adminTestOrderMode
           ? EMPTY_OPERATOR_TEST_ORDER_FLAGS
           : rawOperatorTestOrderFlags;
-      const paidShippingGroupsBeforeSubmit = await checkAlreadyPaidShippingGroups(cleanPhone);
       const submitShippingRequestId = combineShippingRequestRef.current;
       const paidShippingBeforeSubmit = anyPaidShippingGroup(paidShippingGroupsBeforeSubmit);
       const validItems = items.filter(
