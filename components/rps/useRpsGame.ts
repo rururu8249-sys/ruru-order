@@ -31,7 +31,10 @@ export function useRpsGame(publicOnly=false){
  useEffect(()=>{
  mounted.current=true;queueMicrotask(()=>{void loadPublic();void loadMe();});
  const channel=supabase.channel('ruru-rps').on('broadcast',{event:'changed'},({payload})=>{if(payload?.setup)void loadMe();else void loadPublic();}).subscribe(status=>{if(status==='SUBSCRIBED')void loadPublic();});
- const fallback=setInterval(()=>{if(!document.hidden){void loadPublic();void loadMe();}},10000);
+ // [2026-11-13] 게임이 없거나 끝난 동안엔 내 참가 정보(/api/rps/me)를 10초마다 묻지 않고 1분에 한 번만 — 방송 보는 손님 전원이 쉬지 않고 묻던 것.
+ //   게임 상태(/api/rps/state)는 그대로 10초마다 보고, 게임이 시작되면(상태 바뀜) 아래 effect 가 바로 다시 묻는다.
+ let idleTicks=0;
+ const fallback=setInterval(()=>{if(document.hidden)return;void loadPublic();const live=!!latest.current?.id&&latest.current.status!=='closed';idleTicks=live?0:idleTicks+1;if(live||idleTicks%6===0)void loadMe();},10000);
  const resume=()=>{if(!document.hidden){void loadPublic();void loadMe();}};
  window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);
  return()=>{mounted.current=false;clearInterval(fallback);void supabase.removeChannel(channel);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume);};

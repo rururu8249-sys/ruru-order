@@ -9,6 +9,116 @@
       "regions": [
         "sin1"
       ]
+    },
+    "app/api/cart-reservations/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/customer-site-alerts/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/customer-login-sync/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/customer-block-check/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/presence/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/customer-points/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/customer-point-gifts/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/customer-test-account/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/shop-guide-bank/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/chat-orders/mine/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-chat/emoji/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-chat/private/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-chat/site-card/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-chat/watchers/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-chat/products/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-chat/product-intro/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-chat/product-intro/manage/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-watch/featured/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-viewers/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/live-trending/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/rps/me/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/rps/state/route.ts": {
+      "regions": [
+        "sin1"
+      ]
     }
   },
   "crons": [
