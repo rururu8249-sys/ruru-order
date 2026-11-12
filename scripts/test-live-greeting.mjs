@@ -7,6 +7,8 @@ let now=100000, seq=0, blocked=false;
 const timers=new Map(), values=new Map(), listeners=new Map();
 const originalNow=Date.now; Date.now=()=>now;
 globalThis.window={localStorage:{getItem:k=>{if(blocked)throw Error('blocked');return values.get(k)??null;},setItem:(k,v)=>{if(blocked)throw Error('blocked');values.set(k,v);}},setTimeout:(f,ms)=>{const id=++seq;timers.set(id,{f,at:now+ms});return id;},clearTimeout:id=>timers.delete(id),addEventListener:(n,f)=>listeners.set(n,f),removeEventListener:(n,f)=>{if(listeners.get(n)===f)listeners.delete(n);}};
+const docListeners=new Map();let vis='visible';
+globalThis.document={get visibilityState(){return vis;},addEventListener:(n,f)=>docListeners.set(n,f),removeEventListener:(n,f)=>{if(docListeners.get(n)===f)docListeners.delete(n);}};
 const {useLiveGreeting,LIVE_GREETING_TIMING}=createUiLoader()('lib/useLiveGreeting.ts');
 let result,tree;
 function Probe({id='A',enabled=true}){result=useLiveGreeting(id,enabled);return null;}
@@ -25,6 +27,15 @@ await unmount();await mount({id:'C',enabled:false});await advance(20000);assert.
 await unmount();await mount({id:'D'});await advance(1500);assert.equal(result.open,true,'new broadcast gets its own first entry');
 await act(async()=>listeners.get('pagehide')?.());await unmount();await mount({id:'D'});await advance(1500);assert.equal(result.open,false,'page reload does not immediately repeat');
 await act(async()=>listeners.get('pagehide')?.());await advance(LIVE_GREETING_TIMING.returnAfterMs);await act(async()=>listeners.get('pageshow')?.({persisted:true}));await advance(1500);assert.equal(result.open,true,'browser back-cache restore respects return cooldown');
+// [11/12 23:23] 안 보낸 손님: 3분 나갔다 오면 다시 / 보낸 손님: 3분으론 안 뜸
+await unmount();await mount({id:'F'});await advance(1500);assert.equal(result.open,true);
+await unmount();await advance(LIVE_GREETING_TIMING.unsentReturnAfterMs);await mount({id:'F'});await advance(1500);assert.equal(result.open,true,'unsent greeting returns after 3 minutes away');
+await act(async()=>result.dismiss());await unmount();await advance(LIVE_GREETING_TIMING.unsentReturnAfterMs);await mount({id:'F'});await advance(1500);assert.equal(result.open,false,'sent greeting waits the full 30 minutes');
+// 다른 앱으로 갔다 옴(화면 숨김 → 보임)
+await unmount();await mount({id:'G'});await advance(1500);assert.equal(result.open,true);
+vis='hidden';await act(async()=>docListeners.get('visibilitychange')());await advance(60000);vis='visible';await act(async()=>docListeners.get('visibilitychange')());await advance(1500);assert.equal(result.open,true,'short app switch keeps the greeting');
+vis='hidden';await act(async()=>docListeners.get('visibilitychange')());await advance(LIVE_GREETING_TIMING.unsentReturnAfterMs);vis='visible';await act(async()=>docListeners.get('visibilitychange')());assert.equal(result.open,false,'re-shown fresh at the bottom');await advance(1500);assert.equal(result.open,true,'unsent greeting re-appears after app switch');
+await act(async()=>result.dismiss());vis='hidden';await act(async()=>docListeners.get('visibilitychange')());await advance(LIVE_GREETING_TIMING.unsentReturnAfterMs);vis='visible';await act(async()=>docListeners.get('visibilitychange')());await advance(1500);assert.equal(result.open,false,'sent greeting stays closed after short app switch');
 await unmount();blocked=true;await mount({id:'E'});await advance(1500);assert.equal(result.open,true);await advance(10000);assert.equal(result.open,true,'storage failures do not create a hidden expiry');await unmount();
-assert.equal(timers.size,0);assert.equal(listeners.size,0);Date.now=originalNow;
+assert.equal(timers.size,0);assert.equal(listeners.size,0);assert.equal(docListeners.size,0);Date.now=originalNow;
 console.log('PASS greeting: first entry, no timed expiry, 30m since exit, continuous watching, early dismissal, new broadcast, reload, StrictMode, blocked storage and cleanup');
