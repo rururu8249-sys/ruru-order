@@ -19,9 +19,9 @@ export type WelcomePointConfig = {
 
 export const WELCOME_POINT_DEFAULT: WelcomePointConfig = {
   first: { on: false, amount: 2000 },
-  back: { on: false, amount: 1000, days: 60 },
-  watchSec: 30,
-  dailyCap: 50,
+  back: { on: false, amount: 1000, days: 90 },
+  watchSec: 30, // 그립과 같음
+  dailyCap: 30, // 손님 한 명은 늘 한 번뿐 — 이건 «하루 전체» 안전장치(설정 실수·악용 대비)
 };
 
 /** 서버가 받아들이는 범위 — 설정값이 이상해도 이 밖으로는 절대 안 줌 */

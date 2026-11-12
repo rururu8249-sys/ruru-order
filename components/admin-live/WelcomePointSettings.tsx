@@ -92,8 +92,8 @@ export default function WelcomePointSettings() {
       ) : null}
       {cfg.first.on || cfg.back.on ? (
         <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-line pt-2">
-          <NumField label="방송 보기" value={cfg.watchSec} unit="초" min={0} max={WELCOME_LIMITS.watchMax} onChange={(n) => setCfg({ ...cfg, watchSec: n })} />
-          <NumField label="하루 최대" value={cfg.dailyCap} unit="명" min={1} max={WELCOME_LIMITS.capMax} onChange={(n) => setCfg({ ...cfg, dailyCap: n })} />
+          <NumField label="방송 보기" value={cfg.watchSec} unit="초(그립 30)" min={0} max={WELCOME_LIMITS.watchMax} onChange={(n) => setCfg({ ...cfg, watchSec: n })} />
+          <NumField label="안전장치 · 하루 전체 최대" value={cfg.dailyCap} unit="명" min={1} max={WELCOME_LIMITS.capMax} onChange={(n) => setCfg({ ...cfg, dailyCap: n })} />
         </div>
       ) : null}
       {dirty || msg ? (
