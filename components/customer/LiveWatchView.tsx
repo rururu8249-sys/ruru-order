@@ -644,6 +644,7 @@ export default function LiveWatchView(props: Props) {
   const [pinOpen, setPinOpen] = useState(false);
   const pinTextRef = useRef<HTMLSpanElement | null>(null);
   const [banConfirm, setBanConfirm] = useState(false);
+  useCustomerOverlayClose({ open: !!modTarget, onClose: () => { setModTarget(null); setBanConfirm(false); } });
   const pressTimer = useRef<number | null>(null);
   const {open: greetOpen, dismiss: closeGreet} = useLiveGreeting(props.broadcastId || videoId, Boolean(chat?.canWrite));
   const [greetingAnchor, setGreetingAnchor] = useState<{afterId: number | null} | null>(null);
@@ -1066,7 +1067,7 @@ export default function LiveWatchView(props: Props) {
               <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
             </svg>
             <span style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>실시간 채팅에서 인사하기</span>
-            <button type="button" onClick={() => void sendGreet()} style={{ flexShrink: 0, height: "32px", padding: "0 12px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>보내기</button>
+            <button type="button" onClick={() => void sendGreet()} style={{ flexShrink: 0, height: "36px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>보내기</button>
           </div>
   ) : null;
 
@@ -1412,7 +1413,7 @@ export default function LiveWatchView(props: Props) {
           </div>
         ) : null}
         {chat && chat.notice ? (
-          <div data-live-notice style={{ flexShrink: 0, alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45 }}>
+          <div data-live-notice style={{ flexShrink: 0, alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45, wordBreak: "keep-all", overflowWrap: "anywhere" }}>
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
           </div>
         ) : null}
@@ -1591,12 +1592,12 @@ export default function LiveWatchView(props: Props) {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {(() => {
-                const base = (props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지·쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 }));
+                const base = (props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지\u2060·\u2060쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 }));
                 const rank = (k: string) => { const i = ["orders", "notice", "me", "inquiry"].indexOf(k); return i < 0 ? 9 : i; };
                 return [
                   ...base.slice().sort((x, y) => rank(x.key) - rank(y.key)),
                   { key: "guide", label: "주문 방법", onClick: () => setGuideOpen(true), badge: 0 },
-                  { key: "chatview", label: "채팅 글자 크기", onClick: () => setChatViewOpen(true), badge: 0 },
+                  ...(chat ? [{ key: "chatview", label: "채팅 글자 크기", onClick: () => setChatViewOpen(true), badge: 0 }] : []),
                   { key: "share", label: "방송 공유", onClick: shareLive, badge: 0 },
                   ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp, badge: 0 }]),
                   ...((rps.admin || chat?.canGrant) ? [{ key: "rps", label: "게임 · 가위바위보", onClick: () => setRpsAdminOpen(true), badge: 0 }] : []),
@@ -1629,12 +1630,12 @@ export default function LiveWatchView(props: Props) {
               ["채팅창 높이", "height", [["base", "기본"], ["low", "낮게"], ["high", "높게"]]],
             ] as const).map(([label, field, opts]) => (
               <div key={field} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minHeight: "52px" }}>
-                <span style={{ fontSize: "16px", fontWeight: 600 }}>{label}</span>
-                <div style={{ display: "flex", gap: "6px" }}>
+                <span style={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{label}</span>
+                <div style={{ display: "flex", gap: "6px", minWidth: 0 }}>
                   {opts.map(([v, t]) => {
                     const on = chatView[field] === v;
                     return (
-                      <button key={v} type="button" aria-pressed={on} onClick={() => updateChatView({ [field]: v } as Partial<ChatView>)} style={{ height: "40px", minWidth: "56px", padding: "0 12px", borderRadius: "9999px", border: on ? "2px solid #111111" : "1px solid #E5E5E5", background: "#FFFFFF", color: on ? "#111111" : "#707072", fontSize: "14px", fontWeight: on ? 700 : 500, fontFamily: "inherit", cursor: "pointer" }}>{t}</button>
+                      <button key={v} type="button" aria-pressed={on} onClick={() => updateChatView({ [field]: v } as Partial<ChatView>)} style={{ height: "40px", minWidth: "48px", padding: "0 10px", whiteSpace: "nowrap", borderRadius: "9999px", border: on ? "2px solid #111111" : "1px solid #E5E5E5", background: "#FFFFFF", color: on ? "#111111" : "#707072", fontSize: "14px", fontWeight: on ? 700 : 500, fontFamily: "inherit", cursor: "pointer" }}>{t}</button>
                     );
                   })}
                 </div>
@@ -1654,13 +1655,13 @@ export default function LiveWatchView(props: Props) {
       {installHintOpen ? (
         <div role="dialog" aria-modal="true" aria-label="앱 설치" onClick={() => setInstallHintOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "360px", background: "#FFFFFF", color: "#111111", borderRadius: "16px", padding: "24px 20px 20px" }}>
-            <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>휴대폰 홈 화면에 루루동이 추가</div>
-            <div style={{ fontSize: "16px", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px", wordBreak: "keep-all" }}>휴대폰 홈 화면에 루루동이 추가</div>
+            <div style={{ fontSize: "16px", lineHeight: 1.6, wordBreak: "keep-all" }}>
               다음부터 아이콘 한 번 누르면 바로 열려요.<br /><br />
               <b>아이폰</b>: 사파리 아래 <b>공유</b> 버튼 → <b>홈 화면에 추가</b><br />
               <b>안드로이드</b>: 크롬 오른쪽 위 <b>⋮</b> → <b>홈 화면에 추가</b>
             </div>
-            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, marginTop: "12px" }}>카카오톡 안에서 열었으면, 오른쪽 위 메뉴에서 «다른 브라우저로 열기» 뒤에 해 주세요.</div>
+            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, marginTop: "12px", wordBreak: "keep-all" }}>카카오톡 안에서 열었으면, 오른쪽 위 메뉴에서 «다른 브라우저로 열기» 뒤에 해 주세요.</div>
             <button type="button" onClick={() => setInstallHintOpen(false)} style={{ width: "100%", height: "52px", marginTop: "20px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>확인</button>
           </div>
         </div>
