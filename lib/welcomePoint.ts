@@ -104,7 +104,7 @@ export function welcomeHelpLines(kind: WelcomeKind, amount: number, watchSec: nu
     title: kind === "first" ? "처음 오신 분께 드리는 선물이에요" : "오랜만에 오신 분께 드리는 선물이에요",
     lines: [
       watchSec > 0 ? `방송을 ${watchSec}초 이상 보시면 ${amt}를 드려요` : `${amt}를 드려요`,
-      "주문서 제출할 때 바로 쓸 수 있어요",
+      "구매할 때 바로 쓸 수 있어요",
       kind === "first" ? "한 분께 한 번만 드려요" : "오랜만에 오실 때마다 한 번씩 드려요",
     ],
   };

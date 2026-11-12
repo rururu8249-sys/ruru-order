@@ -144,3 +144,16 @@ export function presenceStatusText(args: { pageType: string; pageLabel: string; 
   if (pageType === "order_form") return "상품 보는 중";
   return pageLabel;
 }
+
+// ── [2026-11-12 사장님 22:34] 방송 화면을 «지금 열어 둔» 사람 표시 ──
+//   방송 화면(LiveWatchView)이 열려 있고 그 탭이 보이는 동안만 접속 신호의 path 끝에 표식을 붙인다.
+//   새 칸(DB) 없이 기존 visitor_presence.path 한 칸으로 «방송 보는 중»을 가린다. 닫거나 앱을 내리면 다음 신호에서 빠짐.
+export const LIVE_WATCH_PATH_MARK = "#live";
+let liveWatching = false;
+export function setLiveWatching(on: boolean): void {
+  if (liveWatching === on) return;
+  liveWatching = on;
+  try { window.dispatchEvent(new Event(PRESENCE_ACTIVITY_EVENT)); } catch { /* 서버 */ }
+}
+export function isLiveWatching(): boolean { return liveWatching; }
+export function isLiveWatchPath(path: unknown): boolean { return String(path ?? "").endsWith(LIVE_WATCH_PATH_MARK); }

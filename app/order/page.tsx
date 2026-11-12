@@ -1484,6 +1484,8 @@ export default function OrderPage() {
   // [2026-11-10] 방송 화면 왼쪽 위 시청자 수(유튜브 동시 시청자, 30초마다 읽음)
   const [liveViewers, setLiveViewers] = useState<number | null>(null);
   const [liveSiteViewers, setLiveSiteViewers] = useState<number | null>(null);
+  // [2026-11-12 사장님 22:34] 방송 화면을 지금 열어 둔 사람(눈 그림 숫자) — liveSiteViewers 는 사이트 전체 접속
+  const [liveWatchingViewers, setLiveWatchingViewers] = useState<number | null>(null);
   // 주문 소식 처리(효과 안)에서 지금 채팅이 켜졌는지 보려고
   const liveChatEnabledRef = useRef(false);
   useEffect(() => { liveChatEnabledRef.current = liveChatEnabled; }, [liveChatEnabled]);
@@ -6684,10 +6686,11 @@ export default function OrderPage() {
         if (!active) return;
         setLiveViewers(j && Number.isFinite(Number(j.viewers)) && j.viewers != null ? Number(j.viewers) : null);
         setLiveSiteViewers(j && Number.isFinite(Number(j.site)) && j.site != null ? Number(j.site) : null);
+        setLiveWatchingViewers(j && Number.isFinite(Number(j.watching)) && j.watching != null ? Number(j.watching) : null);
       } catch { /* 숫자 못 읽으면 그대로 */ }
     };
     void loadViewers();
-    const viewersTimer = window.setInterval(() => { if (document.visibilityState === "visible") void loadViewers(); }, 30000);
+    const viewersTimer = window.setInterval(() => { if (document.visibilityState === "visible") void loadViewers(); }, 15000);
     // [2026-11-10 사장님 09:50 「저장했는데 왜 안 나와」] 채팅 켜짐·공지 — 관리자가 저장하면 소식(live_chat_setting)으로 바로, 못 받아도 30초마다 다시 읽음
     let chatMetaBusy = false;
     const refetchChatMeta = async () => {
@@ -8372,7 +8375,7 @@ export default function OrderPage() {
               pausedText={livePausedText}
               viewers={liveViewers}
               siteViewers={liveSiteViewers}
-              showSiteViewers
+              watchingViewers={liveWatchingViewers}
               pinned={liveWatchPinned}
               widgetEnabled={broadcast?.widget_card_enabled !== false}
               features={liveWatchSetting.features}

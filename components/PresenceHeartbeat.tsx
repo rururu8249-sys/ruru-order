@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
-import { PRESENCE_ACTIVITY_EVENT, readPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
+import { LIVE_WATCH_PATH_MARK, PRESENCE_ACTIVITY_EVENT, isLiveWatching, readPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 
 function getOrCreateVisitorKey() {
   if (typeof window === "undefined") return "";
@@ -87,7 +87,8 @@ export default function PresenceHeartbeat() {
           body: JSON.stringify({
             visitorKey,
             pageType,
-            path: pathname,
+            // [2026-11-12] 방송 화면을 열어 두고 이 탭이 보이는 중이면 표식(#live) — «방송 보는 중» 숫자용
+            path: isLiveWatching() && document.visibilityState === "visible" ? `${pathname}${LIVE_WATCH_PATH_MARK}` : pathname,
             nickname: getNickname(),
             viewingProduct: getViewingProduct(),
             kakaoId: getKakaoId(),
@@ -113,8 +114,12 @@ export default function PresenceHeartbeat() {
       quickTimer = window.setTimeout(() => { quickTimer = null; lastQuick = Date.now(); void send(); }, wait);
     };
     window.addEventListener(PRESENCE_ACTIVITY_EVENT, onActivity);
+    // 방송 화면을 보다가 다른 앱·탭으로 가거나 돌아오면 바로 알림(숫자가 빨리 맞게)
+    const onVisible = () => { if (isLiveWatching()) onActivity(); };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
       stopped = true;
       window.clearInterval(timer);
       if (quickTimer !== null) window.clearTimeout(quickTimer);

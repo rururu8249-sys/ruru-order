@@ -34,6 +34,7 @@ import { EMOJI_MAX_PER_MSG, chatBodyAsText, countEmojiTokens, encodeEmojiTokens,
 import { removeEmojiTrigger, composeEmojiMessage } from "@/lib/chatEmojiComposer";
 import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { useIsDesktop } from "@/lib/useIsDesktop";
+import { setLiveWatching } from "@/lib/presenceActivity";
 import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { useProductIntroPlayer } from "@/lib/useProductIntroPlayer";
 import type { IntroReplayRequest } from "@/lib/productIntro";
@@ -74,6 +75,8 @@ type Props = {
   /** [07:18·07:28 사장님] 사이트 접속 수(최근 2분) — 유튜브 숫자와 같이 모든 손님에게 */
   siteViewers?: number | null;
   showSiteViewers?: boolean;
+  /** [2026-11-12 사장님 22:34] 방송 화면을 지금 열어 둔 사람 수(눈 그림) — 모든 손님 */
+  watchingViewers?: number | null;
   /** 방송 번호 — 인사하기를 방송마다 다시 띄우려고 */
   broadcastId?: string;
   pinned: LiveWatchPinned | null;
@@ -367,9 +370,17 @@ function BarBtn(props: { label: string; badge?: number; badgeRed?: boolean; onCl
   );
 }
 
+function IconEyeSmall({ size = 14, color = "#FFFFFF" }: { size?: number; color?: string }) {
+  return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
+}
+
 export default function LiveWatchView(props: Props) {
   // Live view splits by available width, including unfolded foldables and landscape phones.
   const isDesktop = useIsDesktop(640);
+  // [2026-11-12] 관리자 유튜브 채팅창 나란히 — 넓은 PC(1024↑)에서만
+  const isWidePc = useIsDesktop(1024);
+  // 이 화면이 열려 있는 동안 접속 신호에 «방송 보는 중» 표식(닫히면 다음 신호에서 빠짐)
+  useEffect(() => { setLiveWatching(true); return () => setLiveWatching(false); }, []);
   const { videoId, title, paused, pausedText, pinned, items, cartCount, cartTotalText, orderToasts } = props;
   useEffect(() => {
     if (props.broadcastId && videoId) void loadProductIntroCatalog(props.broadcastId, videoId).catch(() => {});
@@ -980,8 +991,35 @@ export default function LiveWatchView(props: Props) {
   const closeGuide = () => { writeGuideSeen(); setGuideOpen(false); };
 
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
-  const desktopChatWidth = "clamp(280px, 35vw, 560px)";
-  const videoRight = isDesktop && !focus ? desktopChatWidth : 0;
+  // [2026-11-12 사장님 22:34] 관리자(채팅 관리 권한)는 넓은 PC에서 유튜브 채팅창을 사이트 채팅 옆에 나란히 — 두 칸이면 조금 좁게
+  const adminDual = Boolean(isWidePc && chat?.canModerate && videoId);
+  const desktopChatWidth = adminDual ? "clamp(260px, 24vw, 440px)" : "clamp(280px, 35vw, 560px)";
+  const videoRight = isDesktop && !focus ? (adminDual ? `calc(${desktopChatWidth} * 2)` : desktopChatWidth) : 0;
+  const [pageHost, setPageHost] = useState("");
+  useEffect(() => { setPageHost(window.location.hostname); }, []);
+  // [2026-11-12] 관리자 — 숫자 누르면 «지금 방송 보는 사람» 목록(10초마다 새로)
+  const [watchersOpen, setWatchersOpen] = useState(false);
+  const [watchers, setWatchers] = useState<{ state: "loading" | "ready" | "error"; message?: string; total?: number; watching?: number; rows: { key: string; nickname: string; name: string; member: boolean; lastSeenAt: string }[] }>({ state: "loading", rows: [] });
+  useEffect(() => {
+    if (!watchersOpen) return;
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/live-chat/watchers", { cache: "no-store", headers: { ...chatIdentityHeaders() } });
+        const j = await r.json().catch(() => null);
+        if (!alive) return;
+        if (!r.ok || !j?.ok) {
+          setWatchers({ state: "error", message: j?.message || "목록을 읽지 못했어요.", rows: [] });
+          if (r.status === 403) verifyChatAccount();
+          return;
+        }
+        setWatchers({ state: "ready", total: j.total, watching: j.watching, rows: Array.isArray(j.rows) ? j.rows : [] });
+      } catch { if (alive) setWatchers((w) => ({ ...w, state: "error", message: "목록을 읽지 못했어요." })); }
+    };
+    void load();
+    const t = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 10000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, [watchersOpen]);
   // [2026-11-12 사장님] 사이트 상품 카드 켬/끔 — 채팅 관리자만(서버가 다시 확인). 유튜브 위젯·순환은 그대로.
   const cardAdmin = Boolean(chat?.canModerate && props.broadcastId);
   const siteCardOff = cardOffLocal && cardOffLocal.bc === props.broadcastId ? cardOffLocal.off : liveFeatured.siteCardOff;
@@ -1219,26 +1257,15 @@ export default function LiveWatchView(props: Props) {
         {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0 }}>
           {/* [07:05 사장님] LIVE + 시청자 수(유튜브 동시 시청자) — 오늘만셀러처럼 한 알약 */}
-          <span aria-label={props.viewers != null ? `${paused ? "쉬는 중" : "라이브"} · 시청자 ${props.viewers}명` : undefined} style={{ display: "inline-flex", alignItems: "stretch", height: "28px", borderRadius: "9999px", overflow: "hidden", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
+          <span style={{ display: "inline-flex", alignItems: "stretch", height: "28px", borderRadius: "9999px", overflow: "hidden", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 10px", background: paused ? "#707072" : "#D30005" }}>
               <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />{paused ? "쉬는 중" : "LIVE"}
             </span>
-            {props.showSiteViewers ? (
-              // 유튜브 시청자·사이트 접속 둘 다(유튜브 빨간 재생 그림 / 사이트 = 폰 그림) — 모든 손님
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 10px 0 8px", background: "rgba(0,0,0,0.5)" }}>
-                <span aria-label={`유튜브 시청자 ${props.viewers ?? "-"}명`} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  <svg aria-hidden="true" width="16" height="12" viewBox="0 0 16 12"><rect width="16" height="12" rx="3" fill="#FF0000" /><path d="M6.5 3.5v5l4-2.5z" fill="#FFFFFF" /></svg>
-                  {props.viewers != null ? props.viewers.toLocaleString("ko-KR") : "-"}
-                </span>
-                <span aria-label={`사이트 접속 ${props.siteViewers ?? "-"}명`} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  <svg aria-hidden="true" width="12" height="14" viewBox="0 0 12 16" fill="none" stroke="#FFFFFF" strokeWidth="1.8"><rect x="1" y="1" width="10" height="14" rx="2" /><path d="M5 12.5h2" /></svg>
-                  {props.siteViewers != null ? props.siteViewers.toLocaleString("ko-KR") : "-"}
-                </span>
-              </span>
-            ) : props.viewers != null ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "0 10px 0 8px", background: "rgba(0,0,0,0.5)" }}>
-                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
-                {props.viewers.toLocaleString("ko-KR")}
+            {/* [2026-11-12 사장님 22:34] 숫자는 «방송 화면을 지금 보는 사람»만, 눈 그림(모바일·PC 모두) — 유튜브 숫자는 여기서 뺌 */}
+            {props.watchingViewers != null ? (
+              <span aria-label={`방송 보는 사람 ${props.watchingViewers}명`} style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "0 10px 0 8px", background: "rgba(0,0,0,0.5)" }}>
+                <IconEyeSmall />
+                {props.watchingViewers.toLocaleString("ko-KR")}
               </span>
             ) : null}
           </span>
@@ -1317,8 +1344,53 @@ export default function LiveWatchView(props: Props) {
       {/* 13:03 사장님 유튜브 캡처 11장 실측: 유튜브도 채팅 뒤(화면 아래 약 45%)를 위에서 아래로 점점 어둡게 깖
           (흰 털 화면 밝기 206 → 맨 아래 80 ≈ 검정 60%). 채팅 칸 위부터만, 손가락 통과, 집중모드·돌려보기엔 숨김 */}
       <div aria-hidden="true" style={{ display: isDesktop || focus || seekMode ? "none" : "block", position: "absolute", left: 0, right: 0, bottom: 0, height: `calc(${CHAT_HEIGHTS[chatView.height]} + 170px + env(safe-area-inset-bottom))`, background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 30%, rgba(0,0,0,0.45) 65%, rgba(0,0,0,0.6) 100%)", pointerEvents: "none" }} />
+      {/* [2026-11-12 사장님 22:34] 관리자 — 유튜브 채팅창을 사이트 채팅 옆에 나란히(넓은 PC만) */}
+      {adminDual && isDesktop && !focus && pageHost ? (
+        <div data-live-yt-chat-panel="1" style={{ position: "absolute", top: 0, bottom: 0, right: desktopChatWidth, width: desktopChatWidth, display: "flex", flexDirection: "column", borderLeft: "1px solid #333333", background: "#0F0F0F", boxSizing: "border-box", zIndex: 3 }}>
+          <div style={{ flexShrink: 0, padding: "20px 16px 16px", borderBottom: "1px solid #333333", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
+            <span style={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>루루동이 유튜브 채팅창</span>
+            <span aria-label={`유튜브 시청자 ${props.viewers ?? "-"}명`} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 10px", border: "1px solid #444444", borderRadius: "9999px", background: "#1F1F1F", fontSize: "13px", fontWeight: 600 }}>
+              <svg aria-hidden="true" width="16" height="12" viewBox="0 0 16 12"><rect width="16" height="12" rx="3" fill="#FF0000" /><path d="M6.5 3.5v5l4-2.5z" fill="#FFFFFF" /></svg>
+              {props.viewers != null ? props.viewers.toLocaleString("ko-KR") : "-"}
+            </span>
+          </div>
+          <iframe title="루루동이 유튜브 채팅창" src={`https://www.youtube.com/live_chat?v=${encodeURIComponent(videoId)}&embed_domain=${encodeURIComponent(pageHost)}&dark_theme=1`} style={{ flex: 1, minHeight: 0, width: "100%", border: 0, background: "#0F0F0F" }} />
+        </div>
+      ) : null}
+      {watchersOpen ? (
+        <div role="dialog" aria-label="지금 방송 보는 사람" onClick={() => setWatchersOpen(false)} style={{ position: "absolute", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(400px, 100%)", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "#FFFFFF", color: "#111111", borderRadius: "16px", overflow: "hidden" }}>
+            <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #E5E5E5", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "16px", fontWeight: 700 }}>지금 방송 보는 사람 {watchers.watching ?? props.watchingViewers ?? "-"}명</div>
+                <div style={{ fontSize: "13px", color: "#707072", marginTop: "2px" }}>사이트 전체 접속 {watchers.total ?? props.siteViewers ?? "-"}명 · 10초마다 새로</div>
+              </div>
+              <button type="button" onClick={() => setWatchersOpen(false)} style={{ flexShrink: 0, height: "36px", padding: "0 14px", border: "1px solid #E5E5E5", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>닫기</button>
+            </div>
+            <div style={{ overflowY: "auto", padding: "4px 0" }}>
+              {watchers.state === "error" ? <div style={{ padding: "16px", fontSize: "13px", color: "#D30005" }}>{watchers.message}</div>
+                : watchers.state === "loading" && !watchers.rows.length ? <div style={{ padding: "16px", fontSize: "13px", color: "#707072" }}>불러오는 중…</div>
+                : !watchers.rows.length ? <div style={{ padding: "16px", fontSize: "13px", color: "#707072" }}>지금 방송 화면을 보는 사람이 없어요</div>
+                : watchers.rows.map((w) => (
+                  <div key={w.key} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderBottom: "1px solid #F0F0F0", fontSize: "14px" }}>
+                    <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.nickname || "닉네임 없음"}</span>
+                    {w.name ? <span style={{ color: "#707072", whiteSpace: "nowrap" }}>{w.name}</span> : null}
+                    {!w.member ? <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: "12px", color: "#707072" }}>{w.nickname ? "회원 확인 안 됨" : "로그인 전"}</span> : null}
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div data-live-chat-panel="1" data-live-rps-layout={rpsActive ? "1" : "0"} data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : bottomBarHeight === null ? "calc(78px + env(safe-area-inset-bottom))" : `${bottomBarHeight + 4}px`, flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: rpsActive ? rpsOverlayBottom ? `max(0px, calc(100% - ${rpsOverlayBottom + (bottomBarHeight ?? 78) + 16}px))` : "28dvh" : "60dvh" }) }}>
-        {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", fontSize: "16px", fontWeight: 600 }}>실시간 채팅</div> : null}
+        {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
+          <span style={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>루루동이 실시간 채팅</span>
+          {/* [2026-11-12] 관리자 — 방송 보는 중 / 사이트 전체, 누르면 누가 보는지 */}
+          {chat?.canModerate ? <button type="button" onClick={() => setWatchersOpen(true)} aria-label="지금 방송 보는 사람 목록 보기"
+            style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 10px", border: "1px solid #444444", borderRadius: "9999px", background: "#1F1F1F", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>
+            <IconEyeSmall size={14} />{props.watchingViewers ?? "-"}<span style={{ color: "#AAAAAA", fontWeight: 400 }}>· 사이트 {props.siteViewers ?? "-"}</span>
+          </button> : null}
+        </div> : null}
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex", flexShrink: 0 }}>
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
