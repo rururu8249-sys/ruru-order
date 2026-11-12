@@ -155,6 +155,7 @@ const MenuIcon = ({ k }: { k: string }) => {
   if (k === "share") return <svg aria-hidden="true" {...p}><path d="M14 5v4C7 10 4 14 3 20c2.5-3.5 6-5 11-5v4l7-7z" /></svg>;
   if (k === "guide") return <svg aria-hidden="true" {...p}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .6-1.5 1.2-1.5 2.3" /><path d="M12 17h.01" /></svg>;
   if (k === "close") return <svg aria-hidden="true" {...p}><path d="M5 15l7-7 7 7" /></svg>;
+  if (k === "rps") return <svg aria-hidden="true" {...p}><rect x="3" y="7" width="18" height="11" rx="4" /><path d="M7.5 10.5v4M5.5 12.5h4M15 11.5h.01M18 13.5h.01" strokeLinecap="round" /></svg>;
   if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
   return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
 };
@@ -395,6 +396,13 @@ export default function LiveWatchView(props: Props) {
   const [streamDelayMs, setStreamDelayMs] = useState(0);
   const liveFeatured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false, streamDelayMs);
   const [replayListSnapshot, setReplayListSnapshot] = useState<LiveWatchItem[] | null>(null);
+  // [2026-11-12 23:29] 상품을 눌러도 목록은 뒤에 그대로 — 옵션 창을 그냥 닫으면 목록으로 돌아와 다른 상품을 바로 볼 수 있음.
+  //   담으면(장바구니 수가 늘면) 목록을 닫아 방송 화면으로 돌아감.
+  const cartCountSeen = useRef(props.cartCount);
+  useEffect(() => {
+    if (props.cartCount > cartCountSeen.current) setListOpen(false);
+    cartCountSeen.current = props.cartCount;
+  }, [props.cartCount]);
   const openProductList = (mode: "all" | "featured") => {
     setReplayListSnapshot(mode === "featured" && replayFeatured.replay ? [...featured.products] : null);
     setQuery(""); setListMode(mode); setListOpen(true);
@@ -1561,27 +1569,37 @@ export default function LiveWatchView(props: Props) {
         )}
       </div>
 
-      {/* 더보기 — 오늘만셀러처럼 오른쪽 아래에서 위로 펼쳐지는 메뉴 */}
+      {/* 더보기 — [2026-11-12 23:29 사장님 「더보기 메뉴도 그렇고」] 영상 위에 글자만 떠 있어 뒤 화면·인사하기 줄과 겹쳐 읽기 어려웠음
+          → 아래에서 올라오는 어두운 판 + 두 칸 큰 버튼(그림 왼쪽·글자 오른쪽). 손님이 자주 쓰는 것(주문내역·공지)부터. */}
       {moreOpen ? (
-        <div role="dialog" aria-modal="true" aria-label="더보기" onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.55)" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: isDesktop ? undefined : "12px", ...(isDesktop ? { left: `calc((100% - ${videoRight || "0px"}) / 2)`, transform: "translateX(-50%)", width: "328px" } : {}), bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-            {[
-              ...((rps.admin || chat?.canGrant) ? [{ key: 'rps', label: '게임 · 가위바위보', onClick: () => setRpsAdminOpen(true) }] : []),
-              ...(props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지·쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 })),
-              { key: "share", label: "공유하기", onClick: shareLive },
-              { key: "chatview", label: "채팅 설정", onClick: () => setChatViewOpen(true) },
-              { key: "guide", label: "사용 방법", onClick: () => setGuideOpen(true) },
-              ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp }]),
-            ].map((m) => (
-              <button key={m.key} type="button" onClick={() => { setMoreOpen(false); m.onClick(); }} style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "52px", padding: "0 4px 0 16px", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", textShadow: "0 1px 3px rgba(0,0,0,0.7)" }}>
-                <span>{m.label}</span>
-                {"badge" in m && m.badge ? <span aria-label={`새 글 ${m.badge}개`} style={{ minWidth: "22px", height: "22px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, lineHeight: "22px", textAlign: "center", textShadow: "none" }}>{m.badge > 99 ? "99+" : m.badge}</span> : null}
-                <MenuIcon k={m.key} />
+        <div role="dialog" aria-modal="true" aria-label="더보기" onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: isDesktop ? "flex-start" : "center" }}>
+          <div data-live-more-panel onClick={(e) => e.stopPropagation()} style={{ boxSizing: "border-box", width: isDesktop ? "360px" : "100%", maxWidth: "560px", ...(isDesktop ? { marginLeft: `calc((100% - ${videoRight || "0px"}) / 2 - 180px)`, marginBottom: "84px", borderRadius: "16px" } : { borderRadius: "16px 16px 0 0" }), background: "#1C1C1E", color: "#FFFFFF", padding: isDesktop ? "8px 12px 12px" : "8px 12px calc(12px + env(safe-area-inset-bottom))" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: "44px", padding: "0 4px 4px" }}>
+              <span style={{ fontSize: "16px", fontWeight: 700 }}>더보기</span>
+              <button type="button" onClick={() => setMoreOpen(false)} aria-label="더보기 닫기" style={{ width: "44px", height: "44px", marginRight: "-8px", border: "none", background: "transparent", color: "#FFFFFF", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
               </button>
-            ))}
-            <button type="button" onClick={() => setMoreOpen(false)} aria-label="더보기 닫기" style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "52px", padding: "0 4px 0 16px", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
-              <span>닫기</span><MenuIcon k="close" />
-            </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              {(() => {
+                const base = (props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지·쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 }));
+                const rank = (k: string) => { const i = ["orders", "notice", "me", "inquiry"].indexOf(k); return i < 0 ? 9 : i; };
+                return [
+                  ...base.slice().sort((x, y) => rank(x.key) - rank(y.key)),
+                  { key: "guide", label: "주문 방법", onClick: () => setGuideOpen(true), badge: 0 },
+                  { key: "chatview", label: "채팅 글자 크기", onClick: () => setChatViewOpen(true), badge: 0 },
+                  { key: "share", label: "방송 공유", onClick: shareLive, badge: 0 },
+                  ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp, badge: 0 }]),
+                  ...((rps.admin || chat?.canGrant) ? [{ key: "rps", label: "게임 · 가위바위보", onClick: () => setRpsAdminOpen(true), badge: 0 }] : []),
+                ];
+              })().map((m) => (
+                <button key={m.key} type="button" onClick={() => { setMoreOpen(false); m.onClick(); }} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "56px", padding: "0 12px", border: "none", borderRadius: "12px", background: "#2C2C2E", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>
+                  <MenuIcon k={m.key} />
+                  <span style={{ flex: 1, minWidth: 0, wordBreak: "keep-all" }}>{m.label}</span>
+                  {m.badge ? <span aria-label={`새 글 ${m.badge}개`} style={{ flexShrink: 0, minWidth: "22px", height: "22px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, lineHeight: "22px", textAlign: "center" }}>{m.badge > 99 ? "99+" : m.badge}</span> : null}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}
@@ -1739,7 +1757,7 @@ export default function LiveWatchView(props: Props) {
                 <div style={{ padding: "32px 0", textAlign: "center", fontSize: "15px", color: "#707072" }}>{query ? "찾는 상품이 없어요" : buyableOnly ? "지금 구매할 수 있는 상품이 없어요" : listMode === "featured" ? "지금 소개 중인 상품이 없어요. 전체 상품을 확인해 주세요." : "방송 상품이 아직 없어요"}</div>
               ) : listItems.map((it) => { const no = items.findIndex((x) => x.id === it.id) + 1; const showNumber = listMode === "all" && !it.detailName && no > 0; return (
                 <div key={`${it.id}|${it.detailName || ""}`} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "1px solid #E5E5E5" }}>
-                  <button type="button" onClick={() => { if (!it.soldOut) { setListOpen(false); props.onOpenProduct(it.id, it.detailName); } }} aria-label={`${showNumber ? `${no}번 ` : ""}${it.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>
+                  <button type="button" onClick={() => { if (!it.soldOut) props.onOpenProduct(it.id, it.detailName); }} aria-label={`${showNumber ? `${no}번 ` : ""}${it.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>
                     {showNumber ? <span aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, zIndex: 1, minWidth: "22px", height: "20px", padding: "0 5px", boxSizing: "border-box", background: "rgba(0,0,0,0.7)", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{no}</span> : null}
                     {it.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -1751,7 +1769,7 @@ export default function LiveWatchView(props: Props) {
                     <span style={{ fontSize: "15px", fontWeight: 600, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.name}</span>
                     <span style={{ fontSize: "15px", fontWeight: 700 }}>{it.priceText}</span>
                   </div>
-                  <button type="button" disabled={it.soldOut} onClick={() => { setListOpen(false); props.onOpenProduct(it.id, it.detailName); }} style={{ flexShrink: 0, height: "40px", minWidth: "64px", padding: "0 14px", border: "none", borderRadius: "9999px", background: it.soldOut ? "#E5E5E5" : "#111111", color: it.soldOut ? "#707072" : "#FFFFFF", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: it.soldOut ? "default" : "pointer" }}>
+                  <button type="button" disabled={it.soldOut} onClick={() => props.onOpenProduct(it.id, it.detailName)} style={{ flexShrink: 0, height: "40px", minWidth: "64px", padding: "0 14px", border: "none", borderRadius: "9999px", background: it.soldOut ? "#E5E5E5" : "#111111", color: it.soldOut ? "#707072" : "#FFFFFF", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: it.soldOut ? "default" : "pointer" }}>
                     {it.soldOut ? "품절" : "상품 선택"}
                   </button>
                 </div>
@@ -1767,16 +1785,16 @@ export default function LiveWatchView(props: Props) {
           <div style={{ width: "100%", maxWidth: "360px", background: "#FFFFFF", color: "#111111", borderRadius: "16px", padding: "24px 20px 20px" }}>
             <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>방송 보면서 바로 담아요</div>
             {([
-              ["1", <>방송에서 마음에 드는 상품이 나오면</>],
-              ["2", <>왼쪽 아래 <b>상품 사진(숫자)</b>을 누르면 방송 상품이 다 나와요. 그 상품의 「상품 선택」으로 옵션을 골라 담아요</>],
-              ["3", <>담으면 오른쪽 아래 장바구니(숫자)가 생겨요. 눌러서 주문서를 내면 끝</>],
+              ["1", <>방송에서 마음에 드는 상품이 나오면 왼쪽 아래 <b>「상품」</b>을 눌러요</>],
+              ["2", <>그 상품의 <b>「상품 선택」</b>을 누르고 사이즈를 골라 담아요</>],
+              ["3", <>다 담았으면 오른쪽 아래 <b>「주문서」</b>를 눌러 제출하고 입금하면 끝</>],
             ] as [string, ReactNode][]).map(([n, t]) => (
               <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
                 <span aria-hidden="true" style={{ width: "28px", height: "28px", flexShrink: 0, borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{n}</span>
-                <span style={{ fontSize: "16px", lineHeight: 1.5, paddingTop: "2px" }}>{t}</span>
+                <span style={{ fontSize: "16px", lineHeight: 1.5, paddingTop: "2px", wordBreak: "keep-all" }}>{t}</span>
               </div>
             ))}
-            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>소리는 오른쪽 위 스피커, 화면이 멈추면 오른쪽 위 새로고침. ✕ 를 누르면 방송 없이 상품 사진으로 크게 볼 수 있어요.</div>
+            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>소리가 안 나면 오른쪽 위 스피커, 화면이 멈추면 그 옆 둥근 화살표를 눌러요. ✕ 는 방송을 닫고 상품만 봐요.</div>
             <button type="button" onClick={closeGuide} style={{ width: "100%", height: "52px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>시작하기</button>
           </div>
         </div>

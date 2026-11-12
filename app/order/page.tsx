@@ -8314,7 +8314,7 @@ export default function OrderPage() {
                               : { marginTop: "8px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "8px" }}>
                               <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                                 {!readComboInfoOrderProduct(product) && <ProductDiscountLabel tone="v2" note={product.product_note} actualPrice={Number(product.price || 0)} />}
-                                <span style={{ fontSize: listView === "grid" ? "20px" : "19px", fontWeight: 700, color: "#111111", lineHeight: 1.35 }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))} 부터 ~` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
+                                <span style={{ fontSize: listView === "grid" ? "20px" : "19px", fontWeight: 700, color: "#111111", lineHeight: 1.35 }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))}부터` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                                 {lowTextV2 ? <span style={{ fontSize: "14px", fontWeight: 600, color: "#D30005", lineHeight: 1.4 }}>{lowTextV2}</span> : null}
                               </div>
 {listView === "grid" || sold ? null : (
@@ -8333,7 +8333,7 @@ export default function OrderPage() {
                               ? { marginTop: "auto", paddingTop: "6px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px" }
                               : { marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                               {!readComboInfoOrderProduct(product) && <ProductDiscountLabel note={product.product_note} actualPrice={Number(product.price || 0)} />}
-                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))} 부터 ~` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
+                              <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))}부터` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                               <CustomerPressButton
                                 type="button"
                                 disabled={sold}
@@ -9201,13 +9201,13 @@ export default function OrderPage() {
                 {(!registeredOptionComboInfo || registeredOptionDetail) && <ProductDiscountLabel tone={uiV2 ? "v2" : undefined} note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionUnitPrice} detail={registeredOptionDetail} />}
                 {registeredOptionBrandGroup && registeredOptionDetail ? <span style={sv({ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "#8A8A8A" })}>{registeredOptionBrandGroup.brandKo} ·</span> : null}
                 {/* [2026-11-08] 브랜드 고르기 단계: 「세부상품 N가지 · 최저가 …」 한 줄(13/600 회색)을 빨간 안내 «위»에 */}
-                {registeredOptionBrandPickStage && registeredOptionComboInfo ? <span style={{ order: -1, flexBasis: "100%", fontSize: "13px", fontWeight: 600, color: "#707072", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>세부상품 {registeredOptionComboInfo.names.length}가지 · 최저가 {won(registeredOptionPrice)} 부터 ~</span> : null}
+                {registeredOptionBrandPickStage && registeredOptionComboInfo ? <span style={{ order: -1, flexBasis: "100%", fontSize: "13px", fontWeight: 600, color: "#707072", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>세부상품 {registeredOptionComboInfo.names.length}가지 · 최저가 {won(registeredOptionPrice)}부터</span> : null}
                 {registeredOptionBrandPickStage ? null : <span style={sv({ flexShrink: 0, fontSize: "15px", fontWeight: 800, color: "#7A1E47" })}>
                         {registeredOptionComboInfo
                           ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
                             ? won(registeredOptionUnitPrice)
                             : registeredOptionComboInfo.maxPlus > 0
-                              ? registeredOptionBrandGroup ? `최저가 ${won(registeredOptionPrice)} 부터 ~` : won(registeredOptionPrice) + "~"
+                              ? registeredOptionBrandGroup ? `최저가 ${won(registeredOptionPrice)}부터` : won(registeredOptionPrice) + "~"
                               : won(registeredOptionPrice)
                           : registeredOptionPrice > 0
                             ? won(registeredOptionPrice)
@@ -9246,7 +9246,8 @@ export default function OrderPage() {
                 {optionNoticePresentation.message}
               </div>
             ) : null}</>}
-            footer={(
+            // [2026-11-12 23:29] 브랜드 묶음에서 세부상품을 고르기 전엔 아래 칸(「세부상품을 먼저 선택」·수량 —)이 쓸모없이 목록을 가렸음 → 담은 게 없으면 숨김(새 모양만)
+            footer={uiV2 && registeredOptionBrandPickStage && registeredOptionBrandCartEntries.length === 0 ? undefined : (
               <>
                 {registeredOptionBrandCartEntries.length > 0 ? (
                   <section style={sv({ flexShrink: 0, maxHeight: "138px", overflowY: "auto", borderTop: "1px solid #D8EADF", background: "#F3FBF7", padding: "9px 14px" })}>
@@ -9516,7 +9517,7 @@ export default function OrderPage() {
                           <input
                             value={registeredOptionComboSearch}
                             onChange={(e) => setRegisteredOptionComboSearch(e.target.value)}
-                            placeholder="브랜드·이름으로 검색 (예: 샤넬, 탐다오)"
+                            placeholder="상품번호·이름 검색 (예: 509, 블랙)"
                             style={sv({ height: "44px", width: "100%", boxSizing: "border-box", borderRadius: "12px", border: "1.5px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "14px", fontWeight: 700, color: "#222", outline: "none" })}
                           />
                           {registeredOptionComboSearch.trim() ? (
