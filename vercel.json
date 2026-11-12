@@ -119,6 +119,11 @@
       "regions": [
         "sin1"
       ]
+    },
+    "app/api/customer-orders/submit/route.ts": {
+      "regions": [
+        "sin1"
+      ]
     }
   },
   "crons": [
