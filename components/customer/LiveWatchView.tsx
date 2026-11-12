@@ -1669,8 +1669,9 @@ export default function LiveWatchView(props: Props) {
 
       {/* 채팅 안내(보냄 실패·금지 등) */}
       {chatHint ? (
-        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
-          <span style={{ padding: "8px 14px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 600 }}>{chatHint}</span>
+        <div role="status" style={{ position: "absolute", left: "16px", right: videoRight ? `calc(${videoRight} + 16px)` : "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
+          {/* [2026-11-13 사장님] PC 는 오른쪽 채팅 칸(관리자는 두 칸)에 가려 글이 잘리던 것 → 영상 칸 안에서만 가운데, 길면 줄바꿈 */}
+          <span style={{ maxWidth: "100%", boxSizing: "border-box", padding: "8px 14px", borderRadius: "20px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, lineHeight: 1.4, textAlign: "center", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{chatHint}</span>
         </div>
       ) : null}
 
