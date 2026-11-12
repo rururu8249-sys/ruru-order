@@ -26,6 +26,7 @@ import {
 } from "@/lib/liveWatch";
 import { isKakaoInAppBrowser } from "@/lib/youtubeChannelLink";
 import { openOrderInExternalBrowser } from "@/components/customer/KakaoExternalOpen";
+import { useCustomerOverlayClose } from "@/components/customer/CustomerBottomSheet";
 import { parseBotRef } from "@/lib/liveChatBot";
 import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 import { EMOJI_MAX_PER_MSG, chatBodyAsText, countEmojiTokens, encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
@@ -399,10 +400,24 @@ export default function LiveWatchView(props: Props) {
   // [2026-11-12 23:29] 상품을 눌러도 목록은 뒤에 그대로 — 옵션 창을 그냥 닫으면 목록으로 돌아와 다른 상품을 바로 볼 수 있음.
   //   담으면(장바구니 수가 늘면) 목록을 닫아 방송 화면으로 돌아감.
   const cartCountSeen = useRef(props.cartCount);
+  const listOpenRef = useRef(false);
+  useEffect(() => { listOpenRef.current = listOpen; }, [listOpen]);
   useEffect(() => {
-    if (props.cartCount > cartCountSeen.current) setListOpen(false);
+    if (props.cartCount > cartCountSeen.current) {
+      if (listOpenRef.current) setListLinger(true);
+      setListOpen(false);
+    }
     cartCountSeen.current = props.cartCount;
   }, [props.cartCount]);
+  // [2026-11-13 사장님 「상품 목록 불편한 점」] 폰 «뒤로» → 사이트에서 나가지 말고 상품 목록만 닫힘(옵션 창과 같은 방문 기록 규칙).
+  //   담아서 닫힐 땐 옵션 창이 자기 기록을 먼저 치우도록 0.5초 뒤에 목록 기록을 치움(빈 기록이 남아 뒤로를 두 번 누르는 일 방지).
+  const [listLinger, setListLinger] = useState(false);
+  useEffect(() => {
+    if (!listLinger) return;
+    const t = window.setTimeout(() => setListLinger(false), 500);
+    return () => window.clearTimeout(t);
+  }, [listLinger]);
+  useCustomerOverlayClose({ open: listOpen || listLinger, onClose: () => { setListOpen(false); setListLinger(false); } });
   // [2026-11-12] 빈 주문서 「방송 상품 보기」 → 상품 목록 열기
   useEffect(() => {
     const open = () => { setQuery(""); setListMode("all"); setListOpen(true); };
@@ -1746,7 +1761,7 @@ export default function LiveWatchView(props: Props) {
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="상품명 검색"
+                placeholder="상품번호·이름 검색 (예: 509)"
                 aria-label="방송 상품 찾기"
                 style={{ flex: 1, minWidth: 0, boxSizing: "border-box", height: "48px", padding: "0 16px", border: "1px solid #E5E5E5", borderRadius: "9999px", fontSize: "16px", fontFamily: "inherit", outline: "none", color: "#111111", background: "#FFFFFF" }}
               />
@@ -1762,8 +1777,8 @@ export default function LiveWatchView(props: Props) {
               {listItems.length === 0 ? (
                 <div style={{ padding: "32px 0", textAlign: "center", fontSize: "15px", color: "#707072" }}>{query ? "찾는 상품이 없어요" : buyableOnly ? "지금 구매할 수 있는 상품이 없어요" : listMode === "featured" ? "지금 소개 중인 상품이 없어요. 전체 상품을 확인해 주세요." : "방송 상품이 아직 없어요"}</div>
               ) : listItems.map((it) => { const no = items.findIndex((x) => x.id === it.id) + 1; const showNumber = listMode === "all" && !it.detailName && no > 0; return (
-                <div key={`${it.id}|${it.detailName || ""}`} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "1px solid #E5E5E5" }}>
-                  <button type="button" onClick={() => { if (!it.soldOut) props.onOpenProduct(it.id, it.detailName); }} aria-label={`${showNumber ? `${no}번 ` : ""}${it.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>
+                <div key={`${it.id}|${it.detailName || ""}`} onClick={() => { if (!it.soldOut) props.onOpenProduct(it.id, it.detailName); }} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "1px solid #E5E5E5", cursor: it.soldOut ? "default" : "pointer" }}>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); if (!it.soldOut) props.onOpenProduct(it.id, it.detailName); }} aria-label={`${showNumber ? `${no}번 ` : ""}${it.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>
                     {showNumber ? <span aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, zIndex: 1, minWidth: "22px", height: "20px", padding: "0 5px", boxSizing: "border-box", background: "rgba(0,0,0,0.7)", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{no}</span> : null}
                     {it.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -1775,7 +1790,7 @@ export default function LiveWatchView(props: Props) {
                     <span style={{ fontSize: "15px", fontWeight: 600, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.name}</span>
                     <span style={{ fontSize: "15px", fontWeight: 700 }}>{it.priceText}</span>
                   </div>
-                  <button type="button" disabled={it.soldOut} onClick={() => props.onOpenProduct(it.id, it.detailName)} style={{ flexShrink: 0, height: "40px", minWidth: "64px", padding: "0 14px", border: "none", borderRadius: "9999px", background: it.soldOut ? "#E5E5E5" : "#111111", color: it.soldOut ? "#707072" : "#FFFFFF", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: it.soldOut ? "default" : "pointer" }}>
+                  <button type="button" disabled={it.soldOut} onClick={(e) => { e.stopPropagation(); props.onOpenProduct(it.id, it.detailName); }} style={{ flexShrink: 0, height: "40px", minWidth: "64px", padding: "0 14px", border: "none", borderRadius: "9999px", background: it.soldOut ? "#E5E5E5" : "#111111", color: it.soldOut ? "#707072" : "#FFFFFF", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: it.soldOut ? "default" : "pointer" }}>
                     {it.soldOut ? "품절" : "상품 선택"}
                   </button>
                 </div>
