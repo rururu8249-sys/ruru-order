@@ -1,7 +1,7 @@
 "use client";
 /**
  * [2026-11-13 사장님] 관리자 PC 사이트 채팅 «자주 쓰는 말».
- *   채팅 입력칸 위 한 줄(번호 칩) — 누르거나 Alt(맥 Option)+숫자 → 입력칸에 들어감(보내기는 Enter, 저절로 안 보냄).
+ *   영상 칸 왼쪽 아래 판(11/13 08:16 「채팅창 위라 보기 힘들다·왼쪽 빈 곳 써라」) — 말을 누르거나 Alt(맥 Option)+숫자 → 입력칸에 들어감(보내기는 Enter, 저절로 안 보냄).
  *   「편집」 = 말 넣기·고치기·지우기·순서. 저장은 서버(관리자·채팅 관리자만) — 다른 PC 에서도 같은 목록.
  */
 import { useEffect, useRef, useState } from "react";
@@ -9,14 +9,23 @@ import { createPortal } from "react-dom";
 import { chatIdentityHeaders } from "@/lib/useLiveChatPrivate";
 import { DEFAULT_QUICK_PHRASES, QUICK_PHRASES_MAX, QUICK_PHRASE_MAX_LEN, cleanQuickPhrases, quickPhraseIndexFromKey } from "@/lib/liveChatQuickPhrases";
 
-export default function ChatQuickPhrases({ onPick, disabled }: { onPick: (phrase: string) => void; disabled?: boolean }) {
+const MODE_KEY = "ruru_quick_phrases_mode_v1"; // 누르면 사이트 채팅칸에 넣을지, 복사할지(편의값)
+const OPEN_KEY = "ruru_quick_phrases_open_v1"; // 이 PC 에서 접어 뒀는지만(편의값)
+export default function ChatQuickPhrases({ onPick, onNotice, disabled, right }: { onPick: (phrase: string) => void; onNotice?: (message: string) => void; disabled?: boolean; right?: string | number }) {
+  const [open, setOpen] = useState(() => { try { return typeof window === "undefined" || localStorage.getItem(OPEN_KEY) !== "0"; } catch { return true; } });
+  const [mode, setMode] = useState<"site" | "copy">(() => { try { return typeof window !== "undefined" && localStorage.getItem(MODE_KEY) === "copy" ? "copy" : "site"; } catch { return "site"; } });
+  const pickMode = (next: "site" | "copy") => { setMode(next); try { localStorage.setItem(MODE_KEY, next); } catch {} };
+  const toggle = (next: boolean) => { setOpen(next); try { localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch {} };
+  const copy = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); onNotice?.("복사했어요. 유튜브 채팅칸을 누르고 붙여넣기(⌘V · Ctrl+V) 하세요"); }
+    catch { onNotice?.("복사하지 못했어요. 다시 눌러 주세요"); }
+  };
   const [phrases, setPhrases] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
-  const live = useRef({ phrases, onPick, disabled, editing: false });
-  useEffect(() => { live.current = { phrases, onPick, disabled, editing: editing !== null }; });
+  const live = useRef({ phrases, use: (() => {}) as (p: string) => void, disabled, editing: false });
 
   useEffect(() => {
     let alive = true;
@@ -34,7 +43,7 @@ export default function ChatQuickPhrases({ onPick, disabled }: { onPick: (phrase
       const cur = live.current;
       if (i < 0 || cur.editing || cur.disabled || e.isComposing || !cur.phrases[i]) return;
       e.preventDefault();
-      cur.onPick(cur.phrases[i]);
+      cur.use(cur.phrases[i]);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -58,23 +67,45 @@ export default function ChatQuickPhrases({ onPick, disabled }: { onPick: (phrase
     const next = [...list]; [next[i], next[j]] = [next[j], next[i]]; return next;
   });
 
+  const use = (p: string) => { if (mode === "copy") void copy(p); else onPick(p); };
+  useEffect(() => { live.current = { phrases, use, disabled, editing: editing !== null }; });
   if (!loaded) return null;
-  const small = { height: "28px", padding: "0 10px", border: "1px solid #555555", borderRadius: "9999px", background: "transparent", color: "#DDDDDD", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 } as const;
+  const small = { height: "32px", padding: "0 12px", border: "1px solid #555555", borderRadius: "9999px", background: "transparent", color: "#DDDDDD", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 } as const;
+  const rightCss = typeof right === "number" ? `${right}px` : right || "0px"; // 세로 영상 옆 검은 여백 폭에 맞춤(좁으면 196px 로 영상 가장자리를 살짝 덮음)
+  const openEdit = () => { setNote(""); setEditing(phrases.length ? [...phrases] : [""]); };
+  // 영상 칸 왼쪽 아래(검은 여백)에 떠 있는 판. 접으면 작은 버튼만.
+  const wrap = { position: "absolute", left: "12px", bottom: "calc(96px + env(safe-area-inset-bottom))", zIndex: 3, pointerEvents: "auto" } as const;
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", margin: "0 0 8px", minWidth: 0 }}>
-        <div data-live-scroll style={{ flex: 1, minWidth: 0, display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none" }}>
-          {phrases.length === 0 ? <span style={{ fontSize: "13px", color: "#AAAAAA", lineHeight: "28px", whiteSpace: "nowrap" }}>자주 쓰는 말을 넣어 두면 한 번에 써요</span> : null}
-          {phrases.map((p, i) => (
-            <button key={p} type="button" disabled={disabled} title={i < 9 ? `${p}\n(Alt+${i + 1})` : p} onClick={() => onPick(p)}
-              style={{ ...small, maxWidth: "180px", display: "flex", alignItems: "center", gap: "6px", background: "#272727", color: "#FFFFFF", fontWeight: 500 }}>
-              {i < 9 ? <span aria-hidden style={{ flexShrink: 0, color: "#AAAAAA", fontSize: "13px", fontWeight: 700 }}>{i + 1}</span> : null}
-              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={() => { setNote(""); setEditing(phrases.length ? [...phrases] : [""]); }} style={small} aria-label="자주 쓰는 말 편집">편집</button>
-      </div>
+      {!open ? (
+        <button type="button" data-live-quick-phrases="closed" onClick={() => toggle(true)} style={{ ...wrap, ...small, height: "40px", background: "rgba(15,15,15,0.86)", color: "#FFFFFF" }}>자주 쓰는 말 {phrases.length}</button>
+      ) : (
+        <section data-live-quick-phrases="open" aria-label="자주 쓰는 말" onClick={(e) => e.stopPropagation()}
+          style={{ ...wrap, width: `clamp(196px, calc((100vw - ${rightCss} - 100dvh * 0.5625) / 2 - 24px), 300px)`, maxHeight: "calc(100% - 200px)", display: "flex", flexDirection: "column", background: "rgba(15,15,15,0.9)", border: "1px solid #333333", borderRadius: "12px", color: "#FFFFFF", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 10px 8px", flexShrink: 0 }}>
+            <strong style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap" }}>자주 쓰는 말</strong>
+            <button type="button" onClick={openEdit} style={{ ...small, padding: "0 8px" }} aria-label="자주 쓰는 말 편집">편집</button>
+            <button type="button" onClick={() => toggle(false)} style={{ ...small, padding: "0 8px" }} aria-label="자주 쓰는 말 접기">접기</button>
+          </div>
+          <div role="group" aria-label="누르면 어디에 쓸지" style={{ display: "flex", gap: "4px", margin: "0 8px 8px", padding: "4px", borderRadius: "10px", background: "#272727", flexShrink: 0 }}>
+            {([["site", "사이트 채팅"], ["copy", "유튜브(복사)"]] as const).map(([k, label]) => (
+              <button key={k} type="button" aria-pressed={mode === k} onClick={() => pickMode(k)}
+                style={{ flex: 1, minWidth: 0, height: "32px", border: "none", borderRadius: "8px", background: mode === k ? "#FFFFFF" : "transparent", color: mode === k ? "#0F0F0F" : "#CCCCCC", fontSize: "13px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>{label}</button>
+            ))}
+          </div>
+          <div data-live-scroll style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+            {phrases.length === 0 ? <div style={{ padding: "8px 4px", fontSize: "13px", color: "#AAAAAA", lineHeight: 1.5 }}>「편집」에서 자주 쓰는 말을 넣어 두세요.</div> : null}
+            {phrases.map((p, i) => (
+              <button key={p} type="button" disabled={disabled && mode === "site"} onClick={() => use(p)} title={i < 9 ? `Alt+${i + 1}` : undefined}
+                style={{ minHeight: "44px", display: "flex", alignItems: "flex-start", gap: "8px", padding: "10px", border: "1px solid #3A3A3A", borderRadius: "8px", background: "#272727", color: "#FFFFFF", fontSize: "14px", fontWeight: 500, lineHeight: 1.45, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>
+                {i < 9 ? <span aria-hidden style={{ flexShrink: 0, width: "18px", height: "18px", marginTop: "1px", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "13px", fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{i + 1}</span> : null}
+                <span style={{ minWidth: 0, wordBreak: "keep-all", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p}</span>
+              </button>
+            ))}
+          </div>
+          <div style={{ padding: "8px 12px 10px", borderTop: "1px solid #333333", fontSize: "13px", color: "#AAAAAA", lineHeight: 1.5, flexShrink: 0, wordBreak: "keep-all" }}>{mode === "copy" ? "누르면 복사돼요. 유튜브 채팅칸을 누르고 붙여넣기 하세요." : "누르면 사이트 채팅칸에 들어가요. Enter 로 보내요."}</div>
+        </section>
+      )}
       {editing ? createPortal(
         <div role="dialog" aria-label="자주 쓰는 말 편집" onClick={(e) => { if (e.target === e.currentTarget && !saving) setEditing(null); }}
           onKeyDown={(e) => { if (e.key === "Escape" && !saving) { e.stopPropagation(); setEditing(null); } }}
@@ -82,7 +113,7 @@ export default function ChatQuickPhrases({ onPick, disabled }: { onPick: (phrase
           <div style={{ width: "100%", maxWidth: "520px", maxHeight: "86vh", display: "flex", flexDirection: "column", background: "#FFFFFF", borderRadius: "16px", color: "#111111", overflow: "hidden" }}>
             <div style={{ padding: "16px 16px 8px", flexShrink: 0 }}>
               <div style={{ fontSize: "17px", fontWeight: 700 }}>자주 쓰는 말</div>
-              <div style={{ marginTop: "4px", fontSize: "13px", color: "#707072", lineHeight: 1.5 }}>누르거나 Alt(맥은 Option)+숫자를 누르면 채팅 입력칸에 들어가요. 보내기는 Enter 예요.</div>
+              <div style={{ marginTop: "4px", fontSize: "13px", color: "#707072", lineHeight: 1.5 }}>말을 누르거나 Alt(맥은 Option)+숫자를 누르면 써져요. 「사이트 채팅」이면 입력칸에 들어가고, 「유튜브(복사)」면 복사돼요.</div>
             </div>
             <div data-live-scroll style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
               {editing.map((p, i) => (

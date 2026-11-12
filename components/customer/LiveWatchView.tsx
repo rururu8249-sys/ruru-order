@@ -1136,7 +1136,6 @@ export default function LiveWatchView(props: Props) {
                 </button>
               </div>
             ) : null}
-            {isDesktop && chat?.canModerate && !productPickerOpen ? <ChatQuickPhrases disabled={sending} onPick={(phrase) => { setEmojiOpen(false); setDraft((d) => insertQuickPhrase(d, phrase, LIVE_CHAT_MAX_LEN)); requestAnimationFrame(() => { const el = inputRef.current; if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} rememberCaret(el); } }); }} /> : null}
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <div style={{ flex: 1, minWidth: 0, height: "48px", boxSizing: "border-box", border: isDesktop ? "1px solid #555555" : "1px solid #E5E5E5", borderRadius: "9999px", display: "flex", alignItems: "center", background: isDesktop ? "#272727" : "#FFFFFF" }}>
                 <input
@@ -1669,6 +1668,9 @@ export default function LiveWatchView(props: Props) {
           </div>
         </div>
       ) : null}
+
+      {/* 관리자 PC — 자주 쓰는 말(영상 칸 왼쪽 아래) */}
+      {isDesktop && chat?.canModerate && !focus ? <ChatQuickPhrases disabled={sending} right={videoRight} onNotice={setChatHint} onPick={(phrase) => { setEmojiOpen(false); setDraft((d) => insertQuickPhrase(d, phrase, LIVE_CHAT_MAX_LEN)); requestAnimationFrame(() => { const el = inputRef.current; if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} rememberCaret(el); } }); }} /> : null}
 
       {/* 채팅 안내(보냄 실패·금지 등) */}
       {chatHint ? (
