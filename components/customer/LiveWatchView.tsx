@@ -1792,7 +1792,7 @@ export default function LiveWatchView(props: Props) {
             <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>방송 보면서 바로 담아요</div>
             {([
               ["1", <>방송에서 마음에 드는 상품이 나오면 왼쪽 아래 <b>「상품」</b>을 눌러요</>],
-              ["2", <>그 상품의 <b>「상품 선택」</b>을 누르고 원하는 옵션을 고르거나 적어서 담아요</>],
+              ["2", <>그 상품의 <b>「상품 선택」</b>을 누르고 원하는 옵션을 고르거나 직접 작성하여 담아요</>],
               ["3", <>다 담았으면 오른쪽 아래 <b>「주문서」</b>를 눌러 제출하고 입금하면 끝</>],
             ] as [string, ReactNode][]).map(([n, t]) => (
               <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
