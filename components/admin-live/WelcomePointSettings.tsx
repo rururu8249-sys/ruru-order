@@ -3,6 +3,7 @@
 //   처음 오신 선물(결제한 적 없는 손님) / 다시 오신 선물(N일 넘게 안 산 손님) 켬·끔·금액, 몇 초 보면, 하루 최대 인원.
 //   저장 = /api/admin-live/welcome-point(관리자만, 비공개 저장소). 지급 자체는 손님 화면 → 서버가 조건 확인 후 기존 포인트 지급 RPC.
 import { useEffect, useState } from "react";
+import WelcomeRecipientList from "@/components/admin-live/WelcomeRecipientList";
 import { WELCOME_LIMITS, WELCOME_POINT_DEFAULT, type WelcomePointConfig } from "@/lib/welcomePoint";
 
 function Switch({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
@@ -35,6 +36,7 @@ export default function WelcomePointSettings() {
   const [today, setToday] = useState<number | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "saving" | "error">("loading");
   const [msg, setMsg] = useState("");
+  const [showList, setShowList] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin-live/welcome-point", { cache: "no-store" })
@@ -102,6 +104,11 @@ export default function WelcomePointSettings() {
           {dirty ? <button type="button" onClick={() => void save()} disabled={busy} className="h-9 shrink-0 rounded-lg bg-ink px-4 text-[13px] font-bold text-white disabled:opacity-50">{state === "saving" ? "저장 중…" : "저장"}</button> : null}
         </div>
       ) : null}
+      <button type="button" onClick={() => setShowList((v) => !v)} aria-expanded={showList}
+        className="h-9 justify-self-start text-[13px] font-bold text-ink underline underline-offset-2">
+        {showList ? "선물 받은 사람 닫기" : "선물 받은 사람 · 그중 주문한 사람 보기"}
+      </button>
+      {showList ? <WelcomeRecipientList /> : null}
     </div>
   );
 }

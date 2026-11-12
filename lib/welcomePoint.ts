@@ -109,3 +109,48 @@ export function welcomeHelpLines(kind: WelcomeKind, amount: number, watchSec: nu
     ],
   };
 }
+
+// ── 선물 받은 사람 목록(관리자) — 선물 뒤 주문했는지 «읽기만» 판정 ──
+export type WelcomeOrderRow = {
+  id?: unknown; order_group_id?: unknown; kakao_id?: unknown; customer_phone?: unknown; created_at?: unknown;
+  admin_order_status_v2?: unknown; order_manage_status?: unknown; is_test_order?: unknown; is_deleted?: unknown; final_amount?: unknown;
+};
+export type WelcomeOrderResult = { orders: number; paidOrders: number; paidAmount: number };
+
+/** 선물(시각·카카오 계정·전화) 뒤에 들어온 주문서 수·결제완료 주문서 수·결제완료 금액. 취소·테스트·삭제 줄은 뺌. 표시 전용. */
+export function welcomeOrderResult(
+  gift: { at: string; kakaoId: string; phone: string },
+  orders: WelcomeOrderRow[],
+  paidStatuses: Set<string>,
+): WelcomeOrderResult {
+  const t = Date.parse(gift.at);
+  const k = String(gift.kakaoId || "").trim();
+  const p = String(gift.phone || "").replace(/[^0-9]/g, "");
+  const groups = new Map<string, boolean>();
+  let paidAmount = 0;
+  for (const o of orders) {
+    if (o.is_deleted === true || o.is_test_order === true) continue;
+    const at = Date.parse(String(o.created_at ?? ""));
+    if (!Number.isFinite(t) || !Number.isFinite(at) || at < t) continue;
+    const ok = String(o.kakao_id ?? "").trim();
+    const op = String(o.customer_phone ?? "").replace(/[^0-9]/g, "");
+    const mine = (k && ok === k) || (p.length >= 9 && op === p);
+    if (!mine) continue;
+    const a = String(o.admin_order_status_v2 ?? "").trim();
+    const b = String(o.order_manage_status ?? "").trim();
+    if (a.includes("취소") || b.includes("취소")) continue;
+    const paid = paidStatuses.has(a) || paidStatuses.has(b);
+    const key = String(o.order_group_id || `o${o.id}`);
+    groups.set(key, (groups.get(key) ?? false) || paid);
+    if (paid) { const n = Number(o.final_amount); if (Number.isFinite(n) && n > 0) paidAmount += n; }
+  }
+  let paidOrders = 0;
+  for (const v of groups.values()) if (v) paidOrders++;
+  return { orders: groups.size, paidOrders, paidAmount: Math.round(paidAmount) };
+}
+
+/** source_key 에서 선물 종류·회원 id */
+export function parseWelcomeSourceKey(key: unknown): { kind: WelcomeKind; customerId: string } | null {
+  const m = /^welcome_(first|back):([^:]+)/.exec(String(key ?? ""));
+  return m ? { kind: m[1] as WelcomeKind, customerId: m[2] } : null;
+}

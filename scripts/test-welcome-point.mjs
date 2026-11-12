@@ -202,3 +202,70 @@ fresh(); { const w = world({ cfg: { ...ON, first: { on: true, amount: 5000000 } 
 fresh();
 
 console.log("welcome-point OK");
+
+// ── 선물 받은 사람 목록: 선물 뒤 주문 판정(읽기 전용 표시) ──
+{
+  const PAIDSET = new Set(["입금확인", "카드결제완료", "출고완료"]);
+  const gift = { at: "2026-11-12T05:00:00Z", kakaoId: "k1", phone: "01012345678" };
+  const rows = [
+    { id: 1, order_group_id: "G0", kakao_id: "k1", created_at: "2026-11-12T04:00:00Z", admin_order_status_v2: "입금확인", final_amount: 9999 }, // 선물 전 → 뺌
+    { id: 2, order_group_id: "G1", kakao_id: "k1", created_at: "2026-11-12T06:00:00Z", admin_order_status_v2: "입금확인", final_amount: 30000 },
+    { id: 3, order_group_id: "G1", kakao_id: "k1", created_at: "2026-11-12T06:00:01Z", admin_order_status_v2: "입금확인", final_amount: 20000 },
+    { id: 4, order_group_id: "G2", customer_phone: "010-1234-5678", created_at: "2026-11-12T07:00:00Z", admin_order_status_v2: "미입금", final_amount: 10000 },
+    { id: 5, order_group_id: "G3", kakao_id: "k1", created_at: "2026-11-12T08:00:00Z", admin_order_status_v2: "주문취소", final_amount: 5000 },
+    { id: 6, order_group_id: "G4", kakao_id: "k1", created_at: "2026-11-12T08:00:00Z", admin_order_status_v2: "입금확인", is_test_order: true, final_amount: 5000 },
+    { id: 7, order_group_id: "G5", kakao_id: "other", customer_phone: "01099998888", created_at: "2026-11-12T08:00:00Z", admin_order_status_v2: "입금확인", final_amount: 5000 },
+  ];
+  assert.deepEqual(W.welcomeOrderResult(gift, rows, PAIDSET), { orders: 2, paidOrders: 1, paidAmount: 50000 });
+  assert.deepEqual(W.welcomeOrderResult(gift, [], PAIDSET), { orders: 0, paidOrders: 0, paidAmount: 0 });
+  assert.deepEqual(W.parseWelcomeSourceKey("welcome_back:abc-1:G9"), { kind: "back", customerId: "abc-1" });
+  assert.deepEqual(W.parseWelcomeSourceKey("welcome_first:xyz"), { kind: "first", customerId: "xyz" });
+  assert.equal(W.parseWelcomeSourceKey("event_x:1"), null);
+  console.log("ok 선물 받은 사람 목록 판정");
+}
+
+// ── 목록 서버 함수(가짜 DB, 읽기만) ──
+{
+  const tables = {
+    customer_point_ledger: [
+      { id: "L1", customer_phone: "01012345678", youtube_nickname: "루*동이", customer_name: "", amount: 1000, source_key: "welcome_first:c1", created_at: "2026-11-12T05:00:00Z" },
+      { id: "L2", customer_phone: "01055556666", youtube_nickname: "", customer_name: "", amount: 1000, source_key: "welcome_back:c2:G7", created_at: "2026-11-12T06:00:00Z" },
+      { id: "X", customer_phone: "01055556666", amount: 500, source_key: "event:1", created_at: "2026-11-12T06:00:00Z" },
+    ],
+    customers: [{ id: "c1", kakao_id: "k1", youtube_nickname: "루루", customer_name: "가" }, { id: "c2", kakao_id: "k2", youtube_nickname: "나무", customer_name: "나" }],
+    orders: [
+      { id: 1, order_group_id: "G1", kakao_id: "k1", customer_phone: "01012345678", created_at: "2026-11-12T06:00:00Z", admin_order_status_v2: "입금확인", final_amount: 30000 },
+      { id: 2, order_group_id: "G2", kakao_id: "k2", customer_phone: "01055556666", created_at: "2026-11-12T07:00:00Z", admin_order_status_v2: "미입금", final_amount: 10000 },
+    ],
+  };
+  const writes = [];
+  const q = (name) => {
+    let list = [...tables[name]]; let counted = false;
+    const api = {
+      select(_c, o) { counted = !!o?.count; return api; },
+      like(col, pat) { const pre = pat.replace(/%$/, ""); list = list.filter((r) => String(r[col] ?? "").startsWith(pre)); return api; },
+      gte(col, v) { list = list.filter((r) => String(r[col]) >= v); return api; },
+      in(col, vs) { list = list.filter((r) => vs.includes(r[col])); return api; },
+      or() { return api; },
+      order(col, o) { list.sort((a, b) => (String(a[col]) < String(b[col]) ? -1 : 1) * (o?.ascending === false ? -1 : 1)); return api; },
+      range(a, b) { const total = list.length; return Promise.resolve({ data: list.slice(a, b + 1), error: null, count: counted ? total : null }); },
+      then(res) { return res({ data: list, error: null }); },
+      insert() { writes.push(name); return api; }, update() { writes.push(name); return api; },
+    };
+    return api;
+  };
+  const sb = { from: q, rpc() { writes.push("rpc"); } };
+  const page1 = await S.listWelcomeRecipients(sb, 1, 1);
+  assert.equal(page1.total, 2);
+  assert.equal(page1.rows.length, 1);
+  assert.equal(page1.rows[0].id, "L2");
+  assert.equal(page1.rows[0].kind, "back");
+  assert.equal(page1.rows[0].nickname, "나무"); // 장부에 없으면 회원 표
+  assert.equal(page1.rows[0].orders, 1); assert.equal(page1.rows[0].paidOrders, 0);
+  const page2 = await S.listWelcomeRecipients(sb, 2, 1);
+  assert.equal(page2.rows[0].id, "L1"); assert.equal(page2.rows[0].paidAmount, 30000); assert.equal(page2.rows[0].phoneTail, "5678");
+  const sum = await S.summarizeWelcome(sb, Date.parse("2026-11-12T09:00:00Z"));
+  assert.deepEqual({ g: sum.gifts, p: sum.points, o: sum.ordered, paid: sum.paid, amt: sum.paidAmount }, { g: 2, p: 2000, o: 2, paid: 1, amt: 30000 });
+  assert.deepEqual(writes, []); // 쓰기 0
+  console.log("ok 목록·요약 서버 함수(쓰기 0)");
+}

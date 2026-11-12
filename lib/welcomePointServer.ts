@@ -5,7 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import {
-  decideWelcome, kstDayStartIso, parseWelcomePointConfig, WELCOME_POINT_DEFAULT, WELCOME_REASON,
+  decideWelcome, kstDayStartIso, parseWelcomePointConfig, parseWelcomeSourceKey, WELCOME_POINT_DEFAULT, WELCOME_REASON,
+  welcomeOrderResult, type WelcomeOrderRow,
   type PaidHistory, type WelcomeDecision, type WelcomeKind, type WelcomePointConfig,
 } from "@/lib/welcomePoint";
 
@@ -185,4 +186,95 @@ export async function claimWelcome(sb: SupabaseClient, kakaoId: string, phone: s
   if (error || !d || typeof d.ok !== "boolean") return { ok: false, status: 503, message: "지급 결과를 확인하지 못했어요" };
   if (!d.ok) return { ok: false, status: 409, message: String(d.message || "지급 실패") };
   return { ok: true, granted: d.duplicate !== true, amount: decision.amount, kind: decision.kind };
+}
+
+
+// ── 관리자: 선물 받은 사람 목록(페이지) + 최근 30일 요약 — 전부 읽기만 ──
+export type WelcomeRecipientRow = {
+  id: string; at: string; kind: "first" | "back"; amount: number;
+  nickname: string; name: string; phoneTail: string;
+  orders: number; paidOrders: number; paidAmount: number;
+};
+export type WelcomeSummary = { days: number; gifts: number; points: number; ordered: number; paid: number; paidAmount: number; capped: boolean };
+
+type LedgerRow = { id: unknown; customer_phone: unknown; youtube_nickname: unknown; customer_name: unknown; amount: unknown; source_key: unknown; created_at: unknown };
+const LEDGER_COLS = "id,customer_phone,youtube_nickname,customer_name,amount,source_key,created_at";
+
+/** 선물 줄들에 «선물 뒤 주문» 결과 붙이기 — 회원 표로 카카오 계정을 찾고, 주문은 100명씩 한 번에 읽음 */
+async function attachResults(sb: SupabaseClient, rows: LedgerRow[]): Promise<WelcomeRecipientRow[]> {
+  const parsed = rows.map((r) => ({ r, k: parseWelcomeSourceKey(r.source_key) }));
+  const ids = Array.from(new Set(parsed.map((x) => x.k?.customerId).filter((v): v is string => !!v)));
+  const kakaoOf = new Map<string, { kakao: string; nick: string; name: string }>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await sb.from("customers").select("id,kakao_id,youtube_nickname,customer_name").in("id", ids.slice(i, i + 100));
+    if (error) throw new Error(error.message);
+    for (const c of (data ?? []) as Record<string, unknown>[]) kakaoOf.set(String(c.id), { kakao: String(c.kakao_id ?? ""), nick: String(c.youtube_nickname ?? ""), name: String(c.customer_name ?? "") });
+  }
+  const gifts = parsed.map(({ r, k }) => {
+    const c = k ? kakaoOf.get(k.customerId) : undefined;
+    return { r, kind: (k?.kind ?? "first") as "first" | "back", at: String(r.created_at ?? ""), kakaoId: c?.kakao ?? "", phone: digits(r.customer_phone), c };
+  });
+  const orders: WelcomeOrderRow[] = [];
+  for (let i = 0; i < gifts.length; i += 100) {
+    const part = gifts.slice(i, i + 100);
+    const minAt = part.map((g) => g.at).filter(Boolean).sort()[0];
+    if (!minAt) continue;
+    const ks = Array.from(new Set(part.map((g) => g.kakaoId.replace(/[^0-9A-Za-z_-]/g, "")).filter(Boolean)));
+    const ps = Array.from(new Set(part.flatMap((g) => (g.phone.length >= 9 ? [g.phone, ...koreanPhoneVariants(g.phone)] : []))));
+    const ors: string[] = [];
+    if (ks.length) ors.push(`kakao_id.in.(${ks.map((v) => `"${v}"`).join(",")})`);
+    if (ps.length) ors.push(`customer_phone.in.(${ps.map((v) => `"${v}"`).join(",")})`);
+    if (!ors.length) continue;
+    for (let page = 0; page < 5; page++) {
+      const { data, error } = await sb.from("orders")
+        .select("id,order_group_id,kakao_id,customer_phone,created_at,admin_order_status_v2,order_manage_status,is_test_order,is_deleted,final_amount")
+        .or(ors.join(",")).gte("created_at", minAt)
+        .order("id", { ascending: true }).range(page * 1000, page * 1000 + 999);
+      if (error) throw new Error(error.message);
+      const list = (data ?? []) as WelcomeOrderRow[];
+      orders.push(...list);
+      if (list.length < 1000) break;
+    }
+  }
+  return gifts.map((g) => {
+    const res = welcomeOrderResult({ at: g.at, kakaoId: g.kakaoId, phone: g.phone }, orders, PAID);
+    return {
+      id: String(g.r.id ?? ""), at: g.at, kind: g.kind, amount: Math.abs(Number(g.r.amount) || 0),
+      nickname: String(g.r.youtube_nickname || g.c?.nick || ""), name: String(g.r.customer_name || g.c?.name || ""),
+      phoneTail: g.phone.slice(-4), ...res,
+    };
+  });
+}
+
+/** 선물 받은 사람 한 페이지(최신순) */
+export async function listWelcomeRecipients(sb: SupabaseClient, page: number, size: number): Promise<{ rows: WelcomeRecipientRow[]; total: number }> {
+  const from = (page - 1) * size;
+  const { data, error, count } = await sb.from("customer_point_ledger")
+    .select(LEDGER_COLS, { count: "exact" })
+    .like("source_key", "welcome_%")
+    .order("created_at", { ascending: false })
+    .range(from, from + size - 1);
+  if (error) throw new Error(error.message);
+  return { rows: await attachResults(sb, (data ?? []) as LedgerRow[]), total: count ?? 0 };
+}
+
+/** 최근 N일 요약 — 선물 몇 명·그중 주문/결제 몇 명. 너무 많으면 최신 2,000명까지만(capped) */
+export async function summarizeWelcome(sb: SupabaseClient, nowMs: number, days = 30): Promise<WelcomeSummary> {
+  const since = new Date(nowMs - days * 86400000).toISOString();
+  const all: LedgerRow[] = [];
+  for (let page = 0; page < 2; page++) {
+    const { data, error } = await sb.from("customer_point_ledger").select(LEDGER_COLS)
+      .like("source_key", "welcome_%").gte("created_at", since)
+      .order("created_at", { ascending: false }).range(page * 1000, page * 1000 + 999);
+    if (error) throw new Error(error.message);
+    const list = (data ?? []) as LedgerRow[];
+    all.push(...list);
+    if (list.length < 1000) break;
+  }
+  const rows = await attachResults(sb, all);
+  return {
+    days, gifts: rows.length, points: rows.reduce((s, r) => s + r.amount, 0),
+    ordered: rows.filter((r) => r.orders > 0).length, paid: rows.filter((r) => r.paidOrders > 0).length,
+    paidAmount: rows.reduce((s, r) => s + r.paidAmount, 0), capped: all.length >= 2000,
+  };
 }
