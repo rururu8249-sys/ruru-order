@@ -13,6 +13,8 @@ import { useLiveFeaturedProducts, streamDelayFromIngestion } from "@/lib/useLive
 import { useReplayProductCard } from "@/lib/useReplayProductCard";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
 import { chatIdentityHeaders, verifyChatAccount } from "@/lib/useLiveChatPrivate";
+import ChatQuickPhrases from "@/components/customer/ChatQuickPhrases";
+import { insertQuickPhrase } from "@/lib/liveChatQuickPhrases";
 import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
 import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
 import {
@@ -1134,6 +1136,7 @@ export default function LiveWatchView(props: Props) {
                 </button>
               </div>
             ) : null}
+            {isDesktop && chat?.canModerate && !productPickerOpen ? <ChatQuickPhrases disabled={sending} onPick={(phrase) => { setEmojiOpen(false); setDraft((d) => insertQuickPhrase(d, phrase, LIVE_CHAT_MAX_LEN)); requestAnimationFrame(() => { const el = inputRef.current; if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} rememberCaret(el); } }); }} /> : null}
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <div style={{ flex: 1, minWidth: 0, height: "48px", boxSizing: "border-box", border: isDesktop ? "1px solid #555555" : "1px solid #E5E5E5", borderRadius: "9999px", display: "flex", alignItems: "center", background: isDesktop ? "#272727" : "#FFFFFF" }}>
                 <input
