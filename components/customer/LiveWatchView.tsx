@@ -11,7 +11,6 @@ import { RpsWidget } from '@/components/rps/RpsWidget';
 import { RpsAdmin } from '@/components/rps/RpsAdmin';
 import { useLiveFeaturedProducts, streamDelayFromIngestion } from "@/lib/useLiveFeaturedProducts";
 import { useReplayProductCard } from "@/lib/useReplayProductCard";
-import { LiveProductCarousel } from "@/components/customer/LiveProductCarousel";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
 import { chatIdentityHeaders, verifyChatAccount } from "@/lib/useLiveChatPrivate";
 import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
@@ -22,7 +21,6 @@ import {
   liveWatchList,
   youtubeCommand,
   youtubeEmbedUrl,
-  LIVE_WATCH_FEATURES_DEFAULT,
   type LiveWatchFeatures,
   type LiveWatchItem,
 } from "@/lib/liveWatch";
@@ -404,7 +402,6 @@ export default function LiveWatchView(props: Props) {
   const [query, setQuery] = useState("");
   // [2026-11-12 그립 참고] 상품 목록 창 「구매 가능만」 — 품절 숨김(이 화면만, 저장 안 함)
   const [buyableOnly, setBuyableOnly] = useState(false);
-  const features = props.features ?? LIVE_WATCH_FEATURES_DEFAULT;
   const [guideOpen, setGuideOpen] = useState(false);
   // 영상을 누르면 유튜브 막대(돌려보기)가 나온다. 막대가 우리 위·아래 띠·채팅에 안 가리게 영상 칸을 띠 사이에만 둔다.
   const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined, { controls: false }), [videoId]);
@@ -663,7 +660,7 @@ export default function LiveWatchView(props: Props) {
     setComposeHint("");
     const previousDraft = draft, previousEmoji = selectedEmoji, previousEmojiOpen = emojiOpen;
     if (!batch) { setDraft(""); setSelectedEmoji(null); setEmojiOpen(false); setComposeOpen(false); }
-    closeGreet();
+    // [2026-11-12 22:46 사장님] 인사하기 줄은 「보내기」를 눌러야만 사라짐 — 채팅을 써도 그대로
     const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
     const r = await chat.onSend(body, commandTarget).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     if (!r.ok && !batch) {
@@ -1041,9 +1038,8 @@ export default function LiveWatchView(props: Props) {
         style={{ pointerEvents: "auto", width: "100%", minHeight: 40, borderRadius: 12, border: "1px dashed rgba(255,255,255,0.5)", background: "rgba(0,0,0,0.45)", color: "#FFFFFF", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
         상품 카드 꺼짐 · 손님에게 안 보여요 · <span style={{ textDecoration: "underline" }}>켜기</span>
       </button> : null)
-    : features.carousel && featured.products.length > 1
-      ? <LiveProductCarousel products={featured.products} current={featured.current} label={replayFeatured.replay ? "보는 중" : "소개 중"} onOpen={props.onOpenProduct} onHide={cardAdmin ? () => void setSiteCard(true) : undefined} />
-      : <LiveFeaturedProductCard product={featured.current} count={featured.products.length} label={replayFeatured.replay ? "지금 보는 상품" : undefined} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} onHide={cardAdmin ? () => void setSiteCard(true) : undefined} />;
+    // [2026-11-12 22:46 사장님 「옆으로 넘기는 거 이상해 — 그 자리에서 바뀌게」] 넘겨 보기 폐기, 카드 1장이 제자리에서 바뀜
+    : <LiveFeaturedProductCard product={featured.current} count={featured.products.length} label={replayFeatured.replay ? "지금 보는 상품" : undefined} onOpen={props.onOpenProduct} onShowProducts={() => openProductList("featured")} onHide={cardAdmin ? () => void setSiteCard(true) : undefined} />;
   // 한 벌의 입력 폼을 PC 채팅 아래 또는 폰 쓰기 시트에만 렌더한다.
   const greetingRow = chat?.canWrite && greetOpen ? (
           // Local row at the entry position; new chat pushes it up naturally.

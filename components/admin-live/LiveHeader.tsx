@@ -643,14 +643,6 @@ export default function LiveHeader({
           <OptionRow label="처음 화면">
             <Segmented value={liveWatch.firstView} disabled={liveWatchSaving} options={[["live", "방송 화면"], ["shop", "쇼핑몰 화면"]]} onChange={(v) => void saveLiveWatch({ ...liveWatch, firstView: v })} />
           </OptionRow>
-          {/* [2026-11-12 사장님 「그립처럼 좋은 건 따라 하고 껐다 켰다」] 방송 화면 기능 켬/끔 */}
-          <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
-            <div className="min-w-0">
-              <div className="text-[14px] font-bold text-ink">상품 카드 여러 장 넘겨 보기</div>
-              <div className="text-[12px] text-ink-mute">{liveWatch.features.carousel ? "켜짐 · 채팅 위에 순환 상품이 옆으로 넘어가요" : "꺼짐 · 지금 소개하는 상품 1장만"}</div>
-            </div>
-            <Switch on={liveWatch.features.carousel} disabled={liveWatchSaving} label="상품 카드 여러 장 넘겨 보기" onChange={(v) => void saveLiveWatch({ ...liveWatch, features: { ...liveWatch.features, carousel: v } }, v ? "상품 카드 넘겨 보기를 켰어요. 손님 화면은 새로고침하면 바로 바뀌어요." : "상품 카드 넘겨 보기를 껐어요.")} />
-          </div>
           <WelcomePointSettings />
           {liveWatch.audience === "admin" ? (
             <div>
