@@ -143,7 +143,6 @@ export default function CustomerPointGiftPopup() {
         >
           <div style={{ fontSize: 15, lineHeight: "20px", fontWeight: 700, color: "#111111" }}>{gift.reason || "포인트 선물"}</div>
           <div style={{ marginTop: 6, fontSize: 40, lineHeight: "46px", fontWeight: 800, color: "#D30005", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>{amountText}</div>
-          <div style={{ marginTop: 6, fontSize: 13, lineHeight: "18px", fontWeight: 600, color: "#333333" }}>주문서 제출할 때 바로 써요</div>
           <div style={{ margin: "12px 0 0", paddingTop: 10, borderTop: "1px dashed #D9D9DE", fontSize: 13, lineHeight: "16px", fontWeight: 700, letterSpacing: "2px", color: "#8E8E93" }}>RURUDONGI</div>
         </div>
       </div>
