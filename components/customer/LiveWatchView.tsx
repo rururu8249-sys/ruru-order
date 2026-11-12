@@ -9,7 +9,7 @@ import { ProductIntroManager } from "./ProductIntroManager";
 import { useRpsGame } from '@/components/rps/useRpsGame';
 import { RpsWidget } from '@/components/rps/RpsWidget';
 import { RpsAdmin } from '@/components/rps/RpsAdmin';
-import { useLiveFeaturedProducts } from "@/lib/useLiveFeaturedProducts";
+import { useLiveFeaturedProducts, streamDelayFromIngestion } from "@/lib/useLiveFeaturedProducts";
 import { useReplayProductCard } from "@/lib/useReplayProductCard";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
 import { chatIdentityHeaders, verifyChatAccount } from "@/lib/useLiveChatPrivate";
@@ -364,7 +364,10 @@ export default function LiveWatchView(props: Props) {
   const [listOpen, setListOpen] = useState(false);
   const [listMode, setListMode] = useState<"all" | "featured">("all");
   useEffect(() => { setListOpen(false); setListMode("all"); setQuery(""); }, [props.broadcastId]);
-  const liveFeatured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false);
+  // [11/12 사장님 「위젯은 바로 바뀌는데 카드는 간헐적으로 다름」] 영상은 몇 초 늦게 보이는데 카드는 지금 시각으로 돌아 앞서 나갔다.
+  // 유튜브가 알려 주는 «지금 보는 장면이 들어온 시각»(ingestionTime)으로 늦은 만큼 카드 시계도 늦춘다.
+  const [streamDelayMs, setStreamDelayMs] = useState(0);
+  const liveFeatured = useLiveFeaturedProducts(props.broadcastId || "", items, props.widgetEnabled !== false, streamDelayMs);
   const [replayListSnapshot, setReplayListSnapshot] = useState<LiveWatchItem[] | null>(null);
   const openProductList = (mode: "all" | "featured") => {
     setReplayListSnapshot(mode === "featured" && replayFeatured.replay ? [...featured.products] : null);
@@ -896,6 +899,11 @@ export default function LiveWatchView(props: Props) {
       const progress = info.progressState as { seekableEnd?: unknown; isAtLiveHead?: unknown } | undefined;
       if (typeof progress?.seekableEnd === "number" && Number.isFinite(progress.seekableEnd) && progress.seekableEnd > 0) cur.seekableEnd = progress.seekableEnd;
       if (typeof progress?.isAtLiveHead === "boolean") cur.atLiveHead = progress.isAtLiveHead;
+      const ingestion = (info.progressState as { ingestionTime?: unknown } | undefined)?.ingestionTime;
+      if (e.origin === "https://www.youtube.com" && e.source === iframeRef.current?.contentWindow) {
+        const delay = streamDelayFromIngestion(ingestion, Date.now());
+        if (delay !== null) setStreamDelayMs((prev) => (Math.abs(prev - delay) >= 400 ? delay : prev));
+      }
       const end = cur.seekableEnd ?? cur.d;
       const behind = cur.live && [1, 2, 3].includes(cur.state) && end > 0 && cur.t >= 0 &&
         (cur.atLiveHead !== null ? !cur.atLiveHead : end - cur.t >= LIVE_EDGE_TOLERANCE_SECONDS);

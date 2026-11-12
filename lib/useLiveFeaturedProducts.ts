@@ -15,7 +15,17 @@ import type {LiveWatchItem} from './liveWatch';
 type State = {id: string; config: WidgetRotationConfig; targets: WidgetProductTarget[]; pinned: boolean; siteCardOff: boolean};
 const EMPTY: WidgetRotationConfig = {mode: 'all', paused: false, targets: []};
 
-export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchItem[], enabled: boolean) {
+/** 방송 PC 인코더(OBS)가 유튜브로 보내기까지 걸리는 시간 — 유튜브 값에 안 잡히는 부분이라 고정으로 더함. */
+export const ENCODER_EXTRA_MS = 1000;
+/** 유튜브 ingestionTime(초) → 영상이 실제보다 늦게 보이는 시간(ms). 라이브가 아니거나 이상한 값이면 null. */
+export function streamDelayFromIngestion(ingestion: unknown, nowMs: number): number | null {
+  if (typeof ingestion !== 'number' || !Number.isFinite(ingestion) || ingestion < 1e9) return null;
+  const raw = nowMs - ingestion * 1000;
+  if (raw < -5000 || raw > 60000) return 0; // 다시보기·시계 어긋남: 늦춤 없음
+  return Math.max(0, Math.round(raw + ENCODER_EXTRA_MS));
+}
+
+export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchItem[], enabled: boolean, delayMs = 0) {
   const [state, setState] = useState<State | null>(null);
   useEffect(() => {
     setState(null);
@@ -57,6 +67,6 @@ export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchIte
   const targets = useMemo(() => (valid && state ? state.targets : []), [valid, state]);
   const mapped = useMemo(() => featuredFromTargets(items, targets), [items, targets]);
   const products = useMemo(() => mapped.filter((p): p is LiveWatchItem => Boolean(p)), [mapped]);
-  const index = useWidgetRotationIndex(config, targets.length, Boolean(valid && state?.pinned));
+  const index = useWidgetRotationIndex(config, targets.length, Boolean(valid && state?.pinned), delayMs);
   return {products, current: mapped[index] ?? null, siteCardOff: Boolean(valid && state?.siteCardOff)};
 }
