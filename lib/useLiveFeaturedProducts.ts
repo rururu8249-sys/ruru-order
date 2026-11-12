@@ -23,10 +23,13 @@ export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchIte
     let alive = true;
     let revision = 0;
     let scheduled: number | undefined;
-    const load = async () => {
+    let follow: number | undefined;
+    const load = async (fresh = false) => {
       const request = ++revision;
       try {
-        const res = await fetch(`/api/live-watch/featured?bc=${encodeURIComponent(broadcastId)}`, {cache: 'no-store'});
+        // fresh: 상품 바뀜 소식 뒤 — 중간 캐시(CDN)를 거치지 않고 서버가 새로 읽은 값을 받음
+        const q = fresh ? `&fresh=1&r=${Date.now()}` : '';
+        const res = await fetch(`/api/live-watch/featured?bc=${encodeURIComponent(broadcastId)}${q}`, {cache: 'no-store'});
         const j = await res.json();
         if (!res.ok || !j?.ok) throw new Error('featured');
         if (!alive || request !== revision) return;
@@ -37,14 +40,17 @@ export function useLiveFeaturedProducts(broadcastId: string, items: LiveWatchIte
     const schedule = () => {
       revision++;
       window.clearTimeout(scheduled);
-      scheduled = window.setTimeout(() => void load(), 300);
+      window.clearTimeout(follow);
+      // 손님마다 0.2~0.6초 흩어서 바로 묻고, 1.5초 뒤 한 번 더(소식이 저장보다 먼저 온 경우 대비)
+      scheduled = window.setTimeout(() => void load(true), 200 + Math.floor(Math.random() * 400));
+      follow = window.setTimeout(() => void load(true), 1500 + Math.floor(Math.random() * 400));
     };
     const unsubscribe = subscribeLiveEvents(supabase, {onCatalog: schedule});
     void load();
     const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 20000);
     const visible = () => { if (!document.hidden) schedule(); };
     document.addEventListener('visibilitychange', visible);
-    return () => { alive = false; revision++; unsubscribe(); window.clearTimeout(scheduled); window.clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
+    return () => { alive = false; revision++; unsubscribe(); window.clearTimeout(scheduled); window.clearTimeout(follow); window.clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
   }, [broadcastId, enabled]);
   const valid = Boolean(state && state.id === broadcastId && enabled);
   const config = valid && state ? state.config : EMPTY;
