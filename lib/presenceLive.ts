@@ -52,6 +52,8 @@ export function excludePresenceRows(rows: PresenceRow[], ex: { kakaoIds?: Iterab
   const names = new Set(Array.from(ex.names || []).map(clean).filter(Boolean));
   return rows.filter((r) => {
     if (clean(r.page_type) === "admin") return false;
+    // actor ID is joined from the server-verified active session projection, never client input.
+    if (clean(r.automation_actor_id) && clean(r.visitor_key).startsWith("live-auto:")) return true;
     if (kakao.size && kakao.has(clean(r.kakao_id))) return false;
     if (names.size && names.has(clean(r.nickname))) return false;
     return true;

@@ -115,3 +115,8 @@ assert.equal(actors[0].cart.qty,2);assert.equal(actors[1].cart.qty,0);
 assert.equal(actors[0].orders.count,0);assert.equal(actors[1].orders.count,1);
 assert.equal(actors[0].name,'','shared technical owner must not replace actor identity');
 console.log("PASS presence-live");
+
+const verifiedAuto={id:'auto',visitor_key:'live-auto:verified',automation_actor_id:'actor-1',kakao_id:'990000000077',nickname:'윤정희',page_type:'order_form'};
+assert.equal(excludePresenceRows([verifiedAuto],{kakaoIds:['990000000077']}).length,1,'verified generated visitor must remain visible to admin');
+assert.equal(excludePresenceRows([{...verifiedAuto,automation_actor_id:undefined}],{kakaoIds:['990000000077']}).length,0,'a visitor key alone cannot override exclusion');
+assert.equal(excludePresenceRows([{...verifiedAuto,page_type:'admin'}],{}).length,0,'admin page sessions remain excluded');
