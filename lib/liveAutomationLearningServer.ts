@@ -53,14 +53,18 @@ export async function refreshLearning(db:SupabaseClient,broadcastId:string,opts:
   `[지금 노트의 규칙]\n${notes.rules.map(x=>`- ${x}`).join('\n')||'(없음)'}`,
   `[채팅 — 오래된 것부터]\n${transcript||'(없음)'}`,
  ].join('\n');
- const ans=await callGeminiJson(prompt,{timeoutMs:20000,maxTokens:900,maxAttempts:2,temperature:.3,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
+ // [2026-11-14 01:03 사장님 「봐도 모르겠다」] 사이트엔 진짜 손님이 없어 자동 규칙·말투 예가 엉터리로 나옴 → Gemini 정리 끔.
+ //   말투는 유튜브 분석(liveAutomationStyleBank)으로, 학습은 «사장님이 지운 AI 글»만(코드가 그대로 모음).
+ const AUTO_RULES=false;
+ const ans=AUTO_RULES?await callGeminiJson(prompt,{timeoutMs:20000,maxTokens:900,maxAttempts:2,temperature:.3,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']}):{text:null,note:'off'};
  let ai:Row={};
  try{const p=JSON.parse(ans.text||'{}');if(p&&typeof p==='object')ai=p as Row;}catch{/* 실패 — 지운 글만 반영 */}
  const lastId=Math.max(notes.lastMessageId,...rows.map(m=>Number(m.id)||0));
  const rules=(Array.isArray(ai.rules)?ai.rules:[]).map(x=>clean(x)).filter(x=>x&&x.length<=40&&!/주문|입금|결제|구매|담았|담아|골랐|샀|정중/.test(x));
- const next=mergeLearning(notes,{rules,good:goodPick},[...human,...goodPick],bad,ans.text?lastId:notes.lastMessageId,claim.updatedAt);
+ const merged=mergeLearning(notes,{rules,good:goodPick},[...human,...goodPick],bad,lastId,claim.updatedAt);
+ const next=AUTO_RULES?merged:{...merged,rules:[],good:[]};
  const saved=await writeLearning(db,claimRaw,next);
- return {ok:saved,message:saved?(ans.text?'SAVED':'SAVED_BAD_ONLY'):'SAVE_FAIL'};
+ return {ok:saved,message:saved?'SAVED':'SAVE_FAIL'};
 }
 /** 관리자 화면에서 한 줄 지우기 */
 export async function removeLearning(db:SupabaseClient,which:LearningList,text:string):Promise<LearningNotes|null>{

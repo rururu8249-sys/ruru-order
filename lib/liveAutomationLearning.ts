@@ -49,9 +49,9 @@ export function learningPromptText(n:LearningNotes):string{
  if(n.bad.length)out.push(`[학습 노트 — 사장님이 지운 AI 글, 이런 말은 하지 않는다]\n${n.bad.map(x=>`- ${x}`).join('\n')}`);
  return out.join('\n');
 }
-/** 다시 정리할 때인지 — 3시간 지났고 새 채팅이 40개 이상(force 면 10개 이상) */
-export function learningDue(n:LearningNotes,nowMs:number,newCount:number,force=false):boolean{
- if(force)return newCount>=10;
+/** 다시 모을 때인지 — [2026-11-14 01:04] Gemini 안 쓰고 지운 AI 글만 모으므로 10분마다(채팅 수 무관) */
+export function learningDue(n:LearningNotes,nowMs:number,_newCount:number,force=false):boolean{
+ if(force)return true;
  const last=Date.parse(n.updatedAt);
- return (!Number.isFinite(last)||nowMs-last>=3*3600000)&&newCount>=40;
+ return !Number.isFinite(last)||nowMs-last>=10*60000;
 }

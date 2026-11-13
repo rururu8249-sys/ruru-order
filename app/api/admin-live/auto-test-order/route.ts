@@ -58,7 +58,7 @@ export async function POST(request:NextRequest){
      if(!bc)return fail('정리할 채팅이 없어요.');
      const r=await refreshLearning(db,bc,{force:true});
      const learning=(await readLearning(db)).notes;
-     return NextResponse.json({ok:true,learning,message:r.message==='TOO_FEW'?'새 채팅이 10개 이상 쌓이면 정리할 수 있어요.':r.message==='BUSY'?'이미 정리 중이에요.':r.ok?(r.message==='SAVED'?'학습 노트를 정리했어요.':'AI가 바빠 지운 글만 반영했어요.'):'정리하지 못했어요.'});
+     return NextResponse.json({ok:true,learning,message:r.message==='TOO_FEW'?'새 채팅이 10개 이상 쌓이면 반영할 수 있어요.':r.message==='BUSY'?'이미 정리 중이에요.':r.ok?'지운 AI 글을 반영했어요.':'정리하지 못했어요.'});
    }
    if(body.action==='run'){
      const result=await runAutomationNow(db,request.nextUrl.origin);
