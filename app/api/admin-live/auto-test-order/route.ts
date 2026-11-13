@@ -5,6 +5,7 @@ import {readAutomationState,controlAutomation} from '@/lib/liveAutomationServer'
 import {runAutomationNow} from '@/lib/liveAutomationWorker';
 import {readAutoTestRows,deleteAutoTestOrders} from '@/lib/autoTestOrderServer';
 import {readGeminiUsage} from '@/lib/geminiGate';
+import {readLearning,refreshLearning,removeLearning} from '@/lib/liveAutomationLearningServer';
 import type {AutomationFeature} from '@/lib/liveAutomation';
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
@@ -17,8 +18,8 @@ export async function GET(request:NextRequest){
  if(!await verifyAdminSessionFromRequest(request))return fail('관리자 로그인이 필요해요.',401);
  try{
    const db=getServiceClient();
-   const [state,rows,gemini,paceRow]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle()]);
-   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value)},{headers:{'Cache-Control':'no-store'}});
+   const [state,rows,gemini,paceRow,learning]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle(),readLearning(db)]);
+   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value),learning:learning.notes},{headers:{'Cache-Control':'no-store'}});
  }catch{return fail('실행 상태를 확인하지 못했어요.',503)}
 }
 export async function POST(request:NextRequest){
@@ -43,6 +44,21 @@ export async function POST(request:NextRequest){
        if(!c.next_order_at||Date.parse(c.next_order_at)-Date.now()>120000)await db.rpc('live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});
      }
      return NextResponse.json({ok:true,pace:body.pace,state:await readAutomationState(db)});
+   }
+   // [2026-11-14] AI 학습 노트 — 한 줄 지우기 / 지금 정리
+   if(body.action==='learning-remove'){
+     if(!['rules','good','bad'].includes(body.list)||typeof body.text!=='string'||!body.text.trim())return fail('지울 줄을 확인해 주세요.');
+     const learning=await removeLearning(db,body.list,body.text);
+     if(!learning)return fail('다른 곳에서 노트가 바뀌었어요. 다시 눌러 주세요.',409);
+     return NextResponse.json({ok:true,learning});
+   }
+   if(body.action==='learning-refresh'){
+     const last=await db.from('live_chat_messages').select('broadcast_id').order('id',{ascending:false}).limit(1).maybeSingle();
+     const bc=String((last.data as {broadcast_id?:unknown}|null)?.broadcast_id??'');
+     if(!bc)return fail('정리할 채팅이 없어요.');
+     const r=await refreshLearning(db,bc,{force:true});
+     const learning=(await readLearning(db)).notes;
+     return NextResponse.json({ok:true,learning,message:r.message==='TOO_FEW'?'새 채팅이 10개 이상 쌓이면 정리할 수 있어요.':r.message==='BUSY'?'이미 정리 중이에요.':r.ok?(r.message==='SAVED'?'학습 노트를 정리했어요.':'AI가 바빠 지운 글만 반영했어요.'):'정리하지 못했어요.'});
    }
    if(body.action==='run'){
      const result=await runAutomationNow(db,request.nextUrl.origin);

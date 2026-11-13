@@ -6,6 +6,8 @@ import type {AutomationFeature,AutomationState} from '@/lib/liveAutomation';
 import {supabase} from '@/lib/supabase';
 
 type Usage={model:string;used:number|null;limit:number;blockedUntil:number};
+type Learning={updatedAt:string;rules:string[];good:string[];bad:string[]};
+const LEARN_LISTS=[['rules','배운 규칙'],['good','손님 말투 예'],['bad','사장님이 지운 AI 글 (이런 말 안 함)']] as const;
 const time=(value:string|number)=>new Date(value).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false});
 // [2026-11-13] AI 채팅이 한 번 건너뛴 기록(정상)은 빨간 오류로 띄우지 않는다
 const AI_SKIP=/^(NO_SUITABLE_MESSAGE|UNGROUNDED_DIALOGUE|AI_WAIT|ORDER_REPORT_REPETITION|UNOWNED_PRODUCT_ORDER|NO_CURRENT_CARD|FEATURED_CHANGED|CURRENT_CARD_CHANGED|BROADCAST_MODE_CHANGED|CHAT_SKIPPED|SILENT)$/;
@@ -17,6 +19,7 @@ export default function AutoTestOrderSettings(){
  const [details,setDetails]=useState(false),[error,setError]=useState('');
  const [busy,setBusy]=useState(false),[runningOnce,setRunningOnce]=useState(false);
  const [pace,setPace]=useState<'low'|'normal'|'high'>('normal');
+ const [learning,setLearning]=useState<Learning|null>(null),[learnBusy,setLearnBusy]=useState(false);
  const reads=useRef(0),writing=useRef(false);
  const load=useCallback(async()=>{
    if(writing.current)return;
@@ -25,7 +28,7 @@ export default function AutoTestOrderSettings(){
      const r=await fetch('/api/admin-live/auto-test-order',{cache:'no-store'}),j=await r.json();
      if(stamp!==reads.current)return;
      if(!r.ok||!j.ok)throw Error(j.message||'실행 상태를 확인하지 못했어요.');
-     setState(j.state);setPace(j.pace==='low'||j.pace==='high'?j.pace:'normal');setUsage(Array.isArray(j.gemini)?j.gemini:[]);setOrders(Number(j.testOrders)||0);setError('');
+     setState(j.state);setPace(j.pace==='low'||j.pace==='high'?j.pace:'normal');setUsage(Array.isArray(j.gemini)?j.gemini:[]);setOrders(Number(j.testOrders)||0);setLearning(j.learning||null);setError('');
    }catch(e){if(stamp===reads.current)setError(e instanceof Error?e.message:'연결을 확인해 주세요.');}
  },[]);
  const active=Boolean(state?.orders||state?.chat||state?.viewers||state?.manualAction||runningOnce);
@@ -59,6 +62,19 @@ export default function AutoTestOrderSettings(){
    try{await post({action:'pace',pace:next});showAdminToast(next==='low'?'주문을 적게 넣어요.':next==='high'?'주문을 많이 넣어요.':'주문 양을 보통으로 했어요.','success')}
    catch(e){setPace(prev);setError(e instanceof Error?e.message:'다시 시도해 주세요.')}
    finally{void load()}
+ };
+ // [2026-11-14] AI 학습 노트 — 한 줄 지우기 / 지금 정리(Gemini 1번)
+ const removeLine=async(list:string,text:string)=>{
+   if(learnBusy)return;setLearnBusy(true);setError('');
+   try{const j=await post({action:'learning-remove',list,text});setLearning(j.learning||null)}
+   catch(e){setError(e instanceof Error?e.message:'다시 시도해 주세요.')}
+   finally{setLearnBusy(false)}
+ };
+ const refreshNotes=async()=>{
+   if(learnBusy)return;setLearnBusy(true);setError('');
+   try{const j=await post({action:'learning-refresh'});setLearning(j.learning||null);showAdminToast(j.message||'정리했어요.','success')}
+   catch(e){setError(e instanceof Error?e.message:'다시 시도해 주세요.')}
+   finally{setLearnBusy(false)}
  };
  const remove=async()=>{
    if(!state||writing.current||runningOnce)return;
@@ -101,6 +117,11 @@ export default function AutoTestOrderSettings(){
        <div className="mb-2 font-bold text-ink">AI 사용량</div>
        {usage.length?usage.map(g=><div key={g.model} className="mb-1 flex flex-wrap justify-between gap-x-2"><span>{g.model.replace('gemini-','').replace('-flash-lite',' Lite').replace('-flash',' Flash')}</span><span>{g.used===null?'확인 불가':`${g.used} / ${g.limit}회`}{g.blockedUntil>Date.now()?` · ${time(g.blockedUntil)}까지 대기`:''}</span></div>):<div>사용량을 확인하지 못했어요.</div>}
        <p className="mt-2 leading-relaxed">이 사이트에서 집계한 호출 수예요. 미국 서부 자정에 초기화됩니다. 질문·상품 인식·관리자 기능을 우선 처리하고 자동 채팅은 잠시 기다립니다.</p>
+     </div>
+     <div className="border-t border-line pt-3 text-[13px] text-ink-soft">
+       <div className="mb-1 flex items-center justify-between gap-2"><span className="font-bold text-ink">AI 학습 노트</span><button type="button" className={`${button} border border-line text-ink`} disabled={learnBusy} onClick={()=>void refreshNotes()}>{learnBusy?'정리 중…':'지금 정리'}</button></div>
+       <p className="mb-2 leading-relaxed">3시간마다 채팅을 읽고 자동으로 정리해요{learning?.updatedAt?` · 마지막 ${new Date(learning.updatedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}`:''}. 이상한 AI 글은 채팅에서 지우기만 하면 아래 목록에 들어가요.</p>
+       {LEARN_LISTS.map(([key,label])=>{const items=learning?.[key]||[];return <div key={key} className="mb-2"><div className="mb-1 font-bold text-ink">{label} {items.length}</div>{items.length?items.map(t=><div key={t} className="flex items-center justify-between gap-2 border-b border-line py-1"><span className="min-w-0 break-words text-ink">{t}</span><button type="button" aria-label={`${t} 지우기`} className="min-h-11 shrink-0 px-2 text-[13px] text-danger-tx disabled:opacity-50" disabled={learnBusy} onClick={()=>void removeLine(key,t)}>지우기</button></div>):<div>아직 없어요.</div>}</div>;})}
      </div>
      <button type="button" className={`${button} w-full border border-line text-ink`} disabled={!state?.ready||busy||runningOnce||Boolean(state.manualAction)} onClick={()=>void run()}>{runningOnce?'주문 처리 중…':'주문 1회 실행'}</button>
      {orders>0?<button type="button" className={`${button} w-full text-danger-tx`} disabled={!state||busy||runningOnce} onClick={()=>void remove()}>생성 주문 {orders}건 삭제</button>:null}
