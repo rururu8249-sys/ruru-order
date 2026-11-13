@@ -20,20 +20,8 @@ async function ensurePool(db:SupabaseClient) {
  if(existing.error)throw Error(existing.error.message);
  if((existing.count||0)>=50)return;
  // [2026-11-13 사장님] 기존 닉네임 뒤에 숫자만 붙인 비슷한 닉네임(양말한짝수배 → 양말한짝수배53)은 만들지 않는다 — 후보 목록 그대로만.
- //   숫자로 끝나는 후보(보리19·Luna17)는 숫자 뗀 이름이 실제 손님·이미 쓴 테스트 닉네임과 같으면 넣지 않는다.
- const baseOf=(n:string)=>n.replace(/[0-9]+$/,'').trim();
- const bases=[...new Set(NICKNAME_CANDIDATES.map(x=>x.nickname).filter(n=>/[0-9]$/.test(n)).map(baseOf).filter(b=>b.length>=2))];
- const variants=[...new Set(bases.flatMap(b=>[b,b.toLowerCase(),b.toUpperCase(),b.charAt(0).toUpperCase()+b.slice(1).toLowerCase()]))];
- const taken=new Set<string>();
- if(variants.length){
-  const [cust,act]=await Promise.all([
-   db.from('customers').select('youtube_nickname').in('youtube_nickname',variants),
-   db.from('live_automation_actors').select('nickname').in('nickname',variants),
-  ]);
-  for(const r of (cust.data||[]) as {youtube_nickname?:string|null}[])if(r.youtube_nickname)taken.add(r.youtube_nickname.trim().toLowerCase());
-  for(const r of (act.data||[]) as {nickname?:string|null}[])if(r.nickname)taken.add(r.nickname.trim().toLowerCase());
- }
- const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]$/.test(x.nickname)||!taken.has(baseOf(x.nickname).toLowerCase()));
+ // [2026-11-13 22:00 사장님 «숫자 빼고 제대로»] 숫자가 들어간 후보(달빛27·Mia27 등)는 아예 넣지 않는다.
+ const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]/.test(x.nickname));
  // 후보 200개는 한 번씩 쓰면 끝이라, 숫자 없는 새 이름(낱말 두 개 이어 붙임) 80개를 같이 넣는다 — 후보가 바닥나 시청자가 한꺼번에 사라지는 것 방지.
  await automationRpc(db,'live_automation_pool_refill',{p_candidates:[...candidates,...generatedNicknameCandidates(80)]});
 }

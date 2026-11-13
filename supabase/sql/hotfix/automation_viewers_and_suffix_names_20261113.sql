@@ -5,19 +5,17 @@
 select
   (select count(*) from public.live_automation_nickname_pool where status='unused') as 남은_닉네임_후보,
   (select count(*) from public.live_automation_sessions where watching and stopped_at is null and leave_at>now()) as 지금_가상_시청자,
-  (select count(*) from public.live_automation_actors a where a.retired_at is null and a.nickname ~ '[0-9]{2}$'
-     and exists(select 1 from public.live_automation_nickname_pool q where q.nickname=regexp_replace(a.nickname,'[0-9]+$',''))) as 숫자붙은_테스트닉네임,
+  (select count(*) from public.live_automation_actors a where a.retired_at is null and a.nickname ~ '[0-9]') as 숫자붙은_테스트닉네임,
   (select population_plan::text from public.live_automation_campaigns where viewers_enabled order by updated_at desc limit 1) as 시청자_계획;
 
 -- ───────── ① 숫자 붙은 테스트 닉네임(양말한짝수배53 등) 내보내기 ─────────
---   «원래 이름 + 숫자» 꼴만(원래 이름이 후보 목록에 있는 것). 채팅·주문 기록은 그대로 남고, 접속 목록·닉네임 고르기에서 빠진다.
+--   [22:00 사장님 «숫자 빼고»] 숫자가 들어간 가상 손님 닉네임 전부(별빛찻잔75·달빛27 등). 실제 손님은 대상 아님. 채팅·주문 기록은 그대로 남고, 접속 목록·닉네임 고르기에서 빠진다.
 do $$
 declare a record; n integer:=0; begin
  perform public.live_automation_identity_lock();
  for a in
    select x.id from public.live_automation_actors x
-   where x.retired_at is null and x.nickname ~ '[0-9]{2}$'
-     and exists(select 1 from public.live_automation_nickname_pool q where q.nickname=regexp_replace(x.nickname,'[0-9]+$',''))
+   where x.retired_at is null and x.nickname ~ '[0-9]'
  loop
    update public.live_automation_actors set retired_at=clock_timestamp() where id=a.id;
    update public.live_automation_sessions set stopped_at=clock_timestamp(),watching=false where actor_id=a.id and stopped_at is null;
@@ -27,8 +25,7 @@ declare a record; n integer:=0; begin
    update public.live_automation_manual_leases set expires_at=clock_timestamp() where actor_id=a.id;
    n:=n+1;
  end loop;
- delete from public.live_automation_nickname_pool p where p.status='unused' and p.nickname ~ '[0-9]{2}$'
-   and exists(select 1 from public.live_automation_nickname_pool q where q.nickname=regexp_replace(p.nickname,'[0-9]+$',''));
+ delete from public.live_automation_nickname_pool p where p.status='unused' and p.nickname ~ '[0-9]';
  raise notice '숫자 붙은 테스트 닉네임 % 개 내보냄', n;
 end $$;
 

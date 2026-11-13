@@ -11,7 +11,8 @@ const ok=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,'달
 await db.exec(hotfix);
 assert.ok(await scalar('select retired_at is not null from live_automation_actors where id=$1',[bad.actor.id]),'숫자 붙은 닉네임 내보냄');
 assert.equal(await scalar('select count(*)::int from live_automation_sessions where actor_id=$1 and stopped_at is null',[bad.actor.id]),0);
-assert.ok(await scalar('select retired_at is null from live_automation_actors where id=$1',[ok.actor.id]),'원래 이름이 후보에 없는 닉네임은 그대로');
+assert.ok(await scalar('select retired_at is not null from live_automation_actors where id=$1',[ok.actor.id]),'숫자 든 닉네임은 전부 내보냄');
+assert.equal(await scalar("select count(*)::int from live_automation_nickname_pool where status='unused' and nickname ~ '[0-9]'"),0);
 assert.equal(await scalar('select population_plan is null from live_automation_campaigns where id=$1',[c.id]),true);
 for(let i=0;i<40;i++){
  if(i%10===0)await scalar('select live_automation_pool_refill($1)',[Array.from({length:200},(_,n)=>({nickname:'핫픽스'+i+'번'+n,category:'korean'}))]);
