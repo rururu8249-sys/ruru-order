@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 process.env.SUPABASE_SERVICE_ROLE_KEY='isolated-conversation-signature-over-32-chars';
+const savedRandom=Math.random;Math.random=()=>.8;
 const id='00000000-0000-4000-8000-000000000001';
 let aiCalls=0,httpCalls=0,taken=false,admissions=0;
 const ctx={campaign:{id,broadcast_id:id,revision:1},session:{id},actor:{id,nickname:'달빛',profile:{seed:0,style:'간결한 존댓말'},order_count:1}};
 const db={from(table){const q={select(){return q},eq(){return q},is(){return q},not(){return q},gte(){return q},or(){return q},order(){return q},limit(){return q},maybeSingle:async()=>({data:{status:'ON'}}),then(resolve,reject){return Promise.resolve({data:table==='broadcasts'?{status:'ON'}:[],error:null}).then(resolve,reject)}};return q},async rpc(name){if(name==='live_automation_context')return {data:ctx};if(name==='live_automation_ai_admission'){admissions++;if(taken)return {error:{message:'MANUAL_CHAT_ACTIVE'}}}return {data:null}}};
-const load=createUiLoader({'./autoTestOrderServer':{streamModeOf:async()=>'live'},'./geminiJson':{callGeminiJson:async()=>{aiCalls++;taken=true;return {text:'{"text":"주문서 제출했어요"}',note:'model'}}}});
+const load=createUiLoader({'./liveAutomationDialogueServer':{readDialogueCard:async()=>null},'./autoTestOrderServer':{streamModeOf:async()=>'live'},'./geminiJson':{callGeminiJson:async()=>{aiCalls++;taken=true;return {text:'{"text":"천천히 구경할게요","scope":"general","productId":"","detailName":""}',note:'model'}}}});
 let C;try{C=load('lib/liveAutomationConversation.ts')}catch{}
 assert.ok(C,'activity-aware conversation driver must exist');
 const action={id,session_id:id,actor_id:id,revision:1,lease_token:id,kind:'chat',plan:{facts:{ordered:true,items:[]},mode:'live'}};
@@ -19,7 +20,8 @@ assert.equal(C.acceptConversationText('색이 괜찮네요',{ordered:false},[]),
 let cardReads=0,missing=false;
 const card={productId:'10',detailName:'',revision:'first'};
 const featuredLoader=createUiLoader({
- './geminiJson':{callGeminiJson:async()=>{aiCalls++;return {text:'{"text":"기장은 어때요?"}'}}},
+ './liveAutomationDialogueServer':{readDialogueCard:async()=>({...card,name:'상품',colors:[],sizes:[]})},
+ './geminiJson':{callGeminiJson:async()=>{aiCalls++;return {text:'{"text":"기장은 어때요?","scope":"product","productId":"10","detailName":""}'}}},
  './liveAutomationFeatured':{readAutomationFeatured:async()=>missing?null:{...card,revision:++cardReads===1?'first':'changed'},featuredMatches:()=>true},
  './autoTestOrderServer':{streamModeOf:async()=>'live'},
 });
@@ -67,3 +69,5 @@ assert.equal(C.acceptConversationText('다들 조용히 주문만 하시네요�
 assert.equal(C.acceptConversationText('다들 조용히 주문만 하시네요ㅎㅎ',{ordered:true},[],'paused'),null);
 
 assert.equal(R.conversationRoom(bot,'paused',now,new Date(now-600000).toISOString()).quietWhileOrdering,false,'independent room-comment history preserves cooldown beyond 40 recent rows');
+
+Math.random=savedRandom;

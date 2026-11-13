@@ -7,7 +7,7 @@ export type AutomationScope='presence'|'cart'|'order'|'chat';
 export type Capability={session:string;action?:string;lease?:string;revision:number;scope:AutomationScope;expires?:number};
 export type AutomationContext={
   campaign:{id:string;broadcast_id:string;revision:number;orders_enabled:boolean;chat_enabled:boolean;viewers_enabled:boolean;next_order_at:string|null;last_submitted_at:string|null;run_id:string;max_active:number;next_join_at:string|null;updated_at:string};
-  actor:{id:string;customer_id:number;nickname:string;profile:Persona;order_target:number;order_count:number;greeting_count:number;last_chat_at:string|null};
+  actor:{next_order_after?:string|null;id:string;customer_id:number;nickname:string;profile:Persona;order_target:number;order_count:number;greeting_count:number;last_chat_at:string|null};
   session:{id:string;actor_id:string;campaign_id:string;cart_key:string;visitor_key:string;leave_at:string;joined_at:string;stopped_at:string|null;last_ack_at:string|null;watching:boolean;driver:'server'|'browser'};
 };
 export class AutomationError extends Error { constructor(message:string,public status=403){super(message);} }

@@ -1,4 +1,6 @@
 "use client";
+import {ChatProfileAvatar} from "@/components/chat/ChatProfileAvatar";
+import {notificationPresentation} from "@/lib/chatPresentation";
 
 // components/admin-live/AdminSiteChatBox.tsx
 // [2026-11-10 사장님 05:54 「관리자 PC 오른쪽 채팅 칸에서 사이트 채팅을 보고 관리」]
@@ -81,6 +83,7 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
       const m = parseChatMessage((ev as CustomEvent).detail);
       if (!m || m.broadcastId !== broadcastId) return;
       setList((prev) => mergeChat(prev, [m]));
+      if(m.badge!=="bot") void load();
       setPinned((prev) => (m.pinned ? m : prev && prev.id === m.id ? null : prev));
     };
     window.addEventListener("ruru-live-chat", onChat);
@@ -157,21 +160,13 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
       >
         {loadError ? <div className="p-3 text-[13px] text-danger-tx">{loadError}</div> : null}
         {!loadError && list.length === 0 ? <div className="p-6 text-center text-[13px] text-ink-mute">아직 글이 없어요. 아래 칸에 쓰면 손님 화면에 바로 올라가요.</div> : null}
-        {list.map((m) => (
+        {list.map((m) => { const palette=notificationPresentation(m); return (
           <div key={m.id} onClick={() => { if (m.badge !== "bot") setMenuId((v) => (v === m.id ? null : m.id)); }}
             className={`relative flex items-start gap-2 rounded-lg px-1.5 py-1 ${m.badge === "bot" ? "" : "cursor-pointer"} ${menuId === m.id ? "bg-surface-2" : ""}`}>
-            {m.badge === "bot" ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src="/ruru-ai-avatar.png" alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover" />
-            ) : m.avatar && m.avatar !== AUTO_TEST_AVATAR ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={m.avatar} alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover" />
-            ) : (
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-line text-[12px] font-bold text-ink-soft">{(Array.from(m.nickname)[0] || "?").toUpperCase()}</span>
-            )}
+            <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={m.nickname} frame={palette?.frame} style={{marginTop:2}} />
             <div className="min-w-0 flex-1 text-[14px] leading-5 text-ink">
-              <span className="mr-1 font-bold text-ink-soft">{m.nickname}</span>
-              {m.badge ? <span className={`mr-1 inline-flex h-[18px] items-center rounded px-1 align-[1px] text-[11px] font-bold ${BADGE_CLS[m.badge] || ""}`}>{BADGE_LABEL[m.badge]}</span> : null}
+              <span className="mr-1 font-bold text-ink-soft" style={palette?{color:palette.light}:undefined}>{m.nickname}</span>
+              {m.badge ? <span style={palette?{background:palette.badge,color:palette.ink}:undefined} className={`mr-1 inline-flex h-[18px] items-center rounded px-1 align-[1px] text-[11px] font-bold ${BADGE_CLS[m.badge] || ""}`}>{BADGE_LABEL[m.badge]}</span> : null}
               <span className="break-words"><ChatBodyView body={m.body} emojis={emojiMap} /></span>
               <span className="ml-1 text-[11px] text-ink-mute">{timeText(m.createdAt)}</span>
             </div>
@@ -189,7 +184,7 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
               </div>
             )}
           </div>
-        ))}
+        ); })}
       </div>
       {emojiOpen && emojis.length > 0 ? (
         <div className="grid max-h-40 grid-cols-6 gap-1 overflow-y-auto border-t border-line p-2">

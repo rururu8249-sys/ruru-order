@@ -8449,7 +8449,7 @@ export default function OrderPage() {
                   return r;
                 },
                 notice: liveChatNotice,
-                pinned: liveChatPinned,
+                pinned: liveChatPinned && privateChat.canReviewDeleted && privateChat.avatars[liveChatPinned.id] ? {...liveChatPinned,avatar:privateChat.avatars[liveChatPinned.id]} : liveChatPinned,
                 canGrant: !viewAsCustomer && isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)),
                 canPin: !viewAsCustomer && ["crown", "crown_pink"].includes(String(chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? "")),
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),

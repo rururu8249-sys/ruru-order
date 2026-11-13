@@ -1,4 +1,5 @@
 'use client';
+import type {PersonaOrderRecord} from './liveAutomationOrderHistory';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {supabase} from '@/lib/supabase';
 import {chatIdentityHeaders} from '@/lib/useLiveChatPrivate';
@@ -11,6 +12,8 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
  const [available,setAvailable]=useState(false),[actors,setActors]=useState<ManualActor[]>([]),[selected,setSelected]=useState<ManualActor|null>(null);
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[open,setOpen]=useState(false);
  const [recent,setRecent]=useState<string[]>([]);
+ const clearRecent=()=>setRecent([]);
+ const readOrders=async(id:string):Promise<PersonaOrderRecord[]>=>{const r=await fetch(endpoint+"?"+new URLSearchParams({bc:broadcastId,client:client.current,actor:id}),{headers:chatIdentityHeaders(),cache:"no-store"});const j=await r.json();if(!r.ok||!j.ok)throw Error("주문 기록을 불러오지 못했어요.");return j.orders||[];};
  const current=useRef<Selection|null>(null),client=useRef(''),access=useRef(false),serial=useRef(0),generation=useRef(0),mounted=useRef(false),locked=useRef(false);
  const readyRef=useRef(false),openRef=useRef(false),lastRenew=useRef(0),retry=useRef<{actor:string;body:string;id:string}|null>(null);
  const lastVerified=useRef(0);
@@ -122,6 +125,6 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
    const channel=supabase.channel('live-automation:'+broadcastId).on('broadcast',{event:'changed'},()=>{if(access.current)void refresh()}).subscribe();
    return ()=>{void supabase.removeChannel(channel)};
  },[available,broadcastId,enabled,refresh]);
- return {available,actors,selected,ready,busy,message,open,setOpen,recent,choose,reset,send,refresh};
+ return {available,actors,selected,ready,busy,message,open,setOpen,recent,clearRecent,readOrders,choose,reset,send,refresh};
 }
 export type ManualAutomationChat=ReturnType<typeof useManualAutomationChat>;

@@ -129,4 +129,56 @@ await assert.rejects(scalar('select live_automation_presence_batch($1,$2,$3)',[c
 assert.equal(await scalar('select count(*)::int from visitor_presence'),0);
 assert.equal(await scalar("select count(*)::int from live_automation_payment_events where status='pending'"),0,'OFF cancels delayed receipts');
 assert.equal(await scalar("select has_function_privilege('anon','live_automation_population_step(uuid,bigint,jsonb)','execute')"),false);
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113104500_live_automation_repeat_orders.sql',import.meta.url),'utf8'));
+assert.ok(await scalar('select next_order_after>clock_timestamp() from live_automation_actors where id=$1',[actor.actor.id]));
+await assert.rejects(db.query("insert into live_automation_actions(campaign_id,session_id,actor_id,kind,due_at,revision) values($1,$2,$3,'order',now(),$4)",[c.id,actor.session.id,actor.actor.id,c.revision]),/ACTOR_ORDER_COOLDOWN/);
+await db.query('update live_automation_actors set order_target=6,order_count=4 where id=$1',[actor.actor.id]);
+const delay=await scalar('select extract(epoch from next_order_after-clock_timestamp())::int from live_automation_actors where id=$1',[actor.actor.id]);
+assert.ok(delay>=479&&delay<=3600);
+const distribution=await db.query('select public.live_automation_order_target() as n from generate_series(1,5000)');
+assert.ok(distribution.rows.filter(r=>r.n===1).length>2900);assert.ok(distribution.rows.some(r=>r.n===6));
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113105500_live_automation_history_and_low_crowd.sql',import.meta.url),'utf8'));
+c=await ctl('all',true,(await scalar('select revision from live_automation_campaigns where id=$1',[c.id])));
+await db.query("update live_automation_campaigns set population_plan=jsonb_build_object('phase','low','target',15,'until',clock_timestamp()+interval '4 minutes','nextSpike',clock_timestamp()+interval '1 hour') where id=$1",[c.id]);
+for(let i=0;i<12;i++)crowd=await step();assert.equal(crowd.count,15,'low population phase persists at 10–30 rather than snapping back to 50');
+await db.query('delete from orders where automation_actor_id=$1',[actor.actor.id]);
+const eligible=await scalar('select live_automation_eligibility($1)',[actor.actor.id]);assert.equal(eligible.manual,true);assert.ok(eligible.orders>0,'submitted snapshot survives deleted order');
+await db.exec(readFileSync('supabase/migrations/20261113105455_live_automation_relaxed_order_tempo.sql','utf8'));
+const slow=await scalar('select live_automation_plan_tempo($1,true)',[c.id]);
+assert.equal(slow.mode,'quiet');assert.ok(Date.parse(slow.at)-Date.now()>=1199000);assert.equal(slow.offsets.length,1);
+for(let i=0;i<120;i++){
+ const p=await scalar('select live_automation_plan_tempo($1,false)',[c.id]);
+ if(p.mode==='steady'){assert.ok(p.offsets.length>=1&&p.offsets.length<=3);assert.ok(Date.parse(p.at)-Date.now()>=479000);}
+ if(p.mode==='busy')assert.ok(p.offsets.length>=2&&p.offsets.length<=3);
+ if(p.mode==='burst'){assert.ok(p.offsets.length>=3&&p.offsets.length<=5);assert.equal((await scalar('select live_automation_plan_tempo($1,false)',[c.id])).mode,'quiet');}
+}
+console.log('PASS relaxed ordinary gaps, long quiet periods, bounded bursts and mandatory post-burst rest');
+await db.exec(readFileSync('supabase/migrations/20261113110247_live_automation_room_chat_pacing.sql','utf8'));
+const speaker=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,'대화간격하나',{seed:1},1,30,false]);
+const other=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,'대화간격둘',{seed:2},1,30,false]);
+for(const s of [speaker,other]){
+ const cartAction=await scalar('select live_automation_action($1,$2,$3,$4,$5,$6,$7)',[s.session.id,'order',new Date().toISOString(),plan,false,null,c.revision]);
+ await scalar('select live_automation_claim($1,$2)',[cartAction.id,c.revision]);
+ await scalar('select live_automation_cart($1,$2,$3)',[s.session.id,c.revision,plan.lines]);
+}
+await assert.rejects(scalar('select live_automation_ai_admission($1,$2)',[speaker.actor.id,'chat']),/ROOM_CHAT_REST/);
+await db.query('update live_automation_campaigns set auto_chat_after=now() where id=$1',[c.id]);
+const speech=await scalar('select live_automation_action($1,$2,$3,$4,$5,$6,$7)',[speaker.session.id,'chat',new Date().toISOString(),{},false,null,c.revision]);
+const speechClaim=await scalar('select live_automation_claim($1,$2)',[speech.id,c.revision]);
+await scalar('select live_automation_chat($1,$2,$3,$4)',[speech.id,speechClaim.lease_token,c.revision,'안녕하세요']);
+assert.ok(await scalar("select auto_chat_after>clock_timestamp()+interval '239 seconds' from live_automation_campaigns where id=$1",[c.id]));
+await assert.rejects(scalar('select live_automation_ai_admission($1,$2)',[other.actor.id,'chat']),/ROOM_CHAT_REST/,'different nicknames share the same room rest');
+await scalar('select live_automation_ai_admission($1,$2)',[other.actor.id,'reply']);
+assert.equal(await scalar('select live_automation_payment_speech_valid($1,$2)',[speech.id,'입금완료 했어요']),false,'receipt report without isolated saved event denied');
+assert.equal(await scalar("select has_function_privilege('anon','live_automation_payment_speech_valid(uuid,text)','execute')"),false);
+await db.exec("update live_automation_actions set completed_at=clock_timestamp()-interval '61 minutes' where kind='order' and status='succeeded'");
+const receiptOrder=(await db.query("select * from live_automation_actions where actor_id=$1 and kind='order' order by created_at desc limit 1",[speaker.actor.id])).rows[0];
+await scalar('select live_automation_submit($1,$2,$3,$4)',[receiptOrder.id,receiptOrder.lease_token,c.revision,[{product_id:10,product_name:'니트',color:'',size:'',qty:1,product_price:100,order_group_id:receiptOrder.order_group_id}]]);
+await db.query("update live_automation_payment_events set status='sent',kind='bank' where order_action_id=$1",[receiptOrder.id]);
+await db.query("update live_automation_actions set plan=jsonb_build_object('facts',jsonb_build_object('paymentActionId',$2::text)) where id=$1",[speech.id,receiptOrder.id]);
+assert.equal(await scalar('select live_automation_payment_speech_valid($1,$2)',[speech.id,'입금완료 했어요~']),true,'only current confirmed isolated receipt permits acknowledgement');
+assert.equal(await scalar('select live_automation_payment_speech_valid($1,$2)',[speech.id,'결제완료 했어요']),false,'bank receipt does not prove card state');
+await db.query('delete from orders where automation_action_id=$1',[receiptOrder.id]);
+assert.equal(await scalar('select live_automation_payment_speech_valid($1,$2)',[speech.id,'입금완료 했어요']),false,'deleting the order revokes acknowledgement evidence');
+console.log('PASS shared room AI rest across different nicknames with direct reply exception');
 await db.close();console.log('PASS 50-person baseline, gradual 100-person peak/return, real batched presence, OFF and old revision fences');

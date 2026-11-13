@@ -1,3 +1,4 @@
+import {publicChatRow} from '@/lib/chatPresentation';
 // app/api/live-chat/route.ts
 // [2026-11-10] 「방송 보며 주문」 ③단계 — 사이트 채팅(손님용).
 //   GET ?bc=방송id → 최근 글 50개(지운 글 빼고) + 고정 공지.
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
         ? { ok: true, enabled: true, notice: setting.notice }
         : { ok: true, enabled: false, notice: "", messages: [], pinned: null });
     }
-    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref";
+    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, public_avatar_id, public_avatar_key, bot_ref";
     const [setting, listRes, pinRes] = await Promise.all([
       readSetting(sb),
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).order("id", { ascending: false }).limit(LIVE_CHAT_RECENT),
@@ -75,8 +76,8 @@ export async function GET(request: NextRequest) {
     ]);
     if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [], pinned: null });
     if (listRes.error) return fail("채팅을 못 불러왔어요.", 500);
-    const messages = (listRes.data ?? []).map(parseChatMessage).filter(Boolean).reverse();
-    return NextResponse.json({ ok: true, enabled: true, notice: setting.notice, messages, pinned: pinRes.data ? parseChatMessage(pinRes.data) : null });
+    const messages = (listRes.data ?? []).map(row=>parseChatMessage(publicChatRow(row))).filter(Boolean).reverse();
+    return NextResponse.json({ ok: true, enabled: true, notice: setting.notice, messages, pinned: pinRes.data ? parseChatMessage(publicChatRow(pinRes.data)) : null });
   } catch {
     return fail("채팅을 못 불러왔어요.", 500);
   }
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
         } : undefined;
         const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : (cleanKakaoPhotoUrl(c.kakao_profile_image) || null) }, target ?? undefined, recordIntro);
         // Only the sender receives this receipt; public history/events retain the hidden flag.
-        return NextResponse.json({ ok: true, privateCommand: true, introNotice, message: parseChatMessage({ ...message, hidden_at: null, pinned_at: null }) }, { headers: { "Cache-Control": "private, no-store" } });
+        return NextResponse.json({ ok: true, privateCommand: true, introNotice, message: parseChatMessage(publicChatRow({ ...message, hidden_at: null, pinned_at: null })) }, { headers: { "Cache-Control": "private, no-store" } });
       } catch (error) {
         return fail(error instanceof Error ? error.message : "상품 순환을 변경하지 못했어요.");
       }
@@ -183,24 +184,24 @@ export async function POST(request: NextRequest) {
         p_client: raw.manual.clientId, p_request: raw.manual.requestId, p_body: finalBody,
       });
       if (error) { const e = manualChatFailure(error.message); return fail(e.message, e.status); }
-      return NextResponse.json({ ok: true, message: parseChatMessage(data) }, { headers: { "Cache-Control": "private, no-store" } });
+      return NextResponse.json({ ok: true, message: parseChatMessage(publicChatRow(data)) }, { headers: { "Cache-Control": "private, no-store" } });
     }
     if(automation){
       const {data,error}=await sb.rpc('live_automation_chat',{p_action:automation.capability.action,p_lease:automation.capability.lease,p_revision:automation.capability.revision,p_body:finalBody});
       if(error)return fail('채팅 실행 조건이 변경되어 전송하지 않았어요.',409);
-      return NextResponse.json({ok:true,message:parseChatMessage(data)},{headers:{'Cache-Control':'no-store'}});
+      return NextResponse.json({ok:true,message:parseChatMessage(publicChatRow(data))},{headers:{'Cache-Control':'no-store'}});
     }
     const { data: ins, error } = await sb
       .from("live_chat_messages")
       .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: finalBody, badge: role.badge ?? null, avatar_url: kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : (cleanKakaoPhotoUrl(c.kakao_profile_image) || null) })
-      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref")
+      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, public_avatar_id, public_avatar_key, bot_ref")
       .single();
     if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);
     // [2026-11-10] 루루동이AI — 응답을 보낸 «뒤»에 상품 안내·자주 묻는 말(손님 글 쓰기를 늦추지 않음, 실패해도 무관)
     //   이모티콘은 빼고 글자만 봄(이모티콘만 보낸 글이면 안내 안 함)
     const botText = chatBodyWithoutEmoji(finalBody);
     if (botText) after(() => runLiveChatBot(sb, bc, botText));
-    return NextResponse.json({ ok: true, message: parseChatMessage(ins) });
+    return NextResponse.json({ ok: true, message: parseChatMessage(publicChatRow(ins)) });
   } catch (error) {
     if(error instanceof AutomationError)return fail('채팅 실행 권한을 확인하지 못했어요.',error.status);
     return fail("못 보냈어요. 다시 눌러 주세요.", 500);

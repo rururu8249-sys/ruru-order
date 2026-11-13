@@ -47,8 +47,9 @@ async function orderActor(db:SupabaseClient,c:LiveCampaign,excluded:Set<string>)
    activeSessions(db,c),rows<Action>(db.from('live_automation_actions').select('*').eq('campaign_id',c.id).eq('kind','order').in('status',['pending','claimed','uncertain'])),
  ]);
  const busy=new Set([...excluded,...pending.map(a=>a.actor_id)]);
- const candidates=actors.filter(a=>a.order_target>a.order_count&&!busy.has(a.id));
- const active=candidates.find(a=>sessions.some(s=>s.actor_id===a.id&&Date.parse(s.leave_at)>Date.now()+180000));
+ const candidates=actors.filter(a=>a.order_target>a.order_count&&!busy.has(a.id)&&(!a.next_order_after||Date.parse(a.next_order_after)<=Date.now()));
+ const available=candidates.filter(a=>sessions.some(s=>s.actor_id===a.id&&Date.parse(s.leave_at)>Date.now()+180000));
+ const active=available[Math.floor(Math.random()*available.length)];
  if(active)return {actor:active,session:sessions.find(s=>s.actor_id===active.id)!};
  const watch=c.viewers_enabled&&sessions.filter(s=>s.watching).length<c.max_active;
  if(candidates.length) {
@@ -57,7 +58,7 @@ async function orderActor(db:SupabaseClient,c:LiveCampaign,excluded:Set<string>)
    return {actor,session};
  }
  const minutes=dwellMinutes();
- return freshActor(db,c,orderTarget(minutes,3),minutes,watch);
+ return freshActor(db,c,orderTarget(minutes,6),minutes,watch);
 }
 function planLines(picks:AutoTestPick[]):AutomationLine[] {
  return picks.map(({productId,productName,color,size,unitPrice,qty})=>({productId,productName,color:color==='없음'?'':color,size:size==='없음'?'':size,unitPrice,qty}));

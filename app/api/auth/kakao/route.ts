@@ -1,3 +1,5 @@
+import {randomBytes} from 'node:crypto';
+import {signChatIdentity,CHAT_SESSION_COOKIE,chatCookieOptions} from '@/lib/liveChatSession';
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -88,7 +90,7 @@ export async function GET(request: Request) {
   });
 
   const userData = await userResponse.json().catch(() => null);
-  if (!userData) {
+  if (!userResponse.ok || !userData || !/^\d+$/.test(String(userData.id))) {
     return NextResponse.json({ error: "카카오 프로필을 읽지 못했습니다. 다시 시도해 주세요." }, { status: 502 });
   }
   const kakaoAccount = userData?.kakao_account || {};
@@ -170,7 +172,11 @@ export async function GET(request: Request) {
     // 조회 실패 → 카카오 값으로 기존 동작 유지
   }
 
-  return NextResponse.json({
+  const nonce=randomBytes(24).toString("hex");
+  let chatToken="";
+  try { chatToken=signChatIdentity({sub:String(userData.id),phone:kakaoPhone,nonce}); } catch { /* Optional chat verification must not interrupt shopping login. */ }
+  const response=NextResponse.json({
+    ...(chatToken?{chat_identity:{sub:String(userData.id),nonce}}:{}),
     kakao_id: String(userData.id || ""),
     kakao_nickname: kakaoAccount?.profile?.nickname || "",
       kakao_profile_image: kakaoAccount?.profile?.profile_image_url || "",
@@ -199,5 +205,7 @@ export async function GET(request: Request) {
       ? shippingData.shipping_addresses.length
       : 0,
     kakao_shipping_error: shippingError,
-  });
+  },{headers:{"Cache-Control":"private, no-store"}});
+  if(chatToken)response.cookies.set(CHAT_SESSION_COOKIE,chatToken,chatCookieOptions());
+  return response;
 }

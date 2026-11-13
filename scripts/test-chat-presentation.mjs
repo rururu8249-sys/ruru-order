@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const load=createUiLoader({});
+const P=load('lib/chatPresentation.ts');
+const cart={id:11,badge:'bot',body:'장바구니 담음',botRef:'c:751'};
+assert.equal(P.notificationPresentation(cart).kind,'cart');
+assert.equal(P.notificationPresentation({...cart,botRef:'ap:123',body:'님 카드결제 확인! 감사합니다'}).kind,'paid');
+assert.equal(P.notificationPresentation({...cart,botRef:'paid:123',body:'입금 확인'}).kind,'paid');
+assert.equal(P.notificationPresentation({...cart,botRef:'order:123',body:'주문 감사합니다'}).kind,'order');
+assert.deepEqual(P.notificationPresentation(cart),P.notificationPresentation(cart));
+assert.equal(P.notificationPresentation({...cart,badge:null}),null);
+assert.equal(new Set(Array.from({length:5000},(_,i)=>JSON.stringify(P.avatarVariant('public:'+i)))).size,5000);
+assert.equal(P.avatarVariant('https://private/photo.jpg'),null);
+assert.equal(P.avatarVariant('public:5000'),null);
+assert.ok(P.NOTIFICATION_NAMES.order.includes('품절임박'));
+console.log('PASS event identity, stable palette and 5000 avatar slots; duplicate images permitted by owner');

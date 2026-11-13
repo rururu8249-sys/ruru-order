@@ -1,3 +1,4 @@
+import {refreshPublicAvatars} from './liveChatPublicAvatars';
 // lib/liveEvents.ts
 // [2026-11-09] DB CPU 줄이기 ①단계 — «표가 바뀌면 알려 줘(postgres_changes)» 대신
 //   DB 트리거가 보내는 «소식(Broadcast)»을 듣는다(supabase/sql/live_events_broadcast.sql).
@@ -42,9 +43,11 @@ export function subscribeLiveEvents(
       if (e) handlers.onOrder?.(e);
     });
   }
-  if (handlers.onCatalog) {
+  {
     channel.on("broadcast", { event: "catalog" }, (msg: { payload?: unknown }) => {
       const p = (msg?.payload && typeof msg.payload === "object" ? msg.payload : {}) as Record<string, unknown>;
+      const avatarBc=String(p.table||"").match(/^live_chat_avatars:([a-f0-9-]{36})$/i)?.[1];
+      if(avatarBc)void refreshPublicAvatars(avatarBc);
       handlers.onCatalog?.({ table: String(p.table ?? ""), type: String(p.type ?? "") });
     });
   }

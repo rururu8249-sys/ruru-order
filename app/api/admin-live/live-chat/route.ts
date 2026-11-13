@@ -19,7 +19,11 @@ import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MSG_COLS = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref";
+const adminMessage=(row:unknown)=>{
+ const r=row as Record<string,unknown>;
+ return parseChatMessage({...r,avatar_url:r.avatar_url&&r.avatar_url!=='autotest'?r.avatar_url:typeof r.public_avatar_id==='number'?'public:'+r.public_avatar_id+(r.public_avatar_key?':'+r.public_avatar_key:''):''});
+};
+const MSG_COLS = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, public_avatar_id, public_avatar_key, bot_ref";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,8 +43,8 @@ export async function GET(request: NextRequest) {
         sb.from("live_chat_messages").select(MSG_COLS).eq("broadcast_id", bc).is("hidden_at", null).not("pinned_at", "is", null).order("pinned_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
       if (listRes.error) return fail("채팅을 못 불러왔어요.", 500);
-      const messages = (listRes.data ?? []).map(parseChatMessage).filter(Boolean).reverse();
-      return NextResponse.json({ ok: true, messages, pinned: pinRes.data ? parseChatMessage(pinRes.data) : null });
+      const messages = (listRes.data ?? []).map(adminMessage).filter(Boolean).reverse();
+      return NextResponse.json({ ok: true, messages, pinned: pinRes.data ? adminMessage(pinRes.data) : null });
     }
     const { data, error } = await sb
       .from("live_chat_bans")
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest) {
       // 관리자 PC 글에도 루루동이 자동 안내(손님 글과 같은 규칙 · 이모티콘 빼고 글자만)
       const botText = body.replace(/:[^:\s]{1,10}:/g, " ").replace(/\s+/g, " ").trim();
       if (botText) after(() => runLiveChatBot(sb, bc, botText));
-      return NextResponse.json({ ok: true, message: parseChatMessage(ins) });
+      return NextResponse.json({ ok: true, message: adminMessage(ins) });
     }
 
     if (action === "pin" || action === "unpin") {

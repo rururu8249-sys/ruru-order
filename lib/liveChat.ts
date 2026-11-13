@@ -1,3 +1,4 @@
+import {notificationPresentation} from './chatPresentation';
 // [2026-11-10] 「방송 보며 주문」 ③단계 — 사이트 채팅(유튜브 채팅과 따로). 순수 계산만.
 //   설정 읽기, 글 다듬기·금지어 가리기, 금지 시간, 소식(Broadcast) 모양 읽기.
 //   돈·주문·장바구니와 무관.
@@ -156,10 +157,11 @@ export function parseChatMessage(raw: unknown): LiveChatMessage | null {
   const broadcastId = String(p.broadcast_id ?? p.broadcastId ?? "");
   if (!Number.isFinite(id) || id <= 0 || !broadcastId) return null;
   const hidden = p.hidden === true || Boolean(p.hidden_at);
+  const presentation=notificationPresentation({id,badge:p.badge,body:String(p.body || ""),botRef:String(p.bot_ref ?? p.botRef ?? "")});
   return {
     id,
     broadcastId,
-    nickname: String(p.nickname ?? "").slice(0, 40) || "손님",
+    nickname: presentation?.nickname || String(p.nickname ?? "").slice(0, 40) || "손님",
     // 이모티콘 표식(한 개 최대 20글자)이 들어가 100글자를 넘을 수 있어 300까지
     body: hidden ? "" : String(p.body ?? "").slice(0, 300),
     createdAt: String(p.created_at ?? p.createdAt ?? ""),
@@ -167,7 +169,7 @@ export function parseChatMessage(raw: unknown): LiveChatMessage | null {
     badge: p.badge === "crown" || p.badge === "crown_pink" || p.badge === "mod" || p.badge === "bot" ? p.badge : null,
     pinned: !hidden && (p.pinned === true || Boolean(p.pinned_at)),
     botRef: String(p.bot_ref ?? p.botRef ?? "").slice(0, 300),
-    avatar: (() => { const a = String(p.avatar_url ?? p.avatar ?? "").trim(); return a === "autotest" ? a : /^https:\/\//i.test(a) ? a.slice(0, 500) : ""; })(), // "autotest" = 자동 테스트 글 표식(그림 아님)
+    avatar: presentation?.avatar || (() => { const a = String(p.avatar_url ?? p.avatar ?? "").trim(); return a === "autotest" || /^public:[0-9]{1,4}(?::[a-f0-9-]{36})?$/i.test(a) ? a : /^https:\/\//i.test(a) ? a.slice(0, 500) : ""; })(), // "autotest" = 자동 테스트 글 표식(그림 아님)
   };
 }
 

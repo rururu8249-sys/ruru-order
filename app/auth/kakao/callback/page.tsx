@@ -74,6 +74,7 @@ export default function KakaoCallbackPage() {
       }
 
       setIfValue("ruru_kakao_id", data.kakao_id);
+      if(data.chat_identity?.sub===String(data.kakao_id)&&data.chat_identity?.nonce)localStorage.setItem("ruru_chat_identity",JSON.stringify(data.chat_identity));
       setIfValue("ruru_kakao_nickname", data.kakao_nickname);
       setIfValue("ruru_kakao_profile_image", data.kakao_profile_image);
 

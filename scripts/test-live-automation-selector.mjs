@@ -10,6 +10,15 @@ let root;await act(async()=>{root=Renderer.create(React.createElement(Component,
 const rows=root.root.findAllByProps({'data-actor-option':true});
 assert.equal(rows.length,2);assert.equal(rows[0].props.disabled,false);assert.equal(rows[1].props.disabled,true);
 await act(async()=>{await rows[0].props.onClick()});assert.deepEqual(chosen,['one']);
+let cleared=0,reads=0;
+const withHistory={...state,recent:['one'],clearRecent:()=>cleared++,readOrders:async id=>{reads++;assert.equal(id,'one');return [{id:'old',at:'2026-11-13T09:00:00Z',deleted:true,lines:[{name:'MIU-1',color:'블랙',size:'38',qty:2}]}]},actors:[{...state.actors[0],used:true,activity:{present:true,cart:false,orders:1}}]};
+await act(async()=>{root.update(React.createElement(Component,{state:withHistory,dark:true}))});
+assert.ok(JSON.stringify(root.toJSON()).includes('● 사용함'));
+const count=chosen.length;
+await act(async()=>{await root.root.findByProps({'aria-label':'One 주문 내역 보기'}).props.onClick();});
+assert.equal(reads,1);assert.equal(chosen.length,count,'viewing orders never acquires manual identity');
+assert.ok(JSON.stringify(root.toJSON()).includes('삭제된 주문'));assert.ok(JSON.stringify(root.toJSON()).includes('MIU-1'));
+await act(async()=>{root.root.findAllByType('button').find(b=>b.children.includes('최근 목록 비우기')).props.onClick()});assert.equal(cleared,1);
 await act(async()=>{root.update(React.createElement(Component,{state:{...state,available:false},dark:true}))});assert.equal(root.toJSON(),null);
 await act(async()=>root.unmount());
 console.log('PASS actor activity labels, one-click selection, other-operator exclusion and no customer-facing controls');

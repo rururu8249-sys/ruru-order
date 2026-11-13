@@ -22,8 +22,10 @@ export const orderWindow = (last:number,now:number,rand=Math.random):number => p
 export const questionWindow = (due:number,rand=Math.random):number => due-30_000-Math.floor(unit(rand)*60_001);
 export const canSubmitQuestion = (asked:number,now:number):boolean => now-asked>=30_000 && now-asked<=120_000;
 export function orderTarget(dwell:number,slots:number,rand=Math.random):number {
-  const capacity=Math.min(3,Math.max(0,Math.floor(slots)),dwell>=5?3:0);
-  return capacity ? 1+Math.floor(unit(rand)*capacity) : 0;
+  const capacity=Math.min(6,Math.max(0,Math.floor(slots)),dwell>=5?6:0);
+  const r=unit(rand);
+  const target=r<.65?1:r<.88?2:r<.97?3:4+Math.floor((r-.97)/.03*3);
+  return Math.min(capacity,target);
 }
 export const nicknameKey = (nickname:string):string => nickname.normalize('NFC').trim().replace(/\s+/g,' ').toLowerCase();
 export type AutomationLine = {productId:string;productName:string;color:string;size:string;unitPrice:number;qty:number};

@@ -1,4 +1,6 @@
 "use client";
+import {ChatProfileAvatar} from "@/components/chat/ChatProfileAvatar";
+import {notificationPresentation} from "@/lib/chatPresentation";
 // 유튜브 기본 탭 · 사이트 새 글 두 개 미리보기 · 확인하면 알림 해제.
 // 탭을 숨겨도 유튜브 iframe을 유지해 재연결 없이 전환한다.
 //   지금 켜진 방송을 저절로 찾음(1분마다 다시 확인 — 새 방송이 켜지면 그 방송으로).
@@ -311,20 +313,15 @@ export default function ChatViewClient() {
             <div style={{ padding: "24px", textAlign: "center", color: C.mute, fontSize: "18px" }}>아직 글이 없어요. 손님이 쓰면 바로 나와요.</div>
           ) : displayMessages.map((m) => {
             const isNew = !m.deletedByAuthor && !m.privateCommand && recent.some((r) => r.id === m.id);
-            const b = m.badge ? BADGE[m.badge] : null;
-            const avatar = m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar === AUTO_TEST_AVATAR ? "" : m.avatar;
+            const palette=notificationPresentation(m);
+            const b = palette ? {label:"AI",bg:palette.badge,fg:palette.ink} : m.badge ? BADGE[m.badge] : null;
             return (
               <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "var(--chat-row-gap, 10px)", padding: "var(--chat-row-padding, 7px 8px)" }}>
-                {avatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatar} alt="" referrerPolicy="no-referrer" style={{ width: "1.6em", height: "1.6em", borderRadius: "9999px", objectFit: "cover", flexShrink: 0 }} />
-                ) : (
-                  <span aria-hidden="true" style={{ width: "1.6em", height: "1.6em", borderRadius: "9999px", background: "#3A3A3A", color: C.soft, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.75em", fontWeight: 700, flexShrink: 0 }}>{(Array.from(m.nickname)[0] || "?").toUpperCase()}</span>
-                )}
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={m.nickname} size="1.6em" frame={palette?.frame} />
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
-                  <span style={{ fontWeight: 700, color: "#C2C2C2", marginRight: "8px" }}>{m.nickname}</span>
+                  <span style={{ fontWeight: 700, color: palette?.nick || "#C2C2C2", marginRight: "8px" }}>{m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}
                   <ChatBodyView body={m.body} emojis={emojiMap} />

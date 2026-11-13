@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';import {createUiLoader} from './admin-ui-test-loader.mjs';
+const bc='00000000-0000-4000-8000-000000000001',entry='00000000-0000-4000-8000-000000000002';let identity=null,calls=[],ended=false;
+const db={from(){const q={select(cols){assert.equal(cols,'id,avatar_id');return q},eq(key,value){assert.equal(key,'broadcast_id');assert.equal(value,bc);return q},limit(){return Promise.resolve({data:[{id:entry,avatar_id:123}]})}};return q},async rpc(name,args){calls.push({name,args});return ended?{error:{message:'BROADCAST_ENDED'}}:{data:{key:entry,avatar:123}}}};
+const load=createUiLoader({'next/server':{NextResponse:{json:(data,opts)=>new Response(JSON.stringify(data),opts)}},'@/lib/youtube':{getServiceClient:()=>db},'@/lib/liveChatSession':{chatIdentityFromRequest:()=>identity,sameChatOrigin:r=>r.headers.get('origin')===r.nextUrl.origin}});
+const route=load('app/api/live-chat/avatars/route.ts');
+const req=(origin='https://shop.test')=>({nextUrl:new URL('https://shop.test/api/live-chat/avatars?bc='+bc),headers:new Headers({origin}),json:async()=>({bc,entry,kakaoId:'victim'})});
+let r=await route.POST(req());assert.equal(r.status,401);assert.equal(calls.length,0);
+identity={sub:'verified'};r=await route.POST(req('https://elsewhere.test'));assert.equal(r.status,403);
+r=await route.POST(req());assert.equal(r.status,200);assert.equal(calls[0].args.p_identity,'verified');
+ended=true;assert.equal((await route.POST(req())).status,409);
+r=await route.GET(req());const j=await r.json();assert.deepEqual(j.profiles,{[entry]:123});assert.ok(!JSON.stringify(j).includes('verified'));assert.ok(r.headers.get('cache-control').includes('no-store'));
+console.log('PASS avatar mutation authenticated, untrusted account ignored, CSRF/ended guards and opaque-only read projection');

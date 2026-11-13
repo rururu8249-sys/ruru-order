@@ -4,7 +4,7 @@ import {verifyAdminSessionFromRequest} from '@/lib/admin-auth';
 import {chatIdentityFromRequest,verifiedChatRole} from '@/lib/liveChatSession';
 export const MANUAL_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type ManualChatSelection={token:string;clientId:string;requestId:string;nickname?:string};
-export type ManualActor={id:string;nickname:string;activity:{present:boolean;cart:boolean;orders:number};inUse:boolean;mine:boolean;expiresAt:string|null};
+export type ManualActor={used?:boolean;id:string;nickname:string;activity:{used?:boolean;present:boolean;cart:boolean;orders:number};inUse:boolean;mine:boolean;expiresAt:string|null};
 export async function manualChatOperator(request:NextRequest,db:SupabaseClient):Promise<string|null> {
   const admin=await verifyAdminSessionFromRequest(request);
   if(admin) return 'admin:'+admin.sub;

@@ -46,6 +46,6 @@ export function duplicateLine(text:string,recent:string[]):boolean {
     return intersection/(a.size+b.size-intersection)>=.8;
   });
 }
-export function safeConversationLine(text:string):boolean {
-  return text.trim().length>0 && text.length<=100 && !/(테스트|\btest\b|\bAI\b|인공지능|API|프롬프트|한도|시스템|결제.{0,3}완료|입금.{0,3}완료|배송.{0,3}보장|https?:\/\/|\d{2,3}-\d{3,4}-\d{4})/i.test(text);
+export function safeConversationLine(text:string,allowPayment=false):boolean {
+  return text.trim().length>0 && text.length<=100 && (allowPayment||!/(결제.{0,3}완료|입금.{0,3}완료)/.test(text)) && !/(테스트|\btest\b|\bAI\b|인공지능|API|프롬프트|한도|시스템|배송.{0,3}보장|https?:\/\/|\d{2,3}-\d{3,4}-\d{4})/i.test(text);
 }

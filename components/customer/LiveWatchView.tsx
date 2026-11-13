@@ -1,4 +1,6 @@
 "use client";
+import {ChatProfileAvatar} from "@/components/chat/ChatProfileAvatar";
+import {notificationPresentation} from "@/lib/chatPresentation";
 // [2026-11-09] 「방송 보며 주문」 ②단계 화면 — 주문서 위에 덮는 방송 화면(손님용).
 //   참고: 오늘만셀러(onmlive)·모루라이브 — 세로 영상 꽉 차게, 아래에 «지금 소개 중» 상품 카드,
 //   맨 아래 줄 [상품 목록][주문서 확인], 「OO님 주문했어요」 알림.
@@ -168,11 +170,11 @@ const MenuIcon = ({ k }: { k: string }) => {
   return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
 };
 // 닉네임 뒤 표시 — 금색 왕관(총관리자) / 분홍 왕관 / R 동그라미(채팅 관리자). 우리 가게 표시라 직접 그림.
-function ChatBadge({ badge }: { badge: LiveChatMessage["badge"] }) {
+function ChatBadge({ badge, palette }: { badge: LiveChatMessage["badge"]; palette?: ReturnType<typeof notificationPresentation> }) {
   if (!badge) return null;
   if (badge === "bot") {
     // 루루동이AI — 손님 글과 헷갈리지 않게 파란 「AI」 표시
-    return <span aria-label="루루동이 자동 안내" style={{ display: "inline-flex", alignItems: "center", verticalAlign: "0.1em", margin: "0 4px 0 4px", height: "1.15em", padding: "0 0.35em", borderRadius: "9999px", background: "#3B82F6", color: "#FFFFFF", fontSize: "0.72em", fontWeight: 800, textShadow: "none", lineHeight: 1 }}>AI</span>;
+    return <span aria-label="루루동이 자동 안내" style={{ display: "inline-flex", alignItems: "center", verticalAlign: "0.1em", margin: "0 4px 0 4px", height: "1.15em", padding: "0 0.35em", borderRadius: "9999px", background: palette?.badge || "#3B82F6", color: palette?.ink || "#FFFFFF", fontSize: "0.72em", fontWeight: 800, textShadow: "none", lineHeight: 1 }}>AI</span>;
   }
   const st = { display: "inline-block", verticalAlign: "-0.18em", margin: "0 4px 0 2px", width: "1.15em", height: "1.15em", flexShrink: 0 } as const;
   if (badge === "mod") {
@@ -192,16 +194,6 @@ function ChatBadge({ badge }: { badge: LiveChatMessage["badge"] }) {
   );
 }
 // 닉네임 앞 동그란 사진 — 카카오 프로필 사진, 없거나 못 불러오면 닉네임 첫 글자(그 사람 색)
-function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: string }) {
-  const [broken, setBroken] = useState(false);
-  const box = { width: "24px", height: "24px", borderRadius: "9999px", flexShrink: 0, marginTop: "-2px", overflow: "hidden" } as const;
-  if (src && src !== AUTO_TEST_AVATAR && !broken) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => setBroken(true)} style={{ ...box, pointerEvents: "none", WebkitTouchCallout: "none", objectFit: "cover", display: "block", background: "#333333" }} />;
-  }
-  const ch = (Array.from(String(nick || "").trim())[0] || "?").toUpperCase(); // 영어는 대문자(Happy → H)
-  return <span aria-hidden="true" style={{ ...box, display: "inline-flex", alignItems: "center", justifyContent: "center", background: color, color: "#111111", fontSize: "12px", fontWeight: 700, textShadow: "none" }}>{ch}</span>;
-}
 // 글자를 상자 없이 영상 위에 바로 — 어떤 화면에서도 읽히게 진한 그림자
 // [08:50 사장님 「닉네임 흐리멍텅·블러 같다」] 번지는 그림자 대신 1px 또렷한 테두리 그림자
 // [09:08 사장님 「밝은 배경에서 흐리멍텅」] 번지는 그림자 대신 또렷한 1px 테두리 + 아래 옅은 그림자
@@ -1463,7 +1455,7 @@ export default function LiveWatchView(props: Props) {
           >
             <div ref={chatContentRef} style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0 }}>
             {greetingAnchor?.afterId === null ? greetingRow : null}
-            {chat.messages.map((m) => { const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
+            {chat.messages.map((m) => { const palette=notificationPresentation(m); const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
               const localLine = !Number.isInteger(m.id);
               const canMod = chat.canModerate && !localLine && !m.deletedByAuthor && !m.privateCommand;
@@ -1490,14 +1482,14 @@ export default function LiveWatchView(props: Props) {
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
-                <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={m.nickname} frame={palette?.frame} />
                 <span style={{ minWidth: 0, flex: 1, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: 12, color: "#ccc", marginBottom: 3 }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: 12, color: "#a8c7fa", marginBottom: 3 }}>나만 보이는 명령어</span> : null}
                   {/* [12:54 사장님 「유튜브랑 똑같이」] 사장님 유튜브 캡처에서 잰 값: 닉네임 흐린 흰색(약 80%)·보통 굵기, 글 흰색·보통 굵기 */}
                   {/* [13:44 사장님 「닉네임만 연한 색」] 닉네임만 사람마다 정해진 색을 흰색과 반쯤 섞은 연한 색(글은 흰색 그대로), 루루동이 안내는 흐린 흰색 */}
-                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: m.badge === "bot" ? "rgba(255,255,255,0.8)" : softNickColor(color) }}>{m.nickname}</span>
-                  <ChatBadge badge={m.badge} />
+                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: palette?.nick || softNickColor(color) }}>{m.nickname}</span>
+                  <ChatBadge badge={m.badge} palette={palette} />
                   {botProduct ? <ChatProductThumb src={chatProductPhoto(props.items, botProduct)} name="안내 상품 사진" /> : null}
                   <span style={{ marginLeft: m.badge ? "4px" : "8px", color: "#FFFFFF" /* 글은 유튜브처럼 늘 흰색 — 연한 색 글은 밝은 배경에서 안 읽힘(12:49), 닉네임만 사람 색 */ }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
@@ -1539,7 +1531,7 @@ export default function LiveWatchView(props: Props) {
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openChatMenu(chat.pinned!, e.clientX, e.clientY, chat.canPin && Number.isInteger(chat.pinned!.id)); }}
             style={{ ...(isDesktop ? { order: 2, flexShrink: 0, maxHeight: "30%", overflowY: "auto" } : {}), pointerEvents: "auto", display: "flex", alignItems: isDesktop && pinOpen ? "flex-start" : "center", gap: "8px", width: "100%", boxSizing: "border-box", minHeight: "44px", padding: "8px 12px", borderRadius: "22px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
           >
-            <ChatAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} color={chatColorMap.get(chat.pinned.id) || "#FFD43B"} />
+            <ChatProfileAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} />
             <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "9999px", background: "rgba(255,255,255,0.16)", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis" }}>
               {chat.pinned.nickname}<ChatBadge badge={chat.pinned.badge} />
             </span>
