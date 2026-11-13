@@ -49,6 +49,17 @@ export function LiveWelcomeChip() {
     return () => window.clearInterval(t);
   }, [offer, left]);
 
+  // [2026-11-14 사장님 「다른 거 하러 나가면 리셋」] 다른 앱·탭으로 가거나 화면이 꺼지면 처음부터 다시 셈(멈춤 아님)
+  useEffect(() => {
+    if (!offer) return;
+    const full = Math.max(0, Math.floor(Number(offer.watchSec) || 0));
+    const onHide = () => {
+      if (document.visibilityState === 'hidden' && !claiming.current) setLeft(full);
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, [offer]);
+
   useEffect(() => {
     if (!offer || left > 0 || claiming.current || !who.current) return;
     claiming.current = true;
