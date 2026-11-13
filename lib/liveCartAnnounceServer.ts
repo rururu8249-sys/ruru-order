@@ -46,7 +46,7 @@ export async function announceNewCartLines(sb: SupabaseClient, input: { sessionK
     if (!kakaoId || !input.lines.length) return;
     const now = Date.now();
     const person = `${kakaoId}`;
-    if (now - (lastPerson.get(person) ?? 0) < PER_PERSON_MS) return;
+    // [2026-11-13] 「한 사람 20초에 한 번」은 뺌 — 상품을 연달아 담으면 두 번째 상품 알림이 통째로 빠졌음(같은 상품 10분 한 번은 그대로)
 
     const [bcRes, chatRes, botRes, custRes] = await Promise.all([
       sb.from("broadcasts").select("id").eq("status", "ON").order("started_at", { ascending: false }).limit(1).maybeSingle(),
@@ -62,7 +62,9 @@ export async function announceNewCartLines(sb: SupabaseClient, input: { sessionK
     const cust = custRes.data as { youtube_nickname?: unknown; is_blocked?: unknown } | null;
     const nick = String(cust?.youtube_nickname ?? "").trim();
     if (!nick || isBlockedValue(cust?.is_blocked)) return;
-    if (now - (lastBroadcast.get(bc) ?? 0) < PER_BROADCAST_MS) return;
+    // 방송 전체 3초 간격 — 버리지 않고 남은 시간만큼 기다렸다 올림(최대 3초)
+    const gap = PER_BROADCAST_MS - (Date.now() - (lastBroadcast.get(bc) ?? 0));
+    if (gap > 0) await new Promise((r) => setTimeout(r, gap));
 
     const cands = await loadCandidates(sb, bc);
     const items: Array<CartAnnounceItem & { ref: string }> = [];
@@ -79,6 +81,14 @@ export async function announceNewCartLines(sb: SupabaseClient, input: { sessionK
     }
     sweep(seenItem, SAME_ITEM_MS);
     if (!items.length) return;
+    // [2026-11-13] 같은 담기 신호가 서버 두 곳에서 동시에 처리되면 같은 글이 두 번 올라갔음 — 최근 10분 같은 글(bot_ref)이 이미 있으면 안 올림
+    {
+      const since = new Date(now - SAME_ITEM_MS).toISOString();
+      const { data: dup } = await sb.from("live_chat_messages").select("bot_ref").eq("broadcast_id", bc).in("bot_ref", items.map((it) => it.ref)).gte("created_at", since).limit(50);
+      const done = new Set((dup ?? []).map((d) => String((d as { bot_ref?: unknown }).bot_ref ?? "")));
+      for (let i = items.length - 1; i >= 0; i--) if (done.has(items[i].ref)) items.splice(i, 1);
+      if (!items.length) return;
+    }
     const body = cartAnnounceText(maskChatNick(nick), items);
     if (!body) return;
     lastPerson.set(person, now);

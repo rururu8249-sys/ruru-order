@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       const plan = body?.plan as ScreenPlan | undefined;
       const text = String(plan?.chatAfter ?? "").trim();
       if (!plan || !text) return NextResponse.json({ ok: true, posted: false });
+      if (!(await readAutoTestState(sb)).chatEnabled) return NextResponse.json({ ok: true, posted: false }); // 채팅 끄면 바로 멈춤
       const { data: c } = await sb.from("customers").select("youtube_nickname").eq("kakao_id", AUTO_TEST_KAKAO_ID).maybeSingle();
       if (String((c as { youtube_nickname?: string } | null)?.youtube_nickname ?? "") !== plan.nickname) return NextResponse.json({ ok: true, posted: false });
       const r = await postTestChat(request.nextUrl.origin, plan.broadcastId, text);

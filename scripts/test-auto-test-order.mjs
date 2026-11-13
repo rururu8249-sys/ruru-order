@@ -215,4 +215,17 @@ assert.equal(one.list.length, 1);
 const dwellMin = (one.list[0].leave - one.list[0].join) / 60_000;
 assert.ok(dwellMin >= 2.4 && dwellMin <= 72, String(dwellMin));
 
+// 상품 카드 질문 → 1~2분 뒤 같은 상품 주문
+{
+  const st = A.parseAutoTestState(JSON.stringify({ enabled: true, pending: { bcId: "b1", nickname: "푸딩", productId: "677", detailName: "PD-202", productName: "PD-202", askedAt: 1, dueAt: 2 } }));
+  assert.equal(st.pending.nickname, "푸딩");
+  assert.equal(A.parseAutoTestState(JSON.stringify({ pending: { bcId: "b1" } })).pending, null);
+  assert.equal(A.parseAutoTestState("{}").pending, null);
+  for (let i = 0; i < 50; i++) { const g = A.pendingGapMs(); assert.ok(g >= 60000 && g <= 120000); }
+  const targets = [{ productId: "677", detailName: "PD-202" }, { productId: "800", detailName: "" }];
+  assert.equal(A.cardHasTarget(targets, "677", "PD-202"), true);
+  assert.equal(A.cardHasTarget(targets, "677", "PD-206"), false);
+  assert.equal(A.cardHasTarget(targets, "800", ""), true);
+  assert.equal(A.cardHasTarget([], "800", ""), false);
+}
 console.log("test-auto-test-order: all passed");

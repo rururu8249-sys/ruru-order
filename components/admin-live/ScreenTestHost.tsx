@@ -246,7 +246,7 @@ export default function ScreenTestHost() {
         const r = await fetch("/api/admin-live/auto-test-order?host=1", { cache: "no-store" });
         const j = await r.json();
         const st = j?.state;
-        if (st?.enabled && st.nextRunAt && st.nextRunAt <= Date.now() && !(st.lockUntil > Date.now())) void runOnce(true);
+        if ((st?.enabled || st?.pending) && st.nextRunAt && st.nextRunAt <= Date.now() && !(st.lockUntil > Date.now())) void runOnce(true);
       } catch { /* 다음에 */ }
     };
     void beat();

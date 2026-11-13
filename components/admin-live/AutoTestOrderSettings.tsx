@@ -37,7 +37,7 @@ export default function AutoTestOrderSettings() {
       const d = (e as CustomEvent).detail;
       if (d?.action !== "done") return;
       setBusy((b) => (b === "run" ? "" : b));
-      if (d.message) showAdminToast(String(d.message), /확인 —|건너뜀/.test(String(d.message)) ? "success" : "error");
+      if (d.message) showAdminToast(String(d.message), /확인 —|건너뜀|질문 올림|취소/.test(String(d.message)) ? "success" : "error");
       void load();
     };
     window.addEventListener(SCREEN_TEST_EVENT, onDone);
@@ -77,7 +77,7 @@ export default function AutoTestOrderSettings() {
         <div className="min-w-0">
           <div className="text-[13px] font-bold text-ink">자동 테스트 주문</div>
           <div className="text-[12px] text-ink-mute">
-            {!on && !state?.chatEnabled ? "꺼짐" : !on ? "꺼짐 · 채팅만 돌아요" : state?.lockUntil && state.lockUntil > Date.now() ? "테스트 중" : state?.nextRunAt ? `켜짐 · 다음 ${hm(state.nextRunAt)}쯤` : "켜짐"}
+            {!on && !state?.chatEnabled ? "꺼짐" : !on && !state?.pending ? "꺼짐 · 채팅만 돌아요" : state?.lockUntil && state.lockUntil > Date.now() ? "테스트 중" : state?.pending ? `질문 올림 · ${hm(state.pending.dueAt)}쯤 같은 상품 주문` : state?.nextRunAt ? `켜짐 · 다음 ${hm(state.nextRunAt)}쯤` : "켜짐"}
           </div>
         </div>
         <Switch on={on} disabled={!state || busy === "toggle"} onChange={(v) => void toggle(v)} label="자동 테스트 주문" />
@@ -85,7 +85,7 @@ export default function AutoTestOrderSettings() {
       <div className="mt-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[13px] font-bold text-ink">자동 테스트 채팅</div>
-          <div className="text-[12px] text-ink-mute">{state?.chatEnabled ? "켜짐 · 주문 앞뒤로 한 줄씩" : "꺼짐"}</div>
+          <div className="text-[12px] text-ink-mute">{state?.chatEnabled ? "켜짐 · 상품 카드 질문 → 1~2분 뒤 그 상품 주문" : "꺼짐"}</div>
         </div>
         <Switch on={state?.chatEnabled === true} disabled={!state || busy === "toggle"} onChange={(v) => void toggle(v, "chat")} label="자동 테스트 채팅" />
       </div>
