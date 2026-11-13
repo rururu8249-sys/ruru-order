@@ -6,7 +6,7 @@
 //   - 삭제는 «자동 테스트 주문서»만(is_test_order=true + test_order_reason 자동 테스트, 주문서 줄 전부가 그럴 때만).
 import { randomBytes, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { makeChatLines, type ChatProduct } from "@/lib/autoTestChat";
+import { makeChatLines, type ChatProduct, type StreamMode } from "@/lib/autoTestChat";
 import { tickTestViewers } from "@/lib/autoTestViewers";
 import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
 import {
@@ -104,7 +104,7 @@ async function decideStep(sb: Db, origin: string, bc: Row, state: AutoTestState)
   const productName = choices[0].productName;
   const nickname = await useFreshNickname(sb);
   const product = await chatProductOf(sb, card.productId, productName, overseasOn);
-  const cl = await makeChatLines({ nickname, live: await isYoutubeLiveNow(sb, bcId), product, withOrder: false });
+  const cl = await makeChatLines({ nickname, mode: await streamModeOf(sb, bc), product, withOrder: false });
   const r = await postTestChat(origin, bcId, cl.before);
   const now = Date.now();
   const pending: AutoTestPending = { bcId, nickname, productId: card.productId, detailName: card.detailName, productName, askedAt: now, dueAt: now + pendingGapMs() };
@@ -143,6 +143,15 @@ export async function isYoutubeLiveNow(sb: Db, bcId: string): Promise<boolean> {
     const t = Date.parse(String(v.t ?? ""));
     return String(v.bc ?? "") === bcId && v.v != null && Number.isFinite(t) && Date.now() - t < 180_000;
   } catch { return false; }
+}
+
+/** 방송 상태 — 서버 값으로만 정함(AI 추측 금지). 잠시 쉬는 중(paused_at) > 유튜브 실시간 송출 여부 > 다시보기 */
+export async function streamModeOf(sb: Db, bc: Row): Promise<StreamMode> {
+  const paused = String(bc.paused_at ?? "");
+  const pausedAt = paused ? Date.parse(paused) : NaN;
+  const startedAt = bc.started_at ? Date.parse(String(bc.started_at)) : 0;
+  if (String(bc.status ?? "").toUpperCase() === "ON" && Number.isFinite(pausedAt) && pausedAt >= (Number.isFinite(startedAt) ? startedAt : 0)) return "paused";
+  return (await isYoutubeLiveNow(sb, String(bc.id ?? ""))) ? "live" : "replay";
 }
 
 /** 테스트 계정으로 사이트 채팅 한 줄 — 손님과 같은 채팅 주소로(닉네임은 회원 표의 지금 닉네임) */
@@ -193,8 +202,7 @@ async function chatOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> 
       const ch = await cardChoices(sb, card.productId, card.detailName, overseasOn);
       if (ch.length) product = await chatProductOf(sb, card.productId, ch[0].productName, overseasOn);
     }
-    const live = await isYoutubeLiveNow(sb, bcId);
-    const lines = await makeChatLines({ nickname, live, product, withOrder: false });
+    const lines = await makeChatLines({ nickname, mode: await streamModeOf(sb, bc), product, withOrder: false });
     const r = await postTestChat(origin, bcId, lines.before);
     return { at, ok: r.ok, message: `[채팅] ${nickname}: ${r.ok ? lines.before : `실패 — ${r.message}`}`, nickname };
   } catch (e) {
@@ -415,7 +423,7 @@ async function runOnce(sb: Db, origin: string, bc: Row, withChat = false, step: 
     if (withChat) {
       const { overseasOn } = await readSettings(sb);
       const product = step.fixed ? await chatProductOf(sb, lines[0].productId, lines[0].productName, overseasOn) : null;
-      const cl = await makeChatLines({ nickname, live: await isYoutubeLiveNow(sb, bcId), product, withOrder: true });
+      const cl = await makeChatLines({ nickname, mode: await streamModeOf(sb, bc), product, withOrder: true });
       chatAfter = cl.after;
       if (step.greet) { await postTestChat(origin, bcId, cl.before); await wait(between(6_000, 12_000)); }
     }
@@ -556,7 +564,7 @@ export async function screenTestPlan(sb: Db, origin: string, scheduled = false):
     try {
       const { overseasOn } = await readSettings(sb);
       const product = step.fixed ? await chatProductOf(sb, prep.lines[0].productId, prep.lines[0].productName, overseasOn) : null;
-      const cl = await makeChatLines({ nickname: prep.nickname, live: await isYoutubeLiveNow(sb, String(bc.id ?? "")), product, withOrder: true });
+      const cl = await makeChatLines({ nickname: prep.nickname, mode: await streamModeOf(sb, bc), product, withOrder: true });
       if (step.greet) await postTestChat(origin, String(bc.id ?? ""), cl.before); // 카드 없을 때만 인사(상품 질문 아님)
       chatAfter = cl.after;
     } catch { /* 채팅 실패는 주문 테스트와 무관 */ }

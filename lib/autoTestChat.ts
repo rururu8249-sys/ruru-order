@@ -30,13 +30,17 @@ export function randomBody(rand = Math.random): { height: number; weight: number
 }
 
 export type ChatPhase = "before" | "after";
+/** 서버가 정한 방송 상태(AI 가 추측하지 않음) — live=실시간 송출 중 / paused=잠시 쉬는 중 / replay=송출 끝·다시보기 */
+export type StreamMode = "live" | "paused" | "replay";
 
 /** 문장 목록(제미나이 실패 때) — 라이브/다시보기 × 앞/뒤 × 상품 종류 */
-export function fallbackChatLine(phase: ChatPhase, live: boolean, product: ChatProduct | null, rand = Math.random): string {
+export function fallbackChatLine(phase: ChatPhase, mode: StreamMode, product: ChatProduct | null, rand = Math.random): string {
+  const live = mode === "live";
   if (phase === "after") {
     return pick(["주문서 제출했어요~", "방금 주문했어요!", "주문 잘했어요~", "장바구니 담고 주문했어요", "주문했어요 😊", "방금 주문서 냈어요~"], rand);
   }
-  if (!live) return pick(["안녕하세요~", "구경 왔어요", "다시보기 보고 있어요~", "다시보기 편하네요", "잘 보고 있어요~", "오늘도 구경 왔어요"], rand);
+  if (mode === "paused") return pick(["안녕하세요~", "구경 왔어요", "잠깐 쉬는 동안 상품 구경 중이에요", "상품 둘러보고 있어요~", "오늘도 구경 왔어요"], rand);
+  if (!live) return pick(["안녕하세요~", "구경 왔어요", "다시보기 보고 있어요~", "방송 다시 보면서 구경 중이에요", "잘 보고 있어요~", "오늘도 구경 왔어요"], rand);
   const greet = ["안녕하세요~ 오늘도 구경 왔어요", "안녕하세요!", "왔어요~ 오늘 예쁜 거 많네요", "언니 안녕하세요~"];
   if (!product) return pick(greet, rand);
   const kind = chatProductKind(product);
@@ -51,20 +55,29 @@ export function fallbackChatLine(phase: ChatPhase, live: boolean, product: ChatP
   return pick(qs, rand);
 }
 
+function kstClock(): string {
+  const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", hour12: false }).format(new Date())) % 24;
+  return `${h}시(${h < 6 ? "새벽" : h < 11 ? "아침" : h < 17 ? "낮" : h < 21 ? "저녁" : "밤"})`;
+}
+
 const TONES = ["짧고 상냥한 존댓말", "친근한 반말 섞인 존댓말", "물결(~)을 자주 쓰는 말투", "이모티콘 한 개 정도 쓰는 말투", "차분한 존댓말", "신난 말투"];
 
 /** 앞·뒤 두 문장 — 제미나이로 만들고, 안 되면 문장 목록. 절대 예외를 던지지 않음 */
-export async function makeChatLines(input: { nickname: string; live: boolean; product: ChatProduct | null; withOrder: boolean }, rand = Math.random): Promise<{ before: string; after: string; source: "ai" | "list" }> {
-  const fb = { before: fallbackChatLine("before", input.live, input.product, rand), after: fallbackChatLine("after", input.live, input.product, rand), source: "list" as const };
+export async function makeChatLines(input: { nickname: string; mode: StreamMode; product: ChatProduct | null; withOrder: boolean }, rand = Math.random): Promise<{ before: string; after: string; source: "ai" | "list" }> {
+  const live = input.mode === "live";
+  const fb = { before: fallbackChatLine("before", input.mode, input.product, rand), after: fallbackChatLine("after", input.mode, input.product, rand), source: "list" as const };
   try {
     const kind = input.product ? chatProductKind(input.product) : "unknown";
     const body = randomBody(rand);
     const rules = [
       "너는 유튜브 라이브 쇼핑 방송을 보는 40~60대 여성 손님이다. 사이트 채팅에 올릴 짧은 한국어 문장을 만든다.",
       `닉네임: ${input.nickname} / 말투: ${pick(TONES, rand)}`,
-      input.live
-        ? "지금 방송이 진행 중이다. before 문장은 인사 또는 상품 질문(가격·사이즈·색상·배송·주문 가능 여부) 중 하나."
-        : "지금은 방송이 끝나고 다시보기 중이다. before 문장은 가벼운 인사만(예: 안녕하세요~, 다시보기 보고 있어요). 답이 필요한 질문(가격·사이즈·재고·배송)은 절대 쓰지 마.",
+      `지금 한국 시각은 ${kstClock()}이다. 시간대에 안 맞는 인사(밤인데 좋은 아침, 낮인데 잘 자요·안녕히 주무세요)는 쓰지 마.`,
+      input.mode === "live"
+        ? "지금 방송이 실시간으로 송출 중이다. before 문장은 인사 또는 상품 질문(가격·사이즈·색상·배송·주문 가능 여부) 중 하나."
+        : input.mode === "paused"
+          ? "방송이 «잠시 쉬는 중»이다(진행자가 지금 말하지 않음). before 문장은 가벼운 인사나 상품 구경 중이라는 말만. 답이 필요한 질문(가격·사이즈·재고·배송)과 「지금 방송 중이네요」 같은 말은 절대 쓰지 마."
+          : "지금은 실시간 송출이 끝나고 다시보기 중이다. before 문장은 가벼운 인사나 다시보기 감상만(예: 다시보기 보고 있어요~). 답이 필요한 질문(가격·사이즈·재고·배송)과 「지금 방송 중이네요」·「라이브」 같은 말은 절대 쓰지 마.",
       input.product ? `상품: ${input.product.name} (${input.product.category || "분류 없음"}, ${input.product.price.toLocaleString()}원, 색상 ${input.product.colors.join("/") || "-"}, 사이즈 ${input.product.sizes.join("/") || "-"})` : "상품 정보 없음 — 인사만.",
       kind === "appliance" ? "이 상품은 가전이다. 키·몸무게·옷 사이즈 질문 금지. 가격·구성품·색상 같은 질문만." :
         kind === "maya" ? "이 상품은 상품 정보에 맞게만 묻는다. 성별·몸 치수를 단정하지 마." :
@@ -81,7 +94,8 @@ export async function makeChatLines(input: { nickname: string; live: boolean; pr
     let before = clean(j.before);
     let after = clean(j.after);
     if (!before) return fb;
-    if (!input.live && /\?|얼마|사이즈|재고|배송|있나요|되나요/.test(before)) before = fb.before; // 다시보기 중 질문 금지
+    if (!live && /\?|얼마|사이즈|재고|배송|있나요|되나요|방송 중|라이브|생방/.test(before)) before = fb.before; // 쉬는 중·다시보기엔 질문·「방송 중」 금지
+    if (/주무세요|잘 ?자요|굿밤|좋은 ?아침|굿모닝/.test(before)) before = fb.before;
     if (kind === "appliance" && /키|몸무게|kg|사이즈|55|66/.test(before)) before = fb.before;
     if (!after || /결제|입금/.test(after)) after = fb.after;
     return { before, after, source: "ai" };

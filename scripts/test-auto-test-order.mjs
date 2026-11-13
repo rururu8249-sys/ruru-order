@@ -188,11 +188,13 @@ const C = load("lib/autoTestChat.ts");
 const dyson = { name: "다이슨 에어랩HS05-2세대", category: "", price: 329000, colors: ["니켈"], sizes: [] };
 const coat = { name: "BB-58", category: "의류", price: 195000, colors: ["블랙", "베이지"], sizes: ["S", "M", "L"] };
 for (let i = 0; i < 300; i += 1) {
-  const replay = C.fallbackChatLine("before", false, coat);
-  assert.ok(!/\?|얼마|사이즈|배송|있나요/.test(replay), replay);
-  const d = C.fallbackChatLine("before", true, dyson);
+  for (const m of ["replay", "paused"]) {
+    const replay = C.fallbackChatLine("before", m, coat);
+    assert.ok(!/\?|얼마|사이즈|배송|있나요|방송 중|라이브/.test(replay), replay);
+  }
+  const d = C.fallbackChatLine("before", "live", dyson);
   assert.ok(!/kg|사이즈 추천|정사이즈|입는데/.test(d), d);
-  assert.ok(!/결제|입금/.test(C.fallbackChatLine("after", true, coat)));
+  assert.ok(!/결제|입금/.test(C.fallbackChatLine("after", "live", coat)));
   const b = C.randomBody();
   assert.ok(b.height >= 150 && b.height <= 170 && b.weight >= 40 && b.weight <= 75, JSON.stringify(b));
 }
