@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
 import {
   AUTO_TEST_KAKAO_ID, AUTO_TEST_KEY, AUTO_TEST_NAME, AUTO_TEST_PHONE, AUTO_TEST_REASON,
-  SCREEN_HOST_FRESH_MS, buildOrderRows, choosePayment, isAutoTestRow, nicknameCandidates, parseAutoTestState, pickOrderLines, productChoices, randomGapMs, verifySavedRows,
+  AUTO_TEST_ORDERED_SINCE, SCREEN_HOST_FRESH_MS, buildOrderRows, filterTestChoices, choosePayment, isAutoTestRow, nicknameCandidates, parseAutoTestState, pickOrderLines, productChoices, randomGapMs, verifySavedRows,
   type AutoTestLast, type AutoTestPick, type AutoTestSettings, type AutoTestState,
 } from "@/lib/autoTestOrder";
 
@@ -207,8 +207,18 @@ async function prepareRun(sb: Db, bc: Row): Promise<Prepared> {
       products.push(...((data ?? []) as Row[]));
     }
     const { s: settings, overseasOn } = await readSettings(sb);
-    const choices = products.flatMap((p) => productChoices(p, overseasOn));
-    if (!choices.length) return { skip: "건너뜀 — 지금 방송에 재고 무제한으로 주문할 수 있는 상품이 없어요." };
+    const all = products.flatMap((p) => productChoices(p, overseasOn));
+    // 11/6 이후 실제 주문이 있었던 상품 이름(테스트·삭제 주문 제외)
+    const names = [...new Set(all.map((c) => c.productName))];
+    const orderedNames = new Set<string>();
+    for (let i = 0; i < names.length; i += 100) {
+      const { data, error } = await sb.from("orders").select("product_name").in("product_name", names.slice(i, i + 100))
+        .gte("created_at", new Date(AUTO_TEST_ORDERED_SINCE).toISOString()).neq("is_test_order", true).neq("is_deleted", true).limit(5000);
+      if (error) throw new Error(`주문 이력 읽기 실패: ${error.message}`);
+      for (const r of (data ?? []) as Row[]) orderedNames.add(String(r.product_name ?? "").trim());
+    }
+    const choices = filterTestChoices(all, orderedNames);
+    if (!choices.length) return { skip: "건너뜀 — 지금 방송에 테스트할 상품(11/6 이후 주문 있었던 재고 무제한 상품)이 없어요." };
     const lines = pickOrderLines(choices);
     const paymentMethod = choosePayment(lines, settings);
 

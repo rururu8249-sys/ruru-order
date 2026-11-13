@@ -23,6 +23,12 @@ assert.deepEqual(A.productChoices(simple, false).map((c) => `${c.color}/${c.size
 const bc = A.productChoices(brand, false);
 assert.deepEqual(bc.map((c) => `${c.productName}|${c.color}|${c.size}|${c.unitPrice}`), ["PD-1|블랙|M|120000", "PD-2|없음||100000"]);
 
+// ── 테스트 상품 기준: 11/6 이후 주문 있었던 것만 · 다이슨 항상 · 샘플할인 제외
+const fc = A.filterTestChoices([
+  { productName: "PD-1" }, { productName: "PD-2" }, { productName: "다이슨 에어랩HS05-2세대" }, { productName: "PD-507 베이지 샘플할인" },
+], new Set(["PD-1", "PD-507 베이지 샘플할인"]));
+assert.deepEqual(fc.map((c) => c.productName), ["PD-1", "다이슨 에어랩HS05-2세대"]);
+
 // ── 1~3개, 서로 다른 상품, 수량 1~3
 for (let i = 0; i < 50; i += 1) {
   const lines = A.pickOrderLines([...A.productChoices(simple, false), ...bc]);
@@ -85,6 +91,7 @@ function fakeDb(tables) {
         select() { return q; }, insert(p) { op = "insert"; payload = p; return q; }, update(p) { op = "update"; payload = p; return q; }, delete() { op = "delete"; return q; },
         eq(k, v) { filters.push((r) => String(r[k]) === String(v)); return q; },
         neq(k, v) { filters.push((r) => String(r[k]) !== String(v)); return q; },
+        gte(k, v) { filters.push((r) => String(r[k] ?? "") >= String(v)); return q; },
         in(k, vs) { filters.push((r) => vs.map(String).includes(String(r[k]))); return q; },
         order() { return q; }, limit() { return q; },
         maybeSingle() { single = true; return q; },
@@ -96,7 +103,10 @@ function fakeDb(tables) {
 }
 
 const tables = {
-  settings: [], customers: [{ id: "c1", youtube_nickname: "포근한고양이100" }], orders: [{ id: 1, youtube_nickname: "기존손님", order_group_id: "real", is_test_order: false }],
+  settings: [], customers: [{ id: "c1", youtube_nickname: "포근한고양이100" }], orders: [{ id: 1, youtube_nickname: "기존손님", order_group_id: "real", is_test_order: false },
+    { id: 2, product_name: "니트", created_at: "2026-11-07T01:00:00.000Z", is_test_order: false, order_group_id: "r2" },
+    { id: 3, product_name: "PD-1", created_at: "2026-11-08T01:00:00.000Z", is_test_order: false, order_group_id: "r3" },
+    { id: 4, product_name: "PD-2", created_at: "2026-11-01T01:00:00.000Z", is_test_order: false, order_group_id: "r4" }],
   broadcasts: [{ id: "b1", status: "ON", is_deleted: false, broadcast_public_title: "테스트방송" }],
   broadcast_products: [{ broadcast_id: "b1", product_id: 10 }, { broadcast_id: "b1", product_id: 11 }, { broadcast_id: "b1", product_id: 20 }],
   products: [simple, stockOn, brand], inventory_ledger: [], live_chat_messages: [],
@@ -129,6 +139,7 @@ assert.equal(calls.length, 2);
 assert.ok(calls[0].url.endsWith("/api/cart-reservations") && calls[1].url.endsWith("/api/customer-orders/submit"));
 assert.equal(calls[1].body.cart_session_key, calls[0].body.sessionKey);
 assert.ok(calls[1].body.orderRows.every((r) => String(r.product_id) !== "11"), "재고 관리 상품은 안 고름");
+assert.ok(calls[1].body.orderRows.every((r) => r.product_name !== "PD-2"), "11/6 전에만 주문된 상품은 안 고름");
 const cust = tables.customers.find((c) => c.kakao_id === A.AUTO_TEST_KAKAO_ID);
 assert.equal(cust.youtube_nickname, last.nickname);
 assert.equal(cust.live_alert_optin, false);

@@ -9,6 +9,14 @@ import { cleanProductNameForFeed } from "@/lib/feedText";
 
 export const LIVE_CHAT_BOT_KEY = "live_chat_bot_v1";
 export const LIVE_CHAT_BOT_NICK = "루루동이";
+/** [2026-11-13 사장님] 주문서 제출 알림 글의 닉네임 — 주문 분위기 나는 짧은 이름 중 랜덤(AI 배지는 그대로) */
+export const ORDER_BOT_NICKS = [
+  "주문폭주", "매진임박", "주문알리미", "실시간주문", "품절주의", "주문접수", "인기폭발", "주문감사", "지금주문중", "장바구니요정",
+  "구매행렬", "완판예감", "주문러시", "오늘의득템", "핫딜알림", "득템성공", "주문도착", "따끈주문", "주문소식", "품절각",
+];
+export function randomOrderBotNick(rand = Math.random): string {
+  return ORDER_BOT_NICKS[Math.floor(rand() * ORDER_BOT_NICKS.length)];
+}
 /** 봇 글의 kakao_id 자리(진짜 손님 계정과 안 겹침) */
 export const LIVE_CHAT_BOT_KAKAO = "bot:ruru";
 /** 같은 상품·같은 답은 이 시간 안에 다시 안 올림(도배 방지) */

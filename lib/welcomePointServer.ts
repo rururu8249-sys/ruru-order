@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
 import { koreanPhoneVariants } from "@/lib/order/phone";
+import { AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
 import {
   decideWelcome, kstDayStartIso, parseWelcomePointConfig, parseWelcomeSourceKey, WELCOME_POINT_DEFAULT, WELCOME_REASON,
   welcomeOrderResult, type WelcomeOrderRow,
@@ -63,6 +64,7 @@ export async function findWelcomeCustomer(sb: SupabaseClient, kakaoId: string, p
   const k = String(kakaoId || "").replace(/[^0-9A-Za-z_-]/g, "");
   const p = digits(phone);
   if (!k || p.length < 10 || p.length > 11) return null;
+  if (k === AUTO_TEST_KAKAO_ID) return null; // [2026-11-13] 자동 테스트 회원은 선물 대상 아님
   const { data, error } = await sb.from("customers").select("*").eq("kakao_id", k).order("created_at", { ascending: false }).limit(3);
   if (error) throw new Error(error.message);
   const row = ((data ?? []) as Record<string, unknown>[]).find((r) => digits(r.customer_phone) === p);

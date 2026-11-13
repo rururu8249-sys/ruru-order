@@ -7,6 +7,7 @@
 //   - 손님 화면 코드는 버튼 표식(data-at)만 붙어 있고 동작은 그대로. 돈·주문 로직 무접촉(주문은 손님 화면이 냄).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { liveWatchViewKey } from "@/lib/liveWatch";
+import { CUSTOMER_SESSION_VERSION_KEY, REQUIRED_CUSTOMER_SESSION_VERSION, REQUIRED_YOUTUBE_NICKNAME_CONFIRM_VERSION, YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY } from "@/lib/customer/customerSession";
 
 const LOCK_KEY = "ruru_admin_screen_test_lock";
 export const SCREEN_TEST_EVENT = "ruru-screen-test";
@@ -19,7 +20,8 @@ type Plan = {
 
 class SkipSignal extends Error {}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const isCustomerKey = (k: string) => k.startsWith("ruru_") && !k.includes("admin");
+// 손님 화면이 쓰는 값만(관리자 화면 값 — 알림 한 번만·미션 등 — 은 안 건드림)
+const isCustomerKey = (k: string) => k.startsWith("ruru_") && !k.includes("admin") && !k.startsWith("ruru_alert_once") && k !== "ruru_mission_last";
 
 async function api(body: Record<string, unknown>) {
   const r = await fetch("/api/admin-live/auto-test-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -184,6 +186,9 @@ export default function ScreenTestHost() {
         ruru_kakao_id: id.kakaoId, ruru_customer_phone: id.phone, ruru_youtube_nickname: plan.nickname, ruru_customer_name: id.name,
         ruru_customer_zipcode: id.zipcode, ruru_customer_address: id.address, ruru_customer_detail_address: id.detailAddress,
         ruru_howto_done: "1", ruru_popup_notice_seen: String(Date.now()), ruru_privacy_consent_version: "autotest",
+        // 없으면 손님 화면이 «옛 로그인»으로 보고 지워 버림(lib/customer/customerSession)
+        [CUSTOMER_SESSION_VERSION_KEY]: REQUIRED_CUSTOMER_SESSION_VERSION,
+        [YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY]: REQUIRED_YOUTUBE_NICKNAME_CONFIRM_VERSION,
       };
       for (const [k, v] of Object.entries(set)) localStorage.setItem(k, v);
       sessionKey = liveWatchViewKey(plan.broadcastId);

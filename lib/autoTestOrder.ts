@@ -257,3 +257,22 @@ export function verifySavedRows(sent: Row[], saved: Row[]): string[] {
   }
   return [...new Set(problems)];
 }
+
+/** [2026-11-13 사장님] 테스트할 상품 고르는 기준
+ *  - 11/6 이후 주문이 1건이라도 있었던 상품(세부상품 이름 기준)만
+ *  - 다이슨은 주문이 적어도 포함
+ *  - 샘플할인 상품은 제외 */
+export const AUTO_TEST_ORDERED_SINCE = "2026-11-06T00:00:00+09:00";
+export const AUTO_TEST_ALWAYS_INCLUDE = ["다이슨"];
+export const AUTO_TEST_EXCLUDE = ["샘플할인"];
+
+export function filterTestChoices(choices: AutoTestChoice[], orderedNames: Set<string>): AutoTestChoice[] {
+  const norm = (v: string) => v.replace(/\s+/g, "").toLowerCase();
+  const ordered = new Set([...orderedNames].map(norm));
+  return choices.filter((c) => {
+    const n = c.productName;
+    if (AUTO_TEST_EXCLUDE.some((w) => n.includes(w))) return false;
+    if (AUTO_TEST_ALWAYS_INCLUDE.some((w) => n.includes(w))) return true;
+    return ordered.has(norm(n));
+  });
+}
