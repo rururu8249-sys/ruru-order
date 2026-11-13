@@ -1,0 +1,111 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {PGlite} from '@electric-sql/pglite';
+process.on('uncaughtException',e=>{console.error(e.message,e.where||'');process.exit(1)});
+const db=new PGlite();
+await db.exec(`
+  create role anon; create role authenticated; create role service_role;
+  create table broadcasts(id uuid primary key,status text,is_deleted boolean default false);
+  create table customers(id bigint primary key,kakao_id text,youtube_nickname text);
+  create table visitor_presence(id bigserial primary key,visitor_key text unique,nickname text,page_type text,path text,last_seen_at timestamptz,created_at timestamptz default now(),updated_at timestamptz,kakao_id text);
+  create table live_chat_messages(id bigserial primary key,broadcast_id uuid,kakao_id text,customer_id bigint,nickname text,body text,created_at timestamptz default now(),hidden_at timestamptz,hidden_by text,avatar_url text);
+  create table orders(id bigserial primary key,order_group_id text,kakao_id text,customer_id bigint,youtube_nickname text,is_test_order boolean,test_order_reason text,operator_test_phone text,exclude_from_settlement boolean,exclude_from_payment_match boolean,exclude_from_shipping boolean,exclude_from_picking boolean,order_status text,admin_status text,shipping_status text);
+  create table products(id bigint primary key,product_name text,price numeric,product_note text,status text,product_status text);
+  create table broadcast_products(broadcast_id uuid,product_id bigint);
+  create table cart_reservations(id bigserial primary key,session_key text,product_id text,color text,size text,qty int,expires_at timestamptz);
+  create table settings(key text primary key,value text);
+  create function ruru_option_manual_soldout(jsonb,text,text,text) returns boolean language sql as $$ select coalesce(($1->>'soldout')::boolean,false) $$;
+  create function submit_customer_order_with_bank_routing(jsonb,integer,text,text,text,text,text) returns jsonb language plpgsql as $$
+  declare r jsonb; g text; begin
+    if $2<>0 then raise exception 'points side effect'; end if;
+    for r in select value from jsonb_array_elements($1) loop
+      g:=r->>'order_group_id';
+      insert into orders(order_group_id,kakao_id,youtube_nickname,is_test_order,test_order_reason,operator_test_phone,exclude_from_settlement,exclude_from_payment_match,exclude_from_shipping,exclude_from_picking)
+      values(g,$7,$4,(r->>'is_test_order')::boolean,r->>'test_order_reason',r->>'operator_test_phone',(r->>'exclude_from_settlement')::boolean,(r->>'exclude_from_payment_match')::boolean,(r->>'exclude_from_shipping')::boolean,(r->>'exclude_from_picking')::boolean);
+    end loop; return jsonb_build_object('ok',true,'order_group_id',g); end $$;
+`);
+const migration=readFileSync(new URL('../supabase/migrations/20261113071302_live_automation_sessions.sql',import.meta.url),'utf8');
+await db.exec(migration);
+const exists=await db.query(`select to_regclass('public.live_automation_campaigns') as name`);
+assert.ok(exists.rows[0].name,'persistent automation campaigns must exist');
+// Only the external scheduling adapter is replaced; SQL locks, writes and all business guards remain real.
+await db.exec(`create table test_schedule(enabled boolean); insert into test_schedule values(false);
+create or replace function live_automation_schedule(p_enabled boolean) returns void language plpgsql as $$ begin update test_schedule set enabled=p_enabled; end $$;`);
+const bc='00000000-0000-4000-8000-000000000001';
+await db.query(`insert into broadcasts values($1,'ON',false)`,[bc]);
+await db.exec(`insert into customers values(4569,'990000000077','original'); insert into products values(10,'니트',100,'{}','판매중','판매중');`);
+await db.query(`insert into broadcast_products values($1,10)`,[bc]);
+const scalar=async(sql,args=[])=>Object.values((await db.query(sql,args)).rows[0])[0];
+const ctl=async(feature,on,rev)=>scalar(`select live_automation_control($1,$2,$3,$4)`,[bc,feature,on,rev]);
+for(const file of ['20261113074405_live_automation_manual_identity.sql','20261113075644_live_automation_variable_tempo.sql','20261113080120_live_automation_worker_actions.sql']) await db.exec(readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+
+await db.exec('alter table live_chat_messages add column badge text; alter table live_chat_messages add column bot_ref text unique; alter table orders add column created_at timestamptz default now(); alter table orders add column payment_method text');
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113082708_live_automation_conversation_runtime.sql',import.meta.url),'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113092853_live_automation_start_feedback.sql',import.meta.url),'utf8'));
+await db.exec(`create function live_automation_dispatch() returns void language plpgsql as $$ begin if exists(select 1 from public.live_automation_campaigns where (orders_enabled and next_order_at<=now())) then return; end if; end $$;`);
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113094047_live_automation_crowd_rhythm.sql',import.meta.url),'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113095014_live_automation_order_dynamics.sql',import.meta.url),'utf8'));
+assert.equal(await scalar("select to_regclass('public.live_automation_payment_events')"),'live_automation_payment_events','isolated simulated payment events must exist');
+let c=await ctl('all',true,0);
+assert.equal(c.max_active,100);
+const profiles=Array.from({length:12},(_,seed)=>({seed}));
+await scalar('select live_automation_pool_refill($1)',[Array.from({length:200},(_,i)=>({nickname:'이름'+i,category:'korean'}))]);
+const step=()=>scalar('select live_automation_population_step($1,$2,$3)',[c.id,c.revision,profiles]);
+let crowd=await step();assert.ok(crowd.count<=15&&crowd.count>0);
+for(let i=0;i<4;i++)crowd=await step();
+assert.ok(crowd.count>=42&&crowd.count<=58,'normal target must center on 50');
+await scalar('select live_automation_presence_batch($1,$2,$3)',[crowd.anchor,c.revision,'/order#live']);
+assert.equal(await scalar('select count(*)::int from visitor_presence'),crowd.count);
+// Force the documented peak boundary; the normal clock chooses this only after cooldown.
+await db.query("update live_automation_campaigns set population_plan=jsonb_build_object('phase','spike','target',100,'until',clock_timestamp()+interval '3 minutes','nextSpike',clock_timestamp()+interval '1 hour') where id=$1",[c.id]);
+for(let i=0;i<5;i++)crowd=await step();
+assert.equal(crowd.count,100);
+await scalar('select live_automation_presence_batch($1,$2,$3)',[crowd.anchor,c.revision,'/order#live']);
+assert.equal(await scalar('select count(*)::int from visitor_presence'),100);
+const oldAnchor=crowd.anchor;
+await db.query("update live_automation_sessions set last_ack_at=now()-interval '80 seconds' where id=$1",[oldAnchor]);
+crowd=await step();
+assert.equal(crowd.count,100,'missed heartbeat reconnect preserves population without duplicate counting');
+assert.ok(await scalar('select stopped_at from live_automation_sessions where id=$1',[oldAnchor]));
+await scalar('select live_automation_presence_batch($1,$2,$3)',[crowd.anchor,c.revision,'/order#live']);
+assert.equal(await scalar('select count(*)::int from visitor_presence'),100);
+await db.query("update live_automation_campaigns set tempo_plan=jsonb_build_object('mode','steady') where id=$1",[c.id]);
+const burst=await scalar('select live_automation_plan_tempo($1,false)',[c.id]);
+assert.equal(burst.mode,'burst');assert.ok(burst.offsets.length>=4&&burst.offsets.length<=8);
+assert.ok(['quiet','steady'].includes((await scalar('select live_automation_plan_tempo($1,false)',[c.id])).mode),'burst must ease into quiet or ordinary activity');
+
+await assert.rejects(scalar('select live_automation_presence_batch($1,$2,$3)',[crowd.anchor,c.revision-1,'/order#live']),/STALE/);
+await db.query("update live_automation_campaigns set population_plan=jsonb_build_object('phase','baseline','target',50,'until',clock_timestamp()+interval '3 minutes','nextSpike',clock_timestamp()+interval '1 hour') where id=$1",[c.id]);
+let down=await step();assert.ok(down.count>=92&&down.count<100,'peak falls in bounded steps');
+for(let i=0;i<7;i++)crowd=await step();
+assert.equal(crowd.count,50);
+await scalar('select live_automation_presence_batch($1,$2,$3)',[crowd.anchor,c.revision,'/order#live']);
+assert.equal(await scalar('select count(*)::int from visitor_presence'),50);
+// Real common-submit wrapper creates flags before the payment event is queued.
+const actor=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,'입금확인용',{seed:1},3,30,false]);
+const plan={lines:[{productId:'10',productName:'니트',color:'',size:'',unitPrice:100,qty:1}]};
+const action=await scalar('select live_automation_action($1,$2,$3,$4,$5,$6,$7)',[actor.session.id,'order',new Date().toISOString(),plan,false,null,c.revision]);
+const claim=await scalar('select live_automation_claim($1,$2)',[action.id,c.revision]);
+await scalar('select live_automation_cart($1,$2,$3)',[actor.session.id,c.revision,plan.lines]);
+await scalar('select live_automation_submit($1,$2,$3,$4)',[action.id,claim.lease_token,c.revision,[{product_id:10,product_name:'니트',color:'',size:'',qty:1,product_price:100,order_group_id:action.order_group_id}]]);
+assert.equal(await scalar('select count(*)::int from live_automation_payment_events'),1);
+await db.query("update live_automation_payment_events set status='pending',due_at=now()-interval '1 second' where order_action_id=$1",[action.id]);
+const body='💗 입금확인용님 입금 확인! 감사합니다';
+assert.equal(await scalar('select live_automation_payment_notice_valid($1,$2,$3,$4,$5,$6)',[action.id,actor.actor.id,actor.session.id,bc,body,'ap:'+action.id]),false,'missing server authorization must be false, never SQL NULL');
+await assert.rejects(db.query("insert into live_chat_messages(broadcast_id,kakao_id,nickname,body,badge,bot_ref,automation_actor_id,automation_session_id,automation_payment_action_id) values($1,'bot:ruru','루루동이',$2,'bot',$3,$4,$5,$6)",[bc,body,'ap:'+action.id,actor.actor.id,actor.session.id,action.id]),/UNAUTHORIZED|AUTH|CHAT|ACTION/);
+const before=await scalar('select jsonb_agg(to_jsonb(o)) from orders o');
+assert.equal(await scalar('select live_automation_drain_payments($1,$2)',[c.id,c.revision]),1);
+assert.equal(await scalar('select live_automation_drain_payments($1,$2)',[c.id,c.revision]),0,'retries cannot duplicate a payment notice');
+assert.deepEqual(await scalar('select jsonb_agg(to_jsonb(o)) from orders o'),before,'receipt notification must not alter any order/financial field');
+assert.equal(await scalar('select count(*)::int from live_chat_messages where automation_payment_action_id is not null'),1);
+await db.query("insert into live_automation_actions(campaign_id,session_id,actor_id,kind,due_at,status,revision,completed_at) select $1,$2,$3,'order',now(),'succeeded',$4,clock_timestamp() from generate_series(1,119)",[c.id,actor.session.id,actor.actor.id,c.revision]);
+await assert.rejects(scalar('select live_automation_order_admission($1,$2)',[c.id,null]),/HOURLY_LIMIT/);
+assert.equal(await scalar('select count(*)::int from live_automation_payment_events'),1,'actions without saved orders cannot create payment events');
+await db.query("update live_automation_payment_events set status='pending',due_at=now() where order_action_id=$1",[action.id]);
+await ctl('all',false,c.revision);
+await assert.rejects(step(),/STALE|OFF/);
+await assert.rejects(scalar('select live_automation_presence_batch($1,$2,$3)',[crowd.anchor,c.revision,'/order#live']),/STALE|ENDED/);
+assert.equal(await scalar('select count(*)::int from visitor_presence'),0);
+assert.equal(await scalar("select count(*)::int from live_automation_payment_events where status='pending'"),0,'OFF cancels delayed receipts');
+assert.equal(await scalar("select has_function_privilege('anon','live_automation_population_step(uuid,bigint,jsonb)','execute')"),false);
+await db.close();console.log('PASS 50-person baseline, gradual 100-person peak/return, real batched presence, OFF and old revision fences');

@@ -5,9 +5,9 @@ let A, P;
 try { A=load('lib/liveAutomation.ts'); P=load('lib/liveAutomationPersona.ts'); } catch {}
 assert.ok(A && P, 'independent session scheduling and persona rules must exist');
 assert.deepEqual([0,.2,.4,.6,.8,.999].map(n=>A.dwellMinutes(()=>n)),[5,9,14,28,46,120]);
-assert.equal(A.orderWindow(1000,1000,()=>0),481000);
-assert.equal(A.orderWindow(1000,1000,()=>.999999),46000);
-assert.equal(A.orderWindow(1000,1000000,()=>0),1480000,'resume never catches up old slots');
+assert.equal(A.orderWindow(1000,1000,()=>0),181000);
+assert.equal(A.orderWindow(1000,1000,()=>.999999),36000);
+assert.equal(A.orderWindow(1000,1000000,()=>0),1180000,'resume never catches up old slots');
 assert.equal(A.questionWindow(600000,()=>0),570000);
 assert.equal(A.questionWindow(600000,()=>.999999),510000);
 assert.equal(A.orderTarget(5,3,()=>.99),3);

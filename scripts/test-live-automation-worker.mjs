@@ -4,15 +4,15 @@ process.env.SUPABASE_SERVICE_ROLE_KEY='isolated-signing-secret-over-32-character
 let W;try{W=createUiLoader()('lib/liveAutomationWorker.ts')}catch{}
 assert.ok(W,'a bounded server-session worker must replace browser-per-nickname execution');
 const id='00000000-0000-4000-8000-000000000001';
-const c={id,broadcast_id:id,revision:2,viewers_enabled:true,chat_enabled:false,orders_enabled:false,max_active:5,next_join_at:new Date(Date.now()+600000).toISOString()};
-const sessions=Array.from({length:5},(_,i)=>({id:'10000000-0000-4000-8000-'+String(i+1).padStart(12,'0'),actor_id:id,campaign_id:id,watching:true,stopped_at:null,leave_at:new Date(Date.now()+600000).toISOString(),last_ack_at:new Date().toISOString(),visitor_key:'live-auto:visitor-'+i,cart_key:'live-auto:cart-'+i}));
+const c={id,broadcast_id:id,revision:2,viewers_enabled:true,chat_enabled:false,orders_enabled:false,max_active:100,next_join_at:new Date(Date.now()+600000).toISOString()};
+const sessions=Array.from({length:100},(_,i)=>({id:'10000000-0000-4000-8000-'+String(i+1).padStart(12,'0'),actor_id:id,campaign_id:id,watching:true,stopped_at:null,leave_at:new Date(Date.now()+600000).toISOString(),last_ack_at:new Date().toISOString(),visitor_key:'live-auto:visitor-'+i,cart_key:'live-auto:cart-'+i}));
 let enabled=false,calls=[],rpcCalls=[];
-const db={from(table){let single=false;const q={select(){return q},eq(){return q},neq(){return q},is(){return q},gt(){return q},gte(){return q},lte(){return q},in(){return q},or(){return q},order(){return q},limit(){return q},update(){return q},maybeSingle(){single=true;return q},then(resolve,reject){const rows=table==='live_automation_campaigns'?(enabled?[c]:[]):table==='live_automation_sessions'?sessions:[];return Promise.resolve({data:single?rows[0]??null:rows,error:null,count:rows.length}).then(resolve,reject)}};return q},async rpc(name,args){rpcCalls.push(name);if(name==='live_automation_tick_claim')return {data:id,error:null};if(name==='live_automation_context'){const session=sessions.find(s=>s.id===args.p_session);return {data:{campaign:c,session,actor:{id,nickname:session.visitor_key}},error:null}}return {data:null,error:null}}};
+const db={from(table){let single=false;const q={select(){return q},eq(){return q},neq(){return q},is(){return q},gt(){return q},gte(){return q},lte(){return q},in(){return q},or(){return q},order(){return q},limit(){return q},update(){return q},maybeSingle(){single=true;return q},then(resolve,reject){const rows=table==='live_automation_campaigns'?(enabled?[c]:[]):table==='live_automation_sessions'?sessions:[];return Promise.resolve({data:single?rows[0]??null:rows,error:null,count:rows.length}).then(resolve,reject)}};return q},async rpc(name,args){rpcCalls.push(name);if(name==='live_automation_population_step')return {data:{anchor:sessions[0].id,count:100,target:100},error:null};if(name==='live_automation_tick_claim')return {data:id,error:null};if(name==='live_automation_context'){const session=sessions.find(s=>s.id===args.p_session);return {data:{campaign:c,session,actor:{id,nickname:session.visitor_key}},error:null}}return {data:null,error:null}}};
 const transport=async(url,init)=>{calls.push({url,body:JSON.parse(init.body)});return new Response(JSON.stringify({ok:true,lastSeenAt:new Date().toISOString()}))};
 await W.runAutomationTick(db,'https://shop.test','presence',transport);
 assert.equal(calls.length,0);assert.equal(rpcCalls.length,0);
 enabled=true;await W.runAutomationTick(db,'https://shop.test','presence',transport);
-assert.equal(calls.length,5);assert.equal(new Set(calls.map(x=>x.body.visitorKey)).size,5);
+assert.equal(calls.length,1,'100 viewer heartbeats must use one real API request');assert.equal(calls[0].body.batch,true);
 assert.ok(calls.every(x=>x.url.endsWith('/api/presence')&&x.body.path.endsWith('#live')));
 assert.ok(!rpcCalls.some(n=>/gemini|submit|cart/.test(n)),'viewers-only never orders or calls AI');
 assert.ok(rpcCalls.includes('live_automation_tick_release'));
@@ -22,4 +22,4 @@ c.orders_enabled=true;c.chat_enabled=true;c.tempo_plan={id,at:new Date().toISOSt
 const rpc=db.rpc;db.rpc=async(name,args)=>name==='live_automation_order_admission'?{error:{message:'ORDER_HOURLY_LIMIT'}}:rpc(name,args);
 await isolated.runAutomationTick(db,'https://shop.test','actions',transport);
 assert.equal(chats,1,'order capacity or catalog failure must not silence independently enabled chat');
-console.log('PASS all-OFF worker performs no actions; five viewer sessions use distinct real presence requests and no AI/order calls');
+console.log('PASS all-OFF worker performs no actions; 100 viewer sessions use one authenticated real presence batch and no AI/order calls');

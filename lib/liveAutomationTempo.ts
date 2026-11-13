@@ -1,16 +1,17 @@
 /** Server-owned scheduling: generate once, persist, then execute without re-rolling on retries. */
-export type TempoMode='quiet'|'steady'|'burst';
-export const MAX_HOURLY_ORDERS=20;
+export type TempoMode='quiet'|'steady'|'busy'|'burst';
+export const MAX_HOURLY_ORDERS=120;
 export const MAX_PARALLEL_ORDERS=3;
 const sample=(random:()=>number)=>Math.min(1-Number.EPSILON,Math.max(0,random()));
 const between=(min:number,max:number,random:()=>number)=>min+Math.floor(sample(random)*(max-min+1));
 export function planOrderTempo(now:number,previous:TempoMode|null,random=Math.random):{mode:TempoMode;nextAt:number;offsets:number[]} {
   const choice=sample(random);
-  const mode:TempoMode=previous==='burst'||choice<.35?'quiet':choice<.85?'steady':'burst';
-  if(mode==='quiet')return {mode,nextAt:now+between(480000,1200000,random),offsets:[0]};
-  if(mode==='steady')return {mode,nextAt:now+between(60000,360000,random),offsets:[0]};
-  const nextAt=now+between(15000,45000,random),count=between(2,3,random);
-  return {mode,nextAt,offsets:Array.from({length:count},()=>between(0,45000,random)).sort((a,b)=>a-b)};
+  const mode:TempoMode=previous==='burst'?(choice<.25?'quiet':'steady'):choice<.2?'quiet':choice<.65?'steady':choice<.9?'busy':'burst';
+  if(mode==='quiet')return {mode,nextAt:now+between(180000,480000,random),offsets:[0]};
+  if(mode==='steady')return {mode,nextAt:now+between(35000,100000,random),offsets:Array.from({length:between(1,2,random)},()=>between(0,45000,random)).sort((a,b)=>a-b)};
+  if(mode==='busy')return {mode,nextAt:now+between(25000,65000,random),offsets:Array.from({length:between(2,3,random)},()=>between(0,60000,random)).sort((a,b)=>a-b)};
+  const nextAt=now+between(15000,35000,random),count=between(4,8,random);
+  return {mode,nextAt,offsets:Array.from({length:count},()=>between(0,90000,random)).sort((a,b)=>a-b)};
 }
 export const cartDelay=(random=Math.random)=>between(15000,150000,random);
 export const actorQuietDelay=(random=Math.random)=>between(300000,900000,random);

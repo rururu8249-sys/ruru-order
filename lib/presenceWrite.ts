@@ -192,9 +192,10 @@ export async function writePresence(
 
   const supabase = getPresenceSupabase();
   const automation = await readAutomationRequest(request || new Request("http://internal.invalid"), { owner: input.kakaoId, sessionKey: input.visitorKey }, "presence", supabase);
+  if (body.batch === true && !automation) throw new AutomationError("AUTOMATION_AUTH_REQUIRED");
   if (automation) {
     if (input.pageType !== "order_form" || !isLiveWatchPath(input.path)) throw new AutomationError("INVALID_WATCH_PATH");
-    const { data, error } = await supabase.rpc("live_automation_presence", { p_session: automation.session.id, p_revision: automation.capability.revision, p_path: input.path });
+    const { data, error } = await supabase.rpc(body.batch === true ? "live_automation_presence_batch" : "live_automation_presence", { p_session: automation.session.id, p_revision: automation.capability.revision, p_path: input.path });
     if (error) throw new AutomationError(error.message);
     return { ok: true, lastSeenAt: String(data.lastSeenAt) };
   }

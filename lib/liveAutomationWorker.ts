@@ -30,25 +30,15 @@ async function activeSessions(db:SupabaseClient,c:Campaign) {
  return rows<Session>(db.from('live_automation_sessions').select('*').eq('campaign_id',c.id).is('stopped_at',null).gt('leave_at',nowIso()));
 }
 async function presenceTick(db:SupabaseClient,c:LiveCampaign,origin:string,transport:typeof fetch) {
- await automationRpc(db,'live_automation_expire',{p_campaign:c.id});
- let sessions=(await activeSessions(db,c)).filter(s=>s.watching);
- if(!c.next_join_at||Date.parse(c.next_join_at)<=Date.now()) {
-   if(sessions.length<c.max_active&&Math.random()<.65) {
-     const minutes=dwellMinutes();
-     const possible=c.orders_enabled&&c.next_order_at&&Date.parse(c.next_order_at)<Date.now()+minutes*60000-150000;
-     const allocated=await freshActor(db,c,possible?orderTarget(minutes,3):0,minutes,true);
-     sessions.push(allocated.session);
-   }
-   await db.from('live_automation_campaigns').update({next_join_at:new Date(Date.now()+45000+Math.floor(Math.random()*195001)).toISOString()}).eq('id',c.id).eq('revision',c.revision);
- }
- return Promise.allSettled(sessions.map(async original=>{
-   let session=original;
-   if(session.last_ack_at&&Date.parse(session.last_ack_at)<Date.now()-75000) {
-     session=await automationRpc(db,'live_automation_reconnect',{p_actor:session.actor_id,p_minutes:dwellMinutes(),p_watch:true});
-   }
-   const ctx=await automationRpc<AutomationContext>(db,'live_automation_context',{p_session:session.id,p_revision:c.revision,p_scope:'presence'});
-   return automationPost(origin,'/api/presence',ctx,null,'presence',{visitorKey:session.visitor_key,kakaoId:AUTOMATION_OWNER,nickname:ctx.actor.nickname,pageType:'order_form',path:'/order#live'},transport);
- }));
+ await ensurePool(db);
+ const population=await automationRpc<{anchor:string|null;count:number;target:number}>(db,'live_automation_population_step',{
+   p_campaign:c.id,p_revision:c.revision,p_profiles:Array.from({length:12},(_,seed)=>createPersona(seed)),
+ });
+ if(!population.anchor)return [];
+ const ctx=await automationRpc<AutomationContext>(db,'live_automation_context',{p_session:population.anchor,p_revision:c.revision,p_scope:'presence'});
+ return Promise.allSettled([automationPost(origin,'/api/presence',ctx,null,'presence',{
+   visitorKey:ctx.session.visitor_key,kakaoId:AUTOMATION_OWNER,nickname:ctx.actor.nickname,pageType:'order_form',path:'/order#live',batch:true,
+ },transport)]);
 }
 async function orderActor(db:SupabaseClient,c:LiveCampaign,excluded:Set<string>):Promise<{actor:Actor;session:Session}> {
  const [actors,sessions,pending]=await Promise.all([
@@ -81,7 +71,7 @@ async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettin
  if(!choices.length){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:true});return;}
  // Expired schedules are replanned; resuming a worker never catches up a backlog.
  if(Date.parse(wave.at)<Date.now()-180000){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});return;}
- for(const offset of wave.offsets.slice(0,3)) {
+ for(const offset of wave.offsets.slice(0,8)) {
    await automationRpc(db,'live_automation_order_admission',{p_campaign:c.id,p_action:null});
    let picks:AutoTestPick[]=[];
    for(let attempt=0;attempt<5;attempt++){
@@ -100,6 +90,9 @@ async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettin
 async function actionsTick(db:SupabaseClient,c:LiveCampaign,origin:string,transport:typeof fetch) {
  await automationRpc(db,'live_automation_expire',{p_campaign:c.id});
  const results:PromiseSettledResult<unknown>[]=[];
+ if(c.orders_enabled){
+   try{await automationRpc(db,'live_automation_drain_payments',{p_campaign:c.id,p_revision:c.revision})}catch(reason){results.push({status:'rejected',reason})}
+ }
  try {
    const settings=await readAutomationSettings(db);
    if(c.orders_enabled)await planWave(db,c,settings);

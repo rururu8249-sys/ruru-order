@@ -17,6 +17,8 @@ assert.equal(response.status,403,'reserved customer cannot bypass signed per-act
 const presence=load('app/api/presence/route.ts');
 response=await presence.POST(req({visitorKey:'live-auto:reserved',kakaoId:'990000000077',path:'/order#live',pageType:'order_form'}));
 assert.equal(response.status,403,'reserved viewer needs server session authorization');
+response=await presence.POST(req({visitorKey:'ordinary-visitor',batch:true,path:'/order#live',pageType:'order_form'}));
+assert.equal(response.status,403,'anonymous visitors cannot request a campaign-wide batch');
 const chat=load('app/api/live-chat/route.ts');
 response=await chat.POST(req({kakao_id:'990000000077',bc:'00000000-0000-4000-8000-000000000001',body:'hello'}));
 assert.equal(response.status,403,'reserved chat identity requires the same signed server-session authority');

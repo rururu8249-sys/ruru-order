@@ -6,7 +6,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const events=new EventTarget();
 globalThis.window=Object.assign(events,{setInterval:()=>1,clearInterval(){}});
 globalThis.document={visibilityState:'visible',addEventListener(){},removeEventListener(){}};
-let state={ready:true,broadcastId:'broadcast',revision:7,orders:false,chat:false,viewers:false,activeViewers:0,nextOrderAt:new Date(Date.now()+90000).toISOString(),manualAction:null,last:null};
+let state={ready:true,broadcastId:'broadcast',revision:7,orders:false,chat:false,viewers:false,activeViewers:50,nextOrderAt:new Date(Date.now()+90000).toISOString(),manualAction:null,last:null};
 const mutations=[];
 globalThis.fetch=async(_url,init={})=>{
  if(init.body){const body=JSON.parse(init.body);mutations.push(body);if(body.action==='control')state={...state,orders:body.enabled,chat:body.enabled,viewers:body.enabled,revision:state.revision+1};}
@@ -25,6 +25,7 @@ assert.ok(!text(tree.toJSON()).includes('테스트 글 포함'));
 await act(async()=>button('시작').props.onClick());
 assert.deepEqual(mutations[0],{action:'control',feature:'all',enabled:true,revision:7});
 assert.ok(button('중지'));
+assert.ok(text(tree.toJSON()).includes('시청 중 50명'));
 assert.ok(text(tree.toJSON()).includes('다음 주문'),'scheduled orders must have visible feedback without opening details');
 await act(async()=>button('중지').props.onClick());
 assert.equal(mutations[1].enabled,false);assert.equal(mutations[1].feature,'all');
