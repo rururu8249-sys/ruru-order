@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import ProductPagination from "@/components/admin-live/ProductPagination";
 
 type Row = {
-  id: string; at: string; kind: "first" | "back"; amount: number;
+  id: string; at: string; kind: "first" | "back"; amount: number; tier?: number;
   nickname: string; name: string; phoneTail: string;
   orders: number; paidOrders: number; paidAmount: number;
 };
@@ -83,7 +83,7 @@ export default function WelcomeRecipientList() {
                   {r.phoneTail ? <span className="font-normal text-ink-mute"> · {r.phoneTail}</span> : null}
                 </div>
                 <div className="text-[12px] text-ink-mute">
-                  {r.kind === "first" ? "처음 오신 선물" : "오랜만에 오신 선물"} {r.amount.toLocaleString("ko-KR")}P · {whenText(r.at)}
+                  {r.kind === "first" ? "처음 오신 선물" : "오랜만에 오신 선물"}{(r.tier ?? 0) > 0 ? ` ${(r.tier ?? 0) + 1}구간` : ""} {r.amount.toLocaleString("ko-KR")}P · {whenText(r.at)}
                 </div>
               </div>
               <div className="shrink-0 text-right text-[12px]">

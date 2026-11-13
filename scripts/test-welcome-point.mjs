@@ -23,7 +23,7 @@ const now = Date.parse("2026-11-12T03:00:00Z");
 const day = 86400000;
 
 // 결제한 적 없음 → 처음 오신 선물
-assert.deepEqual(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, new Date(now - 3600000).toISOString()), { kind: "first", amount: 2000, sourceKey: "welcome_first:c1" });
+assert.deepEqual(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, new Date(now - 3600000).toISOString()), { kind: "first", amount: 2000, sourceKey: "welcome_first:c1", tiers: [{ sec: 30, amount: 2000 }] });
 // [11-13] 가입한 지 24시간 넘은 회원·가입 시각 모름 → 처음 선물 없음
 assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, "2026-10-01T00:00:00+09:00"), null);
 assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, null), null);
@@ -40,7 +40,7 @@ assert.equal(W.decideWelcome({ ...cfg, first: { on: false, amount: 2000 } }, "c1
 assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 3, lastPaidAt: new Date(now - 10 * day).toISOString(), lastPaidKey: "G1" }, now), null);
 // 61일 전 마지막 결제 → 오랜만에 오신 선물(그 마지막 주문서마다 한 번)
 const back = W.decideWelcome(cfg, "c1", { paidCount: 3, lastPaidAt: new Date(now - 61 * day).toISOString(), lastPaidKey: "G1" }, now);
-assert.deepEqual(back, { kind: "back", amount: 1000, sourceKey: "welcome_back:c1:G1" });
+assert.deepEqual(back, { kind: "back", amount: 1000, sourceKey: "welcome_back:c1:G1", tiers: [{ sec: 30, amount: 1000 }] });
 // 오랜만에 오신 선물 꺼짐 → 없음
 assert.equal(W.decideWelcome({ ...cfg, back: { ...cfg.back, on: false } }, "c1", { paidCount: 3, lastPaidAt: new Date(now - 61 * day).toISOString(), lastPaidKey: "G1" }, now), null);
 // 회원 id 없음 → 없음
@@ -72,6 +72,7 @@ function fakeDb(tables) {
         in(k, vs) { list = list.filter((r) => vs.map(String).includes(String(r[k]))); return q; },
         like(k, pat) { const pre = pat.replace(/%$/, ""); list = list.filter((r) => String(r[k] || "").startsWith(pre)); return q; },
         gte(k, v) { list = list.filter((r) => String(r[k]) >= v); return q; },
+        not(k, op, pat) { if (op === "like" && pat === "%#%") list = list.filter((r) => !String(r[k] || "").includes("#")); return q; },
         or(expr) {
           const parts = expr.split(/,(?![^(]*\))/);
           list = list.filter((r) => parts.some((p) => {
@@ -169,24 +170,31 @@ function world({ cfg, on = true, rpcFail = false, ledger = [] }) {
 const NOW = Date.parse("2026-11-12T03:00:00Z");
 const ON = { first: { on: true, amount: 2000 }, back: { on: true, amount: 1000, days: 60 }, watchSec: 30, dailyCap: 50 };
 const fresh = () => S.clearWelcomeConfigCache();
+const SECRET = "test-secret";
+/** 진짜 화면처럼: 보기 시작 표(start) 받고 → 받기 */
+async function claim(w, k, p, now = NOW, startMs = NOW - 60000) {
+  const ev = await S.evaluateWelcome(w.db, k, p, startMs);
+  const t = S.signWelcomeTicket(ev.customer?.id || "-", k, startMs, SECRET);
+  return S.claimWelcome(w.db, k, p, now, { ticket: t, secret: SECRET });
+}
 
 // 1) 설정 꺼짐 → 아무것도 안 줌
 fresh(); { const w = world({ cfg: { ...ON, first: { on: false, amount: 2000 }, back: { on: false, amount: 1000, days: 60 } } });
   assert.equal((await S.evaluateWelcome(w.db, "500", "01050005000", NOW)).decision, null);
-  const r = await S.claimWelcome(w.db, "500", "01050005000", NOW); assert.equal(r.ok, false); assert.equal(w.calls.length, 0); }
+  const r = await claim(w, "500", "01050005000"); assert.equal(r.ok, false); assert.equal(w.calls.length, 0); }
 // 1-1) [11-13] 예전부터 회원인데 결제 0번 → 처음 선물 안 줌
 fresh(); { const w = world({ cfg: ON });
   assert.equal((await S.evaluateWelcome(w.db, "800", "01080008000", NOW)).decision, null);
-  assert.equal((await S.claimWelcome(w.db, "800", "01080008000", NOW)).ok, false); assert.equal(w.calls.length, 0); }
+  assert.equal((await claim(w, "800", "01080008000")).ok, false); assert.equal(w.calls.length, 0); }
 // 2) 방송 꺼짐 → 안 줌
 fresh(); { const w = world({ cfg: ON, on: false });
-  assert.equal((await S.claimWelcome(w.db, "500", "01050005000", NOW)).ok, false); assert.equal(w.calls.length, 0); }
+  assert.equal((await claim(w, "500", "01050005000")).ok, false); assert.equal(w.calls.length, 0); }
 // 3) 결제한 적 없는 손님(미입금 주문만 있음) → 처음 오신 선물 2,000P 한 번만
 fresh(); { const w = world({ cfg: ON });
   const ev = await S.evaluateWelcome(w.db, "500", "010-5000-5000", NOW);
-  assert.deepEqual(ev.decision, { kind: "first", amount: 2000, sourceKey: "welcome_first:n1" });
-  const r1 = await S.claimWelcome(w.db, "500", "01050005000", NOW);
-  assert.deepEqual(r1, { ok: true, granted: true, amount: 2000, kind: "first" });
+  assert.deepEqual(ev.decision, { kind: "first", amount: 2000, sourceKey: "welcome_first:n1", tiers: [{ sec: 30, amount: 2000 }] });
+  const r1 = await claim(w, "500", "01050005000");
+  assert.deepEqual(r1, { ok: true, granted: true, amount: 2000, kind: "first", tier: 0, next: null });
   assert.equal(w.calls.length, 1);
   const a = w.calls[0].a;
   assert.equal(w.calls[0].name, "admin_change_customer_points");
@@ -194,28 +202,28 @@ fresh(); { const w = world({ cfg: ON });
   assert.equal(a.p_reason, "처음 오신 선물"); assert.equal(a.p_customer_visible, true); assert.equal(a.p_source_key, "welcome_first:n1");
   // 두 번째는 안 줌(RPC 도 안 부름)
   assert.equal((await S.evaluateWelcome(w.db, "500", "01050005000", NOW)).decision, null);
-  const r2 = await S.claimWelcome(w.db, "500", "01050005000", NOW); assert.equal(r2.ok, false); assert.equal(w.calls.length, 1);
+  const r2 = await claim(w, "500", "01050005000"); assert.equal(r2.ok, false); assert.equal(w.calls.length, 1);
   // 같은 번호로 카카오 계정 새로 만든 사람 → 안 줌
-  const r3 = await S.claimWelcome(w.db, "501", "01050005000", NOW); assert.equal(r3.ok, false); assert.equal(w.calls.length, 1); }
+  const r3 = await claim(w, "501", "01050005000"); assert.equal(r3.ok, false); assert.equal(w.calls.length, 1); }
 // 4) 남의 번호를 넣으면(카카오 계정과 번호가 다른 회원) → 안 줌
 fresh(); { const w = world({ cfg: ON });
-  assert.equal((await S.claimWelcome(w.db, "500", "01060006000", NOW)).ok, false); assert.equal(w.calls.length, 0); }
+  assert.equal((await claim(w, "500", "01060006000")).ok, false); assert.equal(w.calls.length, 0); }
 // 5) 최근에 산 단골 → 안 줌 / 100일 넘게 쉰 손님 → 오랜만에 오신 선물 1,000P
 fresh(); { const w = world({ cfg: ON });
-  assert.equal((await S.claimWelcome(w.db, "700", "01070007000", NOW)).ok, false);
-  const r = await S.claimWelcome(w.db, "600", "01060006000", NOW);
-  assert.deepEqual(r, { ok: true, granted: true, amount: 1000, kind: "back" });
+  assert.equal((await claim(w, "700", "01070007000")).ok, false);
+  const r = await claim(w, "600", "01060006000");
+  assert.deepEqual(r, { ok: true, granted: true, amount: 1000, kind: "back", tier: 0, next: null });
   assert.equal(w.calls[0].a.p_source_key, "welcome_back:o1:OG1"); assert.equal(w.calls[0].a.p_reason, "오랜만에 오신 선물");
-  assert.equal((await S.claimWelcome(w.db, "600", "01060006000", NOW)).ok, false); assert.equal(w.calls.length, 1); }
+  assert.equal((await claim(w, "600", "01060006000")).ok, false); assert.equal(w.calls.length, 1); }
 // 6) 오늘 최대 인원 다 참 → 안 줌
 fresh(); { const w = world({ cfg: { ...ON, dailyCap: 1 }, ledger: [{ id: 1, customer_phone: "01099990000", source_key: "welcome_first:zz", created_at: "2026-11-12T01:00:00Z" }] });
-  const r = await S.claimWelcome(w.db, "500", "01050005000", NOW); assert.equal(r.ok, false); assert.equal(r.message, "오늘 선물이 모두 나갔어요"); assert.equal(w.calls.length, 0); }
+  const r = await claim(w, "500", "01050005000"); assert.equal(r.ok, false); assert.equal(r.message, "오늘 선물이 모두 나갔어요"); assert.equal(w.calls.length, 0); }
 // 7) 지급 결과를 모르면 실패로(다시 시도해도 같은 키라 두 번 안 들어감)
 fresh(); { const w = world({ cfg: ON, rpcFail: true });
-  const r = await S.claimWelcome(w.db, "500", "01050005000", NOW); assert.equal(r.ok, false); assert.equal(r.status, 503); }
+  const r = await claim(w, "500", "01050005000"); assert.equal(r.ok, false); assert.equal(r.status, 503); }
 // 8) 저장된 금액이 이상해도 1만P 넘게는 안 줌
 fresh(); { const w = world({ cfg: { ...ON, first: { on: true, amount: 5000000 } } });
-  const r = await S.claimWelcome(w.db, "500", "01050005000", NOW); assert.equal(r.ok, true); assert.equal(w.calls[0].a.p_amount, 10000); }
+  const r = await claim(w, "500", "01050005000"); assert.equal(r.ok, true); assert.equal(w.calls[0].a.p_amount, 10000); }
 fresh();
 
 console.log("welcome-point OK");
@@ -235,8 +243,8 @@ console.log("welcome-point OK");
   ];
   assert.deepEqual(W.welcomeOrderResult(gift, rows, PAIDSET), { orders: 2, paidOrders: 1, paidAmount: 50000 });
   assert.deepEqual(W.welcomeOrderResult(gift, [], PAIDSET), { orders: 0, paidOrders: 0, paidAmount: 0 });
-  assert.deepEqual(W.parseWelcomeSourceKey("welcome_back:abc-1:G9"), { kind: "back", customerId: "abc-1" });
-  assert.deepEqual(W.parseWelcomeSourceKey("welcome_first:xyz"), { kind: "first", customerId: "xyz" });
+  assert.deepEqual(W.parseWelcomeSourceKey("welcome_back:abc-1:G9"), { kind: "back", customerId: "abc-1", tier: 0 });
+  assert.deepEqual(W.parseWelcomeSourceKey("welcome_first:xyz"), { kind: "first", customerId: "xyz", tier: 0 });
   assert.equal(W.parseWelcomeSourceKey("event_x:1"), null);
   console.log("ok 선물 받은 사람 목록 판정");
 }
@@ -285,4 +293,82 @@ console.log("welcome-point OK");
   assert.deepEqual({ g: sum.gifts, p: sum.points, o: sum.ordered, paid: sum.paid, amt: sum.paidAmount }, { g: 2, p: 2000, o: 2, paid: 1, amt: 30000 });
   assert.deepEqual(writes, []); // 쓰기 0
   console.log("ok 목록·요약 서버 함수(쓰기 0)");
+}
+
+// ── [2026-11-14] 구간 지급(30초 얼마 · 60초 더 얼마) + 서버 시간 확인(서명된 보기 시작 표) ──
+{
+  // 설정: 예전 값 → 한 구간 / 구간 정리(범위·정렬·겹침·최대 3)
+  const legacy = W.parseWelcomePointConfig({ first: { on: true, amount: 1500 }, back: { on: true, amount: 700, days: 90 }, watchSec: 40 });
+  assert.deepEqual(legacy.first.tiers, [{ sec: 40, amount: 1500 }]);
+  assert.deepEqual(legacy.back.tiers, [{ sec: 40, amount: 700 }]);
+  const t = W.parseWelcomePointConfig({ first: { on: true, tiers: [{ sec: 90, amount: 99999 }, { sec: 30, amount: 1000 }, { sec: 30, amount: 5 }, { sec: 60, amount: 500 }, { sec: 999, amount: 1 }, "x"] } });
+  assert.deepEqual(t.first.tiers, [{ sec: 30, amount: 1000 }, { sec: 60, amount: 500 }, { sec: 90, amount: 10000 }]);
+  assert.equal(t.first.amount, 1000); // 첫 구간 금액 = 예전 amount 칸
+  assert.equal(W.welcomeTierKey("welcome_first:c1", 0), "welcome_first:c1");
+  assert.equal(W.welcomeTierKey("welcome_first:c1", 1), "welcome_first:c1#2");
+  assert.deepEqual(W.parseWelcomeSourceKey("welcome_first:c1#2"), { kind: "first", customerId: "c1", tier: 1 });
+  assert.deepEqual(W.parseWelcomeSourceKey("welcome_back:c2:G7#3"), { kind: "back", customerId: "c2", tier: 2 });
+  assert.deepEqual(W.welcomeHelpLines("first", [{ sec: 30, amount: 1000 }, { sec: 60, amount: 1000 }]).lines.slice(0, 2),
+    ["방송을 30초 이상 보시면 1,000P를 드려요", "1분까지 보시면 1,000P를 더 드려요"]);
+
+  const TIERS = { ...ON, first: { on: true, tiers: [{ sec: 30, amount: 1000 }, { sec: 60, amount: 1000 }] }, back: { on: true, days: 60, tiers: [{ sec: 30, amount: 1000 }, { sec: 60, amount: 500 }] } };
+  const START = NOW;
+  const ticketOf = async (w, k, p, start = START) => { const ev = await S.evaluateWelcome(w.db, k, p, start); return { ev, t: S.signWelcomeTicket(ev.customer?.id || "-", k, start, SECRET) }; };
+  const go = (w, k, p, at, t, secret = SECRET) => S.claimWelcome(w.db, k, p, at, { ticket: t, secret });
+
+  // 처음 손님: 30초 → 1구간, 45초 → 아직, 60초 → 2구간(#2), 그 뒤 더 없음
+  fresh(); { const w = world({ cfg: TIERS });
+    const { ev, t: tk } = await ticketOf(w, "500", "01050005000");
+    assert.equal(ev.tierIndex, 0);
+    assert.equal((await go(w, "500", "01050005000", START + 10_000, tk)).message, "아직 시간이 안 됐어요"); assert.equal(w.calls.length, 0);
+    const r1 = await go(w, "500", "01050005000", START + 30_000, tk);
+    assert.deepEqual(r1, { ok: true, granted: true, amount: 1000, kind: "first", tier: 0, next: 1 });
+    assert.equal(w.calls[0].a.p_source_key, "welcome_first:n1"); // 1구간 키 = 예전 키 그대로
+    assert.equal((await go(w, "500", "01050005000", START + 45_000, tk)).message, "아직 시간이 안 됐어요"); assert.equal(w.calls.length, 1);
+    const r2 = await go(w, "500", "01050005000", START + 60_000, tk);
+    assert.deepEqual(r2, { ok: true, granted: true, amount: 1000, kind: "first", tier: 1, next: null });
+    assert.equal(w.calls[1].a.p_source_key, "welcome_first:n1#2");
+    assert.equal(w.calls[1].a.p_reason, "처음 오신 선물 (더 보기)");
+    assert.equal((await go(w, "500", "01050005000", START + 300_000, tk)).ok, false); assert.equal(w.calls.length, 2);
+    // 같은 번호 다른 카카오 계정은 여전히 못 받음
+    const other = await ticketOf(w, "501", "01050005000");
+    assert.equal(other.ev.decision, null);
+    // 오늘 받은 «사람» 수는 1(2구간은 안 셈)
+    assert.equal(await S.grantedTodayCount(w.db, "2026-11-11T15:00:00.000Z"), 1);
+  }
+
+  // 위조·남의 표·만료·서명 비밀 다름 → 안 줌
+  fresh(); { const w = world({ cfg: TIERS });
+    const { t: tk } = await ticketOf(w, "500", "01050005000");
+    const [body] = tk.split(".");
+    assert.equal((await go(w, "500", "01050005000", START + 60_000, `${body}.forged`)).message, "다시 열어 주세요");
+    assert.equal((await go(w, "500", "01050005000", START + 60_000, tk, "other-secret")).message, "다시 열어 주세요");
+    assert.equal((await go(w, "500", "01050005000", START + 60_000, "")).message, "다시 열어 주세요");
+    const theirs = S.signWelcomeTicket("o1", "600", START, SECRET); // 다른 손님 표
+    assert.equal((await go(w, "500", "01050005000", START + 60_000, theirs)).message, "다시 열어 주세요");
+    const future = S.signWelcomeTicket("n1", "500", START + 60_000, SECRET); // 미래 시각 표(화면 조작) — 시작 직후엔 시간이 안 됨
+    assert.equal((await go(w, "500", "01050005000", START + 60_000, future)).message, "아직 시간이 안 됐어요");
+    assert.equal((await go(w, "500", "01050005000", START + 4 * 3600_000, tk)).message, "다시 열어 주세요"); // 3시간 넘은 표
+    assert.equal(w.calls.length, 0);
+  }
+
+  // 예전에 1구간을 받은 손님 → 다음에 열면 2구간부터(1구간 다시 안 줌), 하루 인원이 꽉 차도 2구간은 줌(같은 사람)
+  fresh(); { const w = world({ cfg: { ...TIERS, dailyCap: 1 }, ledger: [{ id: 1, customer_phone: "01050005000", source_key: "welcome_first:n1", created_at: "2026-11-12T01:00:00Z" }] });
+    const { ev, t: tk } = await ticketOf(w, "500", "01050005000");
+    assert.equal(ev.tierIndex, 1);
+    assert.equal((await go(w, "500", "01050005000", START + 30_000, tk)).message, "아직 시간이 안 됐어요"); // 2구간은 60초
+    const r = await go(w, "500", "01050005000", START + 60_000, tk);
+    assert.equal(r.ok, true); assert.equal(r.tier, 1); assert.equal(w.calls[0].a.p_source_key, "welcome_first:n1#2");
+  }
+
+  // 오랜만 손님 2구간 금액 500 / 금액 0 구간은 건너뜀
+  fresh(); { const w = world({ cfg: TIERS });
+    const { t: tk } = await ticketOf(w, "600", "01060006000");
+    assert.equal((await go(w, "600", "01060006000", START + 30_000, tk)).next, 1);
+    const r = await go(w, "600", "01060006000", START + 60_000, tk);
+    assert.equal(r.amount, 500); assert.equal(w.calls[1].a.p_source_key, "welcome_back:o1:OG1#2"); }
+  fresh(); { const w = world({ cfg: { ...TIERS, first: { on: true, tiers: [{ sec: 30, amount: 1000 }, { sec: 60, amount: 0 }] } } });
+    const { t: tk } = await ticketOf(w, "500", "01050005000");
+    assert.equal((await go(w, "500", "01050005000", START + 30_000, tk)).next, null); }
+  console.log("ok 구간 지급·서버 시간 확인");
 }

@@ -1,13 +1,14 @@
 // [2026-11-12] 방송 시청 선물 포인트 — 서버 전용(service_role).
 //   설정은 비공개 저장소(admin-private/welcome-point.json) — settings 표는 손님도 쓸 수 있어 금액을 거기 두지 않는다.
 //   주문은 읽기만. 지급은 기존 admin_change_customer_points RPC(중복 방지 키) 하나뿐.
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import { AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
 import {
   decideWelcome, kstDayStartIso, parseWelcomePointConfig, parseWelcomeSourceKey, WELCOME_POINT_DEFAULT, WELCOME_REASON,
-  welcomeOrderResult, type WelcomeOrderRow,
+  welcomeOrderResult, welcomeTierKey, type WelcomeOrderRow,
   type PaidHistory, type WelcomeDecision, type WelcomeKind, type WelcomePointConfig,
 } from "@/lib/welcomePoint";
 
@@ -126,24 +127,69 @@ export async function alreadyGranted(sb: SupabaseClient, sourceKey: string): Pro
   return (data ?? []).length > 0;
 }
 
-/** 오늘(한국 시간) 선물 지급 수 */
+/** 이 선물의 구간 키 중 이미 받은 것 */
+export async function grantedTierKeys(sb: SupabaseClient, keys: string[]): Promise<Set<string>> {
+  if (!keys.length) return new Set();
+  const { data, error } = await sb.from("customer_point_ledger").select("source_key").in("source_key", keys).limit(keys.length * 2);
+  if (error) throw new Error(error.message);
+  return new Set(((data ?? []) as { source_key?: unknown }[]).map((r) => String(r.source_key ?? "")));
+}
+
+/** 오늘(한국 시간) 선물 받은 «사람» 수 — 첫 구간 지급만 셈(#2·#3 추가 구간은 같은 사람) */
 export async function grantedTodayCount(sb: SupabaseClient, dayStartIso: string): Promise<number> {
   const { count, error } = await sb.from("customer_point_ledger")
     .select("id", { count: "exact", head: true })
     .like("source_key", "welcome_%")
+    .not("source_key", "like", "%#%")
     .gte("created_at", dayStartIso);
   if (error) throw new Error(error.message);
   return count ?? 0;
 }
 
-/** 같은 전화번호로 이미 «처음 오신 선물»을 받은 적 있는지(카카오 계정을 새로 만들어 또 받는 것 막기) */
-export async function phoneHadFirstGift(sb: SupabaseClient, phone: string): Promise<boolean> {
+/** 같은 전화번호로 «다른 회원»이 이미 처음 오신 선물을 받은 적 있는지(카카오 계정을 새로 만들어 또 받는 것 막기).
+ *  [2026-11-14] 자기 자신이 받은 앞 구간은 막지 않음(다음 구간 받아야 하므로). customerId 없으면 예전처럼 누구든 막음. */
+export async function phoneHadFirstGift(sb: SupabaseClient, phone: string, customerId = ""): Promise<boolean> {
   const p = digits(phone);
   if (p.length < 9) return false;
   const vs = Array.from(new Set([p, ...koreanPhoneVariants(p)]));
-  const { data, error } = await sb.from("customer_point_ledger").select("id").in("customer_phone", vs).like("source_key", "welcome_first:%").limit(1);
+  const { data, error } = await sb.from("customer_point_ledger").select("id,source_key").in("customer_phone", vs).like("source_key", "welcome_first:%").limit(20);
   if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
+  const own = customerId ? `welcome_first:${customerId}` : "";
+  return ((data ?? []) as { source_key?: unknown }[]).some((r) => {
+    const k = String(r.source_key ?? "");
+    return !own || !(k === own || k.startsWith(`${own}#`));
+  });
+}
+
+// ── [2026-11-14] 보기 시작 표(서명) — 서버가 실제로 몇 초 지났는지 확인 ──
+//   GET 때 «언제 보기 시작했는지»를 서명해 손님 화면에 주고, 받기(POST) 때 그 시각부터 지금까지가 구간 초 이상인지 본다.
+//   DB 쓰기 없음. 다른 앱으로 나가면 화면이 새 표를 받아 처음부터 다시 셈.
+const TICKET_AUD = "ruru-welcome-v1";
+const TICKET_MAX_MS = 3 * 3600_000;
+const TICKET_SLACK_MS = 1500; // 손님 폰 1초 셈·네트워크 오차
+type WelcomeTicket = { c: string; k: string; t: number; aud: string };
+const ticketMac = (body: string, secret: string) => createHmac("sha256", secret).update(`${TICKET_AUD}:${body}`).digest("base64url");
+
+export function signWelcomeTicket(customerId: string, kakaoId: string, startMs: number, secret: string): string {
+  if (!secret) throw new Error("서명 설정이 없어요");
+  const body = Buffer.from(JSON.stringify({ c: customerId, k: kakaoId, t: Math.floor(startMs), aud: TICKET_AUD })).toString("base64url");
+  return `${body}.${ticketMac(body, secret)}`;
+}
+
+/** 표가 이 손님 것이고 서명이 맞으면 보기 시작 시각(ms), 아니면 null */
+export function verifyWelcomeTicket(token: unknown, customerId: string, kakaoId: string, nowMs: number, secret: string): number | null {
+  try {
+    if (!secret) return null;
+    const [body, mac, extra] = String(token ?? "").split(".");
+    if (!body || !mac || extra) return null;
+    const a = Buffer.from(ticketMac(body, secret));
+    const b = Buffer.from(mac);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    const p = JSON.parse(Buffer.from(body, "base64url").toString()) as WelcomeTicket;
+    if (p.aud !== TICKET_AUD || p.c !== customerId || p.k !== kakaoId || !Number.isFinite(p.t)) return null;
+    if (p.t > nowMs + 5000 || nowMs - p.t > TICKET_MAX_MS) return null;
+    return p.t;
+  } catch { return null; }
 }
 
 /** 지금 켜진 방송이 있는지 */
@@ -153,48 +199,62 @@ export async function liveBroadcastOn(sb: SupabaseClient): Promise<boolean> {
   return (data ?? []).length > 0;
 }
 
-export type WelcomeEvaluation = { cfg: WelcomePointConfig; decision: WelcomeDecision; customer: WelcomeCustomer | null };
+/** tierIndex = 다음에 받을 구간(0부터). decision 이 null 이면 의미 없음. */
+export type WelcomeEvaluation = { cfg: WelcomePointConfig; decision: WelcomeDecision; customer: WelcomeCustomer | null; tierIndex: number };
 
 /** 이 손님이 지금 받을 수 있는 선물(지급 전 공통 판단). 모르면 null(안 줌). */
 export async function evaluateWelcome(sb: SupabaseClient, kakaoId: string, phone: string, nowMs: number): Promise<WelcomeEvaluation> {
   const cfg = await readWelcomeConfig(sb);
-  if (!cfg.first.on && !cfg.back.on) return { cfg, decision: null, customer: null };
-  if (!(await liveBroadcastOn(sb))) return { cfg, decision: null, customer: null };
+  const none = (customer: WelcomeCustomer | null): WelcomeEvaluation => ({ cfg, decision: null, customer, tierIndex: 0 });
+  if (!cfg.first.on && !cfg.back.on) return none(null);
+  if (!(await liveBroadcastOn(sb))) return none(null);
   const customer = await findWelcomeCustomer(sb, kakaoId, phone);
-  if (!customer) return { cfg, decision: null, customer: null };
+  if (!customer) return none(null);
   const history = await paidHistoryOf(sb, kakaoId, customer.phone);
   const decision = decideWelcome(cfg, customer.id, history, nowMs, customer.joinedAt);
-  if (!decision) return { cfg, decision: null, customer };
-  if (await alreadyGranted(sb, decision.sourceKey)) return { cfg, decision: null, customer };
-  if (decision.kind === "first" && (await phoneHadFirstGift(sb, customer.phone))) return { cfg, decision: null, customer };
-  return { cfg, decision, customer };
+  if (!decision) return none(customer);
+  const keys = decision.tiers.map((_, i) => welcomeTierKey(decision.sourceKey, i));
+  const got = await grantedTierKeys(sb, keys);
+  const tierIndex = keys.findIndex((k, i) => !got.has(k) && decision.tiers[i].amount > 0);
+  if (tierIndex < 0) return none(customer);
+  if (decision.kind === "first" && (await phoneHadFirstGift(sb, customer.phone, customer.id))) return none(customer);
+  return { cfg, decision, customer, tierIndex };
 }
 
 export type WelcomeClaimResult =
-  | { ok: true; granted: boolean; amount: number; kind: WelcomeKind }
+  | { ok: true; granted: boolean; amount: number; kind: WelcomeKind; tier: number; next: number | null }
   | { ok: false; status: number; message: string };
 
-/** 받기 — 조건을 다시 확인하고 기존 포인트 지급 RPC(중복 방지 키)로 한 번만 지급 */
-export async function claimWelcome(sb: SupabaseClient, kakaoId: string, phone: string, nowMs: number): Promise<WelcomeClaimResult> {
-  const { cfg, decision, customer } = await evaluateWelcome(sb, kakaoId, phone, nowMs);
+/** 받기 — 조건을 다시 확인하고, 보기 시작 표로 «실제 지난 시간»을 확인한 뒤 다음 구간 하나만 기존 포인트 지급 RPC(중복 방지 키)로 지급 */
+export async function claimWelcome(
+  sb: SupabaseClient, kakaoId: string, phone: string, nowMs: number,
+  opts: { ticket: unknown; secret: string },
+): Promise<WelcomeClaimResult> {
+  const { cfg, decision, customer, tierIndex } = await evaluateWelcome(sb, kakaoId, phone, nowMs);
   if (!decision || !customer) return { ok: false, status: 409, message: "받을 수 있는 선물이 없어요" };
-  if ((await grantedTodayCount(sb, kstDayStartIso(nowMs))) >= cfg.dailyCap) return { ok: false, status: 409, message: "오늘 선물이 모두 나갔어요" };
+  const tier = decision.tiers[tierIndex];
+  const startMs = verifyWelcomeTicket(opts.ticket, customer.id, String(kakaoId || "").replace(/[^0-9A-Za-z_-]/g, ""), nowMs, opts.secret);
+  if (startMs == null) return { ok: false, status: 409, message: "다시 열어 주세요" };
+  if (nowMs - startMs < tier.sec * 1000 - TICKET_SLACK_MS) return { ok: false, status: 409, message: "아직 시간이 안 됐어요" };
+  if (tierIndex === 0 && (await grantedTodayCount(sb, kstDayStartIso(nowMs))) >= cfg.dailyCap) return { ok: false, status: 409, message: "오늘 선물이 모두 나갔어요" };
   const { data, error } = await sb.rpc("admin_change_customer_points", {
-    p_phone: customer.phone, p_action: "grant", p_amount: decision.amount,
-    p_reason: WELCOME_REASON[decision.kind], p_admin_memo: "방송 시청 선물 자동 지급",
+    p_phone: customer.phone, p_action: "grant", p_amount: tier.amount,
+    p_reason: WELCOME_REASON[decision.kind] + (tierIndex > 0 ? " (더 보기)" : ""), p_admin_memo: "방송 시청 선물 자동 지급",
     p_nickname: customer.nickname, p_customer_name: customer.name,
-    p_customer_visible: true, p_source_key: decision.sourceKey,
+    p_customer_visible: true, p_source_key: welcomeTierKey(decision.sourceKey, tierIndex),
   });
   const d = (data || null) as { ok?: unknown; duplicate?: unknown; message?: unknown } | null;
   if (error || !d || typeof d.ok !== "boolean") return { ok: false, status: 503, message: "지급 결과를 확인하지 못했어요" };
   if (!d.ok) return { ok: false, status: 409, message: String(d.message || "지급 실패") };
-  return { ok: true, granted: d.duplicate !== true, amount: decision.amount, kind: decision.kind };
+  let next: number | null = null;
+  for (let i = tierIndex + 1; i < decision.tiers.length; i++) if (decision.tiers[i].amount > 0) { next = i; break; }
+  return { ok: true, granted: d.duplicate !== true, amount: tier.amount, kind: decision.kind, tier: tierIndex, next };
 }
 
 
 // ── 관리자: 선물 받은 사람 목록(페이지) + 최근 30일 요약 — 전부 읽기만 ──
 export type WelcomeRecipientRow = {
-  id: string; at: string; kind: "first" | "back"; amount: number;
+  id: string; at: string; kind: "first" | "back"; amount: number; tier: number;
   nickname: string; name: string; phoneTail: string;
   orders: number; paidOrders: number; paidAmount: number;
 };
@@ -215,7 +275,7 @@ async function attachResults(sb: SupabaseClient, rows: LedgerRow[]): Promise<Wel
   }
   const gifts = parsed.map(({ r, k }) => {
     const c = k ? kakaoOf.get(k.customerId) : undefined;
-    return { r, kind: (k?.kind ?? "first") as "first" | "back", at: String(r.created_at ?? ""), kakaoId: c?.kakao ?? "", phone: digits(r.customer_phone), c };
+    return { r, kind: (k?.kind ?? "first") as "first" | "back", tier: k?.tier ?? 0, at: String(r.created_at ?? ""), kakaoId: c?.kakao ?? "", phone: digits(r.customer_phone), c };
   });
   const orders: WelcomeOrderRow[] = [];
   for (let i = 0; i < gifts.length; i += 100) {
@@ -242,7 +302,7 @@ async function attachResults(sb: SupabaseClient, rows: LedgerRow[]): Promise<Wel
   return gifts.map((g) => {
     const res = welcomeOrderResult({ at: g.at, kakaoId: g.kakaoId, phone: g.phone }, orders, PAID);
     return {
-      id: String(g.r.id ?? ""), at: g.at, kind: g.kind, amount: Math.abs(Number(g.r.amount) || 0),
+      id: String(g.r.id ?? ""), at: g.at, kind: g.kind, tier: g.tier, amount: Math.abs(Number(g.r.amount) || 0),
       nickname: String(g.r.youtube_nickname || g.c?.nick || ""), name: String(g.r.customer_name || g.c?.name || ""),
       phoneTail: g.phone.slice(-4), ...res,
     };
@@ -275,9 +335,10 @@ export async function summarizeWelcome(sb: SupabaseClient, nowMs: number, days =
     if (list.length < 1000) break;
   }
   const rows = await attachResults(sb, all);
+  const people = rows.filter((r) => r.tier === 0); // 사람 수·주문은 첫 구간 줄로만(추가 구간은 같은 사람)
   return {
-    days, gifts: rows.length, points: rows.reduce((s, r) => s + r.amount, 0),
-    ordered: rows.filter((r) => r.orders > 0).length, paid: rows.filter((r) => r.paidOrders > 0).length,
-    paidAmount: rows.reduce((s, r) => s + r.paidAmount, 0), capped: all.length >= 2000,
+    days, gifts: people.length, points: rows.reduce((s, r) => s + r.amount, 0),
+    ordered: people.filter((r) => r.orders > 0).length, paid: people.filter((r) => r.paidOrders > 0).length,
+    paidAmount: people.reduce((s, r) => s + r.paidAmount, 0), capped: all.length >= 2000,
   };
 }

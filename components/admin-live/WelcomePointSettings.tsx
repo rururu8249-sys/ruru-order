@@ -4,7 +4,7 @@
 //   저장 = /api/admin-live/welcome-point(관리자만, 비공개 저장소). 지급 자체는 손님 화면 → 서버가 조건 확인 후 기존 포인트 지급 RPC.
 import { useEffect, useState } from "react";
 import WelcomeRecipientList from "@/components/admin-live/WelcomeRecipientList";
-import { WELCOME_LIMITS, WELCOME_POINT_DEFAULT, type WelcomePointConfig } from "@/lib/welcomePoint";
+import { WELCOME_LIMITS, WELCOME_POINT_DEFAULT, WELCOME_TIER_MAX, type WelcomePointConfig, type WelcomeTier } from "@/lib/welcomePoint";
 
 function Switch({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
   return (
@@ -20,13 +20,35 @@ function NumField({ label, value, unit, min, max, onChange }: { label: string; v
   useEffect(() => { setText(String(value)); }, [value]);
   return (
     <label className="flex items-center gap-2 text-[13px] text-ink-soft">
-      <span className="shrink-0">{label}</span>
+      {label ? <span className="shrink-0">{label}</span> : null}
       <input inputMode="numeric" value={text}
         onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, ""))}
         onBlur={() => { const n = Math.min(max, Math.max(min, Math.floor(Number(text) || 0))); setText(String(n)); onChange(n); }}
         className="h-9 w-20 rounded-lg border border-line bg-white px-2 text-right text-[14px] font-bold text-ink tabular-nums" />
       <span className="shrink-0">{unit}</span>
     </label>
+  );
+}
+
+/** [2026-11-14 사장님 「30초 얼마 60초 얼마」] 보는 시간 구간 — 구간마다 따로 한 번씩, 앞 구간부터 */
+function TierEditor({ tiers, onChange }: { tiers: WelcomeTier[]; onChange: (t: WelcomeTier[]) => void }) {
+  const set = (i: number, patch: Partial<WelcomeTier>) => onChange(tiers.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+  return (
+    <div className="grid gap-1.5">
+      {tiers.map((t, i) => (
+        <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="w-12 shrink-0 text-[12px] font-bold text-ink-mute">{i + 1}구간</span>
+          <NumField label="" value={t.sec} unit="초 보면" min={0} max={WELCOME_LIMITS.watchMax} onChange={(n) => set(i, { sec: n })} />
+          <NumField label={i > 0 ? "더" : ""} value={t.amount} unit="P" min={0} max={WELCOME_LIMITS.amountMax} onChange={(n) => set(i, { amount: n })} />
+          {i > 0 ? <button type="button" onClick={() => onChange(tiers.filter((_, j) => j !== i))} className="h-9 text-[12px] font-bold text-danger">빼기</button> : null}
+        </div>
+      ))}
+      {tiers.length < WELCOME_TIER_MAX ? (
+        <button type="button" onClick={() => { const last = tiers[tiers.length - 1]; onChange([...tiers, { sec: Math.min(WELCOME_LIMITS.watchMax, (last?.sec || 30) + 30), amount: last?.amount || 1000 }]); }}
+          className="h-9 justify-self-start text-[13px] font-bold text-ink underline underline-offset-2">+ 구간 추가</button>
+      ) : null}
+      {tiers.length > 1 ? <div className="text-[12px] text-ink-mute">구간마다 한 번씩 따로 줘요. 다른 앱으로 나갔다 오면 처음부터 다시 셈.</div> : null}
+    </div>
   );
 }
 
@@ -78,7 +100,7 @@ export default function WelcomePointSettings() {
         </div>
         <Switch on={cfg.first.on} disabled={busy} label="처음 오신 선물" onChange={(v) => setCfg({ ...cfg, first: { ...cfg.first, on: v } })} />
       </div>
-      {cfg.first.on ? <NumField label="금액" value={cfg.first.amount} unit="P" min={0} max={WELCOME_LIMITS.amountMax} onChange={(n) => setCfg({ ...cfg, first: { ...cfg.first, amount: n } })} /> : null}
+      {cfg.first.on ? <TierEditor tiers={cfg.first.tiers} onChange={(t) => setCfg({ ...cfg, first: { ...cfg.first, tiers: t, amount: t[0]?.amount ?? 0 } })} /> : null}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[13px] font-bold text-ink">오랜만에 오신 선물</div>
@@ -87,14 +109,13 @@ export default function WelcomePointSettings() {
         <Switch on={cfg.back.on} disabled={busy} label="오랜만에 오신 선물" onChange={(v) => setCfg({ ...cfg, back: { ...cfg.back, on: v } })} />
       </div>
       {cfg.back.on ? (
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          <NumField label="금액" value={cfg.back.amount} unit="P" min={0} max={WELCOME_LIMITS.amountMax} onChange={(n) => setCfg({ ...cfg, back: { ...cfg.back, amount: n } })} />
+        <div className="grid gap-2">
           <NumField label="기간" value={cfg.back.days} unit="일" min={WELCOME_LIMITS.daysMin} max={WELCOME_LIMITS.daysMax} onChange={(n) => setCfg({ ...cfg, back: { ...cfg.back, days: n } })} />
+          <TierEditor tiers={cfg.back.tiers} onChange={(t) => setCfg({ ...cfg, back: { ...cfg.back, tiers: t, amount: t[0]?.amount ?? 0 } })} />
         </div>
       ) : null}
       {cfg.first.on || cfg.back.on ? (
         <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-line pt-2">
-          <NumField label="방송 보기" value={cfg.watchSec} unit="초(그립 30)" min={0} max={WELCOME_LIMITS.watchMax} onChange={(n) => setCfg({ ...cfg, watchSec: n })} />
           <NumField label="안전장치 · 하루 전체 최대" value={cfg.dailyCap} unit="명" min={1} max={WELCOME_LIMITS.capMax} onChange={(n) => setCfg({ ...cfg, dailyCap: n })} />
         </div>
       ) : null}

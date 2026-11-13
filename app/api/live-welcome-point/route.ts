@@ -5,7 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { WELCOME_REASON, welcomeHelpLines } from "@/lib/welcomePoint";
-import { claimWelcome, evaluateWelcome } from "@/lib/welcomePointServer";
+import { claimWelcome, evaluateWelcome, signWelcomeTicket } from "@/lib/welcomePointServer";
+import { getAdminAuthConfig } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,17 @@ const NO_STORE = { "Cache-Control": "no-store" };
 export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams;
-    const { cfg, decision } = await evaluateWelcome(admin(), String(sp.get("kakao") || ""), String(sp.get("phone") || ""), Date.now());
-    if (!decision) return NextResponse.json({ ok: true, offer: null }, { headers: NO_STORE });
-    const help = welcomeHelpLines(decision.kind, decision.amount, cfg.watchSec);
+    const kakao = String(sp.get("kakao") || "").replace(/[^0-9A-Za-z_-]/g, "");
+    const now = Date.now();
+    const { decision, customer, tierIndex } = await evaluateWelcome(admin(), kakao, String(sp.get("phone") || ""), now);
+    if (!decision || !customer) return NextResponse.json({ ok: true, offer: null }, { headers: NO_STORE });
+    // [2026-11-14] 구간: 지금 보기 시작 → 다음 구간(tierIndex)부터 셈. ticket = 서버가 서명한 «보기 시작 시각»
+    const tiers = decision.tiers.map((t, i) => ({ sec: t.sec, amount: t.amount, done: i < tierIndex }));
+    const next = decision.tiers[tierIndex];
+    const help = welcomeHelpLines(decision.kind, decision.tiers);
+    const ticket = signWelcomeTicket(customer.id, kakao, now, getAdminAuthConfig().sessionSecret);
     return NextResponse.json(
-      { ok: true, offer: { kind: decision.kind, amount: decision.amount, watchSec: cfg.watchSec, label: WELCOME_REASON[decision.kind], help } },
+      { ok: true, offer: { kind: decision.kind, amount: next.amount, watchSec: next.sec, tiers, tierIndex, ticket, label: WELCOME_REASON[decision.kind], help } },
       { headers: NO_STORE },
     );
   } catch {
@@ -34,9 +41,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => null)) as { kakao_id?: unknown; phone?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { kakao_id?: unknown; phone?: unknown; ticket?: unknown } | null;
   try {
-    const r = await claimWelcome(admin(), String(body?.kakao_id || ""), String(body?.phone || ""), Date.now());
+    const r = await claimWelcome(admin(), String(body?.kakao_id || ""), String(body?.phone || ""), Date.now(),
+      { ticket: body?.ticket, secret: getAdminAuthConfig().sessionSecret });
     if (!r.ok) return NextResponse.json({ ok: false, message: r.message }, { status: r.status, headers: NO_STORE });
     return NextResponse.json(r, { headers: NO_STORE });
   } catch {
