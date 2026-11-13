@@ -31,8 +31,8 @@ export function fallbackGreeting(recent:string[],seed:number):string{
 }
 /** 이름 불러 인사·감사한 글에 제미나이 답이 안 나오면 쓰는 짧은 답 */
 export function fallbackThanksReply(question:string,recent:string[],seed:number):string|null{
- if(!/감사|고마|안녕|반가|좋은\s*(밤|하루|저녁|아침)|잘\s*자|수고/.test(question))return null;
- const night=/밤|잘\s*자/.test(question);
+ if(!/감사|고마|안녕|반가|좋은\s*(밤|하루|저녁|아침|꿈)|잘\s*자|수고|평안|편안|굿밤|푹\s*쉬|쉬세요/.test(question))return null;
+ const night=/밤|잘\s*자|꿈|쉬세요|푹\s*쉬/.test(question);
  const list=night?['감사해요~ 좋은 밤 되세요','네 감사합니다 😊 좋은 밤 되세요','루루님도 좋은 밤 되세요~']:['감사해요~','네 감사합니다 😊','감사합니다~ 루루님','넵 감사해요!'];
  for(let i=0;i<list.length;i++){const r=list[(Math.abs(seed)+i)%list.length];if(!duplicateLine(r,recent.slice(0,15)))return r;}
  return null;
@@ -46,6 +46,8 @@ export function mentionsNickname(body:string,nickname:string):boolean{
  if(text.includes(base)||text.includes(head))return true;
  // 사람 이름처럼 한글 3글자면 성 빼고 부르기도 함(장혜숙 → 「혜숙님」)
  if(/^[가-힣]{3}$/.test(base)&&text.includes(base.slice(1)+'님'))return true;
+ // [2026-11-13 23:44 사장님] 앞 두 글자 + 님으로 줄여 부르기(별님찻집 → 「별님」)
+ if(base.length>=3&&text.includes(base.slice(0,2)+'님'))return true;
  return false;
 }
 /** 다른 닉네임이 방금 한 말과 글자가 절반 넘게 겹치면 비슷한 말로 본다 */
