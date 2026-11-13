@@ -147,7 +147,7 @@ export async function runConversationAction(db:SupabaseClient,origin:string,acti
    if(!answer.text){if(firstChat)return await greetOnly();const t=await thanksOnly();if(t)return t;throw Error('AI_WAIT');}
    const generated=JSON.parse(answer.text);
    const candidate=generated?.text;
-   if(!validGroundedDialogue(generated,currentCard,scope,Date.now(),{firstOrder:facts.firstOrder,paymentKind:paymentReport?facts.paymentKind:undefined})||!dialogueActionAllowed(candidate,scope,action.kind,Boolean(facts.ordered&&currentCard&&facts.items?.some(i=>featuredMatches(i,currentCard))))||!expressionAllowed(candidate,expression))throw Error("UNGROUNDED_DIALOGUE");
+   if(!validGroundedDialogue(generated,currentCard,scope,Date.now(),{firstOrder:facts.firstOrder,paymentKind:paymentReport?facts.paymentKind:undefined})||!dialogueActionAllowed(candidate,scope,action.kind,Boolean(facts.ordered&&currentCard&&facts.items?.some(i=>featuredMatches(i,currentCard))))||!expressionAllowed(candidate,expression)){const t=await thanksOnly();if(t)return t;throw Error("UNGROUNDED_DIALOGUE");}
    if(!orderReport&&/주문.{0,12}(했|냈|제출|넣었)|첫\s*주문/.test(candidate))throw Error("ORDER_REPORT_REPETITION");
    if(scope==="product"&&/주문.{0,8}(했|냈|완료|제출|넣었)/.test(candidate)&&!facts.items?.some(i=>featuredMatches(i,currentCard!)))throw Error("UNOWNED_PRODUCT_ORDER");
    if(typeof candidate==='string'&&/조용|주문만|말이 없|말씀.{0,4}없/.test(candidate)){
