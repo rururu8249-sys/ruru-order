@@ -60,7 +60,8 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
     void fetch(`/api/live-chat/private?bc=${encodeURIComponent(bc)}`, { headers, cache: "no-store", signal: controller.signal }).then(async r => {
       const j = await r.json();
       if (controller.signal.aborted || requestId !== serial.current || JSON.stringify(headers) !== JSON.stringify(chatIdentityHeaders())) return;
-      if (!r.ok || !j.ok) { access.current = false; setState(EMPTY); return; }
+      // [2026-11-14 사장님 「관리자 프로필 깜박임」] 잠깐 실패(네트워크·서버 지연)엔 직전 화면 유지 — 권한이 실제로 없을 때(401·403)만 비움
+      if (!r.ok || !j.ok) { if (r.status === 401 || r.status === 403) { access.current = false; setState(EMPTY); } return; }
       access.current = true;
       const deletedMessages = j.canReviewDeleted ? (j.deletedMessages || []).map((raw: unknown) => {
         const m = parseChatMessage(raw); return m && m.broadcastId === bc ? { ...m, deletedByAuthor: true } : null;
@@ -69,7 +70,7 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
         const m = parseChatMessage(raw); return m && m.broadcastId === bc ? { ...m, privateCommand: true } : null;
       }).filter(Boolean) as LiveChatMessage[] : [];
       setState({ testMessages: j.canReviewDeleted ? (j.testMessages || {}) : {}, avatars: j.canReviewDeleted ? (j.avatars || {}) : {}, verified: j.verified === true, canReviewDeleted: j.canReviewDeleted === true, ownIds: j.ownIds || [], hiddenIds: j.hiddenIds || [], deletedMessages, commandMessages });
-    }).catch(() => { if (!controller.signal.aborted) setState(EMPTY); });
+    }).catch(() => { /* 네트워크 실패 — 직전 화면 유지(사진이 진짜↔기본으로 깜박이지 않게) */ });
     return () => { ++serial.current; controller.abort(); };
   }, [bc, enabled, revision]);
   useEffect(() => {
