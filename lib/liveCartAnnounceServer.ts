@@ -97,7 +97,8 @@ export async function announceNewCartLines(sb: SupabaseClient, input: { sessionK
     const { error } = await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: items[0].ref, avatar_url: input.kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : null });
     // Existing after() task: reuse the masked site notice and the configured
     // YouTube notification switch/main+second destinations, without blocking cart success.
-    if (!error && await readActiveBroadcastId(sb) === bc) {
+    // [2026-11-13] 자동 테스트 담기는 유튜브 채팅에 안 올림(사이트 채팅엔 테스트 표식으로만 — 관리자 화면에서만 보임)
+    if (!error && input.kakaoId !== AUTO_TEST_KAKAO_ID && await readActiveBroadcastId(sb) === bc) {
       const results = await postOrderChatEverywhere(body);
       for (const [channel, result] of Object.entries(results)) {
         if (!result.ok && !result.skipped) console.warn("[cart-chat] YouTube notice failed", { channel, reason: result.reason });

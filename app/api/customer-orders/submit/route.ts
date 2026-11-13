@@ -907,6 +907,8 @@ export async function POST(request: NextRequest) {
     after(async () => {
       try {
         const rows = normalizedSubmit.orderRows;
+        // [2026-11-13] 테스트 주문은 유튜브 채팅에 안 올림(공개 채널 — 실제로 안 산 구매 표시 금지)
+        if ((rows as AnyRow[]).some((r) => r?.is_test_order === true)) return;
         // YouTube 실시간 채팅은 메시지당 200자 제한. 180자로 여유를 두고 분할한다.
         // 모든 상품/옵션/색상/사이즈/수량/상품별 금액을 생략 없이 보낸다("외 N개" 축약 금지).
         // [2026-11-06] 하루 한도 아끼기 — 주문마다 바로 올리지 않고 대기열에 넣은 뒤 20초 묶어 한 줄로(lib/orderChatBatch).

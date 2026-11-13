@@ -10,7 +10,7 @@ export const AUTO_TEST_VIEWERS_KEY = "auto_test_viewers_v1";
 export type TestViewer = { id: string; nick: string; join: number; leave: number; live: boolean };
 type Saved = { bc: string; list: TestViewer[] };
 
-const DWELL_MIN = [3, 5, 10, 30, 60];
+const DWELL_MIN = [5, 10, 30, 60, 120]; // [2026-11-13 14:36] 5·10·30·60·120분 중 랜덤
 const MAX_CONCURRENT = 6;
 
 export function parseTestViewers(raw: unknown): Saved {

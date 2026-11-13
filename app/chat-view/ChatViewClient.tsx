@@ -328,7 +328,7 @@ export default function ChatViewClient() {
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
                   <span style={{ fontWeight: 700, color: "#C2C2C2", marginRight: "8px" }}>{m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
-                  {m.avatar === AUTO_TEST_AVATAR ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: "#3A3A3A", color: "#BBBBBB", fontSize: "0.65em", fontWeight: 800, verticalAlign: "0.12em" }}>TEST</span> : null}
+                  {m.avatar === AUTO_TEST_AVATAR ? <span style={{ marginRight: "6px", color: "#BBBBBB", fontWeight: 700 }}>(테스트)</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}
                   <ChatBodyView body={m.body} emojis={emojiMap} />
                 </div>

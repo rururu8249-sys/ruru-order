@@ -1490,9 +1490,8 @@ export default function LiveWatchView(props: Props) {
                   {m.privateCommand ? <span style={{ display: "block", fontSize: 12, color: "#a8c7fa", marginBottom: 3 }}>나만 보이는 명령어</span> : null}
                   {/* [12:54 사장님 「유튜브랑 똑같이」] 사장님 유튜브 캡처에서 잰 값: 닉네임 흐린 흰색(약 80%)·보통 굵기, 글 흰색·보통 굵기 */}
                   {/* [13:44 사장님 「닉네임만 연한 색」] 닉네임만 사람마다 정해진 색을 흰색과 반쯤 섞은 연한 색(글은 흰색 그대로), 루루동이 안내는 흐린 흰색 */}
-                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: m.badge === "bot" ? "rgba(255,255,255,0.8)" : softNickColor(color) }}>{m.nickname}</span>
+                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: m.badge === "bot" ? "rgba(255,255,255,0.8)" : softNickColor(color) }}>{m.avatar === AUTO_TEST_AVATAR ? "(테스트) " : ""}{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
-                  {chat.showTest && m.avatar === AUTO_TEST_AVATAR ? <span style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 700, color: "#BBBBBB" }}>TEST</span> : null}
                   {botProduct ? <ChatProductThumb src={chatProductPhoto(props.items, botProduct)} name="안내 상품 사진" /> : null}
                   <span style={{ marginLeft: m.badge ? "4px" : "8px", color: "#FFFFFF" /* 글은 유튜브처럼 늘 흰색 — 연한 색 글은 밝은 배경에서 안 읽힘(12:49), 닉네임만 사람 색 */ }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
@@ -1536,7 +1535,7 @@ export default function LiveWatchView(props: Props) {
           >
             <ChatAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} color={chatColorMap.get(chat.pinned.id) || "#FFD43B"} />
             <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "9999px", background: "rgba(255,255,255,0.16)", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {chat.pinned.nickname}<ChatBadge badge={chat.pinned.badge} />
+              {chat.pinned.avatar === AUTO_TEST_AVATAR ? "(테스트) " : ""}{chat.pinned.nickname}<ChatBadge badge={chat.pinned.badge} />
             </span>
             {/* 줄 높이 = 이모티콘 높이(2em) — 한 줄로 접혀 있어도 이모티콘 위아래가 안 잘리고, 펼쳐도 줄 높이가 같아 안 움직임 */}
             <span ref={pinTextRef} style={{ flex: 1, minWidth: 0, lineHeight: "2em", padding: "0.15em 0", fontWeight: chatView.bold ? 700 : 500, ...(pinOpen ? { wordBreak: "break-word" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}><ChatBodyView body={chat.pinned.body} emojis={emojiMap} /></span>

@@ -604,6 +604,7 @@ export default function ProductWidgetClient() {
     const onOrderInsert = (payload: { new: AnyProduct }) => {
         const row = (payload.new || {}) as AnyProduct;
         scheduleStockReload(); // 재고 즉시 갱신(중복 토스트 가드보다 먼저 — 상품행마다 재고가 줄기 때문)
+        if (row.is_test_order === true) return; // [2026-11-13] 테스트 주문은 방송 화면 스티커 안 띄움(실제로 안 산 구매 표시 금지)
         collect(`ins:${groupKey(row)}`, row, (rows) => ({ icon: "", title: "주문완료", name: `${nick(rows[0])}님`, detail: itemLine(rows), tone: "green" }));
     };
     // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
@@ -616,6 +617,7 @@ export default function ProductWidgetClient() {
         // 주문취소 등으로 상태가 바뀌면 재고가 복구될 수 있으므로 재고도 다시 읽는다.
         if (status !== oldStatus) scheduleStockReload();
 
+        if (row.is_test_order === true) return; // 테스트 주문은 결제완료 스티커도 안 띄움
         // B·C. 입금확인 (자동입금확인/수동입금확인/입금확인)
         if (/입금확인/.test(status) && !/입금확인/.test(oldStatus)) {
           collect(`dep:${groupKey(row)}`, row, paidToast);
