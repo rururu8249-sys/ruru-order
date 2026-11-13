@@ -15,7 +15,6 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [liveUrl, setLiveUrl] = useState("");
-  const [owner, setOwner] = useState<{ connected: boolean; channel: string }>({ connected: false, channel: "" });
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [messageTemplate, setMessageTemplate] = useState("🛒 {{nickname}}님 주문 감사합니다! ({{items}} · {{amount}})");
   const [savingSettings, setSavingSettings] = useState(false);
@@ -29,7 +28,6 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
       if (json?.ok) {
         setConnected(!!json.connected);
         setLiveUrl(String(json.liveUrl || ""));
-        setOwner({ connected: !!json.ownerConnected, channel: String(json.ownerChannel || "") });
         setNotifyEnabled(!!json.notifyEnabled);
         setMessageTemplate(String(json.messageTemplate || "🛒 {{nickname}}님 주문 감사합니다! ({{items}} · {{amount}})"));
       }
@@ -47,7 +45,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
       const params = new URLSearchParams(window.location.search);
       const yt = params.get("yt");
       const msg = params.get("msg") || "";
-      if (yt === "connected") showAdminToast(msg || "유튜브 연결 완료", "success");
+      if (yt === "connected") showAdminToast("유튜브 연결 완료", "success");
       else if (yt === "error") showAdminToast("유튜브 연결 실패\n\n" + msg, "error");
       if (yt) {
         params.delete("yt");
@@ -135,20 +133,6 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
           className="shrink-0 rounded-full bg-rose-deep px-4 py-2 text-xs font-black text-white transition hover:opacity-90"
         >
           {connected ? "다시 연결" : "유튜브 연결"}
-        </button>
-      </div>
-
-      {/* [2026-11-13] 자주 쓰는 말을 나야루루 이름으로 유튜브 채팅에 바로 보내기 — 채널 주인 계정(봇 계정과 따로) */}
-      <div className="mt-3 flex items-start justify-between gap-3 rounded-2xl border border-line bg-surface-2 p-4">
-        <div>
-          <div className="text-sm font-black text-ink">자주 쓰는 말 · 유튜브 계정</div>
-          <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-            {owner.connected ? `연결됨 · ${owner.channel || "채널 이름 확인 안 됨"} 이름으로 보내져요` : "나야루루 채널 계정으로 한 번 로그인하면 자주 쓰는 말이 유튜브 채팅에 바로 올라가요"}
-          </div>
-        </div>
-        <button type="button" onClick={() => { window.location.href = "/api/youtube/oauth-start?for=owner"; }}
-          className="shrink-0 rounded-full border border-line bg-surface px-4 py-2 text-xs font-black text-ink transition hover:opacity-90">
-          {owner.connected ? "다시 연결" : "계정 연결"}
         </button>
       </div>
 
