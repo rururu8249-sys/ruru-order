@@ -164,7 +164,29 @@ export async function GET(request: NextRequest) {
     }
     const byProductPeople: Record<string, number> = {};
     for (const [pid, set] of Object.entries(peopleSet)) byProductPeople[pid] = set.size;
-    return NextResponse.json({ ok: true, byProduct, byVariant, byProductPeople });
+    // [2026-11-14 사장님 「담는 순간 다른 손님 화면엔 품절」] 옵션별 판매 가능 수량(limit_qty)이 다 찬 옵션 — 이 손님(exclude) 장바구니는 빼고 계산.
+    //   DB 함수(ruru_option_limit_remaining)가 담기·제출 검사와 똑같이 계산. 실패해도 화면은 예전처럼.
+    const limitSoldOut: Array<{ productId: string; color: string; size: string }> = [];
+    try {
+      const { data: limited } = await supabase.from("products").select("id, product_note").in("id", ids.filter((x) => /^[0-9]+$/.test(x)).map(Number)).ilike("product_note", '%"limit_qty":%');
+      for (const prod of (limited || []) as Array<{ id: number; product_note: unknown }>) {
+        let note: any = prod.product_note;
+        if (typeof note === "string") { try { note = JSON.parse(note); } catch { continue; } }
+        const details = note?.brand_group?.detail_options && typeof note.brand_group.detail_options === "object" ? note.brand_group.detail_options : {};
+        for (const row of Array.isArray(note?.stock_variants) ? note.stock_variants : []) {
+          if (typeof row?.limit_qty !== "number") continue;
+          const stored = String(row.color || "");
+          const at = stored.indexOf(" / ");
+          const head = at >= 0 ? stored.slice(0, at) : "";
+          const isDetail = head !== "" && Object.prototype.hasOwnProperty.call(details, head);
+          const detail = isDetail ? head : "";
+          const color = isDetail ? stored.slice(at + 3) : stored;
+          const { data: left } = await supabase.rpc("ruru_option_limit_remaining", { p_product_id: prod.id, p_note: note, p_detail: detail, p_color: color === "없음" ? "" : color, p_size: String(row.size || ""), p_session: exclude || null, p_phone: null });
+          if (typeof left === "number" && left <= 0) limitSoldOut.push({ productId: String(prod.id), color: stored, size: String(row.size || "") });
+        }
+      }
+    } catch { /* 표시용 — 실패해도 담기·제출 검사는 DB 가 한다 */ }
+    return NextResponse.json({ ok: true, byProduct, byVariant, byProductPeople, limitSoldOut });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }

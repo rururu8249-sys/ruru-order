@@ -4195,6 +4195,8 @@ export default function OrderPage() {
     });
   }, [customerPointBalance, totalAmount]);
 
+  // [2026-11-14] 옵션별 판매 가능 수량이 다 찬 옵션(다른 손님이 담았거나 팔림) — 화면에선 품절로 보임. 판정은 서버(DB)
+  const [limitSoldOut, setLimitSoldOut] = useState<string>("[]");
   const quickGroupBuyProducts = useMemo(() => {
     // 두 모드 절대 안 섞임:
     // - 방송 모드(ON): 방송에 담은 broadcast_products만 노출. 카탈로그(in_shop 포함) 전부 제외.
@@ -4221,13 +4223,27 @@ export default function OrderPage() {
       return Number.isFinite(parsed) ? parsed : 999999;
     };
 
+    // [2026-11-14] 판매 가능 수량이 다 찬 옵션은 화면용 메모에만 품절 표시를 얹는다(저장·주문 값은 그대로)
+    let soldList: Array<{ productId: string; color: string; size: string }> = [];
+    try { soldList = JSON.parse(limitSoldOut); } catch { soldList = []; }
+    const markLimitSoldOut = (product: BroadcastProduct): BroadcastProduct => {
+      const mine = soldList.filter((x) => x.productId === String(product?.id ?? ""));
+      if (!mine.length) return product;
+      const raw = (product as any).product_note;
+      let note: any = raw;
+      if (typeof raw === "string") { try { note = JSON.parse(raw); } catch { return product; } }
+      if (!note || !Array.isArray(note.stock_variants)) return product;
+      const next = { ...note, stock_variants: note.stock_variants.map((v: any) => mine.some((x) => x.color === String(v?.color || "") && x.size === String(v?.size || "")) ? { ...v, manual_soldout: true } : v) };
+      return { ...product, product_note: typeof raw === "string" ? JSON.stringify(next) : next } as BroadcastProduct;
+    };
+
     const uniqueProducts = Array.from(
       new Map(
         mergedProducts
           .filter((product) => product && product.status !== "숨김" && product.status !== "deleted")
           // 고객 노출(is_visible)이 명시적으로 false인 상품만 그리드에서 제외. (기존 registered_order_enabled 필터는 검색만(search_only) 상품을 빠뜨려서 교체)
           .filter((product) => (product as any).is_visible !== false)
-          .map((product) => [String(product.id), product]),
+          .map((product) => [String(product.id), markLimitSoldOut(product)]),
       ).values(),
     );
 
@@ -4253,7 +4269,7 @@ export default function OrderPage() {
 
       return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
     });
-  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status, broadcast?.widget_pin_mode, broadcast?.widget_pin_product_id]);
+  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status, broadcast?.widget_pin_mode, broadcast?.widget_pin_product_id, limitSoldOut]);
   // [2026-11-06] 대충 검색(샤넬202·샤202 → CH-202) — 지금 보이는 묶음 상품으로 브랜드↔상품번호 연결표 등록. 검색 전용.
   useMemo(() => registerBrandAliasesFromProducts(quickGroupBuyProducts as unknown[]), [quickGroupBuyProducts]);
 
@@ -4340,6 +4356,7 @@ export default function OrderPage() {
       const data = await res.json().catch(() => null);
       if (data?.ok) {
         setReservedByVariant(data.byVariant || {});
+        setLimitSoldOut(JSON.stringify(Array.isArray(data.limitSoldOut) ? data.limitSoldOut : []));
         setReservedByProduct(data.byProduct || {});
         setHoldersByProduct(data.byProductPeople || {});
       }
