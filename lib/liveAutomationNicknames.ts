@@ -684,15 +684,15 @@ export const NICKNAME_CANDIDATES:readonly NicknameCandidate[]=[
   },
   {
     "category": "english_number",
-    "nickname": "Joy52"
+    "nickname": "Luna17"
   },
   {
     "category": "english_number",
-    "nickname": "Coco81"
+    "nickname": "Bella63"
   },
   {
     "category": "english_number",
-    "nickname": "Rose36"
+    "nickname": "Hana28"
   },
   {
     "category": "real_name",

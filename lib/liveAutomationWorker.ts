@@ -19,9 +19,8 @@ async function ensurePool(db:SupabaseClient) {
  const existing=await db.from('live_automation_nickname_pool').select('nickname_key',{head:true,count:'exact'}).eq('status','unused');
  if(existing.error)throw Error(existing.error.message);
  if((existing.count||0)>=50)return;
- const suffix=String(Math.floor(Math.random()*90)+10);
- const extra=NICKNAME_CANDIDATES.filter(x=>x.category==='korean'||x.category==='humor').slice(0,100).map(x=>({...x,nickname:x.nickname.slice(0,12)+suffix,category:'hangul_number'}));
- await automationRpc(db,'live_automation_pool_refill',{p_candidates:[...NICKNAME_CANDIDATES,...extra]});
+ // [2026-11-13 사장님] 기존 닉네임 뒤에 숫자만 붙인 비슷한 닉네임(양말한짝수배 → 양말한짝수배53)은 만들지 않는다 — 후보 목록 그대로만.
+ await automationRpc(db,'live_automation_pool_refill',{p_candidates:[...NICKNAME_CANDIDATES]});
 }
 async function freshActor(db:SupabaseClient,c:LiveCampaign,target:number,minutes:number,watch:boolean):Promise<{actor:Actor;session:Session}> {
  await ensurePool(db);
