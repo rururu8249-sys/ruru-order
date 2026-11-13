@@ -85,6 +85,9 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right }: { onSe
   useEffect(() => { live.current = { phrases, send, editing: editing !== null }; });
   if (!loaded) return null;
   const rightCss = typeof right === "number" ? `${right}px` : right || "0px";
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || "");
+  const ytKey = (n: number) => isMac ? `⌥ Option + ${n}` : `Alt + ${n}`;
+  const siteKey = (n: number) => isMac ? `⌥ Option + ⇧ Shift + ${n}` : `Alt + Shift + ${n}`;
   const plain = { height: "32px", padding: "0 6px", border: "none", background: "transparent", color: "#AAAAAA", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 } as const;
   const openEdit = () => { setNote(""); setEditing(phrases.length ? [...phrases] : [""]); };
   // 영상 오른쪽 검은 여백(영상과 채팅 사이) 아래쪽에 떠 있는 판. 접으면 작은 버튼만.
@@ -109,18 +112,18 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right }: { onSe
                 {i < 9 ? <span aria-hidden style={{ flexShrink: 0, width: "18px", height: "18px", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "12px", fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{i + 1}</span> : null}
                 <span title={p} style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 500, lineHeight: 1.4, wordBreak: "keep-all", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p}</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px", flexShrink: 0 }}>
-                  <button type="button" onClick={() => void send(p, i, "yt")} disabled={!!busy} aria-label={`${i + 1}번 유튜브용 복사`} title={i < 9 ? `Alt+${i + 1}` : undefined} style={btn(true, busy === `yt:${i}`)}>
+                  <button type="button" onClick={() => void send(p, i, "yt")} disabled={!!busy} aria-label={`${i + 1}번 유튜브용 복사`} title={i < 9 ? `단축키 ${ytKey(i + 1)}` : undefined} style={btn(true, busy === `yt:${i}`)}>
                     <svg aria-hidden width="14" height="10" viewBox="0 0 16 12"><rect width="16" height="12" rx="3" fill="#FF0000" /><path d="M6.5 3.5v5l4-2.5z" fill="#FFFFFF" /></svg>
                     유튜브 복사
                   </button>
-                  <button type="button" onClick={() => void send(p, i, "site")} disabled={!!busy} aria-label={`${i + 1}번 사이트 채팅에 보내기`} title={i < 9 ? `Alt+Shift+${i + 1}` : undefined} style={btn(false, busy === `site:${i}`)}>
+                  <button type="button" onClick={() => void send(p, i, "site")} disabled={!!busy} aria-label={`${i + 1}번 사이트 채팅에 보내기`} title={i < 9 ? `단축키 ${siteKey(i + 1)}` : undefined} style={btn(false, busy === `site:${i}`)}>
                     {busy === `site:${i}` ? "보내는 중" : "사이트"}
                   </button>
                 </div>
               </div>
             ))}
           </div>
-          <div style={{ padding: "6px 12px 8px", borderTop: "1px solid #333333", fontSize: "12px", color: "#999999", lineHeight: 1.4, flexShrink: 0 }}>Alt+숫자 = 유튜브 복사 · Alt+Shift+숫자 = 사이트 보내기</div>
+          <div style={{ padding: "6px 12px 8px", borderTop: "1px solid #333333", fontSize: "12px", color: "#999999", lineHeight: 1.4, flexShrink: 0 }}>{isMac ? <>단축키 <b style={{ color: "#DDDDDD" }}>⌥ Option + 숫자</b> = 유튜브 복사 · <b style={{ color: "#DDDDDD" }}>⌥ Option + ⇧ Shift + 숫자</b> = 사이트 보내기</> : <>단축키 <b style={{ color: "#DDDDDD" }}>Alt + 숫자</b> = 유튜브 복사 · <b style={{ color: "#DDDDDD" }}>Alt + Shift + 숫자</b> = 사이트 보내기</>}<br />유튜브 채팅칸에 커서가 있으면 안 먹어요 — 이 판을 한 번 누른 뒤 쓰세요</div>
         </section>
       )}
       {editing ? createPortal(
