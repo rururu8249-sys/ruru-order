@@ -9,7 +9,7 @@ export type CartChatToast = { key: string; nick: string; detail: string };
 /** 「🛍️ 루*동이님 장바구니 담음 · PD-202 블랙/M · 259,000원 외 2종」 → 닉네임·첫 상품(외 N종). 금액은 안 씀. */
 export function parseCartChatToast(m: LiveChatMessage | null | undefined): CartChatToast | null {
   if (!m || m.hidden || m.badge !== "bot" || !m.botRef.startsWith("c:")) return null;
-  if (m.avatar === "autotest") return null; // 자동 테스트 담기는 방송 화면에 안 띄움
+  // [2026-11-14] 자동 테스트 담기도 실제처럼 스티커(11/13 제외 폐기)
   const hit = /^🛍️\s*(.+?)님 장바구니 담음 · (.+)$/u.exec(String(m.body || "").trim());
   if (!hit) return null;
   let rest = hit[2].trim();
