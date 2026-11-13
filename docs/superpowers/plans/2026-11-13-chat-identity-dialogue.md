@@ -7,7 +7,7 @@ Authorization: user repeatedly requested direct implementation and production re
 - [x] Public projection and realtime privacy migration; authorized private photo overlay; test anonymous/spoofed access and stable identity.
 - [x] Shared avatar renderer and event-specific notification palettes/names; preserve AI badge across customer/admin/chat-view; curated internet image catalog and 5,000 assignment slots.
 - [x] Current-card dialogue scope, owner historical topics/aliases, no fabricated purchase histories; server final checks and stale-card tests.
-- [ ] Targeted regression, TypeScript/build, independent review, migration/deploy and production read-only verification.
+- [x] Targeted regression, TypeScript/build, independent review, migration/deploy and production read-only verification.
 
 Review focus: public GET/POST/realtime/REST leak paths; private response cache and logout clearing; parser idempotence; fake current-card metadata/model misclassification; alias collision and invented options; preserving payment isolation and automatic OFF/manual lease rules.
 
@@ -16,3 +16,5 @@ Latest owner corrections: re-entry updates all same-broadcast history through a 
 Ruling: production tempo migration applied first on owner complaint to prevent continued overload; all remaining bundle changes wait for verification/deploy. Existing unasked pending journeys moved 8+ minutes out without cancelling published question promises.
 
 Latest dialogue correction: short fragments and real contextual replies instead of mandatory full product reports; order greetings/first-order claims and current receipt acknowledgements (including 입완) require persisted matching state. Quality/delivery questions allowed only for current card, never invented assertions. User-provided live screenshots inform style only, never copied identities, prices or experiences. Review fixes verified by dialogue/conversation/crowd DB suites.
+
+Final range correction supersedes all earlier 50/100 goals: ordinary 2–30, rare 42–50, gradual steps 2–4. Exact screenshot near-duplicate phrases now rejected across nicknames; latest non-bot context is used. Production shared UI/privacy endpoints verified; original profiles excluded from anonymous output.

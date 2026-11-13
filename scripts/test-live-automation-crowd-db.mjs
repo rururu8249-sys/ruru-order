@@ -181,4 +181,17 @@ assert.equal(await scalar('select live_automation_payment_speech_valid($1,$2)',[
 await db.query('delete from orders where automation_action_id=$1',[receiptOrder.id]);
 assert.equal(await scalar('select live_automation_payment_speech_valid($1,$2)',[speech.id,'입금완료 했어요']),false,'deleting the order revokes acknowledgement evidence');
 console.log('PASS shared room AI rest across different nicknames with direct reply exception');
+await db.exec(readFileSync('supabase/migrations/20261113111646_live_automation_smaller_crowd.sql','utf8'));
+assert.equal(await scalar('select max_active from live_automation_campaigns where id=$1',[c.id]),50);
+for(let i=0;i<30;i++)crowd=await step();assert.equal(crowd.target,16);assert.equal(crowd.count,16);
+for(let i=0;i<100;i++){
+ if(i%20===0)await scalar('select live_automation_pool_refill($1)',[Array.from({length:200},(_,n)=>({nickname:'새범위'+i+'번'+n,category:'korean'}))]);
+ await db.query("update live_automation_campaigns set population_plan=jsonb_build_object('phase','spike','until',now()-interval '1 second','nextSpike',now()+interval '1 hour') where id=$1",[c.id]);
+ crowd=await step();assert.ok(crowd.target>=2&&crowd.target<=30,'ordinary range 2–30');
+}
+await db.query("update live_automation_campaigns set population_plan=jsonb_build_object('phase','baseline','until',now()-interval '1 second','nextSpike',now()-interval '1 second') where id=$1",[c.id]);
+crowd=await step();assert.ok(crowd.target>=42&&crowd.target<=50,'rare peak around 50');
+await db.query("update live_automation_campaigns set population_plan=jsonb_build_object('phase','spike','target',100,'until',now()+interval '3 minutes') where id=$1",[c.id]);
+crowd=await step();assert.equal(crowd.target,50,'old target cannot exceed revised ceiling');
+console.log('PASS revised 2–30 ordinary range, 42–50 peak, gradual steps and old-plan ceiling');
 await db.close();console.log('PASS 50-person baseline, gradual 100-person peak/return, real batched presence, OFF and old revision fences');
