@@ -44,12 +44,18 @@ async function presenceTick(db:SupabaseClient,c:LiveCampaign,origin:string,trans
  },transport)]);
 }
 async function orderActor(db:SupabaseClient,c:LiveCampaign,excluded:Set<string>):Promise<{actor:Actor;session:Session}> {
- const [actors,sessions,pending]=await Promise.all([
+ const [actors,sessions,pending,placed]=await Promise.all([
    rows<Actor>(db.from('live_automation_actors').select('*').eq('campaign_id',c.id).is('retired_at',null).limit(300)),
    activeSessions(db,c),rows<Action>(db.from('live_automation_actions').select('*').eq('campaign_id',c.id).eq('kind','order').in('status',['pending','claimed','uncertain'])),
+   rows<{automation_actor_id:string|null;order_group_id:string|null}>(db.from('orders').select('automation_actor_id,order_group_id').eq('broadcast_id',c.broadcast_id).not('automation_actor_id','is',null).neq('is_deleted',true).limit(5000)),
  ]);
  const busy=new Set([...excluded,...pending.map(a=>a.actor_id)]);
- const candidates=actors.filter(a=>a.order_target>a.order_count&&!busy.has(a.id)&&(!a.next_order_after||Date.parse(a.next_order_after)<=Date.now()));
+ // [2026-11-13 23:39 사장님] 한 방송에서 같은 닉네임은 주문서 2~3개까지만(닉네임마다 2 또는 3). 채팅·시청은 계속.
+ const groups=new Map<string,Set<string>>();
+ for(const o of placed){const k=String(o.automation_actor_id||'');if(!k)continue;const s=groups.get(k)||new Set<string>();s.add(String(o.order_group_id||''));groups.set(k,s);}
+ const capOf=(id:string)=>2+(Array.from(id).reduce((n,ch)=>n+ch.charCodeAt(0),0)%2);
+ const underCap=(id:string)=>(groups.get(id)?.size||0)<capOf(id);
+ const candidates=actors.filter(a=>a.order_target>a.order_count&&!busy.has(a.id)&&underCap(a.id)&&(!a.next_order_after||Date.parse(a.next_order_after)<=Date.now()));
  const available=candidates.filter(a=>sessions.some(s=>s.actor_id===a.id&&Date.parse(s.leave_at)>Date.now()+180000));
  const active=available[Math.floor(Math.random()*available.length)];
  if(active)return {actor:active,session:sessions.find(s=>s.actor_id===active.id)!};

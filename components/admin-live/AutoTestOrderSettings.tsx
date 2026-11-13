@@ -7,6 +7,8 @@ import {supabase} from '@/lib/supabase';
 
 type Usage={model:string;used:number|null;limit:number;blockedUntil:number};
 const time=(value:string|number)=>new Date(value).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false});
+// [2026-11-13] AI 채팅이 한 번 건너뛴 기록(정상)은 빨간 오류로 띄우지 않는다
+const AI_SKIP=/^(NO_SUITABLE_MESSAGE|UNGROUNDED_DIALOGUE|AI_WAIT|ORDER_REPORT_REPETITION|UNOWNED_PRODUCT_ORDER|NO_CURRENT_CARD|FEATURED_CHANGED|CURRENT_CARD_CHANGED|BROADCAST_MODE_CHANGED|CHAT_SKIPPED)$/;
 const button='min-h-11 rounded-xl px-3 text-[13px] font-bold transition disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2';
 
 export default function AutoTestOrderSettings(){
@@ -90,7 +92,7 @@ export default function AutoTestOrderSettings(){
    {error?<p role="alert" className="mt-1 text-[13px] text-danger-tx">{error}</p>:null}
    {state?.viewers?<p className="mt-1 text-[13px] text-ink-soft">시청 중 {state.activeViewers}명 · 보통 2~30명 · 최대 50명</p>:null}
    {state?.orders&&state.nextOrderAt?<p className="mt-1 text-[13px] text-ink-soft" role="status">{Date.parse(state.nextOrderAt)>Date.now()?`다음 주문 ${time(state.nextOrderAt)}쯤`:'주문 준비·제출 확인 중'}</p>:null}
-   {state?.last?<p className={`mt-1 text-[13px] leading-relaxed ${state.last.ok?'text-ink-soft':'text-danger-tx'}`}>{time(state.last.at)} · {state.last.message}</p>:null}
+   {state?.last&&!AI_SKIP.test(String(state.last.message||''))?<p className={`mt-1 text-[13px] leading-relaxed ${state.last.ok?'text-ink-soft':'text-danger-tx'}`}>{time(state.last.at)} · {state.last.message}</p>:null}
    {state&&!state.ready?<p className="text-[13px] text-ink-soft">실행 기능을 준비 중이에요.</p>:null}
    {details?<div id="live-automation-details" className="mt-2 space-y-3 border-t border-line pt-3">
      {([['orders','자동 주문'],['chat','AI 채팅'],['viewers','시청자 입장·퇴장']] as const).map(([key,label])=><button key={key} type="button" role="switch" aria-checked={Boolean(state?.[key])} aria-label={label} disabled={!state||busy||!state.ready} onClick={()=>void control(key,!state?.[key])} className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-[13px] disabled:opacity-50"><span>{label}</span><span className={`rounded-full px-3 py-1 text-[13px] font-bold ${state?.[key]?'bg-ink text-white':'bg-surface-2 text-ink-soft'}`}>{state?.[key]?'켜짐':'꺼짐'}</span></button>)}
