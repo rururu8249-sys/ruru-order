@@ -13,21 +13,23 @@ const COUNT_CACHE_MS = 8_000;
 const EXCLUDE_CACHE_MS = 60_000;
 
 type Row = Record<string, unknown>;
-export type AudienceRow = { visitorKey: string; nickname: string; kakaoId: string; lastSeenAt: string };
-export type Audience = { total: number; watching: number; watchers: AudienceRow[] };
+export type AudienceRow = { visitorKey: string; nickname: string; kakaoId: string; lastSeenAt: string; staff: boolean };
+export type Audience = { total: number; watching: number; watchers: AudienceRow[]; others: AudienceRow[] };
 
 const clean = (v: unknown) => String(v ?? "").trim();
 
-/** 순수 계산(테스트 대상) — 제외 계정 빼고, 전체 / 방송 화면 보는 중 */
+/** 순수 계산(테스트 대상) — 전체 / 방송 화면 보는 중 / 사이트만.
+ *  [2026-11-13 사장님 12:04] 사장님 계정(제외 계정)도 실제로 접속해 있으니 숫자에 넣음 — 대신 staff 표시(목록에서 사장님만 봄).
+ *  관리자 화면(/admin-live) 줄은 쇼핑몰 접속이 아니라 그대로 뺌. */
 export function computeAudience(rows: Row[], ex: { kakaoIds?: Iterable<string>; names?: Iterable<string> }, nowMs: number): Audience {
   const since = nowMs - LIVE_AUDIENCE_WINDOW_MS;
-  const fresh = rows.filter((r) => { const t = Date.parse(clean(r.last_seen_at)); return Number.isFinite(t) && t >= since; });
-  const kept = excludePresenceRows(fresh, ex);
-  const watchers = kept
-    .filter((r) => isLiveWatchPath(r.path))
-    .map((r) => ({ visitorKey: clean(r.visitor_key), nickname: clean(r.nickname), kakaoId: clean(r.kakao_id), lastSeenAt: clean(r.last_seen_at) }))
-    .sort((a, b) => (a.lastSeenAt < b.lastSeenAt ? 1 : -1));
-  return { total: kept.length, watching: watchers.length, watchers };
+  const fresh = rows.filter((r) => { const t = Date.parse(clean(r.last_seen_at)); return Number.isFinite(t) && t >= since && clean(r.page_type) !== "admin"; });
+  const customers = new Set(excludePresenceRows(fresh, ex));
+  const toRow = (r: Row): AudienceRow => ({ visitorKey: clean(r.visitor_key), nickname: clean(r.nickname), kakaoId: clean(r.kakao_id), lastSeenAt: clean(r.last_seen_at), staff: !customers.has(r) });
+  const byRecent = (a: AudienceRow, b: AudienceRow) => (a.lastSeenAt < b.lastSeenAt ? 1 : -1);
+  const watchers = fresh.filter((r) => isLiveWatchPath(r.path)).map(toRow).sort(byRecent);
+  const others = fresh.filter((r) => !isLiveWatchPath(r.path)).map(toRow).sort(byRecent);
+  return { total: fresh.length, watching: watchers.length, watchers, others };
 }
 
 let excludeCache: { at: number; kakaoIds: string[]; names: string[] } | null = null;
@@ -63,21 +65,20 @@ export async function readLiveAudience(sb: SupabaseClient, nowMs = Date.now()): 
   return value;
 }
 
-/** 관리자 목록 — 방송 보는 사람 닉네임·이름(회원 표에서 카카오 계정으로) */
-export async function readLiveWatcherList(sb: SupabaseClient, nowMs = Date.now()) {
+/** 관리자 목록 — 방송 보는 사람 / 사이트만 접속한 사람(닉네임·이름은 회원 표에서 카카오 계정으로).
+ *  showStaff 가 아니면 사장님 계정 표시를 안 줌(채팅 관리자에게는 그냥 손님처럼 보임). */
+export async function readLiveWatcherList(sb: SupabaseClient, nowMs = Date.now(), showStaff = false) {
   const aud = await readLiveAudience(sb, nowMs);
-  const ids = Array.from(new Set(aud.watchers.map((w) => w.kakaoId).filter(Boolean))).slice(0, 500);
+  const all = [...aud.watchers, ...aud.others];
+  const ids = Array.from(new Set(all.map((w) => w.kakaoId).filter(Boolean))).slice(0, 500);
   const names = new Map<string, { nick: string; name: string }>();
   if (ids.length) {
     const { data } = await sb.from("customers").select("kakao_id, youtube_nickname, customer_name").in("kakao_id", ids);
     for (const c of (data ?? []) as Row[]) names.set(clean(c.kakao_id), { nick: clean(c.youtube_nickname), name: clean(c.customer_name) });
   }
-  return {
-    total: aud.total,
-    watching: aud.watching,
-    rows: aud.watchers.map((w) => {
-      const c = names.get(w.kakaoId);
-      return { key: w.visitorKey.slice(-8), nickname: c?.nick || w.nickname, name: c?.name || "", member: Boolean(c), lastSeenAt: w.lastSeenAt };
-    }),
+  const view = (w: AudienceRow) => {
+    const c = names.get(w.kakaoId);
+    return { key: w.visitorKey.slice(-8), nickname: c?.nick || w.nickname, name: c?.name || "", member: Boolean(c), lastSeenAt: w.lastSeenAt, staff: showStaff && w.staff };
   };
+  return { total: aud.total, watching: aud.watching, rows: aud.watchers.map(view), others: aud.others.map(view) };
 }

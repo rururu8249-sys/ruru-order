@@ -7,15 +7,19 @@ import { readLiveWatcherList } from "@/lib/liveAudienceServer";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const reply = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
-async function authorized(request: NextRequest) {
-  if (await verifyAdminSessionFromRequest(request)) return true;
+// 볼 수 있으면 { owner } — 사장님(관리자 로그인·총관리자)만 「관리자」 표시를 받음
+async function authorized(request: NextRequest): Promise<{ owner: boolean } | null> {
+  if (await verifyAdminSessionFromRequest(request)) return { owner: true };
   const identity = chatIdentityFromRequest(request);
-  return identity ? (await verifiedChatRole(getServiceClient(), identity)).isMod : false;
+  if (!identity) return null;
+  const role = await verifiedChatRole(getServiceClient(), identity);
+  return role.isMod ? { owner: role.isOwner } : null;
 }
 export async function GET(request: NextRequest) {
   try {
-    if (!await authorized(request)) return reply({ ok: false, message: "관리자 로그인 또는 채팅 본인 확인이 필요해요." }, 403);
-    return reply({ ok: true, ...(await readLiveWatcherList(getServiceClient())) });
+    const who = await authorized(request);
+    if (!who) return reply({ ok: false, message: "관리자 로그인 또는 채팅 본인 확인이 필요해요." }, 403);
+    return reply({ ok: true, ...(await readLiveWatcherList(getServiceClient(), Date.now(), who.owner)) });
   } catch {
     return reply({ ok: false, message: "목록을 읽지 못했어요. 잠시 뒤 다시 시도해 주세요." }, 503);
   }

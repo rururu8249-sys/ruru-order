@@ -1019,7 +1019,8 @@ export default function LiveWatchView(props: Props) {
   useEffect(() => { setPageHost(window.location.hostname); }, []);
   // [2026-11-12] 관리자 — 숫자 누르면 «지금 방송 보는 사람» 목록(10초마다 새로)
   const [watchersOpen, setWatchersOpen] = useState(false);
-  const [watchers, setWatchers] = useState<{ state: "loading" | "ready" | "error"; message?: string; total?: number; watching?: number; rows: { key: string; nickname: string; name: string; member: boolean; lastSeenAt: string }[] }>({ state: "loading", rows: [] });
+  type WatcherRow = { key: string; nickname: string; name: string; member: boolean; lastSeenAt: string; staff?: boolean };
+  const [watchers, setWatchers] = useState<{ state: "loading" | "ready" | "error"; message?: string; total?: number; watching?: number; rows: WatcherRow[]; others: WatcherRow[] }>({ state: "loading", rows: [], others: [] });
   useEffect(() => {
     if (!watchersOpen) return;
     let alive = true;
@@ -1029,11 +1030,11 @@ export default function LiveWatchView(props: Props) {
         const j = await r.json().catch(() => null);
         if (!alive) return;
         if (!r.ok || !j?.ok) {
-          setWatchers({ state: "error", message: j?.message || "목록을 읽지 못했어요.", rows: [] });
+          setWatchers({ state: "error", message: j?.message || "목록을 읽지 못했어요.", rows: [], others: [] });
           if (r.status === 403) verifyChatAccount();
           return;
         }
-        setWatchers({ state: "ready", total: j.total, watching: j.watching, rows: Array.isArray(j.rows) ? j.rows : [] });
+        setWatchers({ state: "ready", total: j.total, watching: j.watching, rows: Array.isArray(j.rows) ? j.rows : [], others: Array.isArray(j.others) ? j.others : [] });
       } catch { if (alive) setWatchers((w) => ({ ...w, state: "error", message: "목록을 읽지 못했어요." })); }
     };
     void load();
@@ -1381,22 +1382,32 @@ export default function LiveWatchView(props: Props) {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(400px, 100%)", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "#FFFFFF", color: "#111111", borderRadius: "16px", overflow: "hidden" }}>
             <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #E5E5E5", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: "16px", fontWeight: 700 }}>지금 방송 보는 사람 {watchers.watching ?? props.watchingViewers ?? "-"}명</div>
-                <div style={{ fontSize: "13px", color: "#707072", marginTop: "2px" }}>사이트 전체 접속 {watchers.total ?? props.siteViewers ?? "-"}명 · 10초마다 새로</div>
+                <div style={{ fontSize: "16px", fontWeight: 700 }}>지금 접속 {watchers.total ?? props.siteViewers ?? "-"}명</div>
+                <div style={{ fontSize: "13px", color: "#707072", marginTop: "2px" }}>방송 보는 중 {watchers.watching ?? props.watchingViewers ?? "-"} · 사이트만 {watchers.state === "ready" ? watchers.others.length : "-"} · 10초마다 새로</div>
               </div>
               <button type="button" onClick={() => setWatchersOpen(false)} style={{ flexShrink: 0, height: "36px", padding: "0 14px", border: "1px solid #E5E5E5", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>닫기</button>
             </div>
             <div style={{ overflowY: "auto", padding: "4px 0" }}>
               {watchers.state === "error" ? <div style={{ padding: "16px", fontSize: "13px", color: "#D30005" }}>{watchers.message}</div>
                 : watchers.state === "loading" && !watchers.rows.length ? <div style={{ padding: "16px", fontSize: "13px", color: "#707072" }}>불러오는 중…</div>
-                : !watchers.rows.length ? <div style={{ padding: "16px", fontSize: "13px", color: "#707072" }}>지금 방송 화면을 보는 사람이 없어요</div>
-                : watchers.rows.map((w) => (
-                  <div key={w.key} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderBottom: "1px solid #F0F0F0", fontSize: "14px" }}>
-                    <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.nickname || "닉네임 없음"}</span>
-                    {w.name ? <span style={{ color: "#707072", whiteSpace: "nowrap" }}>{w.name}</span> : null}
-                    {!w.member ? <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: "12px", color: "#707072" }}>{w.nickname ? "회원 확인 안 됨" : "로그인 전"}</span> : null}
-                  </div>
-                ))}
+                : (["live", "site"] as const).map((sec) => {
+                  const list = sec === "live" ? watchers.rows : watchers.others;
+                  return (
+                    <div key={sec}>
+                      <div style={{ position: "sticky", top: 0, padding: "10px 16px 6px", background: "#F5F5F5", fontSize: "13px", fontWeight: 700, color: "#111111" }}>
+                        {sec === "live" ? "방송 화면 보는 중" : "사이트만 접속 · 방송 화면은 안 봄"} {list.length}명
+                      </div>
+                      {!list.length ? <div style={{ padding: "10px 16px", fontSize: "13px", color: "#707072" }}>없어요</div> : list.map((w) => (
+                        <div key={w.key} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderBottom: "1px solid #F0F0F0", fontSize: "14px" }}>
+                          <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.nickname || "닉네임 없음"}</span>
+                          {w.name ? <span style={{ color: "#707072", whiteSpace: "nowrap" }}>{w.name}</span> : null}
+                          {w.staff ? <span style={{ marginLeft: "auto", flexShrink: 0, height: "24px", lineHeight: "24px", padding: "0 8px", borderRadius: "8px", background: "#111111", color: "#FFFFFF", fontSize: "12px", fontWeight: 600 }}>관리자</span>
+                            : !w.member ? <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: "12px", color: "#707072" }}>{w.nickname ? "회원 확인 안 됨" : "로그인 전"}</span> : null}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </div>
