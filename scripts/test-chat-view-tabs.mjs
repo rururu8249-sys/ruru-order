@@ -1,16 +1,15 @@
 import assert from 'node:assert/strict';import React from 'react';import Renderer,{act} from 'react-test-renderer';import {createUiLoader} from './admin-ui-test-loader.mjs';
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
-const noop=()=>{},listeners=new Map();let onChat,historyResolve,followed=0;let ytMessages=[];
+const noop=()=>{},listeners=new Map();let onChat,historyResolve,followed=0;let ytFetches=0;
 globalThis.window={location:{hostname:'localhost',reload:noop},localStorage:{getItem:key=>key==='ruru_chat_view_show'?'{"yt":false,"site":true}':null,setItem:noop},matchMedia:()=>({matches:false,addEventListener:noop,removeEventListener:noop}),setTimeout,clearTimeout,setInterval:()=>1,clearInterval:noop};
 globalThis.document={visibilityState:'visible',fullscreenEnabled:false,addEventListener:(n,f)=>listeners.set(n,f),removeEventListener:n=>listeners.delete(n)};
 const originalFetch=globalThis.fetch;
-globalThis.fetch=async url=>{if(String(url).includes('/api/live-chat?'))return new Promise(resolve=>{historyResolve=rows=>resolve({json:async()=>({ok:true,messages:rows})});});return{json:async()=>({ok:true,items:[],viewers:25,site:4})};};
+globalThis.fetch=async url=>{if(String(url).includes('/api/chat-view/youtube'))ytFetches++;if(String(url).includes('/api/live-chat?'))return new Promise(resolve=>{historyResolve=rows=>resolve({json:async()=>({ok:true,messages:rows})});});return{json:async()=>({ok:true,items:[],viewers:25,site:4})};};
 const load=createUiLoader({
  '@/lib/supabase':{supabase:{from:()=>({select(){return this;},eq(){return this;},order(){return this;},limit:async()=>({data:[{id:'A',title:'방송',youtube_live_url:'https://www.youtube.com/watch?v=abcdefghijk'}]})})}},
  '@/lib/liveEvents':{subscribeLiveEvents:(_,{onChat:fn})=>{onChat=fn;return noop;}},
  '@/lib/useLiveChatPrivate':{useLiveChatPrivate:(_a,_b,list)=>({displayMessages:list,onPublicMessage:noop,canReviewDeleted:false,verify:noop})},
  '@/lib/useChatAutoScroll':{useChatAutoScroll:()=>({boxRef:{current:null},contentRef:{current:null},atBottom:true,followLatest:()=>followed++})},
- '@/lib/useYoutubeChatNotice':{useYoutubeChatNotice:(_bc,_video,active)=>({messages:active?ytMessages:[],status:'live'})},
  './chat-view.css':{},
 });
 const View=load('app/chat-view/ChatViewClient.tsx').default;let tree;
@@ -34,9 +33,10 @@ try{
  await act(async()=>{onChat({...row(9,'장바구니 담음'),badge:'bot',bot_ref:'c:1'});onChat({...row(10,'결제 완료! 감사합니다'),badge:'bot',bot_ref:'paid:1'});onChat({...row(11,'주문 감사합니다!'),badge:'bot',bot_ref:'o:1'});});
  assert.equal(notices()[0].props['aria-label'],'사이트 새 글 1개 확인');
  await act(async()=>tab('site').props.onClick());assert.equal(tree.root.findAllByProps({'data-chat-id':9}).length,0);assert.equal(tree.root.findAllByProps({'data-chat-id':10}).length,0);assert.equal(tree.root.findAllByProps({'data-chat-id':11}).length,1);
- ytMessages=[{id:100,broadcastId:'A',body:'안녕하세요',nickname:'유튜브 손님'}];
- await act(async()=>tree.update(React.createElement(View)));assert.equal(notices()[0].props['aria-label'],'유튜브 새 글 1개 확인');assert.equal(notices()[0].props['data-source'],'youtube');assert.equal(tab('yt').findAllByProps({className:'ruru-chat-unread-badge'}).length,1);
- await act(async()=>notices()[0].props.onClick());assert.equal(tab('yt').props['aria-selected'],true);assert.equal(notices().length,0);assert.equal(tree.root.findByType('iframe'),iframe);
+ await act(async()=>tree.update(React.createElement(View)));
+ assert.equal(tree.root.findAllByProps({'data-source':'youtube'}).length,0,'no YouTube notice (2026-11-13 removed)');
+ assert.equal(tab('yt').findAllByProps({className:'ruru-chat-unread-badge'}).length,0,'no YouTube unread badge');
+ assert.equal(ytFetches,0,'never calls YouTube API route');
  assert.ok(followed>=3,'opening site follows latest messages');
- console.log('PASS default YouTube, two previews/count, initial-fetch race, tabs/read, notice click, deletion, persistent iframe');
+ console.log('PASS default YouTube, two previews/count, initial-fetch race, tabs/read, notice click, deletion, persistent iframe, no YouTube API polling');
 }finally{await act(async()=>tree?.unmount());globalThis.fetch=originalFetch;}

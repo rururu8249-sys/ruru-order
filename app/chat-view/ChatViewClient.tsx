@@ -19,7 +19,6 @@ import {createChatViewUnread, reduceChatViewUnread} from "@/lib/chatViewUnread";
 import {ChatViewNotice} from "./ChatViewNotice";
 import "./chat-view.css";
 import {includeChatViewMessage} from "@/lib/chatViewFilter";
-import {useYoutubeChatNotice} from "@/lib/useYoutubeChatNotice";
 import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
 
 type Bc = { id: string; title: string; videoId: string; paused: boolean };
@@ -114,7 +113,7 @@ export default function ChatViewClient() {
 
   // 사이트 채팅 — 방송이 정해지면 최근 글 + 소식
   const bcId = bc?.id ?? "";
-  const youtubeNotice=useYoutubeChatNotice(bcId,bc?.videoId||"",tab==="site");
+  // [2026-11-13 사장님] 유튜브 새 글 확인(20초마다 유튜브 API 5점) 폐지 — 사이트 새 글 알림만 남김.
   useEffect(() => {
     setList([]);
     dispatchUnread({type:"reset",bc:bcId});
@@ -250,7 +249,7 @@ export default function ChatViewClient() {
       {screenError ? <div role="status" style={{ padding: "8px 12px", fontSize: 14 }}>{screenError}</div> : null}
 
       <div role="tablist" aria-label="채팅 선택" className="ruru-chat-tabs">
-        {([["yt","유튜브 채팅"],["site","사이트 채팅"]] as const).map(([key,label])=><button key={key} type="button" role="tab" id={`chat-tab-${key}`} aria-controls={`chat-panel-${key}`} aria-selected={tab===key} onClick={()=>openTab(key)}>{label}{(key==="site"?unreadMessages:youtubeNotice.messages).length>0&&<span className="ruru-chat-unread-badge" aria-label={`새 글 ${(key==="site"?unreadMessages:youtubeNotice.messages).length}개`}>{Math.min(99,(key==="site"?unreadMessages:youtubeNotice.messages).length)}{(key==="site"?unreadMessages:youtubeNotice.messages).length>99?"+":""}</span>}</button>)}
+        {([["yt","유튜브 채팅"],["site","사이트 채팅"]] as const).map(([key,label])=><button key={key} type="button" role="tab" id={`chat-tab-${key}`} aria-controls={`chat-panel-${key}`} aria-selected={tab===key} onClick={()=>openTab(key)}>{label}{key==="site"&&unreadMessages.length>0&&<span className="ruru-chat-unread-badge" aria-label={`새 글 ${unreadMessages.length}개`}>{Math.min(99,unreadMessages.length)}{unreadMessages.length>99?"+":""}</span>}</button>)}
       </div>
       <div className="ruru-chat-grid one" style={{ flex: 1, minHeight: 0, display: "grid", padding: "8px", boxSizing: "border-box" }}>
       {/* 유튜브 채팅 */}
@@ -296,7 +295,6 @@ export default function ChatViewClient() {
           </div>
         </header>
         <div style={{flex:1,minHeight:0,position:"relative",display:"flex",flexDirection:"column"}}>
-        {tab==="site"&&<ChatViewNotice source="youtube" messages={youtubeNotice.messages} emojis={emojiMap} onOpen={()=>openTab("yt")}/>}
         <div
           ref={boxRef}
           role="log"
@@ -339,7 +337,7 @@ export default function ChatViewClient() {
         </div>
         <div className="ruru-chat-status">
           <span style={{ color: atBottom ? "#A5D8FF" : "#FFD43B" }}>{atBottom ? "● 최신 글 따라가는 중" : "지난 글 읽는 중"}</span>
-          <span>{youtubeNotice.status==="unavailable"?"유튜브 새 글 확인 지연 중":"새 글 최대 3개 강조"}</span>
+          <span>새 글 최대 3개 강조</span>
         </div>
         {!atBottom ? (
           <button type="button" onClick={followLatest}
