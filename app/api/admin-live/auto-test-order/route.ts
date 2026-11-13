@@ -10,12 +10,15 @@ export const dynamic='force-dynamic';
 export const runtime='nodejs';
 export const maxDuration=60;
 const fail=(message:string,status=400)=>NextResponse.json({ok:false,message},{status});
+// [2026-11-13 23:06] 테스트 주문 양 적게/보통/많게 — settings 한 줄(돈·주문 무접촉)
+const PACE_KEY='live_automation_order_pace';
+const paceOf=(v:unknown)=>{const s=String(v??'').replace(/"/g,'').trim();return s==='low'||s==='high'?s:'normal';};
 export async function GET(request:NextRequest){
  if(!await verifyAdminSessionFromRequest(request))return fail('관리자 로그인이 필요해요.',401);
  try{
    const db=getServiceClient();
-   const [state,rows,gemini]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db)]);
-   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini},{headers:{'Cache-Control':'no-store'}});
+   const [state,rows,gemini,paceRow]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle()]);
+   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value)},{headers:{'Cache-Control':'no-store'}});
  }catch{return fail('실행 상태를 확인하지 못했어요.',503)}
 }
 export async function POST(request:NextRequest){
@@ -29,6 +32,17 @@ export async function POST(request:NextRequest){
      if(!['orders','chat','viewers','all'].includes(body.feature)||typeof body.enabled!=='boolean'||!Number.isSafeInteger(body.revision)||body.revision<0)return fail('실행 설정을 확인해 주세요.');
      const state=await controlAutomation(db,body.feature as AutomationFeature|'all',body.enabled,body.revision);
      return NextResponse.json({ok:true,state});
+   }
+   if(body.action==='pace'){
+     if(!['low','normal','high'].includes(body.pace))return fail('주문 양을 확인해 주세요.');
+     const saved=await db.from('settings').upsert([{key:PACE_KEY,value:body.pace}],{onConflict:'key'});
+     if(saved.error)throw Error('PACE_SAVE');
+     // 다음 주문이 2분보다 멀면 새 양으로 바로 다시 계획
+     const camps=await db.from('live_automation_campaigns').select('id,next_order_at').eq('orders_enabled',true);
+     for(const c of (camps.data||[]) as {id:string;next_order_at:string|null}[]){
+       if(!c.next_order_at||Date.parse(c.next_order_at)-Date.now()>120000)await db.rpc('live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});
+     }
+     return NextResponse.json({ok:true,pace:body.pace,state:await readAutomationState(db)});
    }
    if(body.action==='run'){
      const result=await runAutomationNow(db,request.nextUrl.origin);

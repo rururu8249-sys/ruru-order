@@ -14,6 +14,7 @@ export default function AutoTestOrderSettings(){
  const [usage,setUsage]=useState<Usage[]>([]),[orders,setOrders]=useState(0);
  const [details,setDetails]=useState(false),[error,setError]=useState('');
  const [busy,setBusy]=useState(false),[runningOnce,setRunningOnce]=useState(false);
+ const [pace,setPace]=useState<'low'|'normal'|'high'>('normal');
  const reads=useRef(0),writing=useRef(false);
  const load=useCallback(async()=>{
    if(writing.current)return;
@@ -22,7 +23,7 @@ export default function AutoTestOrderSettings(){
      const r=await fetch('/api/admin-live/auto-test-order',{cache:'no-store'}),j=await r.json();
      if(stamp!==reads.current)return;
      if(!r.ok||!j.ok)throw Error(j.message||'실행 상태를 확인하지 못했어요.');
-     setState(j.state);setUsage(Array.isArray(j.gemini)?j.gemini:[]);setOrders(Number(j.testOrders)||0);setError('');
+     setState(j.state);setPace(j.pace==='low'||j.pace==='high'?j.pace:'normal');setUsage(Array.isArray(j.gemini)?j.gemini:[]);setOrders(Number(j.testOrders)||0);setError('');
    }catch(e){if(stamp===reads.current)setError(e instanceof Error?e.message:'연결을 확인해 주세요.');}
  },[]);
  const active=Boolean(state?.orders||state?.chat||state?.viewers||state?.manualAction||runningOnce);
@@ -51,6 +52,12 @@ export default function AutoTestOrderSettings(){
    catch(e){setError(e instanceof Error?e.message:'주문 상태를 확인해 주세요.')}
    finally{setRunningOnce(false);void load()}
  };
+ const changePace=async(next:'low'|'normal'|'high')=>{
+   if(next===pace||writing.current)return;const prev=pace;setPace(next);setError('');
+   try{await post({action:'pace',pace:next});showAdminToast(next==='low'?'주문을 적게 넣어요.':next==='high'?'주문을 많이 넣어요.':'주문 양을 보통으로 했어요.','success')}
+   catch(e){setPace(prev);setError(e instanceof Error?e.message:'다시 시도해 주세요.')}
+   finally{void load()}
+ };
  const remove=async()=>{
    if(!state||writing.current||runningOnce)return;
    writing.current=true;setBusy(true);++reads.current;
@@ -75,6 +82,7 @@ export default function AutoTestOrderSettings(){
      <span className="text-[13px] text-ink-soft" role="status">{!state?'확인 중':error?'연결 확인 필요':active?'실행 중':'중지됨'}</span>
    </div>
    <button type="button" className={`${button} w-full bg-ink text-white`} disabled={busy||(!error&&(!state||(!active&&(!state.ready||!state.broadcastId))))} onClick={()=>{if(error&&!active)void load();else void control('all',!active)}}>{busy?'변경 중…':active?'중지':error?'다시 확인':'시작'}</button>
+   <div className="mt-2 flex items-center gap-2" role="group" aria-label="주문 양"><span className="shrink-0 text-[13px] font-bold text-ink">주문 양</span>{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={pace===k} disabled={!state?.ready} onClick={()=>void changePace(k)} className={`${button} flex-1 ${pace===k?'bg-ink text-white':'border border-line text-ink'}`}>{l}</button>)}</div>
    <div className="mt-1 flex items-center justify-between gap-2">
      <a href="/order" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-[13px] font-semibold text-ink">방송화면 열기 ↗</a>
      <button type="button" className="min-h-11 text-[13px] text-ink-soft" aria-expanded={details} aria-controls="live-automation-details" onClick={()=>setDetails(!details)}>{details?'접기':'상세 설정'}</button>

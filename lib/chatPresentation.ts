@@ -1,9 +1,10 @@
 /** One stable presentation per persisted event; never changes the message's facts or AI badge. */
 export const NOTIFICATION_NAMES = {
- cart:['장바구니요정','담았네담았어','찜콩알림','언니이거사','담기대장','장바구니출동','고민은배송만','쏙담았지'],
- order:['주문알림','주문폭주','품절임박','또팔렸네','언니샀어?','주문왔어요','주문요정','누가또샀어','오늘도득템','장바구니탈출'],
- paid:['입금도착','입금요정','확인요정','입금왔어요','통장에똑똑','띵동입금','입금소식통','확인했지요'],
- guide:['쇼핑길잡이','알려드림','궁금해결사','쇼핑도우미'],
+ // [2026-11-13 23:15 사장님] 알림 닉네임은 종류마다 하나씩만(너무 많아 정신없음)
+ cart:['언니이거사'],
+ order:['주문알림'],
+ paid:['입금요정'],
+ guide:['쇼핑도우미'],
 } as const;
 const PALETTES={
  cart:{nick:'#FFD08A',badge:'#7A4300',ink:'#FFF1D7',light:'#7A4300',frame:'#FFB84D'},

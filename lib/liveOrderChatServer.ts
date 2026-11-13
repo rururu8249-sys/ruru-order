@@ -82,6 +82,11 @@ export async function announceOrderThanks(sb: SupabaseClient, groupId: string): 
     if(rows.some(r=>isAutoTestRow(r as Record<string,unknown>))){
       const action=(rows[0] as Record<string,unknown>).automation_action_id;
       if(action)await sb.rpc('live_automation_order_notice',{p_action:action,p_body:orderThanksText(rows)});
+      // [2026-11-13 23:06] 자동 테스트 카드 주문도 실제처럼 카드 결제 링크 안내(주문서마다 한 번)
+      if(rows.some(isCardOrderRow)){
+        const cardRef=`card:${g}`;
+        if(!(await postedRefs(sb,bc.id,[cardRef])).has(cardRef))await insertBot(sb,bc.id,cardLinkText(rows),cardRef,LIVE_CHAT_BOT_NICK,AUTO_TEST_AVATAR);
+      }
       return;
     }
     const ref = `o:${g}`, cardRef = `card:${g}`;
