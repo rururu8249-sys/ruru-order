@@ -19,13 +19,3 @@ export function parseCartChatToast(m: LiveChatMessage | null | undefined): CartC
   if (!product) return null;
   return { key: String(m.id), nick: hit[1].trim(), detail: more ? `${product} 외 ${more[1]}종` : product };
 }
-
-/** ?full=1 화면 전체 모드 — 카드 위치·크기(화면 % 기준). 값이 이상하면 기본값. */
-export function parseWidgetFullLayout(search: string): { full: boolean; right: number; top: number; width: number } {
-  const q = new URLSearchParams(search);
-  const num = (k: string, d: number, lo: number, hi: number) => {
-    const v = Number(q.get(k));
-    return q.has(k) && Number.isFinite(v) && v >= lo && v <= hi ? v : d;
-  };
-  return { full: q.get("full") === "1", right: num("r", 3, 0, 90), top: num("t", 7, 0, 90), width: num("w", 26, 10, 60) };
-}
