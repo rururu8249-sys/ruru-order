@@ -1,6 +1,6 @@
 /** Original candidates; checked against current customers on 2026-11-13.
  * This snapshot never replaces the atomic database collision check at assignment.
- * Trend inspiration: https://hsad.tistory.com/3798 and https://letter.wepick.kr/post/23942
+ * Trend inspiration: https://hsad.tistory.com/3798 and https://letter.wepick.kr/post/23942 and https://ksma.tistory.com (2026-11-14, 7자 이하·30~50대 여성 손님에 맞는 것만)
  * Names are fictional handles; fan handles never confer celebrity identity or privileges.
  */
 export type NicknameCategory='korean'|'humor'|'celebrity'|'english'|'hangul_number'|'english_number'|'real_name';
@@ -805,6 +805,146 @@ export const NICKNAME_CANDIDATES:readonly NicknameCandidate[]=[
   {
     "category": "real_name",
     "nickname": "남수진"
+  },
+  {
+    "category": "humor",
+    "nickname": "숨만쉬어도살찜"
+  },
+  {
+    "category": "humor",
+    "nickname": "프로귀찮러"
+  },
+  {
+    "category": "humor",
+    "nickname": "칼퇴요정"
+  },
+  {
+    "category": "humor",
+    "nickname": "월급루팡"
+  },
+  {
+    "category": "humor",
+    "nickname": "텅장요정"
+  },
+  {
+    "category": "humor",
+    "nickname": "어쩔티비"
+  },
+  {
+    "category": "humor",
+    "nickname": "더피곤해"
+  },
+  {
+    "category": "humor",
+    "nickname": "나름전설이다"
+  },
+  {
+    "category": "humor",
+    "nickname": "오즈의맙소사"
+  },
+  {
+    "category": "humor",
+    "nickname": "곧휴가철이다"
+  },
+  {
+    "category": "humor",
+    "nickname": "가문의영광굴비"
+  },
+  {
+    "category": "humor",
+    "nickname": "소거기덮밥"
+  },
+  {
+    "category": "humor",
+    "nickname": "오드리햇반"
+  },
+  {
+    "category": "humor",
+    "nickname": "올리비아핫바"
+  },
+  {
+    "category": "humor",
+    "nickname": "입다물면여신"
+  },
+  {
+    "category": "humor",
+    "nickname": "궁민연금"
+  },
+  {
+    "category": "humor",
+    "nickname": "천안호구과자"
+  },
+  {
+    "category": "humor",
+    "nickname": "추적60인분"
+  },
+  {
+    "category": "humor",
+    "nickname": "그대라는사치"
+  },
+  {
+    "category": "humor",
+    "nickname": "이뻔한세상"
+  },
+  {
+    "category": "humor",
+    "nickname": "반만고양이"
+  },
+  {
+    "category": "humor",
+    "nickname": "귀신이고칼로리"
+  },
+  {
+    "category": "humor",
+    "nickname": "빚과송금"
+  },
+  {
+    "category": "humor",
+    "nickname": "띠끌모아파산"
+  },
+  {
+    "category": "humor",
+    "nickname": "월급없는미녀"
+  },
+  {
+    "category": "humor",
+    "nickname": "카드값줘체리"
+  },
+  {
+    "category": "humor",
+    "nickname": "돈들어손내놔"
+  },
+  {
+    "category": "humor",
+    "nickname": "발광머리앤"
+  },
+  {
+    "category": "humor",
+    "nickname": "순대렐라"
+  },
+  {
+    "category": "humor",
+    "nickname": "전국노예자랑"
+  },
+  {
+    "category": "humor",
+    "nickname": "흔들인우동"
+  },
+  {
+    "category": "humor",
+    "nickname": "햄부기주세요"
+  },
+  {
+    "category": "humor",
+    "nickname": "손절미맛집"
+  },
+  {
+    "category": "humor",
+    "nickname": "아뇨뚱인데요"
+  },
+  {
+    "category": "humor",
+    "nickname": "밤양갱먹고싶다"
   }
 ];
 export function nicknameCollisionKey(value:string):string {
