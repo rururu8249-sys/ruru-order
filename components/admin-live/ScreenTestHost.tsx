@@ -8,7 +8,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { liveWatchViewKey } from "@/lib/liveWatch";
 
-export const SCREEN_TEST_ON_KEY = "ruru_admin_screen_test";
 const LOCK_KEY = "ruru_admin_screen_test_lock";
 export const SCREEN_TEST_EVENT = "ruru-screen-test";
 
@@ -21,7 +20,6 @@ type Plan = {
 class SkipSignal extends Error {}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const isCustomerKey = (k: string) => k.startsWith("ruru_") && !k.includes("admin");
-const readOn = () => { try { return localStorage.getItem(SCREEN_TEST_ON_KEY) === "1"; } catch { return false; } };
 
 async function api(body: Record<string, unknown>) {
   const r = await fetch("/api/admin-live/auto-test-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -156,9 +154,8 @@ export default function ScreenTestHost() {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [src, setSrc] = useState("");
   const runningRef = useRef(false);
-  const nextAtRef = useRef(0);
 
-  const runOnce = useCallback(async () => {
+  const runOnce = useCallback(async (scheduled: boolean) => {
     if (runningRef.current) return;
     try {
       const lock = Number(localStorage.getItem(LOCK_KEY) || 0);
@@ -176,8 +173,8 @@ export default function ScreenTestHost() {
     let snap = false;
     let doneMsg = "";
     try {
-      const j = await api({ action: "screen-plan" });
-      if (j.skip) { setStatus(String(j.skip)); doneMsg = String(j.skip); throw new SkipSignal(); }
+      const j = await api({ action: "screen-plan", scheduled });
+      if (j.skip) { setStatus(String(j.skip)); doneMsg = scheduled ? "" : String(j.skip); throw new SkipSignal(); }
       plan = j.plan as Plan;
       snap = true;
       for (let i = 0; i < localStorage.length; i += 1) { const k = localStorage.key(i); if (k && isCustomerKey(k)) saved[k] = localStorage.getItem(k) ?? ""; }
@@ -228,23 +225,23 @@ export default function ScreenTestHost() {
     }
   }, []);
 
-  // 켜 두면 5~10분마다(이 화면이 열려 있는 동안)
+  // 자동 테스트가 켜져 있으면 서버 일정(5~10분)대로 — 관리자 화면이 열려 있는 동안은 이 화면이 맡고, 닫히면 서버가 맡음
   useEffect(() => {
-    const gap = () => 5 * 60_000 + Math.floor(Math.random() * 5 * 60_000);
-    nextAtRef.current = Date.now() + gap();
-    const t = window.setInterval(() => {
-      if (!readOn()) return;
-      if (Date.now() < nextAtRef.current) return;
-      nextAtRef.current = Date.now() + gap();
-      void runOnce();
-    }, 20_000);
-    const onEvent = (e: Event) => {
-      const action = (e as CustomEvent).detail?.action;
-      if (action === "run") void runOnce();
-      if (action === "toggle") nextAtRef.current = Date.now() + gap();
+    let stop = false;
+    const beat = async () => {
+      if (stop || runningRef.current || document.hidden) return;
+      try {
+        const r = await fetch("/api/admin-live/auto-test-order?host=1", { cache: "no-store" });
+        const j = await r.json();
+        const st = j?.state;
+        if (st?.enabled && st.nextRunAt && st.nextRunAt <= Date.now() && !(st.lockUntil > Date.now())) void runOnce(true);
+      } catch { /* 다음에 */ }
     };
+    void beat();
+    const t = window.setInterval(() => void beat(), 30_000);
+    const onEvent = (e: Event) => { if ((e as CustomEvent).detail?.action === "run") void runOnce(false); };
     window.addEventListener(SCREEN_TEST_EVENT, onEvent);
-    return () => { window.clearInterval(t); window.removeEventListener(SCREEN_TEST_EVENT, onEvent); };
+    return () => { stop = true; window.clearInterval(t); window.removeEventListener(SCREEN_TEST_EVENT, onEvent); };
   }, [runOnce]);
 
   if (!running && !src) return null;

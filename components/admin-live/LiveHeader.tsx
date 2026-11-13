@@ -1,7 +1,6 @@
 "use client";
 
 import WelcomePointSettings from "./WelcomePointSettings";
-import AutoTestOrderSettings from "./AutoTestOrderSettings";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
@@ -813,7 +812,6 @@ export default function LiveHeader({
               쇼핑몰 {shopOpen ? "열림" : "닫힘"}
             </button>
           </div>
-          <AutoTestOrderSettings />
         </div>
       </section>
 

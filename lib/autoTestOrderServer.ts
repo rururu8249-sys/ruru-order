@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
 import {
   AUTO_TEST_KAKAO_ID, AUTO_TEST_KEY, AUTO_TEST_NAME, AUTO_TEST_PHONE, AUTO_TEST_REASON,
-  buildOrderRows, choosePayment, isAutoTestRow, nicknameCandidates, parseAutoTestState, pickOrderLines, productChoices, randomGapMs, verifySavedRows,
+  SCREEN_HOST_FRESH_MS, buildOrderRows, choosePayment, isAutoTestRow, nicknameCandidates, parseAutoTestState, pickOrderLines, productChoices, randomGapMs, verifySavedRows,
   type AutoTestLast, type AutoTestPick, type AutoTestSettings, type AutoTestState,
 } from "@/lib/autoTestOrder";
 
@@ -46,6 +46,17 @@ export async function readAutoTestState(sb: Db): Promise<AutoTestState> {
   return (await readStateRaw(sb)).state;
 }
 
+/** 관리자 화면(화면 테스트 담당)의 신호 — 30초에 한 번 남짓. 상태를 돌려준다 */
+export async function screenHostBeat(sb: Db): Promise<AutoTestState> {
+  for (let i = 0; i < 3; i += 1) {
+    const { raw, state } = await readStateRaw(sb);
+    if (!state.enabled) return state;
+    const next = { ...state, screenSeenAt: Date.now() };
+    if (await casState(sb, raw, next)) return next;
+  }
+  return (await readStateRaw(sb)).state;
+}
+
 export async function setAutoTestEnabled(sb: Db, enabled: boolean): Promise<AutoTestState> {
   for (let i = 0; i < 4; i += 1) {
     const { raw, state } = await readStateRaw(sb);
@@ -77,6 +88,8 @@ export async function autoTestTick(sb: Db, origin: string): Promise<{ ran: boole
     return { ran: false, reason: "scheduled" };
   }
   if (now < state.nextRunAt) return { ran: false, reason: "waiting" };
+  // 관리자 화면이 열려 있으면 화면 테스트가 같은 일정으로 돈다 — 서버는 쉼(겹치기 방지)
+  if (now - state.screenSeenAt < SCREEN_HOST_FRESH_MS) return { ran: false, reason: "screen-host" };
   if (!(await casState(sb, raw, { ...state, lockUntil: now + LOCK_MS, nextRunAt: now + randomGapMs() }))) return { ran: false, reason: "lost-lock" };
   const last = await runOnce(sb, origin, bc);
   await finish(sb, last);
@@ -317,14 +330,16 @@ export type ScreenPlan = {
 };
 
 /** 화면 테스트 준비 — 방송 중일 때만. 상품·옵션·수량·결제·새 닉네임을 정해 돌려준다(주문은 화면이 낸다) */
-export async function screenTestPlan(sb: Db): Promise<ScreenPlan | { skip: string }> {
+export async function screenTestPlan(sb: Db, scheduled = false): Promise<ScreenPlan | { skip: string }> {
   const bc = await onBroadcast(sb);
   if (!bc) return { skip: "방송 중일 때만 테스트할 수 있어요." };
   // 서버 방식·다른 화면과 겹치지 않게 잠금(화면 테스트는 길어서 2분 30초) — 결과 확인(screenTestVerify) 때 풀림
   const { raw, state } = await readStateRaw(sb);
   const now = Date.now();
   if (state.lockUntil > now) return { skip: "다른 테스트가 진행 중이에요." };
-  if (!(await casState(sb, raw, { ...state, lockUntil: now + 150_000 }))) return { skip: "다른 테스트가 진행 중이에요." };
+  if (scheduled && (!state.enabled || state.nextRunAt === null || now < state.nextRunAt)) return { skip: "아직 차례가 아니에요." };
+  const nextRunAt = scheduled || state.enabled ? now + randomGapMs() : state.nextRunAt;
+  if (!(await casState(sb, raw, { ...state, lockUntil: now + 150_000, nextRunAt }))) return { skip: "다른 테스트가 진행 중이에요." };
   let prep: Prepared;
   try {
     await ensureOperatorTestAccount(sb);

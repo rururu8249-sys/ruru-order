@@ -13,6 +13,7 @@ import { CONTACT_TYPE_SHORT, adminChatTarget } from "@/lib/shopInfo";
 import { useShopInfo } from "@/lib/useShopInfo";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminLiveSidebarPresence from "./AdminLiveSidebarPresence";
+import AutoTestOrderSettings from "./AutoTestOrderSettings";
 
 type Props = {
   activeMenu: AdminLiveMenuKey;
@@ -230,6 +231,8 @@ export default function AdminLiveSidebar({
               )}
               <button type="button" onClick={() => { broadcastCard.onManage(); onCloseNav?.(); }} className="h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2">방송 관리</button>
             </div>
+            {/* [2026-11-13] 자동 테스트 주문 — 스위치 하나 · 지금 테스트 · 테스트 주문 삭제 */}
+            {broadcastOn ? <AutoTestOrderSettings /> : null}
           </section>
         ) : null}
 

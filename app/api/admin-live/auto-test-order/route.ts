@@ -3,7 +3,7 @@
 //   GET 상태 · POST {action:"toggle",enabled} | {action:"run"} | {action:"delete",groupIds?:string[]} (groupIds 없으면 자동 테스트 주문서 전부)
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { autoTestRunNow, deleteAutoTestOrders, readAutoTestRows, readAutoTestState, screenTestPlan, screenTestVerify, setAutoTestEnabled, type ScreenPlan } from "@/lib/autoTestOrderServer";
+import { autoTestRunNow, deleteAutoTestOrders, readAutoTestRows, readAutoTestState, screenHostBeat, screenTestPlan, screenTestVerify, setAutoTestEnabled, type ScreenPlan } from "@/lib/autoTestOrderServer";
 import { getServiceClient } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +15,12 @@ const deny = () => NextResponse.json({ ok: false, message: "관리자 로그인�
 export async function GET(request: NextRequest) {
   if (!(await verifyAdminSessionFromRequest(request))) return deny();
   const sb = getServiceClient();
+  // ?host=1 = 관리자 화면(화면 테스트 담당)이 살아 있다는 신호
+  if (request.nextUrl.searchParams.get("host") === "1") return NextResponse.json({ ok: true, state: await screenHostBeat(sb) });
   const state = await readAutoTestState(sb);
   const rows = await readAutoTestRows(sb, null).catch(() => []);
-  return NextResponse.json({ ok: true, state, testRows: rows.length });
+  const testOrders = new Set(rows.map((r) => String(r.order_group_id ?? ""))).size;
+  return NextResponse.json({ ok: true, state, testOrders });
 }
 
 export async function POST(request: NextRequest) {
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, last, state: await readAutoTestState(sb) });
     }
     if (action === "screen-plan") {
-      const plan = await screenTestPlan(sb);
+      const plan = await screenTestPlan(sb, body?.scheduled === true);
       return NextResponse.json({ ok: true, ...("skip" in plan ? { skip: plan.skip } : { plan }) });
     }
     if (action === "screen-verify") {

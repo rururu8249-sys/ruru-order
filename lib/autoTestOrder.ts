@@ -23,8 +23,10 @@ export function isAutoTestRow(r: { is_test_order?: unknown; test_order_reason?: 
 }
 
 export type AutoTestLast = { at: number; ok: boolean; message: string; orderCode?: string; nickname?: string };
-export type AutoTestState = { enabled: boolean; nextRunAt: number | null; lockUntil: number; last: AutoTestLast | null };
-export const AUTO_TEST_DEFAULT: AutoTestState = { enabled: false, nextRunAt: null, lockUntil: 0, last: null };
+export type AutoTestState = { enabled: boolean; nextRunAt: number | null; lockUntil: number; last: AutoTestLast | null; screenSeenAt: number };
+export const AUTO_TEST_DEFAULT: AutoTestState = { enabled: false, nextRunAt: null, lockUntil: 0, last: null, screenSeenAt: 0 };
+/** 관리자 화면(화면 테스트)이 이 시간 안에 신호를 보냈으면 서버 방식은 쉬고 화면이 맡는다 */
+export const SCREEN_HOST_FRESH_MS = 90_000;
 
 export function parseAutoTestState(raw: unknown): AutoTestState {
   let v: unknown = raw;
@@ -38,6 +40,7 @@ export function parseAutoTestState(raw: unknown): AutoTestState {
     nextRunAt: o.nextRunAt == null ? null : num(o.nextRunAt) || null,
     lockUntil: num(o.lockUntil),
     last,
+    screenSeenAt: num(o.screenSeenAt),
   };
 }
 

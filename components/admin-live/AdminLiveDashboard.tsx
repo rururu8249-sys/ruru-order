@@ -1232,6 +1232,15 @@ export default function AdminLiveDashboard() {
     window.addEventListener("ruru-broadcast-list-updated", onBroadcastListUpdated);
     return () => window.removeEventListener("ruru-broadcast-list-updated", onBroadcastListUpdated);
   }, []);
+  // [2026-11-13] 테스트 주문 삭제 뒤 주문 목록 다시 읽기(지금 필터 그대로 — 최신 함수로)
+  const loadOrdersLatestRef = useRef(loadOrders);
+  loadOrdersLatestRef.current = loadOrders;
+  useEffect(() => {
+    const onRefresh = () => void loadOrdersLatestRef.current({ silent: true });
+    window.addEventListener("ruru-admin-orders-refresh", onRefresh);
+    return () => window.removeEventListener("ruru-admin-orders-refresh", onRefresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 쇼핑몰 열기/닫기 상태 — 마운트 시 settings.shop_open 읽기(기본 열림)
   useEffect(() => {
