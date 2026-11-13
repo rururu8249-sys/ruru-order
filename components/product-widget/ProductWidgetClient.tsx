@@ -278,7 +278,7 @@ function ToastSticker({ toast, standalone, durMs = TOAST_SHOW_MS }: { toast: Toa
         <div
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
-            background: tagBg, color: "#FFFFFF", fontSize: "20px", fontWeight: 900, lineHeight: 1, padding: "7px 8px",
+            background: tagBg, color: "#FFFFFF", fontSize: Array.from(toast.title).length > 5 ? "17px" : "20px", fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1, padding: "7px 8px",
             letterSpacing: "0.02em",
           }}
         >
@@ -729,7 +729,7 @@ export default function ProductWidgetClient() {
         const key = `cart:${toast.key}`;
         if (seenRef.current.has(key)) return;
         seenRef.current.add(key);
-        push({ icon: "", title: "장바구니", name: `${clipNick(toast.nick)}님`, detail: toast.detail, tone: "pink" });
+        push({ icon: "", title: "장바구니 담음", name: `${clipNick(toast.nick)}님`, detail: toast.detail, tone: "pink" });
       },
     });
     return () => {
@@ -743,7 +743,7 @@ export default function ProductWidgetClient() {
   useEffect(() => {
     if (!previewMode || toastOffRef.current) return;
     const demo: ToastItem[] = [
-      { icon: "", title: "장바구니", name: `${clipNick("예*")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", tone: "pink" },
+      { icon: "", title: "장바구니 담음", name: `${clipNick("예*")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", tone: "pink" },
       { icon: "", title: "주문완료", name: `${clipNick("예시")}님`, detail: "예시 니트 가디건 블랙/M", tone: "green" },
       { icon: "", title: "결제완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", tone: "blue" },
     ];
