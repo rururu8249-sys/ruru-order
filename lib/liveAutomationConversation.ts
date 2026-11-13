@@ -10,6 +10,7 @@ import {readAutomationFeatured,featuredMatches,type FeaturedSnapshot} from './li
 import {BRAND_SPEECH_ALIASES,spokenProductName,normalizeSpokenCodes,unsupportedProductCode,unsuitableSpeech} from './liveAutomationSpeech';
 import {conversationRoom} from './liveAutomationRoom';
 import {isNightKst} from './liveAutomationTempo';
+import {runRoomDirector} from './liveAutomationDirector';
 import {readDialogueCard} from './liveAutomationDialogueServer';
 import {HISTORICAL_TOPICS,dialogueActionAllowed,expressionAllowed,validGroundedDialogue,falseExperience,hasProductReference,expressionPolicy,type DialogueScope} from './liveAutomationDialogue';
 type Row=Record<string,unknown>;
@@ -176,7 +177,11 @@ export async function runConversationAction(db:SupabaseClient,origin:string,acti
  }
 }
 async function rows<T>(query:PromiseLike<{data:unknown;error:{message:string}|null}>):Promise<T[]>{const r=await query;if(r.error)throw Error(r.error.message);return (r.data||[]) as T[]}
+// [2026-11-14] 대화는 채팅방 전체를 보는 runRoomDirector 가 맡는다. 예전 방식은 아래 Legacy 로 남겨 둠(되돌리기용).
 export async function runConversations(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch=fetch){
+ return runRoomDirector(db,c,origin,transport);
+}
+export async function runConversationsLegacy(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch=fetch){
  if(!c.chat_enabled)return;
  const now=Date.now(),today=new Date(now+9*3600000).toISOString().slice(0,10)+'T00:00:00+09:00';
  const sessions=await rows<Session>(db.from('live_automation_sessions').select('*').eq('campaign_id',c.id).is('stopped_at',null).gt('leave_at',new Date(now+30000).toISOString()));

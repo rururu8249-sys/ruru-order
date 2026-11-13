@@ -8,7 +8,7 @@ import {supabase} from '@/lib/supabase';
 type Usage={model:string;used:number|null;limit:number;blockedUntil:number};
 const time=(value:string|number)=>new Date(value).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false});
 // [2026-11-13] AI 채팅이 한 번 건너뛴 기록(정상)은 빨간 오류로 띄우지 않는다
-const AI_SKIP=/^(NO_SUITABLE_MESSAGE|UNGROUNDED_DIALOGUE|AI_WAIT|ORDER_REPORT_REPETITION|UNOWNED_PRODUCT_ORDER|NO_CURRENT_CARD|FEATURED_CHANGED|CURRENT_CARD_CHANGED|BROADCAST_MODE_CHANGED|CHAT_SKIPPED)$/;
+const AI_SKIP=/^(NO_SUITABLE_MESSAGE|UNGROUNDED_DIALOGUE|AI_WAIT|ORDER_REPORT_REPETITION|UNOWNED_PRODUCT_ORDER|NO_CURRENT_CARD|FEATURED_CHANGED|CURRENT_CARD_CHANGED|BROADCAST_MODE_CHANGED|CHAT_SKIPPED|SILENT)$/;
 const button='min-h-11 rounded-xl px-3 text-[13px] font-bold transition disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2';
 
 export default function AutoTestOrderSettings(){
