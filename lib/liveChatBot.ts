@@ -258,7 +258,7 @@ export function orderThanksText(rows: OrderEventRow[]): string {
   return `🛒 ${nick}님 ${item ? `${item} ` : ""}주문 감사합니다!`;
 }
 export function cardLinkText(rows: OrderEventRow[]): string {
-  return `💳 ${clipChatNick(rows[0]?.youtube_nickname)}님, 카드 결제 링크를 카톡으로 보내 드려요. 카톡이 오면 눌러서 편하게 결제해 주세요 😊`;
+  return `💳 ${clipChatNick(rows[0]?.youtube_nickname)}님 카톡 카드결제 링크 확인해주세요 🙏`;
 }
 export function paidThanksText(rows: OrderEventRow[]): string {
   return `💗 ${clipChatNick(rows[0]?.youtube_nickname)}님 결제 완료! 감사합니다`;
