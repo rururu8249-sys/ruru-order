@@ -5,7 +5,7 @@
 //   쓰기: live_chat_messages 봇 글만. 주문·입금·돈 무접촉. 실패해도 주문·입금과 무관(조용히 넘어감).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LIVE_CHAT_KEY, parseLiveChatSetting } from "@/lib/liveChat";
-import { isAutoTestRow } from "@/lib/autoTestOrder";
+import { AUTO_TEST_AVATAR, isAutoTestRow } from "@/lib/autoTestOrder";
 import {
   LIVE_CHAT_BOT_KAKAO,
   LIVE_CHAT_BOT_KEY,
@@ -62,9 +62,9 @@ async function postedRefs(sb: SupabaseClient, bc: string, refs: string[]): Promi
   return new Set(((data ?? []) as Array<{ bot_ref?: unknown }>).map((r) => String(r.bot_ref ?? "")));
 }
 
-async function insertBot(sb: SupabaseClient, bc: string, body: string, ref: string, nickname = LIVE_CHAT_BOT_NICK) {
+async function insertBot(sb: SupabaseClient, bc: string, body: string, ref: string, nickname = LIVE_CHAT_BOT_NICK, avatar: string | null = null) {
   if (!body.trim()) return false;
-  const { error } = await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname, body, badge: "bot", bot_ref: ref });
+  const { error } = await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname, body, badge: "bot", bot_ref: ref, avatar_url: avatar });
   return !error;
 }
 
@@ -83,8 +83,10 @@ export async function announceOrderThanks(sb: SupabaseClient, groupId: string): 
     const done = await postedRefs(sb, bc.id, [ref, cardRef]);
     // [2026-11-13 사장님] 주문서 제출 알림은 주문 분위기 닉네임(랜덤) — 같은 주문의 카드 안내도 같은 이름
     const nick = randomOrderBotNick();
-    if (!done.has(ref)) await insertBot(sb, bc.id, orderThanksText(rows), ref, nick);
-    if (rows.some(isCardOrderRow) && !done.has(cardRef)) await insertBot(sb, bc.id, cardLinkText(rows), cardRef, nick);
+    // 자동 테스트 주문이면 표식만(손님 화면엔 똑같이 보이고, 관리자·부계정 관리자 화면에만 TEST)
+    const mark = rows.some((r) => isAutoTestRow(r as Record<string, unknown>)) ? AUTO_TEST_AVATAR : null;
+    if (!done.has(ref)) await insertBot(sb, bc.id, orderThanksText(rows), ref, nick, mark);
+    if (rows.some(isCardOrderRow) && !done.has(cardRef)) await insertBot(sb, bc.id, cardLinkText(rows), cardRef, nick, mark);
   } catch {
     /* 채팅 글 실패는 주문과 무관 */
   }
@@ -113,7 +115,7 @@ export async function announceRecentPaid(sb: SupabaseClient, nowMs = Date.now(),
     for (const [g, rows] of byGroup) {
       const ref = `paid:${g}`;
       if (done.has(ref)) continue;
-      if (await insertBot(sb, bc.id, paidThanksText(rows), ref)) n += 1;
+      if (await insertBot(sb, bc.id, paidThanksText(rows), ref, LIVE_CHAT_BOT_NICK, rows.some((r) => isAutoTestRow(r as Record<string, unknown>)) ? AUTO_TEST_AVATAR : null)) n += 1;
     }
     return n;
   } catch {

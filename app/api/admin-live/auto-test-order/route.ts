@@ -3,7 +3,8 @@
 //   GET 상태 · POST {action:"toggle",enabled} | {action:"run"} | {action:"delete",groupIds?:string[]} (groupIds 없으면 자동 테스트 주문서 전부)
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { autoTestRunNow, deleteAutoTestOrders, readAutoTestRows, readAutoTestState, screenHostBeat, screenTestPlan, screenTestVerify, setAutoTestEnabled, type ScreenPlan } from "@/lib/autoTestOrderServer";
+import { AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
+import { autoTestRunNow, deleteAutoTestOrders, readAutoTestRows, readAutoTestState, postTestChat, screenHostBeat, screenTestPlan, screenTestVerify, setAutoTestChatEnabled, setAutoTestEnabled, type ScreenPlan } from "@/lib/autoTestOrderServer";
 import { getServiceClient } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
@@ -37,8 +38,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, last, state: await readAutoTestState(sb) });
     }
     if (action === "screen-plan") {
-      const plan = await screenTestPlan(sb, body?.scheduled === true);
+      const plan = await screenTestPlan(sb, request.nextUrl.origin, body?.scheduled === true);
       return NextResponse.json({ ok: true, ...("skip" in plan ? { skip: plan.skip } : { plan }) });
+    }
+    if (action === "toggle-chat") return NextResponse.json({ ok: true, state: await setAutoTestChatEnabled(sb, body?.enabled === true) });
+    if (action === "chat-after") {
+      // 화면 테스트가 주문을 마친 뒤 — 그 닉네임이 아직 테스트 계정의 지금 닉네임일 때만(다음 테스트와 안 섞이게)
+      const plan = body?.plan as ScreenPlan | undefined;
+      const text = String(plan?.chatAfter ?? "").trim();
+      if (!plan || !text) return NextResponse.json({ ok: true, posted: false });
+      const { data: c } = await sb.from("customers").select("youtube_nickname").eq("kakao_id", AUTO_TEST_KAKAO_ID).maybeSingle();
+      if (String((c as { youtube_nickname?: string } | null)?.youtube_nickname ?? "") !== plan.nickname) return NextResponse.json({ ok: true, posted: false });
+      const r = await postTestChat(request.nextUrl.origin, plan.broadcastId, text);
+      return NextResponse.json({ ok: true, posted: r.ok });
     }
     if (action === "screen-verify") {
       const plan = body?.plan as ScreenPlan | undefined;

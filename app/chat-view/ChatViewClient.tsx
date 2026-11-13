@@ -20,6 +20,7 @@ import {ChatViewNotice} from "./ChatViewNotice";
 import "./chat-view.css";
 import {includeChatViewMessage} from "@/lib/chatViewFilter";
 import {useYoutubeChatNotice} from "@/lib/useYoutubeChatNotice";
+import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
 
 type Bc = { id: string; title: string; videoId: string; paused: boolean };
 
@@ -50,7 +51,7 @@ export default function ChatViewClient() {
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
   const [screenError, setScreenError] = useState("");
   // [07:18 사장님] 유튜브 시청자 수·사이트 접속 수 — 각 칸 제목 옆(30초마다)
-  const [counts, setCounts] = useState<{ yt: number | null; site: number | null }>({ yt: null, site: null });
+  const [counts, setCounts] = useState<{ yt: number | null; site: number | null; test: number | null }>({ yt: null, site: null, test: null });
   const emojiMap = useMemo(() => emojiMapOf(emojis), [emojis]);
   const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(displayMessages, `${sizeIdx}:${tab}`, tab === "site");
   const [recent, setRecent] = useState<Array<{ id: number; at: number }>>([]);
@@ -154,13 +155,13 @@ export default function ChatViewClient() {
   }, [bcId]);
 
   useEffect(() => {
-    setCounts({ yt: null, site: null });
+    setCounts({ yt: null, site: null, test: null });
     if (!bcId) return;
     let alive = true;
     const load = () => fetch(`/api/live-viewers?bc=${encodeURIComponent(bcId)}`).then((r) => r.json()).then((j) => {
       if (!alive || !j?.ok) return;
       const n = (v: unknown) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
-      setCounts({ yt: n(j.viewers), site: n(j.site) });
+      setCounts({ yt: n(j.viewers), site: n(j.site), test: n(j.test?.site) });
     }).catch(() => {});
     load();
     const t = window.setInterval(load, 30000);
@@ -286,7 +287,7 @@ export default function ChatViewClient() {
           <div className="ruru-chat-panel-title">
             <h2>사이트 채팅</h2>
             {!privateChat.canReviewDeleted ? <button type="button" onClick={privateChat.verify} style={{ border: 0, background: "transparent", color: C.soft, fontSize: 12 }}>관리자 본인 확인</button> : <span style={{ color: C.soft, fontSize: 12 }}>삭제글 확인 중</span>}
-            <div className="ruru-chat-panel-meta">접속 {bc && counts.site != null ? `${counts.site.toLocaleString("ko-KR")}명` : "—"}</div>
+            <div className="ruru-chat-panel-meta">접속 {bc && counts.site != null ? `실제 ${counts.site.toLocaleString("ko-KR")}명` : "—"}{bc && counts.test ? ` · 테스트 ${counts.test}명` : ""}</div>
           </div>
           <div className="ruru-chat-size">
             {sizeBtn("가−", "사이트 채팅 글자 작게", () => changeSize(-1), sizeIdx === 0, "15px")}
@@ -313,20 +314,21 @@ export default function ChatViewClient() {
           ) : displayMessages.map((m) => {
             const isNew = !m.deletedByAuthor && !m.privateCommand && recent.some((r) => r.id === m.id);
             const b = m.badge ? BADGE[m.badge] : null;
-            const avatar = m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar;
+            const avatar = m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar === AUTO_TEST_AVATAR ? "" : m.avatar;
             return (
               <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "var(--chat-row-gap, 10px)", padding: "var(--chat-row-padding, 7px 8px)" }}>
                 {avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatar} alt="" referrerPolicy="no-referrer" style={{ width: "1.6em", height: "1.6em", borderRadius: "9999px", objectFit: "cover", flexShrink: 0 }} />
                 ) : (
-                  <span aria-hidden="true" style={{ width: "1.6em", height: "1.6em", borderRadius: "9999px", background: "#3A3A3A", color: C.soft, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.75em", fontWeight: 700, flexShrink: 0 }}>{Array.from(m.nickname)[0] || "?"}</span>
+                  <span aria-hidden="true" style={{ width: "1.6em", height: "1.6em", borderRadius: "9999px", background: "#3A3A3A", color: C.soft, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.75em", fontWeight: 700, flexShrink: 0 }}>{(Array.from(m.nickname)[0] || "?").toUpperCase()}</span>
                 )}
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
                   <span style={{ fontWeight: 700, color: "#C2C2C2", marginRight: "8px" }}>{m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
+                  {m.avatar === AUTO_TEST_AVATAR ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: "#3A3A3A", color: "#BBBBBB", fontSize: "0.65em", fontWeight: 800, verticalAlign: "0.12em" }}>TEST</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}
                   <ChatBodyView body={m.body} emojis={emojiMap} />
                 </div>

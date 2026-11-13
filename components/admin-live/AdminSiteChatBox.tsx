@@ -11,6 +11,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
 import type { ChatEmoji } from "@/lib/liveChatEmoji";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
+import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
 
 const BADGE_LABEL: Record<string, string> = { crown: "관리자", crown_pink: "관리자", mod: "R", bot: "AI" };
 const BADGE_CLS: Record<string, string> = {
@@ -162,14 +163,15 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
             {m.badge === "bot" ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src="/ruru-ai-avatar.png" alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover" />
-            ) : m.avatar ? (
+            ) : m.avatar && m.avatar !== AUTO_TEST_AVATAR ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={m.avatar} alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover" />
             ) : (
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-line text-[12px] font-bold text-ink-soft">{m.nickname.slice(0, 1)}</span>
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-line text-[12px] font-bold text-ink-soft">{(Array.from(m.nickname)[0] || "?").toUpperCase()}</span>
             )}
             <div className="min-w-0 flex-1 text-[14px] leading-5 text-ink">
               <span className="mr-1 font-bold text-ink-soft">{m.nickname}</span>
+              {m.avatar === AUTO_TEST_AVATAR ? <span className="mr-1 text-[11px] font-bold text-ink-mute">[TEST]</span> : null}
               {m.badge ? <span className={`mr-1 inline-flex h-[18px] items-center rounded px-1 align-[1px] text-[11px] font-bold ${BADGE_CLS[m.badge] || ""}`}>{BADGE_LABEL[m.badge]}</span> : null}
               <span className="break-words"><ChatBodyView body={m.body} emojis={emojiMap} /></span>
               <span className="ml-1 text-[11px] text-ink-mute">{timeText(m.createdAt)}</span>

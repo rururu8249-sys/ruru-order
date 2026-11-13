@@ -50,9 +50,9 @@ export default function AutoTestOrderSettings() {
     if (!r.ok || !j?.ok) throw new Error(j?.message || "실패");
     return j;
   };
-  const toggle = async (on: boolean) => {
+  const toggle = async (on: boolean, kind: "order" | "chat" = "order") => {
     setBusy("toggle");
-    try { const j = await post({ action: "toggle", enabled: on }); setState(j.state); } catch (e) { showAdminToast(e instanceof Error ? e.message : "실패", "error"); } finally { setBusy(""); }
+    try { const j = await post({ action: kind === "chat" ? "toggle-chat" : "toggle", enabled: on }); setState(j.state); } catch (e) { showAdminToast(e instanceof Error ? e.message : "실패", "error"); } finally { setBusy(""); }
   };
   const runNow = () => {
     setBusy("run");
@@ -77,10 +77,17 @@ export default function AutoTestOrderSettings() {
         <div className="min-w-0">
           <div className="text-[13px] font-bold text-ink">자동 테스트 주문</div>
           <div className="text-[12px] text-ink-mute">
-            {!on ? "꺼짐" : state?.lockUntil && state.lockUntil > Date.now() ? "테스트 중" : state?.nextRunAt ? `켜짐 · 다음 ${hm(state.nextRunAt)}쯤` : "켜짐"}
+            {!on && !state?.chatEnabled ? "꺼짐" : !on ? "꺼짐 · 채팅만 돌아요" : state?.lockUntil && state.lockUntil > Date.now() ? "테스트 중" : state?.nextRunAt ? `켜짐 · 다음 ${hm(state.nextRunAt)}쯤` : "켜짐"}
           </div>
         </div>
         <Switch on={on} disabled={!state || busy === "toggle"} onChange={(v) => void toggle(v)} label="자동 테스트 주문" />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[13px] font-bold text-ink">자동 테스트 채팅</div>
+          <div className="text-[12px] text-ink-mute">{state?.chatEnabled ? "켜짐 · 주문 앞뒤로 한 줄씩" : "꺼짐"}</div>
+        </div>
+        <Switch on={state?.chatEnabled === true} disabled={!state || busy === "toggle"} onChange={(v) => void toggle(v, "chat")} label="자동 테스트 채팅" />
       </div>
       {last ? (
         <div className={`mt-1 truncate text-[12px] ${last.ok ? "text-ink-soft" : "text-danger-tx"}`} title={last.message}>

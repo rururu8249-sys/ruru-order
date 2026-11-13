@@ -13,6 +13,7 @@ const LOCK_KEY = "ruru_admin_screen_test_lock";
 export const SCREEN_TEST_EVENT = "ruru-screen-test";
 
 type Plan = {
+  chatAfter?: string;
   nickname: string; paymentMethod: "무통장입금" | "카드결제"; broadcastId: string;
   lines: Array<{ productId: string; productName: string; color: string; size: string; qty: number; brand: boolean }>;
   identity: { kakaoId: string; phone: string; name: string; zipcode: string; address: string; detailAddress: string };
@@ -178,6 +179,7 @@ export default function ScreenTestHost() {
       const j = await api({ action: "screen-plan", scheduled });
       if (j.skip) { setStatus(String(j.skip)); doneMsg = scheduled ? "" : String(j.skip); throw new SkipSignal(); }
       plan = j.plan as Plan;
+      if (plan.chatAfter) { setStatus("채팅 올림 · 잠깐 기다리는 중"); await sleep(8_000 + Math.floor(Math.random() * 12_000)); }
       snap = true;
       for (let i = 0; i < localStorage.length; i += 1) { const k = localStorage.key(i); if (k && isCustomerKey(k)) saved[k] = localStorage.getItem(k) ?? ""; }
       for (const k of Object.keys(saved)) localStorage.removeItem(k);
@@ -218,6 +220,11 @@ export default function ScreenTestHost() {
         const j = await api({ action: "screen-verify", plan, note });
         doneMsg = String(j.last?.message || "끝");
         setStatus(doneMsg);
+        // 채팅 켜짐: 주문 잘 들어갔으면 잠깐 뒤 같은 닉네임으로 주문 후 한 줄
+        if (j.last?.ok && plan.chatAfter) {
+          const p = plan;
+          window.setTimeout(() => { void api({ action: "chat-after", plan: p }).catch(() => {}); }, 10_000 + Math.floor(Math.random() * 15_000));
+        }
       }
     } catch (e) {
       doneMsg = e instanceof Error ? e.message : "확인 실패";

@@ -34,6 +34,7 @@ import { chatRoleOfKakao, moderateChatMessage, pinChatMessage, setChatManager } 
 import { normalizeWidgetTarget } from "@/lib/widgetProductLibrary";
 import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { AUTO_TEST_AVATAR, AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest) {
             introNotice = result.kept ? "상품 소개 완료 · 기존 소개영상 위치는 유지했어요." : "상품 소개 완료 · 소개영상도 연결했어요.";
           } catch { introNotice = "상품 소개 완료 · 소개영상 연결은 저장하지 못했어요."; }
         } : undefined;
-        const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null }, target ?? undefined, recordIntro);
+        const message = await runChatProductCommand(sb, bc, query || "", { kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body, badge: role.badge ?? null, avatar_url: kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : (cleanKakaoPhotoUrl(c.kakao_profile_image) || null) }, target ?? undefined, recordIntro);
         // Only the sender receives this receipt; public history/events retain the hidden flag.
         return NextResponse.json({ ok: true, privateCommand: true, introNotice, message: parseChatMessage({ ...message, hidden_at: null, pinned_at: null }) }, { headers: { "Cache-Control": "private, no-store" } });
       } catch (error) {
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
     }
     const { data: ins, error } = await sb
       .from("live_chat_messages")
-      .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: finalBody, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null })
+      .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: finalBody, badge: role.badge ?? null, avatar_url: kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : (cleanKakaoPhotoUrl(c.kakao_profile_image) || null) })
       .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref")
       .single();
     if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);

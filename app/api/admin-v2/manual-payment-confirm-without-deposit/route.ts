@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isPaymentMatchExcludedOrder } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
+import { isAutoTestRow } from "@/lib/autoTestOrder";
 
 type RequestBody = {
   orderGroupId?: string;
@@ -118,8 +119,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // [2026-11-13 사장님 「입금확인 처리도 테스트해야지」] 자동 테스트 주문은 «관리자가 손으로» 입금확인할 수 있게(뱅크다 자동매칭은 그대로 제외)
     const blockedTestOrderIds = orders
-      .filter(isPaymentMatchExcludedOrder)
+      .filter((order) => isPaymentMatchExcludedOrder(order) && !isAutoTestRow(order as Record<string, unknown>))
       .map((order) => order.id)
       .filter(Boolean);
 

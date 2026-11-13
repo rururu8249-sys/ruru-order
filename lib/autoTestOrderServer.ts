@@ -6,6 +6,8 @@
 //   - 삭제는 «자동 테스트 주문서»만(is_test_order=true + test_order_reason 자동 테스트, 주문서 줄 전부가 그럴 때만).
 import { randomBytes, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { makeChatLines, type ChatProduct } from "@/lib/autoTestChat";
+import { tickTestViewers } from "@/lib/autoTestViewers";
 import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
 import {
   AUTO_TEST_KAKAO_ID, AUTO_TEST_KEY, AUTO_TEST_NAME, AUTO_TEST_PHONE, AUTO_TEST_REASON,
@@ -57,6 +59,84 @@ export async function screenHostBeat(sb: Db): Promise<AutoTestState> {
   return (await readStateRaw(sb)).state;
 }
 
+export async function setAutoTestChatEnabled(sb: Db, on: boolean): Promise<AutoTestState> {
+  for (let i = 0; i < 4; i += 1) {
+    const { raw, state } = await readStateRaw(sb);
+    const next: AutoTestState = { ...state, chatEnabled: on, nextRunAt: on && state.nextRunAt === null ? Date.now() + randomGapMs() : state.nextRunAt };
+    if (await casState(sb, raw, next)) return next;
+  }
+  throw new Error("저장이 겹쳤어요. 다시 눌러 주세요.");
+}
+
+/** 유튜브 라이브가 지금 진행 중인지 — 1분 기록기가 적는 동시 시청자 수가 최근(3분 안)에 있으면 진행 중 */
+export async function isYoutubeLiveNow(sb: Db, bcId: string): Promise<boolean> {
+  try {
+    const { data } = await sb.from("settings").select("value").eq("key", "live_viewers_now").maybeSingle();
+    const v = JSON.parse(String((data as Row | null)?.value ?? "{}")) as { bc?: string; v?: number | null; t?: string };
+    const t = Date.parse(String(v.t ?? ""));
+    return String(v.bc ?? "") === bcId && v.v != null && Number.isFinite(t) && Date.now() - t < 180_000;
+  } catch { return false; }
+}
+
+/** 테스트 계정으로 사이트 채팅 한 줄 — 손님과 같은 채팅 주소로(닉네임은 회원 표의 지금 닉네임) */
+export async function postTestChat(origin: string, bcId: string, body: string): Promise<{ ok: boolean; message: string }> {
+  const text = String(body || "").trim();
+  if (!text) return { ok: false, message: "빈 글" };
+  try {
+    const r = await postJson(`${origin}/api/live-chat`, { kakao_id: AUTO_TEST_KAKAO_ID, bc: bcId, body: text });
+    return r.json?.ok === true ? { ok: true, message: text } : { ok: false, message: String(r.json?.message ?? r.status) };
+  } catch (e) { return { ok: false, message: e instanceof Error ? e.message : "채팅 실패" }; }
+}
+
+/** 채팅 문장에 쓸 상품 정보(첫 상품) */
+async function chatProductOf(sb: Db, productId: string, productName: string, overseasOn: boolean): Promise<ChatProduct | null> {
+  try {
+    const { data } = await sb.from("products").select("*").eq("id", Number(productId)).maybeSingle();
+    const row = data as Row | null;
+    if (!row) return null;
+    const ch = productChoices(row, overseasOn).filter((c) => c.productName === productName);
+    const colors = [...new Set(ch.map((c) => c.color).filter((c) => c && c !== "없음"))];
+    const sizes = [...new Set(ch.map((c) => c.size).filter(Boolean))];
+    let note: Row = {};
+    try { note = typeof row.product_note === "string" ? JSON.parse(row.product_note) : ((row.product_note as Row) || {}); } catch { note = {}; }
+    const cats = ((note.brand_group as Row | undefined)?.detail_categories as Record<string, unknown> | undefined) || {};
+    const category = String(cats[productName] ?? row.category ?? row.product_category ?? "").trim();
+    return { name: productName, category, price: ch[0]?.unitPrice ?? Math.floor(Number(row.price) || 0), colors, sizes };
+  } catch { return null; }
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const between = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
+
+/** 채팅만(주문 꺼짐·채팅 켜짐) — 새 닉네임으로 한 줄 */
+async function chatOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
+  const at = Date.now();
+  try {
+    const bcId = String(bc.id ?? "");
+    const { s: _settings, overseasOn } = await readSettings(sb);
+    void _settings;
+    await ensureTestCustomer(sb);
+    const nickname = await freshNickname(sb);
+    const { error } = await sb.from("customers").update({ youtube_nickname: nickname, last_login_at: new Date().toISOString() }).eq("kakao_id", AUTO_TEST_KAKAO_ID);
+    if (error) throw new Error(`닉네임 바꾸기 실패: ${error.message}`);
+    const { data: bp } = await sb.from("broadcast_products").select("product_id").eq("broadcast_id", bcId).limit(500);
+    const ids = ((bp ?? []) as Row[]).map((r) => String(r.product_id ?? "")).filter((x) => /^\d+$/.test(x));
+    let product: ChatProduct | null = null;
+    if (ids.length) {
+      const pid = ids[Math.floor(Math.random() * ids.length)];
+      const { data: prow } = await sb.from("products").select("*").eq("id", Number(pid)).maybeSingle();
+      const ch = prow ? productChoices(prow as Row, overseasOn) : [];
+      if (ch.length) product = await chatProductOf(sb, pid, ch[Math.floor(Math.random() * ch.length)].productName, overseasOn);
+    }
+    const live = await isYoutubeLiveNow(sb, bcId);
+    const lines = await makeChatLines({ nickname, live, product, withOrder: false });
+    const r = await postTestChat(origin, bcId, lines.before);
+    return { at, ok: r.ok, message: `[채팅] ${nickname}: ${r.ok ? lines.before : `실패 — ${r.message}`}`, nickname };
+  } catch (e) {
+    return { at, ok: false, message: `[채팅] ${e instanceof Error ? e.message : "실패"}` };
+  }
+}
+
 export async function setAutoTestEnabled(sb: Db, enabled: boolean): Promise<AutoTestState> {
   for (let i = 0; i < 4; i += 1) {
     const { raw, state } = await readStateRaw(sb);
@@ -74,10 +154,14 @@ async function onBroadcast(sb: Db): Promise<Row | null> {
 /** 1분 cron — 켜짐 + 방송 중 + 시간이 됐을 때만 실행 */
 export async function autoTestTick(sb: Db, origin: string): Promise<{ ran: boolean; reason: string; last?: AutoTestLast }> {
   const { raw, state } = await readStateRaw(sb);
-  if (!state.enabled) return { ran: false, reason: "off" };
+  const on = state.enabled || state.chatEnabled;
+  // 가상 테스트 시청자(관리자·채팅뷰어에만 보임) — 켜짐+방송 중이면 1분마다 들어오고 나감, 아니면 비움
+  const bcForViewers = on ? await onBroadcast(sb) : null;
+  try { await tickTestViewers(sb, String(bcForViewers?.id ?? ""), on && Boolean(bcForViewers)); } catch { /* 시청자 흉내 실패는 무시 */ }
+  if (!on) return { ran: false, reason: "off" };
   const now = Date.now();
   if (state.lockUntil > now) return { ran: false, reason: "running" };
-  const bc = await onBroadcast(sb);
+  const bc = bcForViewers;
   if (!bc) {
     // 방송 종료 동안은 쉰다 — 다시 켜지면 그때부터 5~10분 뒤
     if (state.nextRunAt !== null) await casState(sb, raw, { ...state, nextRunAt: null });
@@ -88,10 +172,10 @@ export async function autoTestTick(sb: Db, origin: string): Promise<{ ran: boole
     return { ran: false, reason: "scheduled" };
   }
   if (now < state.nextRunAt) return { ran: false, reason: "waiting" };
-  // 관리자 화면이 열려 있으면 화면 테스트가 같은 일정으로 돈다 — 서버는 쉼(겹치기 방지)
-  if (now - state.screenSeenAt < SCREEN_HOST_FRESH_MS) return { ran: false, reason: "screen-host" };
+  // 관리자 화면이 열려 있으면 화면 테스트가 같은 일정으로 돈다 — 서버는 쉼(겹치기 방지). 채팅만일 땐 서버가 함.
+  if (state.enabled && now - state.screenSeenAt < SCREEN_HOST_FRESH_MS) return { ran: false, reason: "screen-host" };
   if (!(await casState(sb, raw, { ...state, lockUntil: now + LOCK_MS, nextRunAt: now + randomGapMs() }))) return { ran: false, reason: "lost-lock" };
-  const last = await runOnce(sb, origin, bc);
+  const last = state.enabled ? await runOnce(sb, origin, bc, state.chatEnabled) : await chatOnce(sb, origin, bc);
   await finish(sb, last);
   return { ran: true, reason: "ran", last };
 }
@@ -235,13 +319,23 @@ const lineText = (lines: AutoTestPick[]) => lines.map((l) => {
   return `${l.productName}${opt ? ` ${opt}` : ""} ×${l.qty}`;
 }).join(", ");
 
-async function runOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
+async function runOnce(sb: Db, origin: string, bc: Row, withChat = false): Promise<AutoTestLast> {
   const at = Date.now();
   try {
     const bcId = String(bc.id ?? "");
     const prep = await prepareRun(sb, bc);
     if ("skip" in prep) return { at, ok: true, message: prep.skip };
     const { lines, paymentMethod, nickname, settings } = prep;
+    // 채팅 켜짐: 주문 전 한 줄 → 잠깐 기다림(서버 방식은 1분 안에 끝나야 해서 짧게)
+    let chatAfter = "";
+    if (withChat) {
+      const { overseasOn } = await readSettings(sb);
+      const product = await chatProductOf(sb, lines[0].productId, lines[0].productName, overseasOn);
+      const cl = await makeChatLines({ nickname, live: await isYoutubeLiveNow(sb, bcId), product, withOrder: true });
+      await postTestChat(origin, bcId, cl.before);
+      chatAfter = cl.after;
+      await wait(between(6_000, 12_000));
+    }
 
     // 3. 장바구니 담기(손님과 같은 주소) — 테스트마다 새 장바구니
     const sessionKey = `autotest-${randomBytes(8).toString("hex")}`;
@@ -277,6 +371,7 @@ async function runOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
     const problems = verifySavedRows(orderRows, (saved ?? []) as Row[]);
     const summary = `${nickname} · ${paymentMethod === "카드결제" ? "카드" : "무통장"} · ${lineText(lines)}`;
     if (problems.length) return { at, ok: false, message: `저장 내용이 달라요 — ${problems.join(" · ")} (${summary})`, orderCode: lookupCode, nickname };
+    if (chatAfter) { await wait(between(8_000, 15_000)); await postTestChat(origin, bcId, chatAfter); }
     return { at, ok: true, message: `주문서 제출 확인 — ${summary}`, orderCode: lookupCode, nickname };
   } catch (e) {
     return { at, ok: false, message: e instanceof Error ? e.message : "테스트 실패" };
@@ -334,13 +429,14 @@ export async function readAutoTestRows(sb: Db, groupIds: string[] | null): Promi
 
 // ── 화면 방식(관리자 화면이 손님 주문 화면을 띄워 버튼을 직접 누름) ──
 export type ScreenPlan = {
+  chatAfter?: string;
   nickname: string; paymentMethod: "무통장입금" | "카드결제"; broadcastId: string;
   lines: Array<{ productId: string; productName: string; color: string; size: string; qty: number; brand: boolean }>;
   identity: { kakaoId: string; phone: string; name: string; zipcode: string; address: string; detailAddress: string };
 };
 
 /** 화면 테스트 준비 — 방송 중일 때만. 상품·옵션·수량·결제·새 닉네임을 정해 돌려준다(주문은 화면이 낸다) */
-export async function screenTestPlan(sb: Db, scheduled = false): Promise<ScreenPlan | { skip: string }> {
+export async function screenTestPlan(sb: Db, origin: string, scheduled = false): Promise<ScreenPlan | { skip: string }> {
   const bc = await onBroadcast(sb);
   if (!bc) return { skip: "방송 중일 때만 테스트할 수 있어요." };
   // 서버 방식·다른 화면과 겹치지 않게 잠금(화면 테스트는 길어서 2분 30초) — 결과 확인(screenTestVerify) 때 풀림
@@ -349,7 +445,7 @@ export async function screenTestPlan(sb: Db, scheduled = false): Promise<ScreenP
   if (state.lockUntil > now) return { skip: "다른 테스트가 진행 중이에요." };
   if (scheduled && (!state.enabled || state.nextRunAt === null || now < state.nextRunAt)) return { skip: "아직 차례가 아니에요." };
   const nextRunAt = scheduled || state.enabled ? now + randomGapMs() : state.nextRunAt;
-  if (!(await casState(sb, raw, { ...state, lockUntil: now + 150_000, nextRunAt }))) return { skip: "다른 테스트가 진행 중이에요." };
+  if (!(await casState(sb, raw, { ...state, lockUntil: now + 180_000, nextRunAt }))) return { skip: "다른 테스트가 진행 중이에요." };
   let prep: Prepared;
   try {
     await ensureOperatorTestAccount(sb);
@@ -367,7 +463,19 @@ export async function screenTestPlan(sb: Db, scheduled = false): Promise<ScreenP
     if (typeof n === "string") { try { n = JSON.parse(n); } catch { n = null; } }
     if ((n as Row | null)?.brand_group && ((n as Row).brand_group as Row).enabled === true) brandIds.add(String(r.id));
   }
+  // 채팅 켜짐: 주문 전 한 줄은 지금 올리고, 주문 후 한 줄은 화면이 주문을 마친 뒤 올림(chat-after)
+  let chatAfter = "";
+  if (state.chatEnabled) {
+    try {
+      const { overseasOn } = await readSettings(sb);
+      const product = await chatProductOf(sb, prep.lines[0].productId, prep.lines[0].productName, overseasOn);
+      const cl = await makeChatLines({ nickname: prep.nickname, live: await isYoutubeLiveNow(sb, String(bc.id ?? "")), product, withOrder: true });
+      await postTestChat(origin, String(bc.id ?? ""), cl.before);
+      chatAfter = cl.after;
+    } catch { /* 채팅 실패는 주문 테스트와 무관 */ }
+  }
   return {
+    chatAfter,
     nickname: prep.nickname, paymentMethod: prep.paymentMethod, broadcastId: String(bc.id ?? ""),
     lines: prep.lines.map((l) => ({ productId: l.productId, productName: l.productName, color: l.color, size: l.size, qty: l.qty, brand: brandIds.has(l.productId) })),
     identity: { kakaoId: AUTO_TEST_KAKAO_ID, phone: AUTO_TEST_PHONE, name: AUTO_TEST_NAME, zipcode: "00000", address: "자동 테스트 주소", detailAddress: "자동 테스트" },

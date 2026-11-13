@@ -183,4 +183,36 @@ assert.ok(!tables.orders.some((o) => o.order_group_id === testGroups[2]));
 const del2 = await S.deleteAutoTestOrders(db, ["real"]);
 assert.equal(del2.groups, 0); assert.ok(tables.orders.some((o) => o.id === 1));
 
+// ── 채팅 문장: 다시보기 중엔 질문 없음 · 다이슨엔 사이즈 질문 없음 · 주문 뒤엔 결제 완료 표현 없음
+const C = load("lib/autoTestChat.ts");
+const dyson = { name: "다이슨 에어랩HS05-2세대", category: "", price: 329000, colors: ["니켈"], sizes: [] };
+const coat = { name: "BB-58", category: "의류", price: 195000, colors: ["블랙", "베이지"], sizes: ["S", "M", "L"] };
+for (let i = 0; i < 300; i += 1) {
+  const replay = C.fallbackChatLine("before", false, coat);
+  assert.ok(!/\?|얼마|사이즈|배송|있나요/.test(replay), replay);
+  const d = C.fallbackChatLine("before", true, dyson);
+  assert.ok(!/kg|사이즈 추천|정사이즈|입는데/.test(d), d);
+  assert.ok(!/결제|입금/.test(C.fallbackChatLine("after", true, coat)));
+  const b = C.randomBody();
+  assert.ok(b.height >= 150 && b.height <= 170 && b.weight >= 40 && b.weight <= 75, JSON.stringify(b));
+}
+assert.equal(C.chatProductKind(dyson), "appliance");
+assert.equal(C.chatProductKind({ name: "MC-328 블랙(마야여자친구) 1", category: "" }), "maya");
+assert.equal(C.chatProductKind(coat), "clothing");
+assert.equal(C.chatProductKind({ name: "종이방향제", category: "" }), "unknown");
+
+// ── 가상 시청자: 들어오고 나감 · 꺼지면 비움 · 방송 바뀌면 새로
+const V = load("lib/autoTestViewers.ts");
+let vs = { bc: "", list: [] };
+let t0 = Date.now();
+for (let m = 0; m < 120; m += 1) vs = V.stepTestViewers(vs, "b1", true, t0 + m * 60_000);
+assert.ok(vs.list.every((v) => v.leave > t0 + 119 * 60_000), "나갈 시간 지난 사람은 빠짐");
+assert.ok(vs.list.length <= 7);
+assert.equal(V.stepTestViewers(vs, "b1", false, t0).list.length, 0);
+assert.equal(V.stepTestViewers(vs, "b2", true, t0, () => 0.99).list.length, 0);
+const one = V.stepTestViewers({ bc: "b1", list: [] }, "b1", true, t0, () => 0.1);
+assert.equal(one.list.length, 1);
+const dwellMin = (one.list[0].leave - one.list[0].join) / 60_000;
+assert.ok(dwellMin >= 2.4 && dwellMin <= 72, String(dwellMin));
+
 console.log("test-auto-test-order: all passed");

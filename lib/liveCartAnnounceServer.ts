@@ -20,6 +20,7 @@ import {
 import { loadCandidates } from "@/lib/liveChatBotServer";
 import { isBlockedValue } from "@/lib/assistantSearchServer";
 import { postOrderChatEverywhere, readActiveBroadcastId } from "@/lib/youtube";
+import { AUTO_TEST_AVATAR, AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
 
 export type NewCartLine = { productId: string; productName: string; color: string; size: string; unitPrice: number | null };
 
@@ -83,7 +84,7 @@ export async function announceNewCartLines(sb: SupabaseClient, input: { sessionK
     lastPerson.set(person, now);
     lastBroadcast.set(bc, now);
     sweep(lastPerson, PER_PERSON_MS);
-    const { error } = await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: items[0].ref });
+    const { error } = await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: items[0].ref, avatar_url: input.kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : null });
     // Existing after() task: reuse the masked site notice and the configured
     // YouTube notification switch/main+second destinations, without blocking cart success.
     if (!error && await readActiveBroadcastId(sb) === bc) {

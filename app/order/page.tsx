@@ -172,6 +172,7 @@ import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { sameCartDraftItems } from "@/lib/cartDraftSync";
 import { CART_SEQ_NEW, readCartSeqField } from "@/lib/cartClearMarks";
+import { AUTO_TEST_VIEWER_PHONES } from "@/lib/autoTestOrder";
 import {
   CUSTOMER_DETAIL_NAME_MAX_LENGTH,
   buildCustomerDetailProductName,
@@ -8441,6 +8442,7 @@ export default function OrderPage() {
                 pinned: liveChatPinned,
                 canGrant: isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)),
                 canPin: ["crown", "crown_pink"].includes(String(chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? "")),
+                showTest: isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)) || operatorTestAccount !== null || AUTO_TEST_VIEWER_PHONES.includes(normalizePhone(customerPhone)),
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
                 canModerate: operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null,
                 emojis: liveChatEmojis,

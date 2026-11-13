@@ -49,6 +49,7 @@ import type { ChatProductSelection } from "@/lib/liveChatProductCommand";
 import { ChatProductThumb } from "./ChatProductThumb";
 import { chatProductPhoto } from "@/lib/chatProductPhoto";
 import { LiveWelcomeChip } from "./LiveWelcomeChip";
+import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
 
 export type LiveWatchPinned = {
   productId: string;
@@ -109,6 +110,8 @@ type Props = {
     pinned: LiveChatMessage | null;
     /** 총관리자 — 길게 눌러 채팅 관리자 지정·해제 */
     canGrant: boolean;
+    /** [2026-11-13] 자동 테스트 글에 TEST 표시 — 관리자·부계정 관리자 화면만(손님은 모름) */
+    showTest?: boolean;
     /** 왕관 표시 두 사람만 — 길게 눌러 고정 댓글 */
     canPin: boolean;
     onModerate: (messageId: number, action: LiveChatAction) => Promise<{ ok: boolean; message?: string }>;
@@ -190,11 +193,11 @@ function ChatBadge({ badge }: { badge: LiveChatMessage["badge"] }) {
 function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: string }) {
   const [broken, setBroken] = useState(false);
   const box = { width: "24px", height: "24px", borderRadius: "9999px", flexShrink: 0, marginTop: "-2px", overflow: "hidden" } as const;
-  if (src && !broken) {
+  if (src && src !== AUTO_TEST_AVATAR && !broken) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => setBroken(true)} style={{ ...box, pointerEvents: "none", WebkitTouchCallout: "none", objectFit: "cover", display: "block", background: "#333333" }} />;
   }
-  const ch = Array.from(String(nick || "").trim())[0] || "?";
+  const ch = (Array.from(String(nick || "").trim())[0] || "?").toUpperCase(); // 영어는 대문자(Happy → H)
   return <span aria-hidden="true" style={{ ...box, display: "inline-flex", alignItems: "center", justifyContent: "center", background: color, color: "#111111", fontSize: "12px", fontWeight: 700, textShadow: "none" }}>{ch}</span>;
 }
 // 글자를 상자 없이 영상 위에 바로 — 어떤 화면에서도 읽히게 진한 그림자
@@ -1013,7 +1016,8 @@ export default function LiveWatchView(props: Props) {
   // [2026-11-12] 관리자 — 숫자 누르면 «지금 방송 보는 사람» 목록(10초마다 새로)
   const [watchersOpen, setWatchersOpen] = useState(false);
   type WatcherRow = { key: string; nickname: string; name: string; member: boolean; lastSeenAt: string; staff?: boolean };
-  const [watchers, setWatchers] = useState<{ state: "loading" | "ready" | "error"; message?: string; total?: number; watching?: number; rows: WatcherRow[]; others: WatcherRow[] }>({ state: "loading", rows: [], others: [] });
+  type WatcherTest = { site: number; watching: number; rows: Array<WatcherRow & { live?: boolean }>; orderedNicks: string[] };
+  const [watchers, setWatchers] = useState<{ state: "loading" | "ready" | "error"; message?: string; total?: number; watching?: number; rows: WatcherRow[]; others: WatcherRow[]; test?: WatcherTest }>({ state: "loading", rows: [], others: [] });
   useEffect(() => {
     if (!watchersOpen) return;
     let alive = true;
@@ -1027,7 +1031,7 @@ export default function LiveWatchView(props: Props) {
           if (r.status === 403) verifyChatAccount();
           return;
         }
-        setWatchers({ state: "ready", total: j.total, watching: j.watching, rows: Array.isArray(j.rows) ? j.rows : [], others: Array.isArray(j.others) ? j.others : [] });
+        setWatchers({ state: "ready", total: j.total, watching: j.watching, rows: Array.isArray(j.rows) ? j.rows : [], others: Array.isArray(j.others) ? j.others : [], test: j.test && typeof j.test === "object" ? j.test : undefined });
       } catch { if (alive) setWatchers((w) => ({ ...w, state: "error", message: "목록을 읽지 못했어요." })); }
     };
     void load();
@@ -1365,7 +1369,7 @@ export default function LiveWatchView(props: Props) {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(400px, 100%)", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "#FFFFFF", color: "#111111", borderRadius: "16px", overflow: "hidden" }}>
             <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #E5E5E5", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: "16px", fontWeight: 700 }}>지금 접속 {watchers.total ?? props.siteViewers ?? "-"}명</div>
+                <div style={{ fontSize: "16px", fontWeight: 700 }}>지금 접속 {watchers.total ?? props.siteViewers ?? "-"}명{watchers.test ? <span style={{ fontSize: "13px", fontWeight: 600, color: "#707072" }}> (실제) · 테스트 {watchers.test.site}명</span> : null}</div>
                 <div style={{ fontSize: "13px", color: "#707072", marginTop: "2px" }}>방송 보는 중 {watchers.watching ?? props.watchingViewers ?? "-"} · 사이트만 {watchers.state === "ready" ? watchers.others.length : "-"} · 10초마다 새로</div>
               </div>
               <button type="button" onClick={() => setWatchersOpen(false)} style={{ flexShrink: 0, height: "36px", padding: "0 14px", border: "1px solid #E5E5E5", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>닫기</button>
@@ -1391,6 +1395,21 @@ export default function LiveWatchView(props: Props) {
                     </div>
                   );
                 })}
+              {watchers.test ? (
+                <div>
+                  <div style={{ position: "sticky", top: 0, padding: "10px 16px 6px", background: "#F5F5F5", fontSize: "13px", fontWeight: 700, color: "#111111" }}>
+                    테스트 {watchers.test.site}명 · 방송 화면 {watchers.test.watching} <span style={{ fontWeight: 400, color: "#707072" }}>(위 숫자와 손님 화면 숫자에는 안 들어가요)</span>
+                  </div>
+                  {watchers.test.rows.length ? watchers.test.rows.map((w) => (
+                    <div key={`t-${w.key}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderBottom: "1px solid #F0F0F0", fontSize: "14px" }}>
+                      <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.nickname}</span>
+                      <span style={{ color: "#707072", whiteSpace: "nowrap", fontSize: "12px" }}>{w.name}{w.live === false ? " · 사이트만" : ""}</span>
+                      <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: "12px", fontWeight: 700, color: "#707072" }}>TEST</span>
+                    </div>
+                  )) : <div style={{ padding: "10px 16px", fontSize: "13px", color: "#707072" }}>지금은 없어요</div>}
+                  {watchers.test.orderedNicks.length ? <div style={{ padding: "10px 16px", fontSize: "12px", color: "#707072" }}>이번 방송 테스트 주문 닉네임 {watchers.test.orderedNicks.length}개 · {watchers.test.orderedNicks.slice(0, 20).join(", ")}</div> : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1473,6 +1492,7 @@ export default function LiveWatchView(props: Props) {
                   {/* [13:44 사장님 「닉네임만 연한 색」] 닉네임만 사람마다 정해진 색을 흰색과 반쯤 섞은 연한 색(글은 흰색 그대로), 루루동이 안내는 흐린 흰색 */}
                   <span style={{ fontWeight: chatView.bold ? 700 : 400, color: m.badge === "bot" ? "rgba(255,255,255,0.8)" : softNickColor(color) }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
+                  {chat.showTest && m.avatar === AUTO_TEST_AVATAR ? <span style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 700, color: "#BBBBBB" }}>TEST</span> : null}
                   {botProduct ? <ChatProductThumb src={chatProductPhoto(props.items, botProduct)} name="안내 상품 사진" /> : null}
                   <span style={{ marginLeft: m.badge ? "4px" : "8px", color: "#FFFFFF" /* 글은 유튜브처럼 늘 흰색 — 연한 색 글은 밝은 배경에서 안 읽힘(12:49), 닉네임만 사람 색 */ }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (

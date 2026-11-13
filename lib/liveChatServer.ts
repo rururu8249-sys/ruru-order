@@ -4,6 +4,7 @@ import { penaltyUntil, type LiveChatPenalty } from "@/lib/liveChat";
 import { LIVE_WATCH_KEY, chatBadgeOf, isChatOwnerPhone, parseLiveWatchSetting, serializeLiveWatchSetting, type LiveChatBadge } from "@/lib/liveWatch";
 import { buildBlockReason } from "@/lib/customerBlockReason";
 import { koreanPhoneVariants } from "@/lib/order/phone";
+import { AUTO_TEST_PHONE } from "@/lib/autoTestOrder";
 
 export const LIVE_CHAT_PENALTIES: LiveChatPenalty[] = ["hide", "mute30s", "mute5m", "ban"];
 const LABEL: Record<LiveChatPenalty, string> = {
@@ -34,7 +35,8 @@ export async function chatRoleOfKakao(sb: SupabaseClient, kakaoId: string): Prom
   ]);
   if (!phone) return { phone: "", badge: null, isMod: false, isOwner: false };
   const isOwner = isChatOwnerPhone(setting, phone);
-  const isOp = (opsRes.data ?? []).some((o) => String((o as { customer_phone?: string }).customer_phone ?? "").replace(/[^0-9]/g, "") === phone);
+  // [2026-11-13] 자동 테스트 회원 번호는 시험 계정 표에 있어도 채팅에선 평범한 손님(R 표시·관리 권한 없음)
+  const isOp = phone !== AUTO_TEST_PHONE && (opsRes.data ?? []).some((o) => String((o as { customer_phone?: string }).customer_phone ?? "").replace(/[^0-9]/g, "") === phone);
   const badge = chatBadgeOf(setting, phone) ?? (isOp ? "mod" : null);
   return { phone, badge, isMod: isOwner || isOp || setting.mods.includes(phone), isOwner };
 }
