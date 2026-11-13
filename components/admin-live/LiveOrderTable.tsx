@@ -16,6 +16,7 @@ import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./Broadcast
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
 import { buildCustomerOrderCopyText, buildPaymentRequestNote, buildPaymentRequestKakao, paymentRequestToast } from "./liveOrderCustomerCopy";
 import { showAdminConfirm } from "@/lib/adminConfirm";
+import { isAutoTestRow } from "@/lib/autoTestOrder";
 import { pickingProgress, isPickingComplete, pickingScope } from "@/lib/orderPicking";
 import ProductPagination from "./ProductPagination";
 import { pickPullBadgeText, pickPullAwayText, pickPullMovedFromText, pickPullMovedToText } from "@/lib/orderPickPull";
@@ -907,7 +908,7 @@ export default function LiveOrderTable({
 
   // [2026-11-13] 자동 테스트 주문서 영구 삭제 — 선택한 것 중 «자동 테스트» 주문서만 서버로(서버가 한 번 더 확인, 일반 주문은 절대 안 지움)
   const [deletingTest, setDeletingTest] = useState(false);
-  const selectedAutoTestOrders = pickingSelectedFromTable.filter((o) => o.isTestOrder && o.testOrderReason === "자동 테스트");
+  const selectedAutoTestOrders = pickingSelectedFromTable.filter((o) => isAutoTestRow({ is_test_order: o.isTestOrder === true, test_order_reason: o.testOrderReason, operator_test_phone: o.operatorTestPhone }));
   const handleDeleteAutoTest = async () => {
     const targets = selectedAutoTestOrders;
     if (targets.length === 0) return;

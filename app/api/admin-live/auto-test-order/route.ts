@@ -3,8 +3,7 @@
 //   GET 상태 · POST {action:"toggle",enabled} | {action:"run"} | {action:"delete",groupIds?:string[]} (groupIds 없으면 자동 테스트 주문서 전부)
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { autoTestRunNow, deleteAutoTestOrders, readAutoTestState, setAutoTestEnabled } from "@/lib/autoTestOrderServer";
-import { AUTO_TEST_REASON } from "@/lib/autoTestOrder";
+import { autoTestRunNow, deleteAutoTestOrders, readAutoTestRows, readAutoTestState, screenTestPlan, screenTestVerify, setAutoTestEnabled, type ScreenPlan } from "@/lib/autoTestOrderServer";
 import { getServiceClient } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +16,8 @@ export async function GET(request: NextRequest) {
   if (!(await verifyAdminSessionFromRequest(request))) return deny();
   const sb = getServiceClient();
   const state = await readAutoTestState(sb);
-  const { count } = await sb.from("orders").select("order_group_id", { count: "exact", head: true }).eq("is_test_order", true).eq("test_order_reason", AUTO_TEST_REASON);
-  return NextResponse.json({ ok: true, state, testRows: count ?? 0 });
+  const rows = await readAutoTestRows(sb, null).catch(() => []);
+  return NextResponse.json({ ok: true, state, testRows: rows.length });
 }
 
 export async function POST(request: NextRequest) {
@@ -32,6 +31,16 @@ export async function POST(request: NextRequest) {
     if (action === "toggle") return NextResponse.json({ ok: true, state: await setAutoTestEnabled(sb, body?.enabled === true) });
     if (action === "run") {
       const last = await autoTestRunNow(sb, request.nextUrl.origin);
+      return NextResponse.json({ ok: true, last, state: await readAutoTestState(sb) });
+    }
+    if (action === "screen-plan") {
+      const plan = await screenTestPlan(sb);
+      return NextResponse.json({ ok: true, ...("skip" in plan ? { skip: plan.skip } : { plan }) });
+    }
+    if (action === "screen-verify") {
+      const plan = body?.plan as ScreenPlan | undefined;
+      if (!plan || !plan.nickname || !Array.isArray(plan.lines)) return NextResponse.json({ ok: false, message: "계획이 없어요." }, { status: 400 });
+      const last = await screenTestVerify(sb, plan, String(body?.note ?? "").slice(0, 300));
       return NextResponse.json({ ok: true, last, state: await readAutoTestState(sb) });
     }
     if (action === "delete") {

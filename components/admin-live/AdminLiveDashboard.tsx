@@ -83,6 +83,7 @@ import type { EventWinnerCustomerRef } from "@/lib/eventCustomGift";
 import ChatOrderQueuePopup from "./ChatOrderQueuePopup";
 import { ADMIN_PREVIEW_DEFAULTS, readAdminUiPreview } from "@/lib/adminUiSwitch";
 import ChatOrderReaderLoop from "./ChatOrderReaderLoop";
+import ScreenTestHost from "./ScreenTestHost";
 import {
   alwaysOrderFilterValue,
   buildAlwaysOrderOptions,
@@ -1771,6 +1772,7 @@ export default function AdminLiveDashboard() {
 
   return (
     <div className={`min-h-screen bg-canvas text-ink ${theme === "dark" ? "dark" : ""}`} data-ruru-controltower-shell="layout-b-pages-rail-v4">
+      <ScreenTestHost />
       <div className="flex min-h-screen">
         <AdminLiveSidebar
           activeMenu={activeMenu}

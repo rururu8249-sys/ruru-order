@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import type { AutoTestState } from "@/lib/autoTestOrder";
+import { SCREEN_TEST_EVENT, SCREEN_TEST_ON_KEY } from "./ScreenTestHost";
 
 function Switch({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
   return (
@@ -30,6 +31,32 @@ export default function AutoTestOrderSettings({ onChanged }: { onChanged?: () =>
     } catch { /* 다음에 다시 */ }
   }, []);
   useEffect(() => { void load(); const t = window.setInterval(() => void load(), 30_000); return () => window.clearInterval(t); }, [load]);
+
+  // 화면 테스트(이 기기) — 켬/끔은 이 브라우저에만 저장, 실행은 관리자 화면 전체에 붙은 ScreenTestHost 가 함
+  const [screenOn, setScreenOn] = useState(false);
+  const [screenBusy, setScreenBusy] = useState(false);
+  useEffect(() => { try { setScreenOn(localStorage.getItem(SCREEN_TEST_ON_KEY) === "1"); } catch { /* 무시 */ } }, []);
+  useEffect(() => {
+    const onDone = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (d?.action !== "done") return;
+      setScreenBusy(false);
+      if (d.message) showAdminToast(String(d.message), /확인 —|건너뜀/.test(String(d.message)) ? "success" : "error");
+      onChanged?.();
+      void load();
+    };
+    window.addEventListener(SCREEN_TEST_EVENT, onDone);
+    return () => window.removeEventListener(SCREEN_TEST_EVENT, onDone);
+  }, [load, onChanged]);
+  const toggleScreen = (on: boolean) => {
+    setScreenOn(on);
+    try { if (on) localStorage.setItem(SCREEN_TEST_ON_KEY, "1"); else localStorage.removeItem(SCREEN_TEST_ON_KEY); } catch { /* 무시 */ }
+    window.dispatchEvent(new CustomEvent(SCREEN_TEST_EVENT, { detail: { action: "toggle" } }));
+  };
+  const runScreen = () => {
+    setScreenBusy(true);
+    window.dispatchEvent(new CustomEvent(SCREEN_TEST_EVENT, { detail: { action: "run" } }));
+  };
 
   const post = async (body: Record<string, unknown>) => {
     const r = await fetch("/api/admin-live/auto-test-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -68,7 +95,7 @@ export default function AutoTestOrderSettings({ onChanged }: { onChanged?: () =>
     <div className="rounded-lg border border-line p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[14px] font-bold text-ink">자동 테스트 주문</div>
+          <div className="text-[14px] font-bold text-ink">자동 테스트 주문 (서버)</div>
           <div className="text-[12px] text-ink-mute">
             {state?.enabled
               ? state.nextRunAt ? `켜짐 · 다음 ${hm(state.nextRunAt)}쯤 (5~10분마다)` : "켜짐 · 방송을 켜면 시작해요"
@@ -77,13 +104,24 @@ export default function AutoTestOrderSettings({ onChanged }: { onChanged?: () =>
         </div>
         <Switch on={state?.enabled === true} disabled={!state || busy !== ""} onChange={(v) => void toggle(v)} label="자동 테스트 주문" />
       </div>
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+        <div className="min-w-0">
+          <div className="text-[14px] font-bold text-ink">화면 테스트 (이 기기)</div>
+          <div className="text-[12px] text-ink-mute">이 관리자 화면이 손님 주문 화면을 띄워 버튼을 직접 눌러요 · 켜 두면 5~10분마다(이 창이 열려 있는 동안)</div>
+        </div>
+        <Switch on={screenOn} onChange={toggleScreen} label="화면 테스트" />
+      </div>
       {last ? (
         <div className={`mt-2 text-[12px] ${last.ok ? "text-ink-soft" : "text-danger"}`}>마지막 {hm(last.at)} · {last.message}</div>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={busy !== ""} onClick={() => void runNow()}
           className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-40">
-          {busy === "run" ? "테스트 중…" : "지금 테스트"}
+          {busy === "run" ? "테스트 중…" : "지금 서버 테스트"}
+        </button>
+        <button type="button" disabled={busy !== "" || screenBusy} onClick={runScreen}
+          className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-40">
+          {screenBusy ? "화면 테스트 중…" : "지금 화면 테스트"}
         </button>
         <button type="button" disabled={busy !== "" || rows === 0} onClick={() => void removeAll()}
           className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-danger hover:bg-surface-2 disabled:opacity-40">

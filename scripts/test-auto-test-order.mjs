@@ -31,6 +31,17 @@ for (let i = 0; i < 50; i += 1) {
   for (const l of lines) assert.ok(l.qty >= 1 && l.qty <= 3);
 }
 
+// ── 300개 목록: test 글자 없음·서로 다름·섞어 고름
+const N = load("lib/autoTestNicknames.ts");
+assert.equal(N.AUTO_TEST_NICKNAME_POOL.length, 300);
+assert.equal(new Set(N.AUTO_TEST_NICKNAME_POOL).size, 300);
+for (const n of N.AUTO_TEST_NICKNAME_POOL) assert.ok(!/test|테스트/i.test(n), n);
+assert.notDeepEqual(N.pickNicknameCandidates(300).slice(0, 10), N.pickNicknameCandidates(300).slice(0, 10));
+// 화면 방식 주문(운영자 테스트 계정 사유)도 자동 테스트로 봄, 사람 테스트 주문은 아님
+assert.equal(A.isAutoTestRow({ is_test_order: true, test_order_reason: "운영자 테스트 계정 주문", operator_test_phone: A.AUTO_TEST_PHONE }), true);
+assert.equal(A.isAutoTestRow({ is_test_order: true, test_order_reason: "운영자 테스트 계정 주문", operator_test_phone: "01087852465" }), false);
+assert.equal(A.isAutoTestRow({ is_test_order: false, test_order_reason: "자동 테스트" }), false);
+
 // ── 닉네임: test 글자 없음·서로 다름
 const nicks = A.nicknameCandidates(30);
 assert.equal(new Set(nicks).size, nicks.length);
@@ -148,8 +159,10 @@ tables.orders.push({ id: 900, order_group_id: testGroups[0], is_test_order: fals
 const ledgerRow = tables.orders.find((o) => o.order_group_id === testGroups[1]);
 tables.inventory_ledger.push({ order_id: ledgerRow.id });
 tables.orders.push({ id: 901, order_group_id: "manual", is_test_order: true, test_order_reason: "운영자 테스트 계정 주문" });
+tables.orders.push({ id: 902, order_group_id: "screen1", is_test_order: true, test_order_reason: "운영자 테스트 계정 주문", operator_test_phone: A.AUTO_TEST_PHONE }); // 화면 방식 주문
 const del = await S.deleteAutoTestOrders(db, null);
-assert.equal(del.groups, 1);
+assert.equal(del.groups, 2);
+assert.ok(!tables.orders.some((o) => o.id === 902), "화면 방식 테스트 주문도 지움");
 assert.ok(del.skipped.includes(testGroups[0]) && del.skipped.includes(testGroups[1]));
 assert.ok(tables.orders.some((o) => o.id === 1), "일반 주문 그대로");
 assert.ok(tables.orders.some((o) => o.id === 900), "섞인 주문서의 일반 줄 그대로");

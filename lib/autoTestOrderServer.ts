@@ -6,10 +6,11 @@
 //   - 삭제는 «자동 테스트 주문서»만(is_test_order=true + test_order_reason 자동 테스트, 주문서 줄 전부가 그럴 때만).
 import { randomBytes, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
 import {
   AUTO_TEST_KAKAO_ID, AUTO_TEST_KEY, AUTO_TEST_NAME, AUTO_TEST_PHONE, AUTO_TEST_REASON,
-  buildOrderRows, choosePayment, nicknameCandidates, parseAutoTestState, pickOrderLines, productChoices, randomGapMs, verifySavedRows,
-  type AutoTestLast, type AutoTestSettings, type AutoTestState,
+  buildOrderRows, choosePayment, isAutoTestRow, nicknameCandidates, parseAutoTestState, pickOrderLines, productChoices, randomGapMs, verifySavedRows,
+  type AutoTestLast, type AutoTestPick, type AutoTestSettings, type AutoTestState,
 } from "@/lib/autoTestOrder";
 
 type Db = SupabaseClient;
@@ -136,15 +137,35 @@ async function ensureTestCustomer(sb: Db): Promise<string> {
   return String((ins as Row[] | null)?.[0]?.id ?? "");
 }
 
+/** 화면 방식은 손님 화면이 주문을 만든다 — 이 번호를 운영자 테스트 계정으로 등록해 두면 화면이 «테스트 주문»으로 제출한다 */
+async function ensureOperatorTestAccount(sb: Db): Promise<void> {
+  const { data } = await sb.from("operator_test_accounts").select("customer_phone, is_active").eq("customer_phone", AUTO_TEST_PHONE).maybeSingle();
+  if (data && (data as Row).is_active === true) return;
+  const row = {
+    customer_phone: AUTO_TEST_PHONE, display_label: "자동 테스트", is_active: true,
+    allow_point_test: false, allow_amount_test: false,
+    exclude_from_settlement: true, exclude_from_payment_match: true, exclude_from_shipping: true, exclude_from_picking: true,
+  };
+  const { error } = data
+    ? await sb.from("operator_test_accounts").update(row).eq("customer_phone", AUTO_TEST_PHONE)
+    : await sb.from("operator_test_accounts").insert(row);
+  if (error) throw new Error(`테스트 계정 등록 실패: ${error.message}`);
+}
+
 async function freshNickname(sb: Db): Promise<string> {
-  for (let round = 0; round < 3; round += 1) {
-    const cands = nicknameCandidates(12);
-    const [c, o] = await Promise.all([
-      sb.from("customers").select("youtube_nickname").in("youtube_nickname", cands),
-      sb.from("orders").select("youtube_nickname").in("youtube_nickname", cands),
-    ]);
-    if (c.error || o.error) throw new Error("닉네임 중복 확인 실패");
-    const used = new Set([...(c.data ?? []), ...(o.data ?? [])].map((r) => String((r as Row).youtube_nickname ?? "").trim().toLowerCase()));
+  // 목록 전체를 랜덤으로 섞어 한 번에 확인 → 안 쓴 것 중 맨 앞(=랜덤). 다 쓰면 숫자 붙인 이름으로.
+  const rounds = [pickNicknameCandidates(AUTO_TEST_NICKNAME_POOL.length), numberedNicknameCandidates(40), nicknameCandidates(40)];
+  for (const cands of rounds) {
+    const used = new Set<string>();
+    for (let i = 0; i < cands.length; i += 100) {
+      const part = cands.slice(i, i + 100);
+      const [c, o] = await Promise.all([
+        sb.from("customers").select("youtube_nickname").in("youtube_nickname", part),
+        sb.from("orders").select("youtube_nickname").in("youtube_nickname", part),
+      ]);
+      if (c.error || o.error) throw new Error("닉네임 중복 확인 실패");
+      for (const r of [...(c.data ?? []), ...(o.data ?? [])]) used.add(String((r as Row).youtube_nickname ?? "").trim().toLowerCase());
+    }
     const free = cands.find((n) => !used.has(n.toLowerCase()));
     if (free) return free;
   }
@@ -157,9 +178,10 @@ async function postJson(url: string, body: unknown): Promise<{ status: number; j
   return { status: res.status, json };
 }
 
-async function runOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
-  const at = Date.now();
-  try {
+type Prepared = { lines: AutoTestPick[]; paymentMethod: "무통장입금" | "카드결제"; nickname: string; settings: AutoTestSettings } | { skip: string };
+
+/** 상품·옵션·수량·결제·새 닉네임 정하기 + 테스트 회원 닉네임 바꾸기(서버·화면 방식 공통) */
+async function prepareRun(sb: Db, bc: Row): Promise<Prepared> {
     const bcId = String(bc.id ?? "");
     // 1. 지금 방송 상품
     const { data: bp, error: bpErr } = await sb.from("broadcast_products").select("product_id").eq("broadcast_id", bcId).limit(2000);
@@ -173,7 +195,7 @@ async function runOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
     }
     const { s: settings, overseasOn } = await readSettings(sb);
     const choices = products.flatMap((p) => productChoices(p, overseasOn));
-    if (!choices.length) return { at, ok: true, message: "건너뜀 — 지금 방송에 재고 무제한으로 주문할 수 있는 상품이 없어요." };
+    if (!choices.length) return { skip: "건너뜀 — 지금 방송에 재고 무제한으로 주문할 수 있는 상품이 없어요." };
     const lines = pickOrderLines(choices);
     const paymentMethod = choosePayment(lines, settings);
 
@@ -182,6 +204,21 @@ async function runOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
     const nickname = await freshNickname(sb);
     const { error: nickErr } = await sb.from("customers").update({ youtube_nickname: nickname, last_login_at: new Date().toISOString() }).eq("kakao_id", AUTO_TEST_KAKAO_ID);
     if (nickErr) throw new Error(`닉네임 바꾸기 실패: ${nickErr.message}`);
+    return { lines, paymentMethod, nickname, settings };
+}
+
+const lineText = (lines: AutoTestPick[]) => lines.map((l) => {
+  const opt = [l.color, l.size].filter((x) => x && x !== "없음").join("/");
+  return `${l.productName}${opt ? ` ${opt}` : ""} ×${l.qty}`;
+}).join(", ");
+
+async function runOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
+  const at = Date.now();
+  try {
+    const bcId = String(bc.id ?? "");
+    const prep = await prepareRun(sb, bc);
+    if ("skip" in prep) return { at, ok: true, message: prep.skip };
+    const { lines, paymentMethod, nickname, settings } = prep;
 
     // 3. 장바구니 담기(손님과 같은 주소) — 테스트마다 새 장바구니
     const sessionKey = `autotest-${randomBytes(8).toString("hex")}`;
@@ -215,7 +252,7 @@ async function runOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
     const { data: saved, error: savedErr } = await sb.from("orders").select("id, product_id, product_name, color, size, qty, youtube_nickname, payment_method, is_test_order").eq("order_group_id", groupId);
     if (savedErr) throw new Error(`저장 확인 실패: ${savedErr.message}`);
     const problems = verifySavedRows(orderRows, (saved ?? []) as Row[]);
-    const summary = `${nickname} · ${paymentMethod === "카드결제" ? "카드" : "무통장"} · ${lines.map((l) => `${l.productName}${[l.color, l.size].filter((x) => x && x !== "없음").length ? ` ${[l.color, l.size].filter((x) => x && x !== "없음").join("/")}` : ""} ×${l.qty}`).join(", ")}`;
+    const summary = `${nickname} · ${paymentMethod === "카드결제" ? "카드" : "무통장"} · ${lineText(lines)}`;
     if (problems.length) return { at, ok: false, message: `저장 내용이 달라요 — ${problems.join(" · ")} (${summary})`, orderCode: lookupCode, nickname };
     return { at, ok: true, message: `주문서 제출 확인 — ${summary}`, orderCode: lookupCode, nickname };
   } catch (e) {
@@ -225,21 +262,18 @@ async function runOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> {
 
 /** 자동 테스트 주문서 영구 삭제 — groupIds 없으면 전부. 일반 주문이 하나라도 섞인 주문서는 건너뜀. */
 export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): Promise<{ deleted: number; groups: number; skipped: string[] }> {
-  let q = sb.from("orders").select("id, order_group_id").eq("is_test_order", true).eq("test_order_reason", AUTO_TEST_REASON).limit(5000);
-  if (groupIds) q = q.in("order_group_id", groupIds.slice(0, 500));
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
-  const groups = [...new Set(((data ?? []) as Row[]).map((r) => String(r.order_group_id ?? "")).filter(Boolean))];
+  const data = await readAutoTestRows(sb, groupIds);
+  const groups = [...new Set(data.map((r) => String(r.order_group_id ?? "")).filter(Boolean))];
   const skipped: string[] = [];
   if (groupIds) for (const g of groupIds) if (!groups.includes(g)) skipped.push(g);
   let deleted = 0, done = 0;
   for (let i = 0; i < groups.length; i += 100) {
     const batch = groups.slice(i, i + 100);
     // 주문서의 «모든» 줄 다시 읽기 — 하나라도 자동 테스트가 아니면 그 주문서는 손대지 않음
-    const { data: all, error: allErr } = await sb.from("orders").select("id, order_group_id, is_test_order, test_order_reason").in("order_group_id", batch);
+    const { data: all, error: allErr } = await sb.from("orders").select("id, order_group_id, is_test_order, test_order_reason, operator_test_phone").in("order_group_id", batch);
     if (allErr) throw new Error(allErr.message);
     const rows = (all ?? []) as Row[];
-    const bad = new Set(rows.filter((r) => r.is_test_order !== true || String(r.test_order_reason ?? "") !== AUTO_TEST_REASON).map((r) => String(r.order_group_id)));
+    const bad = new Set(rows.filter((r) => !isAutoTestRow(r)).map((r) => String(r.order_group_id)));
     const okRows = rows.filter((r) => !bad.has(String(r.order_group_id)));
     // 재고 기록이 있는 줄(재고가 실제로 빠진 주문)은 일반 삭제로 — 여기선 건너뜀
     const ids = okRows.map((r) => Number(r.id));
@@ -252,7 +286,7 @@ export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): P
     const finalGroups = [...new Set(finalRows.map((r) => String(r.order_group_id)))];
     if (!finalRows.length) continue;
     const { data: del, error: delErr } = await sb.from("orders").delete()
-      .in("id", finalRows.map((r) => Number(r.id))).eq("is_test_order", true).eq("test_order_reason", AUTO_TEST_REASON).select("id");
+      .in("id", finalRows.map((r) => Number(r.id))).eq("is_test_order", true).select("id");
     if (delErr) throw new Error(delErr.message);
     deleted += (del ?? []).length;
     done += finalGroups.length;
@@ -261,4 +295,79 @@ export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): P
     await sb.from("live_chat_messages").delete().in("bot_ref", refs);
   }
   return { deleted, groups: done, skipped: [...new Set(skipped)] };
+}
+
+/** 자동 테스트 주문 줄(서버 방식 + 화면 방식) */
+export async function readAutoTestRows(sb: Db, groupIds: string[] | null): Promise<Row[]> {
+  const cols = "id, order_group_id, is_test_order, test_order_reason, operator_test_phone";
+  const qa = () => { let q = sb.from("orders").select(cols).eq("is_test_order", true).limit(5000); if (groupIds) q = q.in("order_group_id", groupIds.slice(0, 500)); return q; };
+  const [a, b] = await Promise.all([qa().eq("test_order_reason", AUTO_TEST_REASON), qa().eq("operator_test_phone", AUTO_TEST_PHONE)]);
+  if (a.error) throw new Error(a.error.message);
+  if (b.error) throw new Error(b.error.message);
+  const byId = new Map<string, Row>();
+  for (const r of [...((a.data ?? []) as Row[]), ...((b.data ?? []) as Row[])]) if (isAutoTestRow(r)) byId.set(String(r.id), r);
+  return [...byId.values()];
+}
+
+// ── 화면 방식(관리자 화면이 손님 주문 화면을 띄워 버튼을 직접 누름) ──
+export type ScreenPlan = {
+  nickname: string; paymentMethod: "무통장입금" | "카드결제"; broadcastId: string;
+  lines: Array<{ productId: string; productName: string; color: string; size: string; qty: number; brand: boolean }>;
+  identity: { kakaoId: string; phone: string; name: string; zipcode: string; address: string; detailAddress: string };
+};
+
+/** 화면 테스트 준비 — 방송 중일 때만. 상품·옵션·수량·결제·새 닉네임을 정해 돌려준다(주문은 화면이 낸다) */
+export async function screenTestPlan(sb: Db): Promise<ScreenPlan | { skip: string }> {
+  const bc = await onBroadcast(sb);
+  if (!bc) return { skip: "방송 중일 때만 테스트할 수 있어요." };
+  // 서버 방식·다른 화면과 겹치지 않게 잠금(화면 테스트는 길어서 2분 30초) — 결과 확인(screenTestVerify) 때 풀림
+  const { raw, state } = await readStateRaw(sb);
+  const now = Date.now();
+  if (state.lockUntil > now) return { skip: "다른 테스트가 진행 중이에요." };
+  if (!(await casState(sb, raw, { ...state, lockUntil: now + 150_000 }))) return { skip: "다른 테스트가 진행 중이에요." };
+  let prep: Prepared;
+  try {
+    await ensureOperatorTestAccount(sb);
+    prep = await prepareRun(sb, bc);
+  } catch (e) {
+    await finish(sb, { at: now, ok: false, message: `[화면] ${e instanceof Error ? e.message : "준비 실패"}` });
+    throw e;
+  }
+  if ("skip" in prep) { await finish(sb, { at: now, ok: true, message: `[화면] ${prep.skip}` }); return { skip: prep.skip }; }
+  const brandIds = new Set<string>();
+  const ids = [...new Set(prep.lines.map((l) => l.productId))];
+  const { data } = await sb.from("products").select("id, product_note").in("id", ids.map(Number));
+  for (const r of (data ?? []) as Row[]) {
+    let n: unknown = r.product_note;
+    if (typeof n === "string") { try { n = JSON.parse(n); } catch { n = null; } }
+    if ((n as Row | null)?.brand_group && ((n as Row).brand_group as Row).enabled === true) brandIds.add(String(r.id));
+  }
+  return {
+    nickname: prep.nickname, paymentMethod: prep.paymentMethod, broadcastId: String(bc.id ?? ""),
+    lines: prep.lines.map((l) => ({ productId: l.productId, productName: l.productName, color: l.color, size: l.size, qty: l.qty, brand: brandIds.has(l.productId) })),
+    identity: { kakaoId: AUTO_TEST_KAKAO_ID, phone: AUTO_TEST_PHONE, name: AUTO_TEST_NAME, zipcode: "00000", address: "자동 테스트 주소", detailAddress: "자동 테스트" },
+  };
+}
+
+/** 화면 테스트 결과 확인 — 그 닉네임 주문이 DB 에 저장됐는지·줄이 맞는지. 결과 한 줄을 남긴다. */
+export async function screenTestVerify(sb: Db, plan: ScreenPlan, clientNote: string): Promise<AutoTestLast> {
+  const at = Date.now();
+  const tag = "[화면] ";
+  const { data, error } = await sb.from("orders").select("id, order_group_id, order_lookup_code, product_id, product_name, color, size, qty, youtube_nickname, payment_method, is_test_order, kakao_id, created_at")
+    .eq("youtube_nickname", plan.nickname).eq("kakao_id", AUTO_TEST_KAKAO_ID);
+  let last: AutoTestLast;
+  const saved = (error ? [] : (data ?? [])) as Row[];
+  const summary = `${plan.nickname} · ${plan.paymentMethod === "카드결제" ? "카드" : "무통장"} · ${plan.lines.map((l) => `${l.productName}${[l.color, l.size].filter((x) => x && x !== "없음").length ? ` ${[l.color, l.size].filter((x) => x && x !== "없음").join("/")}` : ""} ×${l.qty}`).join(", ")}`;
+  if (error) last = { at, ok: false, message: `${tag}저장 확인 실패: ${error.message}` };
+  else if (!saved.length) last = { at, ok: false, message: `${tag}주문이 저장되지 않았어요 — ${clientNote || "화면에서 멈춤"} (${summary})`, nickname: plan.nickname };
+  else {
+    const sent = plan.lines.map((l) => ({ product_id: l.productId, product_name: l.productName, color: l.color, size: l.size, qty: l.qty, youtube_nickname: plan.nickname, payment_method: plan.paymentMethod }));
+    const problems = verifySavedRows(sent, saved);
+    const code = String(saved[0].order_lookup_code ?? "");
+    last = problems.length
+      ? { at, ok: false, message: `${tag}저장 내용이 달라요 — ${problems.join(" · ")} (${summary})`, orderCode: code, nickname: plan.nickname }
+      : { at, ok: true, message: `${tag}주문서 제출 확인 — ${summary}`, orderCode: code, nickname: plan.nickname };
+  }
+  await finish(sb, last);
+  return last;
 }

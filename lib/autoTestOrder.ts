@@ -16,6 +16,12 @@ export const AUTO_TEST_NAME = "자동테스트";
 export const AUTO_TEST_MIN_GAP_MS = 5 * 60_000;
 export const AUTO_TEST_MAX_GAP_MS = 10 * 60_000;
 
+/** 자동 테스트 주문 줄인지 — 서버 방식(사유 「자동 테스트」) 또는 화면 방식(테스트 회원 번호로 낸 운영자 테스트 주문) */
+export function isAutoTestRow(r: { is_test_order?: unknown; test_order_reason?: unknown; operator_test_phone?: unknown }): boolean {
+  if (r.is_test_order !== true) return false;
+  return String(r.test_order_reason ?? "") === AUTO_TEST_REASON || String(r.operator_test_phone ?? "").replace(/\D/g, "") === AUTO_TEST_PHONE;
+}
+
 export type AutoTestLast = { at: number; ok: boolean; message: string; orderCode?: string; nickname?: string };
 export type AutoTestState = { enabled: boolean; nextRunAt: number | null; lockUntil: number; last: AutoTestLast | null };
 export const AUTO_TEST_DEFAULT: AutoTestState = { enabled: false, nextRunAt: null, lockUntil: 0, last: null };

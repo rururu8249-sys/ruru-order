@@ -135,6 +135,7 @@ export default function OrderPurchaseConsentModal({
           >
             <input
               type="checkbox"
+              data-at="consent-check"
               checked={accepted}
               disabled={submitting}
               onChange={(event) => setAccepted(event.target.checked)}
@@ -157,6 +158,7 @@ export default function OrderPurchaseConsentModal({
           </button>
           <button
             type="button"
+            data-at="consent-ok"
             disabled={!accepted || submitting}
             onClick={() => {
               if (!accepted || submitting) return;

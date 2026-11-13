@@ -8023,7 +8023,7 @@ export default function OrderPage() {
                       return (
                         <div
                           key={String(product.id)}
-                          className="ruru-customer-product-card"
+                          className="ruru-customer-product-card" data-at="card" data-at-pid={String(product.id ?? "")}
                           onClick={uiS6 && !sold ? (event) => {
                             if ((event.target as HTMLElement).closest("button, a, input, select, textarea, label")) return;
                             selectQuickGroupBuyProduct(product as BroadcastProduct);
@@ -8561,6 +8561,7 @@ export default function OrderPage() {
                 ) : null}
                 <button
                   type="button"
+                  data-at="submit"
                   aria-disabled={!finalSubmitReady}
                   onClick={() => {
                     // [2026-08-28 P0-1] 확인 체크가 안 되어 있으면 막기만 하지 말고 그 자리로 데려간다.
@@ -8813,6 +8814,7 @@ export default function OrderPage() {
                       setPaymentMethod(method);
                       if (method === "무통장입금") void syncCartReservationsRef.current();
                     }}
+                    data-at={`pay-${method}`}
                     aria-pressed={uiS3 ? paymentMethod === method : undefined}
                     style={uiS3 ? { height: "52px", borderRadius: "8px", border: paymentMethod === method ? "1px solid #111111" : "1px solid #CACACB", background: paymentMethod === method ? "#111111" : "#FFFFFF", cursor: "pointer", fontSize: "15px", fontWeight: 600, color: paymentMethod === method ? "#FFFFFF" : "#111111", fontFamily: "inherit" } : { height: "48px", borderRadius: "12px", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}
                   >
@@ -9340,7 +9342,7 @@ export default function OrderPage() {
                       <div style={uiV2 ? { display: "grid", gridTemplateColumns: "44px 44px 44px", height: "44px", alignItems: "center", gap: "4px" } : { display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
                         <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={uiV2 ? { width: "44px", height: "44px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", fontSize: "20px", fontWeight: 600, color: "#111111", cursor: "pointer" } : { borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
                         <div style={uiV2 ? { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", fontWeight: 700, color: "#111111" } : { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
-                        <button type="button" onClick={() => {
+                        <button type="button" data-at="qty-plus" onClick={() => {
                           // [2026-09-11] 상한 = 「최대 N개」와 같은 숫자(재고 − 홀드). 재고연동 아니면 예전처럼 999.
                           const maxStock = registeredOptionAvailableQty === null ? 999 : Math.max(1, registeredOptionAvailableQty);
                           setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
@@ -9377,6 +9379,7 @@ export default function OrderPage() {
                     ) : (
                     <CustomerPressButton
                       type="button"
+                      data-at="sheet-add"
                       aria-disabled={!registeredOptionSelectionReady}
                       onClick={() => {
                         // [2026-08-28 P0-4] 비활성으로 막아두면 눌러도 아무 반응이 없어 손님이 이유를 모른 채 이탈했다.
@@ -9681,7 +9684,7 @@ export default function OrderPage() {
                                 const fewLeft = m.remain !== null && m.remain > 0 && m.remain <= 10;
                                 return (
                                   <div key={name} style={sv({ position: "relative" })}>
-                                    <button type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} aria-label={`${label} ${m.priceView.actualLabel}${m.soldOut ? " 품절" : ""}`} style={sv({display:"flex",alignItems:"center",gap:"12px",width:"100%",padding:"8px",border:"1px solid #F0EAE0",borderRadius:"12px",background:"#FFFDFB",opacity:m.soldOut?.45:1,textAlign:"left"})}>
+                                    <button type="button" data-at="detail" data-at-v={name} onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} aria-label={`${label} ${m.priceView.actualLabel}${m.soldOut ? " 품절" : ""}`} style={sv({display:"flex",alignItems:"center",gap:"12px",width:"100%",padding:"8px",border:"1px solid #F0EAE0",borderRadius:"12px",background:"#FFFDFB",opacity:m.soldOut?.45:1,textAlign:"left"})}>
                                       {m.cover?<span style={sv({position:"relative",width:104,height:104,flexShrink:0,borderRadius:8,overflow:"hidden",background:"#F5F5F5"})}><img src={m.cover} alt="" loading="lazy" decoding="async" style={sv({width:104,height:104,objectFit:"cover"})}/>{m.soldOut?<span style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.45)",color:"#fff",fontSize:"15px",fontWeight:700}}>품절</span>:null}</span>:null}
                                       <span style={sv({flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:"4px"})}>
                                         <span style={sv({fontSize:15,fontWeight:700,color:'#111111',lineHeight:1.35,overflowWrap:'anywhere'})}>{label}</span>
@@ -9706,7 +9709,7 @@ export default function OrderPage() {
                           <div style={sv({ display: "grid", gap: "9px" })}>
                             {entries.map((entry) => {
                               const name=entry.name, m=metaOf(name);
-                              return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={sv({display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1})}>{/* [2026-09-09 3순위] 예전엔 사진을 누르면 «확대창»이 떠서 «고르려던» 손님이 헷갈렸다(색상칩도 같은 문제였다).
+                              return <button key={name} type="button" data-at="detail" data-at-v={name} onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={sv({display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1})}>{/* [2026-09-09 3순위] 예전엔 사진을 누르면 «확대창»이 떠서 «고르려던» 손님이 헷갈렸다(색상칩도 같은 문제였다).
                                   → 사진을 눌러도 그냥 «선택»된다. 확대는 위 대표사진(🔍 크게)이 맡는다. */}
                               {m.cover?<span style={sv({position:"relative",width:48,height:48,flexShrink:0})}><img src={m.cover} alt="" loading="lazy" decoding="async" style={sv({width:48,height:48,objectFit:"cover",borderRadius:8})}/></span>:null}
                               <span style={sv({flex:1,minWidth:0,textAlign:"left",fontSize:13,fontWeight:800,color:m.selected?'#fff':'#333',overflowWrap:'anywhere'})}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??''),name)}</span>
@@ -9742,7 +9745,7 @@ export default function OrderPage() {
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             const hex = registeredOptionColorSwatches[option] || colorNameSwatch(option) || "#F5F5F5";
                             return (
-                              <button key={`cd-${option}`} type="button" role="radio" aria-checked={selected} aria-label={soldOut ? `${option} 품절` : option} disabled={soldOut} onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: "56px", maxWidth: "88px", padding: "4px", border: "none", background: "transparent", cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, fontFamily: "inherit" }}>
+                              <button key={`cd-${option}`} data-at="color" data-at-v={option} type="button" role="radio" aria-checked={selected} aria-label={soldOut ? `${option} 품절` : option} disabled={soldOut} onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: "56px", maxWidth: "88px", padding: "4px", border: "none", background: "transparent", cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, fontFamily: "inherit" }}>
                                 <span aria-hidden="true" style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "9999px", backgroundColor: hex, border: isLightSwatch(hex) ? "1px solid #CACACB" : "1px solid transparent", boxSizing: "border-box", boxShadow: selected ? "0 0 0 2px #FFFFFF, 0 0 0 4px #111111" : "none" }} />
                                 <span style={{ fontSize: "13px", fontWeight: selected ? 700 : 400, color: selected ? "#111111" : "#39393B", lineHeight: 1.3, textAlign: "center", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{soldOut ? `${option} (품절)` : option}</span>
                               </button>
@@ -9755,13 +9758,14 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={uiV2 ? { minHeight: "52px", borderRadius: "8px", border: selected ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: selected ? "7px" : "8px", fontFamily: "inherit" } : { minHeight: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={sv({ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" })} /> : uiV2 ? (() => { const hx = registeredOptionColorSwatches[option] || colorNameSwatch(option); return hx ? <span aria-hidden="true" style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "9999px", backgroundColor: hx, border: isLightSwatch(hx) ? "1px solid #CACACB" : "1px solid transparent", boxSizing: "border-box" }} /> : null; })() : <ColorSwatch hex={registeredOptionColorSwatches[option]}/>}<span style={sv({ overflowWrap: "anywhere", minWidth:0 })}>{soldOut ? option + " (품절)" : option}</span></button>
+                              <button key={`c-${option}`} data-at="color" data-at-v={option} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={uiV2 ? { minHeight: "52px", borderRadius: "8px", border: selected ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: selected ? "7px" : "8px", fontFamily: "inherit" } : { minHeight: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={sv({ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" })} /> : uiV2 ? (() => { const hx = registeredOptionColorSwatches[option] || colorNameSwatch(option); return hx ? <span aria-hidden="true" style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "9999px", backgroundColor: hx, border: isLightSwatch(hx) ? "1px solid #CACACB" : "1px solid transparent", boxSizing: "border-box" }} /> : null; })() : <ColorSwatch hex={registeredOptionColorSwatches[option]}/>}<span style={sv({ overflowWrap: "anywhere", minWidth:0 })}>{soldOut ? option + " (품절)" : option}</span></button>
                             );
                           })}
                         </div>
                       ) : (
                         /* [2026-09-20 사장님] 5개 이상이면 폰이 띄우는 큰 글씨 목록(드롭다운). 칩이 34px로 쪼그라들던 문제 해결. */
                         <select
+                          data-at="color-select"
                           value={registeredOptionColor}
                           onChange={(e) => { const next = e.target.value; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); setRegisteredOptionHeroPhoto(next ? (registeredOptionColorPhotos[next] || "") : ""); }}
                           style={uiV2 ? { width: "100%", height: "52px", borderRadius: "8px", border: registeredOptionColor ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", padding: "0 14px", fontSize: "16px", fontWeight: 600, color: "#111111", fontFamily: "inherit" } : { width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionColor ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionColor ? "#7A1E47" : "#444" }}
@@ -9769,7 +9773,7 @@ export default function OrderPage() {
                           <option value="">색상을 골라주세요 ({registeredOptionColorChoices.length}가지)</option>
                           {registeredOptionColorChoices.map((option) => {
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
-                            return <option key={`c-${option}`} value={option} disabled={soldOut}>{option}{soldOut ? " · 품절" : ""}</option>;
+                            return <option key={`c-${option}`} data-at="color" data-at-v={option} value={option} disabled={soldOut}>{option}{soldOut ? " · 품절" : ""}</option>;
                           })}
                         </select>
                       )}
@@ -9818,14 +9822,15 @@ export default function OrderPage() {
                             return (
                               uiV2 ? (() => {
                                 const qtyLeft = registeredOptionColor.trim() || registeredOptionColorChoices.length === 0 ? availableQtyColorSize(registeredOptionColor, option) : null;
-                                return <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ minHeight: "52px", borderRadius: "8px", border: selected ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", padding: selected ? "5px 7px" : "6px 8px", fontFamily: "inherit" }}><span>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</span>{!soldOut && qtyLeft !== null && qtyLeft > 0 && qtyLeft <= 10 ? <span style={{ fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{qtyLeft}개 남음</span> : null}</button>;
-                              })() : <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
+                                return <button key={`s-${option}`} data-at="size" data-at-v={option} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ minHeight: "52px", borderRadius: "8px", border: selected ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", padding: selected ? "5px 7px" : "6px 8px", fontFamily: "inherit" }}><span>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</span>{!soldOut && qtyLeft !== null && qtyLeft > 0 && qtyLeft <= 10 ? <span style={{ fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{qtyLeft}개 남음</span> : null}</button>;
+                              })() : <button key={`s-${option}`} data-at="size" data-at-v={option} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
                             );
                           })}
                         </div>
                       ) : (
                         /* [2026-09-20 사장님] 5개 이상이면 드롭다운 — 항목에 「L · 2개 남음」「2XL · 품절」(재고연동 상품만). */
                         <select
+                          data-at="size-select"
                           value={registeredOptionSize}
                           onChange={(e) => setRegisteredOptionSize(e.target.value)}
                           style={uiV2 ? { width: "100%", height: "52px", borderRadius: "8px", border: registeredOptionSize ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", padding: "0 14px", fontSize: "16px", fontWeight: 600, color: "#111111", fontFamily: "inherit" } : { width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionSize ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionSize ? "#7A1E47" : "#444" }}
@@ -9834,7 +9839,7 @@ export default function OrderPage() {
                           {registeredOptionSizeChoices.map((option) => {
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             const qty = registeredOptionColor.trim() || registeredOptionColorChoices.length === 0 ? availableQtyColorSize(registeredOptionColor, option) : null;
-                            return <option key={`s-${option}`} value={option} disabled={soldOut}>{sizeDisplayLabel(option)}{soldOut ? " · 품절" : optionQtyLabel(qty)}</option>;
+                            return <option key={`s-${option}`} data-at="size" data-at-v={option} value={option} disabled={soldOut}>{sizeDisplayLabel(option)}{soldOut ? " · 품절" : optionQtyLabel(qty)}</option>;
                           })}
                         </select>
                       )}
@@ -10144,6 +10149,7 @@ export default function OrderPage() {
               return (
                 <button
                   type="button"
+                  data-at="open-order"
                   onClick={() => { setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
                   style={uiV2 ? withPcBar({ position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "12px", background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "10px 16px", boxShadow: "0 -4px 12px rgba(0,0,0,0.06)", cursor: "pointer", fontFamily: "inherit" }) : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "10px", background: "#7A1E47", border: "none", borderRadius: "15px", padding: "11px 14px", boxShadow: "0 8px 22px rgba(122,30,71,0.35)", cursor: "pointer" }}
                 >

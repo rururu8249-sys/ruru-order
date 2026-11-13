@@ -5,7 +5,7 @@
 //   쓰기: live_chat_messages 봇 글만. 주문·입금·돈 무접촉. 실패해도 주문·입금과 무관(조용히 넘어감).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LIVE_CHAT_KEY, parseLiveChatSetting } from "@/lib/liveChat";
-import { AUTO_TEST_REASON } from "@/lib/autoTestOrder";
+import { isAutoTestRow } from "@/lib/autoTestOrder";
 import {
   LIVE_CHAT_BOT_KAKAO,
   LIVE_CHAT_BOT_KEY,
@@ -18,7 +18,7 @@ import {
   type OrderEventRow,
 } from "@/lib/liveChatBot";
 
-const ORDER_COLS = "id, order_group_id, broadcast_id, youtube_nickname, product_name, color, size, payment_method, is_test_order, test_order_reason, is_deleted, created_at, deposit_confirmed_at, admin_order_status_v2, order_manage_status";
+const ORDER_COLS = "id, order_group_id, broadcast_id, youtube_nickname, product_name, color, size, payment_method, is_test_order, test_order_reason, operator_test_phone, is_deleted, created_at, deposit_confirmed_at, admin_order_status_v2, order_manage_status";
 
 type OnBroadcast = { id: string; startedAt: string };
 
@@ -52,7 +52,7 @@ export function isPaidRow(row: OrderEventRow): boolean {
 
 function liveRows(rows: OrderEventRow[]): OrderEventRow[] {
   // [2026-11-13] 자동 테스트 주문은 실제처럼 채팅에도 올림(사장님 「확인용이니 올려야지」) — 사람이 낸 테스트 주문은 예전처럼 뺌
-  return rows.filter((r) => (r.is_test_order !== true || String((r as Record<string, unknown>).test_order_reason ?? "") === AUTO_TEST_REASON) && r.is_deleted !== true);
+  return rows.filter((r) => (r.is_test_order !== true || isAutoTestRow(r as Record<string, unknown>)) && r.is_deleted !== true);
 }
 
 async function postedRefs(sb: SupabaseClient, bc: string, refs: string[]): Promise<Set<string>> {
