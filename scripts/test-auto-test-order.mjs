@@ -93,6 +93,7 @@ function fakeDb(tables) {
         neq(k, v) { filters.push((r) => String(r[k]) !== String(v)); return q; },
         gte(k, v) { filters.push((r) => String(r[k] ?? "") >= String(v)); return q; },
         in(k, vs) { filters.push((r) => vs.map(String).includes(String(r[k]))); return q; },
+        is(k, v) { filters.push((r) => (v === null ? r[k] == null : r[k] === v)); return q; },
         order() { return q; }, limit() { return q; },
         maybeSingle() { single = true; return q; },
         then(res, rej) { return Promise.resolve(run()).then(res, rej); },
@@ -170,10 +171,27 @@ tables.orders.push({ id: 900, order_group_id: testGroups[0], is_test_order: fals
 const ledgerRow = tables.orders.find((o) => o.order_group_id === testGroups[1]);
 tables.inventory_ledger.push({ order_id: ledgerRow.id });
 tables.orders.push({ id: 901, order_group_id: "manual", is_test_order: true, test_order_reason: "운영자 테스트 계정 주문" });
-tables.orders.push({ id: 902, order_group_id: "screen1", is_test_order: true, test_order_reason: "운영자 테스트 계정 주문", operator_test_phone: A.AUTO_TEST_PHONE }); // 화면 방식 주문
+tables.orders.push({ id: 902, order_group_id: "screen1", is_test_order: true, test_order_reason: "운영자 테스트 계정 주문", operator_test_phone: A.AUTO_TEST_PHONE, youtube_nickname: "정이네", broadcast_id: "b1" }); // 화면 방식 주문
+// 그 주문서에 딸린 채팅 글(테스트 표식) + 지우면 안 되는 글
+const T = A.AUTO_TEST_AVATAR;
+tables.live_chat_messages.push(
+  { id: 7001, broadcast_id: "b1", avatar_url: T, nickname: "주문알리미", body: "🛒 정이네님 BB-59 L 주문 감사합니다!", bot_ref: "o:screen1" },
+  { id: 7002, broadcast_id: "b1", avatar_url: T, nickname: "주문알리미", body: "💳 정이네님, 카드 결제 링크…", bot_ref: "card:screen1" },
+  { id: 7003, broadcast_id: "b1", avatar_url: T, nickname: "루루동이", body: "💗 정이네님 결제 완료! 감사합니다", bot_ref: "paid:screen1" },
+  { id: 7004, broadcast_id: "b1", avatar_url: T, nickname: "루루동이", body: "🛍️ 정*네님 장바구니 담음 · BB-59 L · 195,000원", bot_ref: "c:ab12~5|BB-59" },
+  { id: 7005, broadcast_id: "b1", avatar_url: T, nickname: "정이네", body: "주문서 먼저 넣어뒀어요~", bot_ref: null },
+  { id: 7006, broadcast_id: "b1", avatar_url: null, nickname: "정이네", body: "진짜 손님 글", bot_ref: null },
+  { id: 7007, broadcast_id: "b1", avatar_url: null, nickname: "루루동이", body: "🛍️ 정*네님 장바구니 담음 · PD-1", bot_ref: "c:zz~1|PD-1" },
+  { id: 7008, broadcast_id: "b1", avatar_url: T, nickname: "루루동이", body: "🛍️ 모*님 장바구니 담음 · BB-59 XL", bot_ref: "c:cd~5|BB-59" },
+);
 const del = await S.deleteAutoTestOrders(db, null);
 assert.equal(del.groups, 2);
 assert.ok(!tables.orders.some((o) => o.id === 902), "화면 방식 테스트 주문도 지움");
+const hiddenIds = tables.live_chat_messages.filter((m) => m.hidden_at).map((m) => m.id).sort();
+assert.deepEqual(hiddenIds, [7001, 7002, 7003, 7004, 7005], "그 주문서 테스트 글만 숨김(손님 글·다른 테스트 글 그대로)");
+assert.ok(tables.live_chat_messages.every((m) => !m.hidden_at || m.hidden_by === "autotest"));
+assert.equal(A.isTestOrderChatLine({ avatar_url: T, body: "🛍️ 가나다라마바사아자차카님 장바구니 담음 · X", bot_ref: "c:1" }, [], ["가나다라마바사아자차카타"]), false);
+assert.equal(A.isTestOrderChatLine({ avatar_url: T, body: "🛍️ 가*다라마바사아자님 장바구니 담음 · X", bot_ref: "c:1" }, [], ["가나다라마바사아자차카타"]), true);
 assert.ok(del.skipped.includes(testGroups[0]) && del.skipped.includes(testGroups[1]));
 assert.ok(tables.orders.some((o) => o.id === 1), "일반 주문 그대로");
 assert.ok(tables.orders.some((o) => o.id === 900), "섞인 주문서의 일반 줄 그대로");

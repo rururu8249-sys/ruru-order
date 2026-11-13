@@ -11,8 +11,8 @@ import { AUTO_TEST_AI_DAILY_CAP, AUTO_TEST_AI_PAUSE_MS, aiQuotaDay } from "@/lib
 import { tickTestViewers } from "@/lib/autoTestViewers";
 import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
 import {
-  AUTO_TEST_KAKAO_ID, AUTO_TEST_KEY, AUTO_TEST_NAME, AUTO_TEST_PHONE, AUTO_TEST_REASON,
-  AUTO_TEST_ORDERED_SINCE, AUTO_TEST_EXCLUDE, SCREEN_HOST_FRESH_MS, cardHasTarget, pendingGapMs, buildOrderRows, filterTestChoices, choosePayment, isAutoTestRow, nicknameCandidates, parseAutoTestState, pickOrderLines, productChoices, randomGapMs, verifySavedRows,
+  AUTO_TEST_AVATAR, AUTO_TEST_KAKAO_ID, AUTO_TEST_KEY, AUTO_TEST_NAME, AUTO_TEST_PHONE, AUTO_TEST_REASON,
+  AUTO_TEST_ORDERED_SINCE, AUTO_TEST_EXCLUDE, SCREEN_HOST_FRESH_MS, cardHasTarget, isTestOrderChatLine, pendingGapMs, buildOrderRows, filterTestChoices, choosePayment, isAutoTestRow, nicknameCandidates, parseAutoTestState, pickOrderLines, productChoices, randomGapMs, verifySavedRows,
   type AutoTestChoice, type AutoTestLast, type AutoTestPending, type AutoTestPick, type AutoTestSettings, type AutoTestState,
 } from "@/lib/autoTestOrder";
 import { computeWidgetFeatured } from "@/lib/widgetFeaturedServer";
@@ -510,7 +510,7 @@ export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): P
   for (let i = 0; i < groups.length; i += 100) {
     const batch = groups.slice(i, i + 100);
     // 주문서의 «모든» 줄 다시 읽기 — 하나라도 자동 테스트가 아니면 그 주문서는 손대지 않음
-    const { data: all, error: allErr } = await sb.from("orders").select("id, order_group_id, is_test_order, test_order_reason, operator_test_phone").in("order_group_id", batch);
+    const { data: all, error: allErr } = await sb.from("orders").select("id, order_group_id, is_test_order, test_order_reason, operator_test_phone, youtube_nickname, broadcast_id").in("order_group_id", batch);
     if (allErr) throw new Error(allErr.message);
     const rows = (all ?? []) as Row[];
     const bad = new Set(rows.filter((r) => !isAutoTestRow(r)).map((r) => String(r.order_group_id)));
@@ -530,9 +530,18 @@ export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): P
     if (delErr) throw new Error(delErr.message);
     deleted += (del ?? []).length;
     done += finalGroups.length;
-    // 그 주문서에 붙은 채팅 안내 글(주문 감사·카드 안내)도 정리
-    const refs = finalGroups.flatMap((g) => [`o:${g}`, `card:${g}`, `paid:${g}`]);
-    await sb.from("live_chat_messages").delete().in("bot_ref", refs);
+    // 그 주문서에 딸린 채팅 글(주문 감사·카드 안내·결제 완료·장바구니 담음·그 테스트 닉네임 글) — 테스트 표식 글만.
+    // 지우지 않고 «관리자 채팅 지우기»와 같은 칸(hidden_at)을 채움 → 기존 소식 길로 열려 있는 손님 화면에서도 바로 사라짐
+    const nicknames = [...new Set(finalRows.map((r) => String(r.youtube_nickname ?? "").trim()).filter(Boolean))];
+    const bcs = [...new Set(finalRows.map((r) => String(r.broadcast_id ?? "")).filter(Boolean))];
+    if (bcs.length) {
+      const { data: msgs } = await sb.from("live_chat_messages").select("id, avatar_url, nickname, body, bot_ref")
+        .in("broadcast_id", bcs).eq("avatar_url", AUTO_TEST_AVATAR).is("hidden_at", null).limit(3000);
+      const hideIds = ((msgs ?? []) as Row[]).filter((m) => isTestOrderChatLine(m, finalGroups, nicknames)).map((m) => Number(m.id));
+      for (let j = 0; j < hideIds.length; j += 200) {
+        await sb.from("live_chat_messages").update({ hidden_at: new Date().toISOString(), hidden_by: "autotest" }).in("id", hideIds.slice(j, j + 200)).eq("avatar_url", AUTO_TEST_AVATAR);
+      }
+    }
   }
   return { deleted, groups: done, skipped: [...new Set(skipped)] };
 }

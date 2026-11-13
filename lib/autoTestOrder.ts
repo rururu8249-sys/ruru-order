@@ -26,6 +26,24 @@ export function isAutoTestRow(r: { is_test_order?: unknown; test_order_reason?: 
   return String(r.test_order_reason ?? "") === AUTO_TEST_REASON || String(r.operator_test_phone ?? "").replace(/\D/g, "") === AUTO_TEST_PHONE;
 }
 
+/** [2026-11-13 15:05 사장님 「테스트 끝나면 주문·관련 글 선택 삭제」] 지울 테스트 주문서에 딸린 채팅 글인지(테스트 표식 글만).
+ *  주문 안내(o:·card:·paid:)·그 닉네임이 쓴 글·「정*네님 장바구니 담음」(가린 닉네임이 그 닉네임과 맞을 때) */
+export function isTestOrderChatLine(m: { avatar_url?: unknown; nickname?: unknown; body?: unknown; bot_ref?: unknown }, groups: string[], nicknames: string[]): boolean {
+  if (String(m.avatar_url ?? "") !== AUTO_TEST_AVATAR) return false;
+  const ref = String(m.bot_ref ?? "");
+  if (ref && groups.some((g) => ref === `o:${g}` || ref === `card:${g}` || ref === `paid:${g}`)) return true;
+  const nicks = nicknames.map((n) => String(n ?? "").trim()).filter(Boolean);
+  if (nicks.includes(String(m.nickname ?? "").trim())) return true;
+  const hit = /^🛍️ (.+?)님 장바구니 담음/u.exec(String(m.body ?? ""));
+  if (!hit || !ref.startsWith("c:")) return false;
+  const masked = Array.from(hit[1]);
+  return nicks.some((n) => {
+    const full = Array.from(n);
+    const a = full.length > 10 ? full.slice(0, 9) : full; // 채팅 닉네임은 10자 넘으면 9자로 잘림(clipChatNick)
+    return a.length === masked.length && masked.every((c, i) => c === "*" || c === a[i]);
+  });
+}
+
 export type AutoTestLast = { at: number; ok: boolean; message: string; orderCode?: string; nickname?: string };
 /** [2026-11-13 14:02 사장님] 상품 카드 질문 → 1~2분 뒤 같은 상품·같은 닉네임으로 주문. 질문을 올린 뒤 주문 차례까지 기억해 두는 칸 */
 export type AutoTestPending = { bcId: string; nickname: string; productId: string; detailName: string; productName: string; askedAt: number; dueAt: number; after?: string };
