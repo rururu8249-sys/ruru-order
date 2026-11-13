@@ -1,0 +1,162 @@
+// [2026-11-13] 자동 테스트 주문 — 상품/옵션 고르기·주문 줄·저장 확인·실행 흐름(가짜 DB+가짜 주소)·잠금·삭제 안전장치
+import assert from "node:assert/strict";
+import { createUiLoader } from "./admin-ui-test-loader.mjs";
+
+const load = createUiLoader({});
+const A = load("lib/autoTestOrder.ts");
+const S = load("lib/autoTestOrderServer.ts");
+
+// ── 고를 수 있는 상품: 재고 관리 상품·숨김·0원·구매제한은 빼고, 브랜드 묶음은 세부상품 단가(추가금)·품절 체크 반영
+const simple = { id: 10, product_name: "니트", price: 30000, color_options: ["블랙", "화이트"], size_options: ["M"], product_note: {} };
+const stockOn = { id: 11, product_name: "재고상품", price: 30000, product_note: { stock_management_enabled: true, stock_variants: [{ color: "블랙", size: "M", stock: 3 }] } };
+const hidden = { id: 12, product_name: "숨김", price: 30000, status: "숨김", product_note: {} };
+const brand = { id: 20, product_name: "프라다", price: 100000, product_note: {
+  brand_group: { enabled: true, detail_options: { "PD-1": { colors: ["블랙"], sizes: ["S", "M"] }, "PD-2": { colors: [], sizes: [] }, "PD-3": { colors: ["레드"], sizes: ["S"] } } },
+  option_pricing: { "PD-1": 20000 }, combo_hidden: ["PD-3"],
+  stock_variants: [{ color: "PD-1 / 블랙", size: "S", manual_soldout: true }],
+} };
+assert.equal(A.productChoices(stockOn, false).length, 0);
+assert.equal(A.productChoices(hidden, false).length, 0);
+assert.equal(A.productChoices({ ...simple, price: 0 }, false).length, 0);
+assert.equal(A.productChoices({ ...simple, product_note: { purchase_limit_enabled: true } }, false).length, 0);
+assert.deepEqual(A.productChoices(simple, false).map((c) => `${c.color}/${c.size}`), ["블랙/M", "화이트/M"]);
+const bc = A.productChoices(brand, false);
+assert.deepEqual(bc.map((c) => `${c.productName}|${c.color}|${c.size}|${c.unitPrice}`), ["PD-1|블랙|M|120000", "PD-2|없음||100000"]);
+
+// ── 1~3개, 서로 다른 상품, 수량 1~3
+for (let i = 0; i < 50; i += 1) {
+  const lines = A.pickOrderLines([...A.productChoices(simple, false), ...bc]);
+  assert.ok(lines.length >= 1 && lines.length <= 3);
+  assert.equal(new Set(lines.map((l) => `${l.productId}|${l.productName}`)).size, lines.length);
+  for (const l of lines) assert.ok(l.qty >= 1 && l.qty <= 3);
+}
+
+// ── 닉네임: test 글자 없음·서로 다름
+const nicks = A.nicknameCandidates(30);
+assert.equal(new Set(nicks).size, nicks.length);
+for (const n of nicks) assert.ok(!/test|테스트/i.test(n), n);
+
+// ── 주문 줄: 배송비는 갈래마다 첫 줄에만·카드면 추가금·테스트 표시
+const settings = { shipping: { normalFee: 4000, normalRemoteFee: 6000, vendorFee: 4000, vendorRemoteFee: 7000, overseasFee: 0 }, customerCardRate: 10, actualCardRate: 7, cardMinAmount: 100000 };
+const lines = [{ ...A.productChoices(simple, false)[0], qty: 2 }, { ...bc[0], qty: 1 }];
+const rows = A.buildOrderRows({ lines, paymentMethod: "카드결제", nickname: "포근한고양이123", groupId: "g1", lookupCode: "RURU-X", broadcast: { id: "b1", title: "방송", subtitle: "" }, settings });
+assert.equal(rows[0].shipping_fee, 4000); assert.equal(rows[1].shipping_fee, 0);
+assert.equal(rows[0].total_price, 60000 + 4000 + 6400);
+assert.equal(rows[1].total_price, 120000 + 12000);
+assert.ok(rows.every((r) => r.is_test_order === true && r.test_order_reason === "자동 테스트" && r.exclude_from_settlement === true));
+// 카드 최소 금액 못 넘으면 무통장
+assert.equal(A.choosePayment([{ ...A.productChoices(simple, false)[0], qty: 1 }], settings, () => 0.9), "무통장입금");
+assert.equal(A.choosePayment(lines, settings, () => 0.9), "카드결제");
+
+// ── 저장 확인
+assert.deepEqual(A.verifySavedRows(rows, rows.map((r) => ({ ...r }))), []);
+assert.ok(A.verifySavedRows(rows, [rows[0]]).length > 0);
+assert.ok(A.verifySavedRows(rows, rows.map((r) => ({ ...r, youtube_nickname: "다른이름" }))).some((p) => p.includes("닉네임")));
+
+// ── 가짜 DB
+function fakeDb(tables) {
+  return {
+    tables,
+    from(name) {
+      tables[name] ||= [];
+      let filters = [];
+      let op = "select", payload = null, single = false;
+      const match = (r) => filters.every((f) => f(r));
+      const run = () => {
+        const t = tables[name];
+        if (op === "insert") { const add = (Array.isArray(payload) ? payload : [payload]).map((r, i) => ({ id: t.length + i + 1, ...r })); t.push(...add); return { data: add, error: null }; }
+        if (op === "update") { const hit = t.filter(match); hit.forEach((r) => Object.assign(r, payload)); return { data: hit, error: null }; }
+        if (op === "delete") { const hit = t.filter(match); tables[name] = t.filter((r) => !match(r)); return { data: hit, error: null }; }
+        const hit = t.filter(match);
+        return { data: single ? hit[0] ?? null : hit, error: null, count: hit.length };
+      };
+      const q = {
+        select() { return q; }, insert(p) { op = "insert"; payload = p; return q; }, update(p) { op = "update"; payload = p; return q; }, delete() { op = "delete"; return q; },
+        eq(k, v) { filters.push((r) => String(r[k]) === String(v)); return q; },
+        neq(k, v) { filters.push((r) => String(r[k]) !== String(v)); return q; },
+        in(k, vs) { filters.push((r) => vs.map(String).includes(String(r[k]))); return q; },
+        order() { return q; }, limit() { return q; },
+        maybeSingle() { single = true; return q; },
+        then(res, rej) { return Promise.resolve(run()).then(res, rej); },
+      };
+      return q;
+    },
+  };
+}
+
+const tables = {
+  settings: [], customers: [{ id: "c1", youtube_nickname: "포근한고양이100" }], orders: [{ id: 1, youtube_nickname: "기존손님", order_group_id: "real", is_test_order: false }],
+  broadcasts: [{ id: "b1", status: "ON", is_deleted: false, broadcast_public_title: "테스트방송" }],
+  broadcast_products: [{ broadcast_id: "b1", product_id: 10 }, { broadcast_id: "b1", product_id: 11 }, { broadcast_id: "b1", product_id: 20 }],
+  products: [simple, stockOn, brand], inventory_ledger: [], live_chat_messages: [],
+};
+const db = fakeDb(tables);
+const calls = [];
+globalThis.fetch = async (url, init) => {
+  const body = JSON.parse(init.body);
+  calls.push({ url, body });
+  if (url.endsWith("/api/cart-reservations")) {
+    return { status: 200, json: async () => ({ ok: true, results: body.items.map((it) => ({ ...it, ok: true })) }) };
+  }
+  // 주문 저장 RPC 처럼 받은 줄을 그대로 저장
+  db.tables.orders.push(...body.orderRows.map((r, i) => ({ id: 100 + db.tables.orders.length + i, ...r })));
+  return { status: 200, json: async () => ({ ok: true }) };
+};
+
+// 꺼져 있으면 cron 은 아무것도 안 함
+assert.equal((await S.autoTestTick(db, "https://x")).reason, "off");
+await S.setAutoTestEnabled(db, true);
+const st = await S.readAutoTestState(db);
+assert.ok(st.enabled && st.nextRunAt > Date.now() + 4.9 * 60_000 && st.nextRunAt <= Date.now() + 10 * 60_000 + 1000);
+assert.equal((await S.autoTestTick(db, "https://x")).reason, "waiting");
+assert.equal(calls.length, 0);
+
+// 지금 테스트 → 담기 → 제출 → 저장 확인
+const last = await S.autoTestRunNow(db, "https://x");
+assert.equal(last.ok, true, last.message);
+assert.equal(calls.length, 2);
+assert.ok(calls[0].url.endsWith("/api/cart-reservations") && calls[1].url.endsWith("/api/customer-orders/submit"));
+assert.equal(calls[1].body.cart_session_key, calls[0].body.sessionKey);
+assert.ok(calls[1].body.orderRows.every((r) => String(r.product_id) !== "11"), "재고 관리 상품은 안 고름");
+const cust = tables.customers.find((c) => c.kakao_id === A.AUTO_TEST_KAKAO_ID);
+assert.equal(cust.youtube_nickname, last.nickname);
+assert.equal(cust.live_alert_optin, false);
+// 다음 테스트 닉네임은 달라야 함(이전 닉네임 안 남음)
+const last2 = await S.autoTestRunNow(db, "https://x");
+assert.equal(last2.ok, true); assert.notEqual(last2.nickname, last.nickname);
+assert.equal((await S.readAutoTestState(db)).lockUntil, 0);
+
+// 잠금 중이면 두 번째 실행 거절
+const raw = tables.settings[0];
+const locked = JSON.parse(raw.value); locked.lockUntil = Date.now() + 60_000; raw.value = JSON.stringify(locked);
+assert.equal((await S.autoTestRunNow(db, "https://x")).ok, false);
+locked.lockUntil = 0; locked.nextRunAt = Date.now() - 1; raw.value = JSON.stringify(locked);
+// 시간 된 cron 은 실행하고 다음 시간을 다시 잡음
+const t = await S.autoTestTick(db, "https://x");
+assert.equal(t.ran, true);
+assert.ok((await S.readAutoTestState(db)).nextRunAt > Date.now());
+// 방송이 꺼지면 쉼(꺼짐 아님)
+tables.broadcasts[0].status = "OFF";
+assert.equal((await S.autoTestTick(db, "https://x")).reason, "no-broadcast");
+assert.equal((await S.readAutoTestState(db)).enabled, true);
+tables.broadcasts[0].status = "ON";
+
+// ── 삭제: 자동 테스트 주문서만. 일반 주문 섞인 주문서·재고 기록 있는 주문서는 건너뜀
+const testGroups = [...new Set(tables.orders.filter((o) => o.test_order_reason === "자동 테스트").map((o) => o.order_group_id))];
+assert.equal(testGroups.length, 3);
+tables.orders.push({ id: 900, order_group_id: testGroups[0], is_test_order: false, youtube_nickname: "진짜" }); // 섞인 주문서
+const ledgerRow = tables.orders.find((o) => o.order_group_id === testGroups[1]);
+tables.inventory_ledger.push({ order_id: ledgerRow.id });
+tables.orders.push({ id: 901, order_group_id: "manual", is_test_order: true, test_order_reason: "운영자 테스트 계정 주문" });
+const del = await S.deleteAutoTestOrders(db, null);
+assert.equal(del.groups, 1);
+assert.ok(del.skipped.includes(testGroups[0]) && del.skipped.includes(testGroups[1]));
+assert.ok(tables.orders.some((o) => o.id === 1), "일반 주문 그대로");
+assert.ok(tables.orders.some((o) => o.id === 900), "섞인 주문서의 일반 줄 그대로");
+assert.ok(tables.orders.some((o) => o.id === 901), "사람이 낸 테스트 주문 그대로");
+assert.ok(!tables.orders.some((o) => o.order_group_id === testGroups[2]));
+// 일반 주문서 번호를 직접 넣어도 안 지움
+const del2 = await S.deleteAutoTestOrders(db, ["real"]);
+assert.equal(del2.groups, 0); assert.ok(tables.orders.some((o) => o.id === 1));
+
+console.log("test-auto-test-order: all passed");

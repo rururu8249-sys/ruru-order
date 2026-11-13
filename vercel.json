@@ -146,6 +146,10 @@
     {
       "path": "/api/cron/live-metrics",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/auto-test-order",
+      "schedule": "* * * * *"
     }
   ]
 }

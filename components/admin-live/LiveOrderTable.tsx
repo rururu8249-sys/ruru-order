@@ -905,6 +905,28 @@ export default function LiveOrderTable({
   };
 
 
+  // [2026-11-13] 자동 테스트 주문서 영구 삭제 — 선택한 것 중 «자동 테스트» 주문서만 서버로(서버가 한 번 더 확인, 일반 주문은 절대 안 지움)
+  const [deletingTest, setDeletingTest] = useState(false);
+  const selectedAutoTestOrders = pickingSelectedFromTable.filter((o) => o.isTestOrder && o.testOrderReason === "자동 테스트");
+  const handleDeleteAutoTest = async () => {
+    const targets = selectedAutoTestOrders;
+    if (targets.length === 0) return;
+    if (!(await showAdminConfirm(`자동 테스트 주문서 ${targets.length}건을 영구 삭제할까요?\n되돌릴 수 없어요. 일반 주문은 지워지지 않아요.`, { title: "테스트 주문 삭제", confirmText: "영구 삭제" }))) return;
+    setDeletingTest(true);
+    try {
+      const res = await fetch("/api/admin-live/auto-test-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", groupIds: targets.map((o) => String(o.groupId || o.id)) }) });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.message || "삭제 실패");
+      showAdminToast(`테스트 주문서 ${json.groups}건을 지웠어요${json.skipped?.length ? ` · ${json.skipped.length}건은 건너뜀` : ""}`, "success");
+      setSelectedOrderIds(new Set());
+      void onRefresh?.();
+    } catch (e: any) {
+      showAdminToast("테스트 주문 삭제 실패\n\n" + (e?.message || e), "error");
+    } finally {
+      setDeletingTest(false);
+    }
+  };
+
   const currentFilterLabel = useMemo(() => {
     const broadcastLabel =
       filters.broadcast === "all"
@@ -1161,6 +1183,17 @@ export default function LiveOrderTable({
               >
                 {unmarkingInvoice ? "지우는중..." : "송장출력 해제"}
               </button>
+              {selectedAutoTestOrders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAutoTest}
+                  disabled={deletingTest}
+                  className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-danger hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="선택한 것 중 자동 테스트 주문서만 영구 삭제합니다"
+                >
+                  {deletingTest ? "지우는중..." : `테스트 주문 삭제 ${selectedAutoTestOrders.length}`}
+                </button>
+              )}
             </>
           )}
           <button
@@ -1437,6 +1470,7 @@ export default function LiveOrderTable({
                         <div className="flex items-center gap-2">
                           <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} className="h-5 w-5 shrink-0 accent-[var(--color-ink)]" />
                           <span className="min-w-0 truncate text-[14px] font-bold text-ink">{order.nickname}</span>
+                          {order.isTestOrder ? <span className="shrink-0 text-[12px] font-bold text-ink-mute">[TEST]</span> : null}
                           {order.name ? <span className="shrink-0 text-[13px] text-ink-soft">{order.name}</span> : null}
                           <span className="ml-auto shrink-0 text-[12px] text-ink-mute tabular-nums">{when}</span>
                         </div>
@@ -1506,6 +1540,7 @@ export default function LiveOrderTable({
                           <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[13px]">
                             {order.nickname}
                           </button>
+                          {order.isTestOrder ? <span className="ml-1 text-[12px] font-bold text-ink-mute">[TEST]</span> : null}
                         </div>
                         {/* [2026-10-22] 지난 주문 가상 묶음(가져온 줄만)은 금액이 주문서 전체가 아니므로 복사·쪽지는 원래 주문(상세)에서 */}
                         {order.pickPull && !order.pickPull.whole ? null : (
