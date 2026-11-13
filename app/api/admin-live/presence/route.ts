@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { writePresence } from "@/lib/presenceWrite";
 import { buildLiveVisitors, summarizeLiveVisitors, excludePresenceRows, type CustomerRow, type CartRow, type OrderRow } from "@/lib/presenceLive";
 import { loadExcludedCustomers } from "@/lib/visitStatsExclude";
+import { readAutomationAdminActivity } from "@/lib/liveAutomationAdminActivity";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,9 @@ export async function GET() {
       return NextResponse.json({ ok: true, available: false, total: 0, byType: { orderForm: 0, orderLookup: 0, admin: 0, others: 0 }, visitors: [] });
     }
 
-    const rawRows = (data || []) as Array<Record<string, unknown>>;
+    const automation = await readAutomationAdminActivity(supabase);
+    const actorByVisitor = new Map(automation.sessions.map(s=>[s.visitorKey,s.actorId]));
+    const rawRows = ((data || []) as Array<Record<string, unknown>>).map(row=>({...row,automation_actor_id:actorByVisitor.get(String(row.visitor_key))}));
     // [2026-11-09 ③] 관리자 화면 줄 + 접속 기록 「제외 계정」(사장님 계정 — 카카오 계정·닉네임 전부)은 목록·숫자에서 뺀다. 목록 못 읽으면 관리자 줄만 뺌.
     let excludeKakao: string[] = [];
     let excludeNames: string[] = [];
@@ -109,10 +112,10 @@ export async function GET() {
         : Promise.resolve({ data: [] as unknown[], error: null }),
       supabase.from("cart_reservations").select("kakao_id,nickname,qty,unit_price,product_name,detail_name,expires_at").gt("expires_at", nowIso).limit(2000),
       kakaoIds.length
-        ? supabase.from("orders").select("id,order_group_id,kakao_id,youtube_nickname,admin_order_status_v2,order_manage_status,final_amount,total_price,created_at,is_deleted,is_test_order,product_name").gte("created_at", since).in("kakao_id", kakaoIds).limit(2000)
+        ? supabase.from("orders").select("id,order_group_id,kakao_id,youtube_nickname,admin_order_status_v2,order_manage_status,final_amount,total_price,created_at,is_deleted,is_test_order,product_name,automation_actor_id").gte("created_at", since).in("kakao_id", kakaoIds).limit(2000)
         : Promise.resolve({ data: [] as unknown[], error: null }),
       nicks.length
-        ? supabase.from("orders").select("id,order_group_id,kakao_id,youtube_nickname,admin_order_status_v2,order_manage_status,final_amount,total_price,created_at,is_deleted,is_test_order,product_name").gte("created_at", since).in("youtube_nickname", nicks).limit(2000)
+        ? supabase.from("orders").select("id,order_group_id,kakao_id,youtube_nickname,admin_order_status_v2,order_manage_status,final_amount,total_price,created_at,is_deleted,is_test_order,product_name,automation_actor_id").gte("created_at", since).in("youtube_nickname", nicks).limit(2000)
         : Promise.resolve({ data: [] as unknown[], error: null }),
     ]);
     const ordersMerged = new Map<string, OrderRow>();
@@ -121,7 +124,7 @@ export async function GET() {
     const visitors = buildLiveVisitors({
       rows: listedRows,
       customers: (custRes.data || []) as CustomerRow[],
-      carts: (cartRes.data || []) as CartRow[],
+      carts: [...(cartRes.data || []),...automation.holds] as CartRow[],
       orders: Array.from(ordersMerged.values()),
       now,
     });

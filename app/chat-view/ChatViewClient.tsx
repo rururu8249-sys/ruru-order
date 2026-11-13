@@ -287,7 +287,7 @@ export default function ChatViewClient() {
           <div className="ruru-chat-panel-title">
             <h2>사이트 채팅</h2>
             {!privateChat.canReviewDeleted ? <button type="button" onClick={privateChat.verify} style={{ border: 0, background: "transparent", color: C.soft, fontSize: 12 }}>관리자 본인 확인</button> : <span style={{ color: C.soft, fontSize: 12 }}>삭제글 확인 중</span>}
-            <div className="ruru-chat-panel-meta">접속 {bc && counts.site != null ? `실제 ${counts.site.toLocaleString("ko-KR")}명` : "—"}{bc && counts.test ? ` · 테스트 ${counts.test}명` : ""}</div>
+            <div className="ruru-chat-panel-meta">접속 {bc && counts.site != null ? `${counts.site.toLocaleString("ko-KR")}명` : "—"}</div>
           </div>
           <div className="ruru-chat-size">
             {sizeBtn("가−", "사이트 채팅 글자 작게", () => changeSize(-1), sizeIdx === 0, "15px")}
@@ -328,7 +328,6 @@ export default function ChatViewClient() {
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
                   <span style={{ fontWeight: 700, color: "#C2C2C2", marginRight: "8px" }}>{m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
-                  {m.avatar === AUTO_TEST_AVATAR ? <span style={{ marginRight: "6px", color: "#BBBBBB", fontWeight: 700 }}>(테스트)</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}
                   <ChatBodyView body={m.body} emojis={emojiMap} />
                 </div>

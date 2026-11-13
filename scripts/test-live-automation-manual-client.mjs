@@ -22,8 +22,15 @@ assert.ok(useManual,'manual client must synchronize ownership and preserve retry
 function Harness(){state=useManual('broadcast-a',true);return null}
 await act(async()=>{root=Renderer.create(React.createElement(Harness));await new Promise(r=>setTimeout(r,0));});
 assert.equal(state.available,true);
+const realNow=Date.now;Date.now=()=>realNow()+7000;
+const selectBefore=requests.filter(r=>r.opts.body&&JSON.parse(r.opts.body).action==='select').length;
+await act(async()=>{await Promise.all([state.choose(actor.id),state.choose(actor.id)])});
+assert.equal(requests.filter(r=>r.opts.body&&JSON.parse(r.opts.body).action==='select').length-selectBefore,1,'double tap while checking freshness only acquires once');
+Date.now=realNow;
 await act(async()=>{await state.choose(actor.id)});
 assert.equal(state.selected.nickname,'Chosen');
+await act(async()=>{const event=new Event('storage');Object.defineProperty(event,'key',{value:'unrelated-cart'});events.dispatchEvent(event)});
+assert.equal(state.selected?.nickname,'Chosen','unrelated storage changes must not clear the selected nickname');
 const sender=async(_body,selection)=>{requestIds.push(selection.requestId);return {ok:!failSend,message:failSend?'network':''}};
 await act(async()=>{await state.send('hello',sender)});
 failSend=false;await act(async()=>{await state.send('hello',sender)});

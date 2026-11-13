@@ -13,6 +13,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { normalizePresenceActivity, normalizePresenceEvents } from "@/lib/presenceActivity";
+import { isLiveWatchPath } from "@/lib/presenceActivity";
+import { readAutomationRequest, AutomationError } from "@/lib/liveAutomationAuth";
 
 export function getPresenceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -179,6 +181,7 @@ async function recordVisit(
 export async function writePresence(
   body: Record<string, unknown>,
   ip = "",
+  request?: Request,
 ): Promise<
   { ok: true; lastSeenAt: string } | { ok: false; status: number; message: string }
 > {
@@ -188,6 +191,13 @@ export async function writePresence(
   if (!input.valid) return { ok: false, status: 400, message: "visitorKey 형식이 올바르지 않습니다." };
 
   const supabase = getPresenceSupabase();
+  const automation = await readAutomationRequest(request || new Request("http://internal.invalid"), { owner: input.kakaoId, sessionKey: input.visitorKey }, "presence", supabase);
+  if (automation) {
+    if (input.pageType !== "order_form" || !isLiveWatchPath(input.path)) throw new AutomationError("INVALID_WATCH_PATH");
+    const { data, error } = await supabase.rpc("live_automation_presence", { p_session: automation.session.id, p_revision: automation.capability.revision, p_path: input.path });
+    if (error) throw new AutomationError(error.message);
+    return { ok: true, lastSeenAt: String(data.lastSeenAt) };
+  }
   const nowIso = new Date().toISOString();
 
   const baseRow = {

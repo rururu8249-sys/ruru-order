@@ -1,74 +1,49 @@
-// app/api/admin-live/auto-test-order/route.ts
-// [2026-11-13] 자동 테스트 주문 관리 — 관리자만(미들웨어 + 세션 확인).
-//   GET 상태 · POST {action:"toggle",enabled} | {action:"run"} | {action:"delete",groupIds?:string[]} (groupIds 없으면 자동 테스트 주문서 전부)
-import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
-import { autoTestRunNow, deleteAutoTestOrders, readAutoTestRows, readAutoTestState, postTestChat, screenHostBeat, screenTestPlan, screenTestVerify, setAutoTestChatEnabled, setAutoTestEnabled, type ScreenPlan } from "@/lib/autoTestOrderServer";
-import { getServiceClient } from "@/lib/youtube";
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-export const maxDuration = 60;
-
-const deny = () => NextResponse.json({ ok: false, message: "관리자 로그인이 필요해요." }, { status: 401 });
-
-export async function GET(request: NextRequest) {
-  if (!(await verifyAdminSessionFromRequest(request))) return deny();
-  const sb = getServiceClient();
-  // ?host=1 = 관리자 화면(화면 테스트 담당)이 살아 있다는 신호
-  if (request.nextUrl.searchParams.get("host") === "1") return NextResponse.json({ ok: true, state: await screenHostBeat(sb) });
-  const state = await readAutoTestState(sb);
-  const rows = await readAutoTestRows(sb, null).catch(() => []);
-  const testOrders = new Set(rows.map((r) => String(r.order_group_id ?? ""))).size;
-  const { readGeminiUsage } = await import("@/lib/geminiGate");
-  const gemini = await readGeminiUsage(sb).catch(() => []);
-  return NextResponse.json({ ok: true, state, testOrders, gemini });
+import {NextRequest,NextResponse} from 'next/server';
+import {verifyAdminSessionFromRequest} from '@/lib/admin-auth';
+import {getServiceClient} from '@/lib/youtube';
+import {readAutomationState,controlAutomation} from '@/lib/liveAutomationServer';
+import {runAutomationNow} from '@/lib/liveAutomationWorker';
+import {readAutoTestRows,deleteAutoTestOrders} from '@/lib/autoTestOrderServer';
+import {readGeminiUsage} from '@/lib/geminiGate';
+import type {AutomationFeature} from '@/lib/liveAutomation';
+export const dynamic='force-dynamic';
+export const runtime='nodejs';
+export const maxDuration=60;
+const fail=(message:string,status=400)=>NextResponse.json({ok:false,message},{status});
+export async function GET(request:NextRequest){
+ if(!await verifyAdminSessionFromRequest(request))return fail('관리자 로그인이 필요해요.',401);
+ try{
+   const db=getServiceClient();
+   const [state,rows,gemini]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db)]);
+   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini},{headers:{'Cache-Control':'no-store'}});
+ }catch{return fail('실행 상태를 확인하지 못했어요.',503)}
 }
-
-export async function POST(request: NextRequest) {
-  if (!(await verifyAdminSessionFromRequest(request))) return deny();
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ ok: false, message: "잘못된 요청" }, { status: 403 });
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-  const action = String(body?.action ?? "");
-  const sb = getServiceClient();
-  try {
-    if (action === "toggle") return NextResponse.json({ ok: true, state: await setAutoTestEnabled(sb, body?.enabled === true) });
-    if (action === "run") {
-      const last = await autoTestRunNow(sb, request.nextUrl.origin);
-      return NextResponse.json({ ok: true, last, state: await readAutoTestState(sb) });
-    }
-    if (action === "screen-plan") {
-      const plan = await screenTestPlan(sb, request.nextUrl.origin, body?.scheduled === true);
-      return NextResponse.json({ ok: true, ...("skip" in plan ? { skip: plan.skip } : { plan }) });
-    }
-    if (action === "toggle-public") { const { setAutoTestPublic } = await import("@/lib/autoTestOrderServer"); return NextResponse.json({ ok: true, state: await setAutoTestPublic(sb, body?.enabled === true) }); }
-    if (action === "toggle-chat") return NextResponse.json({ ok: true, state: await setAutoTestChatEnabled(sb, body?.enabled === true) });
-    if (action === "chat-after") {
-      // 화면 테스트가 주문을 마친 뒤 — 그 닉네임이 아직 테스트 계정의 지금 닉네임일 때만(다음 테스트와 안 섞이게)
-      const plan = body?.plan as ScreenPlan | undefined;
-      const text = String(plan?.chatAfter ?? "").trim();
-      if (!plan || !text) return NextResponse.json({ ok: true, posted: false });
-      if (!(await readAutoTestState(sb)).chatEnabled) return NextResponse.json({ ok: true, posted: false }); // 채팅 끄면 바로 멈춤
-      const { data: c } = await sb.from("customers").select("youtube_nickname").eq("kakao_id", AUTO_TEST_KAKAO_ID).maybeSingle();
-      if (String((c as { youtube_nickname?: string } | null)?.youtube_nickname ?? "") !== plan.nickname) return NextResponse.json({ ok: true, posted: false });
-      const r = await postTestChat(request.nextUrl.origin, plan.broadcastId, text);
-      return NextResponse.json({ ok: true, posted: r.ok });
-    }
-    if (action === "screen-verify") {
-      const plan = body?.plan as ScreenPlan | undefined;
-      if (!plan || !plan.nickname || !Array.isArray(plan.lines)) return NextResponse.json({ ok: false, message: "계획이 없어요." }, { status: 400 });
-      const last = await screenTestVerify(sb, plan, String(body?.note ?? "").slice(0, 300));
-      return NextResponse.json({ ok: true, last, state: await readAutoTestState(sb) });
-    }
-    if (action === "delete") {
-      const ids = Array.isArray(body?.groupIds) ? (body!.groupIds as unknown[]).map((x) => String(x ?? "").trim()).filter(Boolean) : null;
-      if (ids && ids.length === 0) return NextResponse.json({ ok: false, message: "지울 주문서가 없어요." }, { status: 400 });
-      return NextResponse.json({ ok: true, ...(await deleteAutoTestOrders(sb, ids)) });
-    }
-    return NextResponse.json({ ok: false, message: "알 수 없는 요청" }, { status: 400 });
-  } catch (e) {
-    return NextResponse.json({ ok: false, message: e instanceof Error ? e.message : "실패" }, { status: 500 });
-  }
+export async function POST(request:NextRequest){
+ if(!await verifyAdminSessionFromRequest(request))return fail('관리자 로그인이 필요해요.',401);
+ if(request.headers.get('origin')!==request.nextUrl.origin)return fail('잘못된 요청이에요.',403);
+ const body=await request.json().catch(()=>null);
+ if(!body||typeof body!=='object')return fail('요청을 확인해 주세요.');
+ const db=getServiceClient();
+ try{
+   if(body.action==='control'){
+     if(!['orders','chat','viewers','all'].includes(body.feature)||typeof body.enabled!=='boolean'||!Number.isSafeInteger(body.revision)||body.revision<0)return fail('실행 설정을 확인해 주세요.');
+     const state=await controlAutomation(db,body.feature as AutomationFeature|'all',body.enabled,body.revision);
+     return NextResponse.json({ok:true,state});
+   }
+   if(body.action==='run'){
+     const result=await runAutomationNow(db,request.nextUrl.origin);
+     return NextResponse.json({ok:true,result,state:await readAutomationState(db)});
+   }
+   if(body.action==='delete'){
+     const state=await readAutomationState(db);
+     if(state.orders||state.chat||state.viewers||state.manualAction)return fail('먼저 자동 실행을 중지해 주세요.',409);
+     const result=await deleteAutoTestOrders(db,null);
+     return NextResponse.json({ok:true,...result,state:await readAutomationState(db)});
+   }
+   if(['screen-plan','screen-verify','chat-after','toggle-public','toggle','toggle-chat'].includes(body.action))return fail('화면이 변경됐어요. 새로고침해 주세요.',410);
+   return fail('알 수 없는 요청이에요.');
+ }catch(e){
+   const message=e instanceof Error?e.message:'';
+   return fail(message.includes('STALE_REVISION')?'다른 관리자가 설정을 변경했어요. 최신 상태에서 다시 눌러 주세요.':message.includes('NOT_READY')?'실행 기능을 준비 중이에요.':message.includes('BROADCAST_ENDED')?'방송이 종료되어 실행을 멈췄어요.':'처리하지 못했어요. 상태를 다시 확인해 주세요.',409);
+ }
 }

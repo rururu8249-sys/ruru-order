@@ -280,12 +280,14 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
             {/* 아래 줄: 금액 · 계좌 · 작업 */}
             <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2 px-4 py-2.5 max-md:px-3">
               <span className="text-[12px] text-ink-mute tabular-nums">담긴 금액 <span className="text-[14px] font-semibold text-ink">{won(knownTotal)}{unknown?" + 기록 없음":""}</span></span>
+              {g.sessionKey.startsWith('live-auto:')?<span className="text-[13px] text-ink-soft">자동 실행에서 관리</span>:<>
               <label className="flex min-w-[220px] flex-1 items-center gap-2 text-[12px] text-ink-mute max-md:basis-full"><span className="shrink-0">계좌</span><select aria-label={`${groupLabel(g)} 장바구니 계좌`} value={meta?.overrideAccount?`active:${meta.overrideAccount.id}`:"default"} disabled={assigningAccount===g.sessionKey} onChange={(e)=>void setBankOverride(g,e.target.value)} className={`${selectCls} flex-1`}><option value="default">기본 계좌 설정 사용</option>{meta?.overrideAccount?<option value={`active:${meta.overrideAccount.id}`}>지금 지정 · {meta.overrideAccount.bankName} {meta.overrideAccount.bankAccount} · 예금주 {meta.overrideAccount.bankHolder}</option>:null}{bankAccounts.map(account=><option key={account.id} value={account.id}>{account.label} · {account.bankName} {account.bankAccount} · 예금주 {account.bankHolder}</option>)}</select></label>
               <div className="flex items-center gap-2 max-md:w-full">
                 <button type="button" disabled={extending===g.sessionKey} onClick={()=>void extendHold(g)} title="지금 설정한 유지시간을 이 장바구니에도 적용(늘리기만)" className={`${btnSub} max-md:flex-1`}>{extending===g.sessionKey?"늘리는 중":"시간 늘리기"}</button>
                 <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className={`${btnSub} max-md:flex-1`}>{reminding===g.sessionKey?"보내는 중":"주문 확인 알림"}</button>
                 <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className={`${btnDanger} max-md:flex-1`}>{clearing===g.sessionKey?"비우는 중":"비우기"}</button>
               </div>
+              </>}
             </div>
           </section>;})}</div>}
       </div>

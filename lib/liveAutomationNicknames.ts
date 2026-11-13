@@ -814,4 +814,3 @@ export function availableNicknameCandidates(memberNames:readonly string[],reserv
   const denied=new Set([...memberNames.map(nicknameCollisionKey),...reserved]);
   return NICKNAME_CANDIDATES.filter(x=>!denied.has(nicknameCollisionKey(x.nickname))).map(x=>({...x}));
 }
-

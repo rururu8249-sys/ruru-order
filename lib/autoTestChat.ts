@@ -88,7 +88,7 @@ export async function makeChatLines(input: { nickname: string; mode: StreamMode;
       '답은 JSON 하나: {"before":"...","after":"..."}',
     ].join("\n");
     // 무료 등급 Lite 모델 2개만(하루 500회씩) — 한도 적은 모델로 넘어가지 않게. 문장이 매번 달라지게 온도 0.9
-    const r = await callGeminiJson(rules, { timeoutMs: 6000, maxTokens: 200, temperature: 0.9, models: ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] });
+    const r = await callGeminiJson(rules, { timeoutMs: 6000, maxTokens: 200, maxAttempts: 1, temperature: 0.9, priority: 'background', models: ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] });
     if (!r.text) return { ...fb, limited: /http_429|:quota/.test(r.note) };
     const j = JSON.parse(r.text) as { before?: unknown; after?: unknown };
     const clean = (v: unknown) => String(v ?? "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 40);

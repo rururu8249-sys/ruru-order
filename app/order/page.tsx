@@ -172,7 +172,6 @@ import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { sameCartDraftItems } from "@/lib/cartDraftSync";
 import { CART_SEQ_NEW, readCartSeqField } from "@/lib/cartClearMarks";
-import { AUTO_TEST_AVATAR, AUTO_TEST_VIEWER_PHONES } from "@/lib/autoTestOrder";
 import {
   CUSTOMER_DETAIL_NAME_MAX_LENGTH,
   buildCustomerDetailProductName,
@@ -2358,10 +2357,7 @@ export default function OrderPage() {
   //   - 일반 손님은 operatorTestAccount 가 항상 null → 화면에도 안 보이고 동작에도 영향 없음.
   //   - 기본값은 "테스트 주문 ON"(기존 동작 그대로). 체크를 풀어야만 실제 주문으로 접수된다.
   const [operatorTestAccount, setOperatorTestAccount] = useState<OperatorTestOrderFlags | null>(null);
-  // [2026-11-13] 자동 테스트 글을 볼 수 있는 화면(총관리자·관리자 시험 계정·부관리자) — 일반 손님은 false
-  const liveShowTest = isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)) || operatorTestAccount !== null || AUTO_TEST_VIEWER_PHONES.includes(normalizePhone(customerPhone));
-  // [2026-11-13 14:46 사장님 「손님 화면에 잘 나오는지 확인해야」] ?view=customer → 이 브라우저만 «손님 화면 그대로»(관리자 메뉴·(테스트) 글자 없음)에
-  //   테스트 글까지 보여 줌(같은 화면 코드·같은 실시간 수신). ?view=off 로 끔. 진짜 손님 화면엔 여전히 테스트 글 안 나감.
+  // Optional customer view hides operator controls only; message visibility is identical for everyone.
   const [viewAsCustomer, setViewAsCustomer] = useState(false);
   useEffect(() => {
     try {
@@ -2371,8 +2367,6 @@ export default function OrderPage() {
       setViewAsCustomer(window.sessionStorage.getItem("ruru_view_customer") === "1");
     } catch { /* 저장소 못 쓰면 평소 화면 */ }
   }, []);
-  const [liveTestPublic, setLiveTestPublic] = useState(false); // 관리자 「손님 화면에도 보이기」 — 켜면 모든 손님에게 「(테스트)」 붙여 보임
-  const liveSeeTest = liveShowTest || viewAsCustomer || liveTestPublic;
   const [adminTestOrderMode, setAdminTestOrderMode] = useState(true);
 
   useEffect(() => {
@@ -6751,7 +6745,6 @@ export default function OrderPage() {
         const wasOn = liveChatEnabledRef.current;
         setLiveChatEnabled(on);
         setLiveChatNotice(String(json.notice ?? ""));
-        setLiveTestPublic(json.testPublic === true);
         if (on && !wasOn) void loadChatFull();
       } catch { /* 다음에 다시 */ } finally { chatMetaBusy = false; }
     };
@@ -6764,7 +6757,6 @@ export default function OrderPage() {
         if (!active || !json?.ok) return;
         setLiveChatEnabled(json.enabled === true);
         setLiveChatNotice(String(json.notice ?? ""));
-        setLiveTestPublic(json.testPublic === true);
         const list = (Array.isArray(json.messages) ? json.messages : []).map(parseChatMessage).filter(Boolean) as LiveChatMessage[];
         setLiveChatMessages((prev) => mergeChat(prev.filter((x) => x.broadcastId === String(bid)), list));
         const pin = json.pinned ? parseChatMessage(json.pinned) : null;
@@ -6796,7 +6788,7 @@ export default function OrderPage() {
         const gk = String(n.order_group_id ?? n.id ?? "");
         const buf = orderBuf.get(gk);
         if (buf) { buf.push(n); return; }
-        if (n.is_test_order === true || n.is_deleted === true) return;
+        if ((n.is_test_order === true && n.automation_verified !== true) || n.is_deleted === true) return;
         if (n.broadcast_id != null && String(n.broadcast_id) !== String(bid)) return;
         const nick = String(n.youtube_nickname ?? "").trim();
         if (!nick) return;
@@ -8446,7 +8438,7 @@ export default function OrderPage() {
               chat={liveChatEnabled && broadcast?.id ? {
                 // [08:10] 내가 담은 «장바구니 담음» 공개 글은 내 화면에선 숨김(담은 사람 지문 = 이 화면 장바구니 열쇠) — 개인 문구만
                 // [2026-11-13 14:36] 자동 테스트 글(avatar autotest)은 관리자·부관리자·테스트 계정 화면에만 — 일반 손님에겐 안 보임(실제로 안 산 구매 표시 금지)
-                messages: privateChat.displayMessages.filter((m) => (liveSeeTest || m.avatar !== AUTO_TEST_AVATAR) && (!m.botRef || !m.botRef.startsWith("c:") || cartRefOwner(m.botRef) !== cartOwnerTag(getCartSessionKey()))),
+                messages: privateChat.displayMessages.filter((m) => !m.botRef || !m.botRef.startsWith("c:") || cartRefOwner(m.botRef) !== cartOwnerTag(getCartSessionKey())),
                 ownIds: privateChat.ownIds,
                 identityVerified: privateChat.verified,
                 canReviewDeleted: privateChat.canReviewDeleted,
@@ -8457,10 +8449,9 @@ export default function OrderPage() {
                   return r;
                 },
                 notice: liveChatNotice,
-                pinned: liveChatPinned && (liveSeeTest || liveChatPinned.avatar !== AUTO_TEST_AVATAR) ? liveChatPinned : null,
+                pinned: liveChatPinned,
                 canGrant: !viewAsCustomer && isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)),
                 canPin: !viewAsCustomer && ["crown", "crown_pink"].includes(String(chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? "")),
-                showTest: liveTestPublic || (liveShowTest && !viewAsCustomer), // 「(테스트)」 글자 — 손님 공개 중이면 누구에게나 붙음
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
                 canModerate: !viewAsCustomer && (operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null),
                 emojis: liveChatEmojis,

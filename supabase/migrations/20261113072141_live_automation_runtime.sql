@@ -66,6 +66,7 @@ end $$;
 -- an order bound to the currently claimed, authenticated automation action.
 do $$ declare body text; marker text:='IF v_matched THEN'; begin
   select pg_get_functiondef('public.submit_customer_order_with_points(jsonb,integer,text,text,text,text)'::regprocedure) into body;
+  if md5(body)<>'9a7f117399ca8704445bbb20a5e2c2eb' then raise exception 'ORDER_RPC_FINGERPRINT_CHANGED_REVIEW_REQUIRED'; end if;
   if length(body)-length(replace(body,marker,''))<>length(marker) then raise exception 'ORDER_RPC_CHANGED_REVIEW_REQUIRED'; end if;
   body:=replace(body,marker,'IF v_matched AND NOT public.live_automation_verified_order(p_order_rows->0->>''order_group_id'') THEN');
   execute body;

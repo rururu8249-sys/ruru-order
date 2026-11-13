@@ -4,7 +4,7 @@
 
 **Goal:** Implement the approved design plus user-requested v1.5 tempo, mobile switching and nickname pool design using one existing customer and isolated actors/sessions, real customer APIs, controllable resource use and normal public presentation.
 
-**Architecture:** Private database campaigns persist identity and order counts across OFF/ON. Atomic RPCs own controls, leases, action outcomes and scheduler state. Existing customer APIs authenticate narrow automation capabilities and retain their common validation/storage path. A server worker drives API sessions; an optional local browser host verifies real UI actions.
+**Architecture:** Private database campaigns persist identity and order counts across OFF/ON. Atomic RPCs own controls, leases, action outcomes and scheduler state. Existing customer APIs authenticate narrow automation capabilities and retain their common validation/storage path. A server worker drives API sessions; the old browser host is retired. Browser verification is separate from the worker.
 
 **Tech Stack:** Next 16.2.6, React 19.2.4, TypeScript, Supabase Postgres/pg_cron/pg_net/Vault, PGlite and existing Node test loaders.
 
@@ -15,7 +15,7 @@
 - One existing customer only; no global customer nickname mutation. Sessions/actors share owner but not carts, actions or nicknames.
 - Per ordering actor 1–3 distinct forms per broadcast campaign; variable quiet/steady/burst tempo with rolling-hour and concurrency caps. A posted product question binds the same actor/product to submission 30–120 seconds later.
 - Sold-out preflight sends no submit request. A stock race must roll back the entire save. No inventory, points, settlement, payment matching, shipping or external messages from automation.
-- Three independent switches, default OFF. OFF cancels unsent work and scheduler; no dedicated periodic polling when everything is OFF. Manual action makes one order without enabling switches.
+- One primary Start/Stop controls all three features atomically; independent switches stay in collapsed details. Default OFF. OFF cancels unsent work and scheduler; no dedicated periodic polling when everything is OFF. Manual action makes one order without enabling switches.
 - One shared Gemini gate for all environments and retries. Unknown/malformed policy denies calls; provider policy and local counters are distinct. No billing changes.
 - Public presentation retains existing design and counts valid sessions, without test badges. Provenance remains internal. Ended runs hide their public messages.
 - Existing unrelated files, normal customers and other cron jobs remain intact. No deployment claim without verified deployment and live evidence.
@@ -63,7 +63,7 @@ Interfaces: signed short-lived capability(session,action,revision,scope), requir
 Files: lib/geminiGate.ts, lib/geminiJson.ts and other discovered Gemini transports, lib/autoTestChat.ts, lib/liveAutomationConversation.ts; scripts/test-gemini-gate.mjs and conversation tests.
 Interfaces: shared permit immediately before HTTP, model policy with RPM/RPD/TPM, feature priority and attempt ledger; conversation uses actor persona and bounded history.
 - [ ] Write failing tests for malformed quotas, development bypass, minute-boundary bursts, each retry counted, unknown TPM denial, model 429 not hopped, Q/A reserves, duplicate direct mentions and non-LIVE questions.
-- [ ] Implement central admission in all transports, remove auto-only 150 cutoff, keep aggregate 450/13 as proposed operating ceiling after policy verification.
+- [ ] Implement central admission in all transports, remove auto-only 150 cutoff, use verified full provider caps (primary 500/day, 15/minute), no percentage reserve; defer background speech behind active interactive requests.
 - [ ] Implement same-person consistent questions/replies and server variation; all product questions require an order slot; failures emit no internal text publicly.
 - [ ] Run targeted gate/conversation tests and existing AI tests; commit task.
 
@@ -93,6 +93,8 @@ Files: app/api/live-chat/automation-persona/route.ts, lib/liveAutomationManualCh
 - [ ] Validate real local UI with two isolated contexts using real routes and isolated data; record API versus browser execution evidence separately.
 - [ ] Fresh whole-branch review; reproduce important findings with failing tests and fix. Re-run affected suites and build as appropriate.
 - [ ] Update CLAUDE.md and user-facing report with exact files, checks, remaining deployment dependencies and rollback.
+
+2026-11-13 checkpoint: local implementation and 40 focused suites pass; actual admin component rendered and clicked at narrow card width. Latest affected automation suite rerun after fixes. Production build and TypeScript verified separately. Existing UI guard has the same 13 violations on base; existing option-split guard flags unchanged chat tokenization. Whole-branch reviewer found uncertain-action recovery and order failures suppressing chat; both reproduced and fixed. Production remains untouched. Real multi-device, actual provider policy and production end-to-end acceptance remain pending; do not mark Task 8 complete.
 
 ## Task 8 — Apply and verify the operational result
 - [ ] Check actual project policy, pg_net availability and deployment settings; prepare additive migration with OFF defaults and protected scheduler configuration.

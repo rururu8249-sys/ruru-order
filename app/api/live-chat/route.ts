@@ -35,7 +35,8 @@ import { normalizeWidgetTarget } from "@/lib/widgetProductLibrary";
 import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { manualChatOperator, validManualSelection, manualChatFailure } from "@/lib/liveAutomationManualChat";
-import { AUTO_TEST_AVATAR, AUTO_TEST_KAKAO_ID, AUTO_TEST_KEY, parseAutoTestState } from "@/lib/autoTestOrder";
+import { AUTO_TEST_AVATAR, AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
+import {readAutomationRequest,AutomationError} from '@/lib/liveAutomationAuth';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,14 +54,6 @@ async function readSetting(sb: ReturnType<typeof getServiceClient>) {
   return parseLiveChatSetting((data as { value?: unknown } | null)?.value);
 }
 
-/** [2026-11-13 14:48] 자동 테스트 글을 손님 화면에도 보일지(관리자 스위치) — 못 읽으면 false */
-async function readTestPublic(sb: ReturnType<typeof getServiceClient>): Promise<boolean> {
-  try {
-    const { data } = await sb.from("settings").select("value").eq("key", AUTO_TEST_KEY).maybeSingle();
-    return parseAutoTestState((data as { value?: unknown } | null)?.value).publicTest === true;
-  } catch { return false; }
-}
-
 export async function GET(request: NextRequest) {
   const bc = String(request.nextUrl.searchParams.get("bc") ?? "").trim();
   if (!UUID.test(bc)) return fail("방송 정보가 없어요.");
@@ -69,22 +62,21 @@ export async function GET(request: NextRequest) {
     // Metadata polling needs only the setting. Initial history reads are independent
     // and can run in parallel; disabled chat still returns no messages or pin.
     if (request.nextUrl.searchParams.get("meta") === "1") {
-      const [setting, testPublic] = await Promise.all([readSetting(sb), readTestPublic(sb)]);
+      const setting = await readSetting(sb);
       return NextResponse.json(setting.enabled
-        ? { ok: true, enabled: true, notice: setting.notice, testPublic }
+        ? { ok: true, enabled: true, notice: setting.notice }
         : { ok: true, enabled: false, notice: "", messages: [], pinned: null });
     }
     const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref";
-    const [setting, listRes, pinRes, testPublic] = await Promise.all([
+    const [setting, listRes, pinRes] = await Promise.all([
       readSetting(sb),
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).order("id", { ascending: false }).limit(LIVE_CHAT_RECENT),
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).not("pinned_at", "is", null).order("pinned_at", { ascending: false }).limit(1).maybeSingle(),
-      readTestPublic(sb),
     ]);
     if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [], pinned: null });
     if (listRes.error) return fail("채팅을 못 불러왔어요.", 500);
     const messages = (listRes.data ?? []).map(parseChatMessage).filter(Boolean).reverse();
-    return NextResponse.json({ ok: true, enabled: true, notice: setting.notice, testPublic, messages, pinned: pinRes.data ? parseChatMessage(pinRes.data) : null });
+    return NextResponse.json({ ok: true, enabled: true, notice: setting.notice, messages, pinned: pinRes.data ? parseChatMessage(pinRes.data) : null });
   } catch {
     return fail("채팅을 못 불러왔어요.", 500);
   }
@@ -102,6 +94,8 @@ export async function POST(request: NextRequest) {
 
     const sb = getServiceClient();
     // 빠르게 — 서로 상관없는 읽기는 한꺼번에
+    const automation=await readAutomationRequest(request,{owner:kakaoId},'chat',sb);
+    if(automation&&(automation.campaign.broadcast_id!==bc||raw.manual!==undefined||body.startsWith('/')))return fail('허용되지 않은 채팅 요청이에요.',403);
     let manualOperator: string | null = null;
     if (raw.manual !== undefined) {
       if (!sameChatOrigin(request)) return fail("잘못된 요청입니다.", 403);
@@ -116,7 +110,7 @@ export async function POST(request: NextRequest) {
       sb.from("broadcasts").select("id, status, widget_card_enabled, youtube_live_url").eq("id", bc).maybeSingle(),
       sb.from("customers").select("id, youtube_nickname, is_blocked, kakao_profile_image").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("live_chat_bans").select("until_at, lifted_at").eq("kakao_id", kakaoId).is("lifted_at", null).order("id", { ascending: false }).limit(5),
-      sb.from("live_chat_messages").select("created_at").eq("kakao_id", kakaoId).order("id", { ascending: false }).limit(1).maybeSingle(),
+      sb.from("live_chat_messages").select("created_at").eq(automation?'automation_actor_id':'kakao_id',automation?automation.actor.id:kakaoId).order("id", { ascending: false }).limit(1).maybeSingle(),
     ]);
     if (!setting.enabled) return fail("지금은 채팅을 쓸 수 없어요.", 403);
 
@@ -128,7 +122,7 @@ export async function POST(request: NextRequest) {
 
     // 닉네임은 회원 표에서(카카오 계정 기준, 최신 1줄)
     const c = custRes.data as { id?: string; youtube_nickname?: string; is_blocked?: unknown; kakao_profile_image?: unknown } | null;
-    const nickname = String(c?.youtube_nickname ?? "").trim().slice(0, 40);
+    const nickname = String(automation?.actor.nickname ?? c?.youtube_nickname ?? "").trim().slice(0, 40);
     if (!c || !nickname) return fail("닉네임을 먼저 정해 주세요.", 403);
     if (isBlockedValue(c.is_blocked)) return fail("채팅을 쓸 수 없어요.", 403);
 
@@ -191,6 +185,11 @@ export async function POST(request: NextRequest) {
       if (error) { const e = manualChatFailure(error.message); return fail(e.message, e.status); }
       return NextResponse.json({ ok: true, message: parseChatMessage(data) }, { headers: { "Cache-Control": "private, no-store" } });
     }
+    if(automation){
+      const {data,error}=await sb.rpc('live_automation_chat',{p_action:automation.capability.action,p_lease:automation.capability.lease,p_revision:automation.capability.revision,p_body:finalBody});
+      if(error)return fail('채팅 실행 조건이 변경되어 전송하지 않았어요.',409);
+      return NextResponse.json({ok:true,message:parseChatMessage(data)},{headers:{'Cache-Control':'no-store'}});
+    }
     const { data: ins, error } = await sb
       .from("live_chat_messages")
       .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: finalBody, badge: role.badge ?? null, avatar_url: kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : (cleanKakaoPhotoUrl(c.kakao_profile_image) || null) })
@@ -202,7 +201,8 @@ export async function POST(request: NextRequest) {
     const botText = chatBodyWithoutEmoji(finalBody);
     if (botText) after(() => runLiveChatBot(sb, bc, botText));
     return NextResponse.json({ ok: true, message: parseChatMessage(ins) });
-  } catch {
+  } catch (error) {
+    if(error instanceof AutomationError)return fail('채팅 실행 권한을 확인하지 못했어요.',error.status);
     return fail("못 보냈어요. 다시 눌러 주세요.", 500);
   }
 }

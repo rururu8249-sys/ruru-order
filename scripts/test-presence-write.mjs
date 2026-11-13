@@ -6,7 +6,8 @@
 //   실제 화면(PresenceHeartbeat)이 만드는 키가 통과하는지 여기서 확인한다.
 
 import assert from "node:assert";
-import { normalizePresenceInput } from "../lib/presenceWrite.ts";
+import {createUiLoader} from "./admin-ui-test-loader.mjs";
+const {normalizePresenceInput}=createUiLoader()("lib/presenceWrite.ts");
 
 let pass = 0;
 const ok = (label) => { pass += 1; console.log("  ✓ " + label); };

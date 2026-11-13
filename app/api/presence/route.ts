@@ -20,6 +20,7 @@
 
 import { NextResponse } from "next/server";
 import { writePresence } from "@/lib/presenceWrite";
+import { AutomationError } from "@/lib/liveAutomationAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const clientIp = (request.headers.get("x-forwarded-for") || "").split(",")[0].trim()
       || (request.headers.get("x-real-ip") || "").trim();
-    const result = await writePresence(body, clientIp);
+    const result = await writePresence(body, clientIp, request);
 
     if (!result.ok) {
       return NextResponse.json({ ok: false, message: result.message }, { status: result.status });
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
+      { status: error instanceof AutomationError ? error.status : 500 },
     );
   }
 }

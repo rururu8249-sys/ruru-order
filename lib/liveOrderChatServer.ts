@@ -19,7 +19,7 @@ import {
   type OrderEventRow,
 } from "@/lib/liveChatBot";
 
-const ORDER_COLS = "id, order_group_id, broadcast_id, youtube_nickname, product_name, color, size, payment_method, is_test_order, test_order_reason, operator_test_phone, is_deleted, created_at, deposit_confirmed_at, admin_order_status_v2, order_manage_status";
+const ORDER_COLS = "id, order_group_id, broadcast_id, youtube_nickname, product_name, color, size, payment_method, is_test_order, test_order_reason, operator_test_phone, is_deleted, created_at, deposit_confirmed_at, admin_order_status_v2, order_manage_status, automation_action_id";
 
 type OnBroadcast = { id: string; startedAt: string };
 
@@ -79,6 +79,11 @@ export async function announceOrderThanks(sb: SupabaseClient, groupId: string): 
     const rows = liveRows((data ?? []) as OrderEventRow[]);
     if (!rows.length || !isThisBroadcastOrder(rows[0], bc)) return;
     if (!String(rows[0].youtube_nickname ?? "").trim()) return;
+    if(rows.some(r=>isAutoTestRow(r as Record<string,unknown>))){
+      const action=(rows[0] as Record<string,unknown>).automation_action_id;
+      if(action)await sb.rpc('live_automation_order_notice',{p_action:action,p_body:orderThanksText(rows)});
+      return;
+    }
     const ref = `o:${g}`, cardRef = `card:${g}`;
     const done = await postedRefs(sb, bc.id, [ref, cardRef]);
     // [2026-11-13 사장님] 주문서 제출 알림은 주문 분위기 닉네임(랜덤) — 같은 주문의 카드 안내도 같은 이름
@@ -101,7 +106,7 @@ export async function announceRecentPaid(sb: SupabaseClient, nowMs = Date.now(),
     const { data } = await sb.from("orders").select(ORDER_COLS).gte("deposit_confirmed_at", since).order("deposit_confirmed_at", { ascending: true }).limit(300);
     const byGroup = new Map<string, OrderEventRow[]>();
     for (const r of liveRows((data ?? []) as OrderEventRow[])) {
-      if (!isPaidRow(r) || !isThisBroadcastOrder(r, bc)) continue;
+      if (r.is_test_order===true || !isPaidRow(r) || !isThisBroadcastOrder(r, bc)) continue;
       if (!String(r.youtube_nickname ?? "").trim()) continue;
       const g = String(r.order_group_id ?? r.id ?? "").trim();
       if (!g) continue;

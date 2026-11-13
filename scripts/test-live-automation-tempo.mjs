@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const load=createUiLoader();let T;try{T=load('lib/liveAutomationTempo.ts')}catch{}
+assert.ok(T,'variable tempo must replace fixed five-minute submission spacing');
+const sequence=(...values)=>()=>values.shift()??0;
+let plan=T.planOrderTempo(1000,null,sequence(0,0));
+assert.equal(plan.mode,'quiet');assert.equal(plan.nextAt,481000);assert.equal(plan.offsets.length,1);
+plan=T.planOrderTempo(1000,null,sequence(.5,0));assert.equal(plan.mode,'steady');assert.equal(plan.nextAt,61000);
+plan=T.planOrderTempo(1000,null,sequence(.9,0,.99,0,.5,.99));assert.equal(plan.mode,'burst');
+assert.equal(plan.offsets.length,3);assert.ok(plan.offsets.every(v=>v>=0&&v<=45000));
+assert.equal(T.planOrderTempo(1000,'burst',sequence(.9,0)).mode,'quiet','bursts cannot continually chain');
+assert.equal(T.cartDelay(()=>0),15000);assert.equal(T.cartDelay(()=>.999999),150000);
+assert.equal(T.nextAdmission(3_600_000,Array(20).fill(1)),3_600_001);
+assert.equal(T.nextAdmission(3_600_000,Array(20).fill(0)),3_600_000,'rolling boundary expires exactly');
+assert.equal(T.maySpeak({kind:'proactive',now:10000,hasActivity:false,manualUntil:0,quietUntil:0,actorLast:null,recent:[]}),false);
+assert.equal(T.maySpeak({kind:'reply',now:10000,hasActivity:true,manualUntil:20000,quietUntil:0,actorLast:null,recent:[]}),false);
+assert.equal(T.maySpeak({kind:'proactive',now:3600000,hasActivity:true,manualUntil:0,quietUntil:0,actorLast:null,recent:Array(6).fill({at:1,kind:'proactive'})}),false);
+assert.equal(T.maySpeak({kind:'reply',now:3600000,hasActivity:true,manualUntil:0,quietUntil:0,actorLast:null,recent:[{at:3599000,kind:'reply'}]}),true);
+assert.equal(T.maySpeak({kind:'reply',now:3600000,hasActivity:true,manualUntil:0,quietUntil:0,actorLast:null,recent:[{at:3599000,kind:'reply'},{at:3599001,kind:'proactive'}]}),false);
+console.log('PASS variable quiet/steady/burst tempo, cart dwell, rolling limits and activity/manual-aware sparse AI');

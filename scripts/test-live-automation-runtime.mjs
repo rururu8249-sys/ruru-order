@@ -18,7 +18,8 @@ create table live_automation_actions(campaign_id uuid,status text,due_at timesta
 create function live_automation_verified_order(text) returns boolean language sql as $$ select $1='authenticated-action-group' $$;
 create function submit_customer_order_with_points(jsonb,integer,text,text,text,text) returns jsonb language plpgsql as $$ declare v_matched boolean:=true; p_order_rows jsonb:=$1; begin IF v_matched THEN return '{"deduct":true}'; end if; return '{"deduct":false}'; end $$;
 `);
-const sql=readFileSync(new URL('../supabase/migrations/20261113072141_live_automation_runtime.sql',import.meta.url),'utf8').replace('create extension if not exists pg_net with schema extensions;','');
+const fixtureHash=(await db.query("select md5(pg_get_functiondef('public.submit_customer_order_with_points(jsonb,integer,text,text,text,text)'::regprocedure)) as hash")).rows[0].hash;
+const sql=readFileSync(new URL('../supabase/migrations/20261113072141_live_automation_runtime.sql',import.meta.url),'utf8').replace('create extension if not exists pg_net with schema extensions;','').replace('9a7f117399ca8704445bbb20a5e2c2eb',fixtureHash);
 await db.exec(sql);
 const scalar=async(sql,args=[])=>Object.values((await db.query(sql,args)).rows[0])[0];
 assert.equal(await scalar('select live_automation_runtime_ready()'),false);

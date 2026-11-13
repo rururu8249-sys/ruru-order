@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient, readSetting } from "@/lib/youtube";
 import { LIVE_VIEWERS_NOW_KEY } from "@/lib/liveMetricsServer";
 import { readLiveAudience } from "@/lib/liveAudienceServer";
-import { readTestViewers } from "@/lib/autoTestViewers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,16 +20,12 @@ export async function GET(request: NextRequest) {
     let site = o && fresh && (!bc || o.bc === bc) && Number.isFinite(Number(o.s)) && o.s != null ? Number(o.s) : null;
     // [2026-11-12 사장님 22:34] 사이트 «지금»(75초 안 신호) 전체 / 방송 화면 열어 둔 사람 — 8초 기억, 실패하면 예전 값
     let watching: number | null = null;
-    let test: { site: number; watching: number } | null = null;
     try {
-      const aud = await readLiveAudience(getServiceClient());
+      const aud = await readLiveAudience(getServiceClient(),Date.now(),bc);
       site = aud.total;
       watching = aud.watching;
-      // [2026-11-13] 테스트 시청자(테스트 계정 + 가상) — 실제 숫자와 따로. 채팅뷰어만 씀(손님 화면은 실제 숫자만)
-      const virtual = bc ? await readTestViewers(getServiceClient(), bc) : [];
-      test = { site: aud.testSite + virtual.length, watching: aud.testWatching + virtual.filter((v) => v.live).length };
     } catch { /* 예전 1분 기록 숫자 그대로 */ }
-    return NextResponse.json({ ok: true, viewers, site, watching, test }, { headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=20" } });
+    return NextResponse.json({ ok: true, viewers, site, watching }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ ok: true, viewers: null, site: null, watching: null });
   }

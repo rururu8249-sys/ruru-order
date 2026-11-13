@@ -8,10 +8,9 @@ import { isLiveWatchPath } from "@/lib/presenceActivity";
 import { excludePresenceRows } from "@/lib/presenceLive";
 import { loadExcludedCustomers } from "@/lib/visitStatsExclude";
 import { AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
-import { readTestViewers } from "@/lib/autoTestViewers";
 
 export const LIVE_AUDIENCE_WINDOW_MS = 75_000;
-const COUNT_CACHE_MS = 8_000;
+const COUNT_CACHE_MS = 2_000;
 const EXCLUDE_CACHE_MS = 60_000;
 
 type Row = Record<string, unknown>;
@@ -23,13 +22,12 @@ const clean = (v: unknown) => String(v ?? "").trim();
 /** 순수 계산(테스트 대상) — 전체 / 방송 화면 보는 중 / 사이트만.
  *  [2026-11-13 사장님 12:04] 사장님 계정(제외 계정)도 실제로 접속해 있으니 숫자에 넣음 — 대신 staff 표시(목록에서 사장님만 봄).
  *  관리자 화면(/admin-live) 줄은 쇼핑몰 접속이 아니라 그대로 뺌. */
-export function computeAudience(rows: Row[], ex: { kakaoIds?: Iterable<string>; names?: Iterable<string> }, nowMs: number): Audience {
+export function computeAudience(rows: Row[], ex: { kakaoIds?: Iterable<string>; names?: Iterable<string> }, nowMs: number, validAutomation:ReadonlyMap<string,string>=new Map()): Audience {
   const since = nowMs - LIVE_AUDIENCE_WINDOW_MS;
   const fresh0 = rows.filter((r) => { const t = Date.parse(clean(r.last_seen_at)); return Number.isFinite(t) && t >= since && clean(r.page_type) !== "admin"; });
-  // [2026-11-13] 자동 테스트 계정 접속은 실제 숫자에서 빼고 따로(손님 화면 숫자 = 실제 사람만)
-  const isTest = (r: Row) => clean(r.kakao_id) === AUTO_TEST_KAKAO_ID;
-  const testFresh = fresh0.filter(isTest);
-  const fresh = fresh0.filter((r) => !isTest(r));
+  const isTest = (r: Row) => clean(r.kakao_id) === AUTO_TEST_KAKAO_ID || Boolean(r.automation_session_id) || clean(r.visitor_key).startsWith('live-auto:');
+  const fresh = fresh0.filter(r=>!isTest(r)||(Boolean(r.automation_session_id)&&validAutomation.get(clean(r.visitor_key))===clean(r.automation_session_id)));
+  const testFresh = fresh.filter(isTest);
   const customers = new Set(excludePresenceRows(fresh, ex));
   const toRow = (r: Row): AudienceRow => ({ visitorKey: clean(r.visitor_key), nickname: clean(r.nickname), kakaoId: clean(r.kakao_id), lastSeenAt: clean(r.last_seen_at), staff: !customers.has(r) });
   const byRecent = (a: AudienceRow, b: AudienceRow) => (a.lastSeenAt < b.lastSeenAt ? 1 : -1);
@@ -40,7 +38,7 @@ export function computeAudience(rows: Row[], ex: { kakaoIds?: Iterable<string>; 
 }
 
 let excludeCache: { at: number; kakaoIds: string[]; names: string[] } | null = null;
-let audienceCache: { at: number; value: Audience } | null = null;
+let audienceCache: { at: number; broadcast:string; value: Audience } | null = null;
 
 async function excludeList(sb: SupabaseClient, nowMs: number) {
   if (excludeCache && nowMs - excludeCache.at < EXCLUDE_CACHE_MS) return excludeCache;
@@ -54,10 +52,10 @@ async function excludeList(sb: SupabaseClient, nowMs: number) {
 }
 
 /** 지금 접속·방송 보는 중 — 8초 동안 같은 답(손님이 많아도 DB 읽기는 8초에 한 번) */
-export async function readLiveAudience(sb: SupabaseClient, nowMs = Date.now()): Promise<Audience> {
-  if (audienceCache && nowMs - audienceCache.at < COUNT_CACHE_MS) return audienceCache.value;
+export async function readLiveAudience(sb: SupabaseClient, nowMs = Date.now(), broadcast=''): Promise<Audience> {
+  if (audienceCache && audienceCache.broadcast===broadcast && nowMs - audienceCache.at < COUNT_CACHE_MS) return audienceCache.value;
   const since = new Date(nowMs - LIVE_AUDIENCE_WINDOW_MS).toISOString();
-  const selects = ["visitor_key, nickname, kakao_id, page_type, path, last_seen_at", "visitor_key, nickname, page_type, path, last_seen_at"];
+  const selects = ["visitor_key, nickname, kakao_id, page_type, path, last_seen_at, automation_session_id"];
   let rows: Row[] = [];
   let lastError = "";
   for (const sel of selects) {
@@ -67,8 +65,21 @@ export async function readLiveAudience(sb: SupabaseClient, nowMs = Date.now()): 
   }
   if (lastError) throw new Error(lastError);
   const ex = await excludeList(sb, nowMs);
-  const value = computeAudience(rows, ex, nowMs);
-  audienceCache = { at: nowMs, value };
+  const valid=new Map<string,string>();
+  if(rows.some(r=>r.automation_session_id)){
+    let query=sb.from('live_automation_campaigns').select('id,broadcasts!inner(status,is_deleted)').eq('viewers_enabled',true).eq('broadcasts.status','ON').neq('broadcasts.is_deleted',true);
+    if(broadcast)query=query.eq('broadcast_id',broadcast);
+    const campaigns=await query;
+    if(campaigns.error)throw Error(campaigns.error.message);
+    const ids=(campaigns.data||[]).map(c=>c.id);
+    if(ids.length){
+      const sessions=await sb.from('live_automation_sessions').select('id,visitor_key').in('campaign_id',ids).eq('watching',true).is('stopped_at',null).gt('leave_at',new Date(nowMs).toISOString()).gte('last_ack_at',since);
+      if(sessions.error)throw Error(sessions.error.message);
+      for(const s of sessions.data||[])valid.set(s.visitor_key,s.id);
+    }
+  }
+  const value = computeAudience(rows, ex, nowMs,valid);
+  audienceCache = { at: nowMs,broadcast, value };
   return value;
 }
 
@@ -84,28 +95,11 @@ export async function readLiveWatcherList(sb: SupabaseClient, nowMs = Date.now()
     for (const c of (data ?? []) as Row[]) names.set(clean(c.kakao_id), { nick: clean(c.youtube_nickname), name: clean(c.customer_name) });
   }
   const view = (w: AudienceRow) => {
-    const c = names.get(w.kakaoId);
+    const c = w.kakaoId===AUTO_TEST_KAKAO_ID?undefined:names.get(w.kakaoId);
     return { key: w.visitorKey.slice(-8), nickname: c?.nick || w.nickname, name: c?.name || "", member: Boolean(c), lastSeenAt: w.lastSeenAt, staff: showStaff && w.staff };
   };
   const base = { total: aud.total, watching: aud.watching, rows: aud.watchers.map(view), others: aud.others.map(view) };
-  if (!showTest) return base;
-  // 관리자·부계정 관리자만 — 테스트 계정(화면 테스트 중) + 가상 테스트 시청자 + 이번 방송 테스트 주문 닉네임
-  const { data: bcRow } = await sb.from("broadcasts").select("id").eq("status", "ON").order("started_at", { ascending: false }).limit(1).maybeSingle();
-  const bcId = String((bcRow as Row | null)?.id ?? "");
-  const virtual = bcId ? await readTestViewers(sb, bcId, nowMs) : [];
-  let orderedNicks: string[] = [];
-  if (bcId) {
-    const { data } = await sb.from("orders").select("youtube_nickname").eq("broadcast_id", bcId).eq("kakao_id", AUTO_TEST_KAKAO_ID).eq("is_test_order", true).limit(500);
-    orderedNicks = Array.from(new Set(((data ?? []) as Row[]).map((r) => clean(r.youtube_nickname)).filter(Boolean)));
-  }
-  const test = {
-    site: aud.testSite + virtual.length,
-    watching: aud.testWatching + virtual.filter((v) => v.live).length,
-    rows: [
-      ...aud.testRows.map((w) => ({ key: w.visitorKey.slice(-8), nickname: names.get(w.kakaoId)?.nick || w.nickname, name: "테스트 계정(화면 테스트 중)", member: true, lastSeenAt: w.lastSeenAt, test: true })),
-      ...virtual.map((v) => ({ key: v.id, nickname: v.nick, name: `가상 · ${Math.max(1, Math.round((v.leave - nowMs) / 60_000))}분 뒤 나감`, member: true, lastSeenAt: new Date(nowMs).toISOString(), test: true, live: v.live })),
-    ],
-    orderedNicks,
-  };
-  return { ...base, test };
+  // Retain the parameter for existing callers. Every role sees the same verified list.
+  void showTest;
+  return base;
 }

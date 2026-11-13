@@ -25,6 +25,7 @@ import {
   parseOrderPurchaseConsentSettings,
 } from "@/lib/orderPurchaseConsent";
 import { purchaseLimitProductSelect } from "@/lib/orderSchemaQueries";
+import { readAutomationRequest, AutomationError } from "@/lib/liveAutomationAuth";
 
 // [2026-11-06] 주문 알림 채팅을 20초 묶어 올리느라 응답 뒤 작업(after)이 길어짐 — 응답 속도와는 무관.
 export const maxDuration = 60;
@@ -777,6 +778,8 @@ export async function POST(request: NextRequest) {
       const t = String(body.cart_session_key ?? body.cartSessionKey ?? "").trim();
       return t.length >= 6 && t.length <= 80 ? t : null;
     })();
+    const automation = await readAutomationRequest(request, { owner: kakaoId, phone, sessionKey: cartSessionKey }, "order", supabase);
+    if (automation && pointUseAmount !== 0) throw new AutomationError("AUTOMATION_POINTS_NOT_ALLOWED");
 
     // 개인당 구매제한 차단(돈/재고/포인트 RPC 무변경 — RPC 호출 전 검증만)
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
@@ -790,9 +793,22 @@ export async function POST(request: NextRequest) {
     );
     await assertShippingFeeNotSkipped(supabase, orderRows, phone, productCatalog, kakaoId);
     await assertPurchaseLimit(supabase, orderRows, phone, kakaoId);
-    await assertCartHoldAlive(supabase, orderRows, cartSessionKey);
+    if (!automation) await assertCartHoldAlive(supabase, orderRows, cartSessionKey);
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
+    if (automation) {
+      const { data, error } = await supabase.rpc("live_automation_submit", {
+        p_action: automation.capability.action, p_lease: automation.capability.lease,
+        p_revision: automation.capability.revision, p_rows: normalizedSubmit.orderRows,
+      });
+      if (error) throw new Error(error.message);
+      const assigned = parseOrderBankRoutingResult(data);
+      after(async()=>{
+        const {announceOrderThanks}=await import('@/lib/liveOrderChatServer');
+        await announceOrderThanks(supabase,text((normalizedSubmit.orderRows[0] as AnyRow)?.order_group_id));
+      });
+      return NextResponse.json({ ...(data as Record<string, unknown>), customerOrderSegment: assigned.customerOrderSegment, bankAccount: assigned.bankAccount });
+    }
 
     const { data, error } = await supabase.rpc("submit_customer_order_with_bank_routing", {
       p_order_rows: normalizedSubmit.orderRows,
@@ -943,6 +959,6 @@ export async function POST(request: NextRequest) {
       bankAccount: assignedBank.bankAccount,
     });
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : "주문 저장 실패", 400);
+    return jsonError(error instanceof Error ? error.message : "주문 저장 실패", error instanceof AutomationError ? error.status : 400);
   }
 }

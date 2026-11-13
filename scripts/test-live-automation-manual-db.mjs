@@ -57,7 +57,16 @@ const clientA='10000000-0000-4000-8000-000000000001',clientB='10000000-0000-4000
 const ai=await scalar('select live_automation_eligibility($1)',[a.actor.id]);
 assert.equal(ai.present,true);
 assert.equal(ai.ai,false,'presence-only actors cannot generate chat');
+c=await ctl('chat',true,c.revision);
+await db.query("insert into live_automation_cart_holds(session_id,items,expires_at) values($1,'[{\"productId\":\"10\"}]',clock_timestamp()+interval '2 minutes')",[session.id]);
+assert.equal((await scalar('select live_automation_eligibility($1)',[a.actor.id])).ai,true);
+const aiAction=await scalar('select live_automation_action($1,$2,$3,$4,$5,$6,$7)',[session.id,'chat',new Date().toISOString(),{},false,null,c.revision]);
+const aiClaim=await scalar('select live_automation_claim($1,$2)',[aiAction.id,c.revision]);
 const lease=await scalar('select live_automation_manual_select($1,$2,$3,$4)',[bc,a.actor.id,opA,clientA]);
+await assert.rejects(scalar('select live_automation_chat($1,$2,$3,$4)',[aiAction.id,aiClaim.lease_token,c.revision,'late generated text']),/ACTION_STOPPED/);
+await assert.rejects(db.query("insert into live_chat_messages(broadcast_id,automation_actor_id,body) values($1,$2,'late')",[bc,a.actor.id]),/MANUAL_CHAT_ACTIVE/);
+c=await ctl('chat',false,c.revision);
+
 assert.equal(lease.actor_id,a.actor.id);
 await assert.rejects(scalar('select live_automation_manual_select($1,$2,$3,$4)',[bc,a.actor.id,opB,clientB]),/IN_USE/);
 await assert.rejects(scalar('select live_automation_manual_renew($1,$2,$3)',[lease.token,opB,clientB]),/LEASE_LOST/);

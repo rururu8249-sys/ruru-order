@@ -7,7 +7,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fallbackChatLine, makeChatLines, type ChatProduct, type StreamMode } from "@/lib/autoTestChat";
-import { AUTO_TEST_AI_DAILY_CAP, AUTO_TEST_AI_PAUSE_MS, aiQuotaDay } from "@/lib/autoTestOrder";
+import { aiQuotaDay } from "@/lib/autoTestOrder";
 import { tickTestViewers } from "@/lib/autoTestViewers";
 import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
 import {
@@ -79,18 +79,14 @@ async function useFreshNickname(sb: Db): Promise<string> {
 }
 
 /** [2026-11-13 14:15 사장님 「무료 한도 안에서, 넘으면 채팅만 멈춤」] Gemini 호출을 세고 지킴.
- *  - 하루(미국 서부 날짜 = 무료 한도 새로 채워지는 기준) 150회까지, 한도 초과(429)면 30분 채팅만 쉼 → null(채팅 안 올림). 주문은 그대로. */
+ *  - 한도는 모든 AI 기능이 공유하는 geminiGate에서만 적용한다. */
 async function aiChatLines(sb: Db, input: Parameters<typeof makeChatLines>[0]): Promise<{ before: string; after: string } | null> {
-  const now = Date.now();
-  const day = aiQuotaDay(now);
-  const { state } = await readStateRaw(sb);
-  const used = state.aiDay === day ? state.aiCount : 0;
-  if (state.aiPausedUntil > now || used >= AUTO_TEST_AI_DAILY_CAP) return null;
+  const day = aiQuotaDay();
   const cl = await makeChatLines(input);
   for (let i = 0; i < 4; i += 1) {
     const cur = await readStateRaw(sb);
     const n = cur.state.aiDay === day ? cur.state.aiCount : 0;
-    if (await casState(sb, cur.raw, { ...cur.state, aiDay: day, aiCount: n + 1, aiPausedUntil: cl.limited ? now + AUTO_TEST_AI_PAUSE_MS : cur.state.aiPausedUntil })) break;
+    if (await casState(sb, cur.raw, { ...cur.state, aiDay: day, aiCount: n + 1, aiPausedUntil: 0 })) break;
   }
   return cl.limited ? null : { before: cl.before, after: cl.after };
 }
@@ -517,7 +513,8 @@ export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): P
     const okRows = rows.filter((r) => !bad.has(String(r.order_group_id)));
     // 재고 기록이 있는 줄(재고가 실제로 빠진 주문)은 일반 삭제로 — 여기선 건너뜀
     const ids = okRows.map((r) => Number(r.id));
-    const { data: led } = ids.length ? await sb.from("inventory_ledger").select("order_id").in("order_id", ids) : { data: [] };
+    const { data: led, error: ledgerError } = ids.length ? await sb.from("inventory_ledger").select("order_id").in("order_id", ids) : { data: [], error: null };
+    if (ledgerError) throw new Error('재고 기록을 확인하지 못해 삭제하지 않았어요.');
     const ledgerOrders = new Set(((led ?? []) as Row[]).map((r) => String(r.order_id)));
     const ledgerGroups = new Set(okRows.filter((r) => ledgerOrders.has(String(r.id))).map((r) => String(r.order_group_id)));
     for (const g of bad) skipped.push(g);

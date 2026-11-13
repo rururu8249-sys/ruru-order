@@ -58,7 +58,7 @@ begin
    where s.actor_id=a.id and s.campaign_id=c.id and s.stopped_at is null and s.leave_at>clock_timestamp()
    and h.expires_at>clock_timestamp() and jsonb_array_length(h.items)>0) into cart;
  select count(distinct o.order_group_id)::int into submitted from public.orders o
-   where o.automation_actor_id=a.id and o.created_at>=today and o.created_at<today+interval '1 day';
+   where o.automation_actor_id=a.id and (to_jsonb(o)->>'is_deleted')::boolean is not true and o.created_at>=today and o.created_at<today+interval '1 day';
  return jsonb_build_object('manual',watching or cart or submitted>0,'ai',cart or submitted>0,
    'present',watching,'cart',cart,'orders',submitted);
 end $$;
@@ -276,4 +276,3 @@ declare t text; f record; begin
  execute format('grant execute on function %s to service_role',f.signature);
  end loop;
 end $$;
-

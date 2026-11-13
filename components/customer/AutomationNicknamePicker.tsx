@@ -43,4 +43,3 @@ export function AutomationNicknamePicker({state,dark=false,disabled=false,onPick
    </div>:null}
  </div>;
 }
-

@@ -13,8 +13,8 @@ const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n
 
 export type PresenceRow = Record<string, unknown>;
 export type CustomerRow = { kakao_id?: unknown; youtube_nickname?: unknown; customer_name?: unknown; customer_phone?: unknown; is_blocked?: unknown };
-export type CartRow = { kakao_id?: unknown; nickname?: unknown; qty?: unknown; unit_price?: unknown; product_name?: unknown; detail_name?: unknown; expires_at?: unknown };
-export type OrderRow = { order_group_id?: unknown; id?: unknown; kakao_id?: unknown; youtube_nickname?: unknown; admin_order_status_v2?: unknown; order_manage_status?: unknown; final_amount?: unknown; total_price?: unknown; created_at?: unknown; is_deleted?: unknown; is_test_order?: unknown; product_name?: unknown };
+export type CartRow = { automation_actor_id?: unknown; kakao_id?: unknown; nickname?: unknown; qty?: unknown; unit_price?: unknown; product_name?: unknown; detail_name?: unknown; expires_at?: unknown };
+export type OrderRow = { automation_actor_id?: unknown; order_group_id?: unknown; id?: unknown; kakao_id?: unknown; youtube_nickname?: unknown; admin_order_status_v2?: unknown; order_manage_status?: unknown; final_amount?: unknown; total_price?: unknown; created_at?: unknown; is_deleted?: unknown; is_test_order?: unknown; product_name?: unknown };
 
 export type LiveVisitor = {
   id: string;
@@ -83,12 +83,12 @@ export function buildLiveVisitors(args: {
   }
 
   // 주문은 주문서(order_group_id) 단위로 묶어 1건 — 첫 줄 상태 기준(liveSummary 와 같은 규칙)
-  type Group = { key: string; kakao: string; nick: string; rows: OrderRow[] };
+  type Group = { key: string; kakao: string; nick: string; actor: string; rows: OrderRow[] };
   const groups = new Map<string, Group>();
   for (const o of args.orders) {
-    if (o.is_deleted === true || o.is_test_order === true) continue;
+    if (o.is_deleted === true || (o.is_test_order === true && !o.automation_actor_id)) continue;
     const key = clean(o.order_group_id) || `row:${clean(o.id)}`;
-    const g = groups.get(key) || { key, kakao: clean(o.kakao_id), nick: nickKey(o.youtube_nickname), rows: [] };
+    const g = groups.get(key) || { key, kakao: clean(o.kakao_id), nick: nickKey(o.youtube_nickname), actor: clean(o.automation_actor_id), rows: [] };
     g.rows.push(o);
     if (!g.kakao) g.kakao = clean(o.kakao_id);
     if (!g.nick) g.nick = nickKey(o.youtube_nickname);
@@ -97,15 +97,16 @@ export function buildLiveVisitors(args: {
   const ordByKakao = new Map<string, Group[]>();
   const ordByNick = new Map<string, Group[]>();
   for (const g of groups.values()) {
-    if (g.kakao) ordByKakao.set(g.kakao, [...(ordByKakao.get(g.kakao) || []), g]);
-    if (g.nick) ordByNick.set(g.nick, [...(ordByNick.get(g.nick) || []), g]);
+    if (!g.actor && g.kakao) ordByKakao.set(g.kakao, [...(ordByKakao.get(g.kakao) || []), g]);
+    if (!g.actor && g.nick) ordByNick.set(g.nick, [...(ordByNick.get(g.nick) || []), g]);
   }
 
   return args.rows.map((row) => {
     const pageType = clean(row.page_type) || "page";
     const kakaoId = clean(row.kakao_id);
+    const actorId = clean(row.automation_actor_id);
     const nick0 = clean(row.nickname);
-    const cust = (kakaoId && custByKakao.get(kakaoId)) || (nick0 && custByNick.get(nickKey(nick0))) || null;
+    const cust = actorId ? null : (kakaoId && custByKakao.get(kakaoId)) || (nick0 && custByNick.get(nickKey(nick0))) || null;
     const nickname = nick0 || clean(cust?.youtube_nickname);
     const activityKind = clean(row.activity);
     const activityAt = row.activity_at ? Date.parse(clean(row.activity_at)) : 0;
@@ -113,7 +114,7 @@ export function buildLiveVisitors(args: {
     const liveActivity = activity && activity.at && now - activity.at <= PRESENCE_ACTIVITY_MAX_AGE_MS ? activity : null;
     const timeline = normalizePresenceEvents(row.activity_log, now).reverse().map((e) => ({ kind: e.k, label: e.l, at: e.at, text: presenceActivityText(e.k, e.l) }));
 
-    const cartRows = (kakaoId && cartByKakao.get(kakaoId)) || (nickname && cartByNick.get(nickKey(nickname))) || [];
+    const cartRows = actorId ? args.carts.filter(r=>clean(r.automation_actor_id)===actorId&&(!r.expires_at||Date.parse(clean(r.expires_at))>now)) : ((kakaoId && cartByKakao.get(kakaoId)) || (nickname && cartByNick.get(nickKey(nickname))) || []).filter(r=>!r.automation_actor_id);
     let cartQty = 0, cartAmount = 0, unknownPrice = false;
     const cartItems: Array<{ name: string; qty: number }> = [];
     for (const r of cartRows) {
@@ -124,7 +125,7 @@ export function buildLiveVisitors(args: {
       if (cartItems.length < 6) cartItems.push({ name: clean(r.detail_name) || clean(r.product_name) || "상품", qty: q });
     }
 
-    const ordGroups = (kakaoId && ordByKakao.get(kakaoId)) || (nickname && ordByNick.get(nickKey(nickname))) || [];
+    const ordGroups = actorId ? Array.from(groups.values()).filter(g=>g.actor===actorId) : (kakaoId && ordByKakao.get(kakaoId)) || (nickname && ordByNick.get(nickKey(nickname))) || [];
     let paid = 0, unpaid = 0, amount = 0;
     const orderItems: LiveVisitor["orders"]["items"] = [];
     for (const g of ordGroups) {

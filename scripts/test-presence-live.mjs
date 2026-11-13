@@ -110,4 +110,8 @@ assert.equal(presenceActivityText("sheet_close", ""), "주문서 닫음(제출 �
 const kept = excludePresenceRows(rows, { kakaoIds: ["K5"], names: ["핑크링"] }).map((r) => r.id);
 assert.deepEqual(kept, ["p1", "p3"]);
 assert.deepEqual(excludePresenceRows(rows, {}).map((r) => r.id), ["p1", "p2", "p3", "p5"], "목록 없어도 관리자 줄은 뺌");
+const actors=buildLiveVisitors({now,rows:[{id:'a',nickname:'First',kakao_id:'shared',automation_actor_id:'actor-a'},{id:'b',nickname:'Second',kakao_id:'shared',automation_actor_id:'actor-b'}],customers:[{kakao_id:'shared',customer_name:'Owner'}],carts:[{automation_actor_id:'actor-a',nickname:'First',qty:2,unit_price:100}],orders:[{id:90,order_group_id:'ag',kakao_id:'shared',youtube_nickname:'Second',automation_actor_id:'actor-b',is_test_order:true,total_price:100}]});
+assert.equal(actors[0].cart.qty,2);assert.equal(actors[1].cart.qty,0);
+assert.equal(actors[0].orders.count,0);assert.equal(actors[1].orders.count,1);
+assert.equal(actors[0].name,'','shared technical owner must not replace actor identity');
 console.log("PASS presence-live");

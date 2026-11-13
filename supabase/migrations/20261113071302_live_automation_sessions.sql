@@ -231,7 +231,7 @@ declare item jsonb; p public.products; n jsonb; v jsonb; inventory_color text; s
   if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)<1 or jsonb_array_length(p_items)>30 then raise exception 'INVALID_ITEMS'; end if;
   for item in select value from jsonb_array_elements(p_items) order by (value->>'productId')::bigint loop
     select * into p from public.products where id=(item->>'productId')::bigint for update;
-    if p.id is null or (to_jsonb(p)->>'is_visible')::boolean is false or p.status in('hidden','숨김','deleted','판매중지','품절') or p.product_status in('hidden','숨김','deleted','판매중지','품절') or not exists(select 1 from public.broadcast_products where broadcast_id=p_broadcast and product_id=p.id) then raise exception 'PRODUCT_UNAVAILABLE'; end if;
+    if p.id is null or (to_jsonb(p)->>'is_visible')::boolean is false or p.status in('hidden','숨김','deleted','판매중지','품절') or p.product_status in('hidden','숨김','deleted','판매중지','품절') or not exists(select 1 from public.broadcast_products bp where broadcast_id=p_broadcast and product_id=p.id and (to_jsonb(bp)->>'is_visible')::boolean is not false) then raise exception 'PRODUCT_UNAVAILABLE'; end if;
     n:=coalesce(nullif(p.product_note,'')::jsonb,'{}');
     wanted:=(item->>'qty')::integer;
     if wanted<1 or wanted>3 then raise exception 'INVALID_QUANTITY'; end if;
@@ -337,8 +337,9 @@ declare j jsonb:=to_jsonb(new); oldj jsonb; automatic boolean; begin
   if tg_op='INSERT' and not public.live_automation_verified_order(new.order_group_id) then raise exception 'AUTOMATION_AUTH_REQUIRED'; end if;
   if new.is_test_order is not true or new.exclude_from_settlement is not true or new.exclude_from_payment_match is not true
      or new.exclude_from_shipping is not true or new.exclude_from_picking is not true then raise exception 'AUTOMATION_PROVENANCE_REQUIRED'; end if;
-  if coalesce(j->>'admin_order_status_v2','') in ('입금확인','카드결제완료') or coalesce(j->>'order_status','') in ('입금확인','카드결제완료')
-    or coalesce(j->>'shipping_status','') in ('출고완료','배송완료') or coalesce((j->>'point_used_amount')::numeric,0)>0
+  if concat_ws(' ',j->>'admin_order_status_v2',j->>'order_status',j->>'order_manage_status',j->>'admin_order_status',j->>'deposit_status',j->>'shipping_status') ~ '입금확인|결제완료|출고완료|배송완료'
+    or coalesce((j->>'point_used_amount')::numeric,0)>0 or coalesce((j->>'point_earned_amount')::numeric,0)>0
+    or coalesce((j->>'point_refunded_amount')::numeric,0)>0 or j->>'deposit_confirmed_at' is not null
     or j->>'inventory_deducted_at' is not null then raise exception 'AUTOMATION_FINANCIAL_EFFECT_BLOCKED'; end if;
   return new;
 end $$;

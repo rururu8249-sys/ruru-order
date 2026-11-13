@@ -8,6 +8,7 @@ import { CART_SEQ_NEW, cartClearNeedsNotice, cartItemClearedBy, normCartOpt, typ
 import { sweepExpiredCartHolds } from "@/lib/cartHoldSweep";
 import { readExposedProductIds } from "@/lib/cartExposureServer";
 import { announceNewCartLines, type NewCartLine } from "@/lib/liveCartAnnounceServer";
+import { readAutomationRequest, AutomationError } from "@/lib/liveAutomationAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -177,6 +178,17 @@ export async function POST(request: NextRequest) {
     if (!sessionKey) return NextResponse.json({ ok: false, error: "sessionKey 없음" }, { status: 400 });
 
     const supabase = getSupabaseAdmin();
+    const automation = await readAutomationRequest(request, { owner: body?.kakaoId, phone: body?.phone, sessionKey }, "cart", supabase);
+    if (automation) {
+      if (action !== "clear" && action !== "sync") return NextResponse.json({ ok: false, error: "알 수 없는 action" }, { status: 400 });
+      const items = (Array.isArray(body?.items) ? body.items.slice(0, MAX_ITEMS) : []).map((it: Record<string, unknown>) => buildCartHoldSnapshotItem(it));
+      const { data, error } = await supabase.rpc(action === "clear" || items.length === 0 ? "live_automation_clear_cart" : "live_automation_cart", {
+        p_session: automation.session.id, p_revision: automation.capability.revision,
+        ...(action === "sync" && items.length > 0 ? { p_items: items } : {}),
+      });
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, allOk: true, holdMinutes: 5, results: items.map((it: ReturnType<typeof buildCartHoldSnapshotItem>) => ({ productId: it.productId, color: it.color, size: it.size, requested: it.qty, ok: true })), ...data });
+    }
     if (action === "clear") {
       const { error: delError } = await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
       if (delError) return NextResponse.json({ ok: false, error: delError.message }, { status: 500 });
@@ -344,6 +356,6 @@ export async function POST(request: NextRequest) {
       clearedSeq: clearedSeq || null,
     });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: e instanceof AutomationError ? e.status : 500 });
   }
 }

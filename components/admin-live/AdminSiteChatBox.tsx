@@ -171,7 +171,6 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
             )}
             <div className="min-w-0 flex-1 text-[14px] leading-5 text-ink">
               <span className="mr-1 font-bold text-ink-soft">{m.nickname}</span>
-              {m.avatar === AUTO_TEST_AVATAR ? <span className="mr-1 font-bold text-ink-mute">(테스트)</span> : null}
               {m.badge ? <span className={`mr-1 inline-flex h-[18px] items-center rounded px-1 align-[1px] text-[11px] font-bold ${BADGE_CLS[m.badge] || ""}`}>{BADGE_LABEL[m.badge]}</span> : null}
               <span className="break-words"><ChatBodyView body={m.body} emojis={emojiMap} /></span>
               <span className="ml-1 text-[11px] text-ink-mute">{timeText(m.createdAt)}</span>

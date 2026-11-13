@@ -4,7 +4,7 @@
 //   - «생각» 토큰 때문에 답이 비지 않게 thinkingLevel(3 계열)·thinkingBudget(2.5 계열)을 차례로, 모르는 설정(400)이면 다음.
 //   - 어떤 경우에도 예외를 던지지 않는다: 실패하면 text=null + note(이유, 비밀값 없음).
 //   - [2026-11-13] 부르기 전마다 lib/geminiGate 에서 무료 한도 자리를 받음(다시 시도·다른 모델 포함). 표에 없는 모델은 안 부름.
-import { acquireGemini, blockGemini, GEMINI_DEFAULT_MODELS, GEMINI_FREE_LIMITS } from "@/lib/geminiGate";
+import { acquireGemini, blockGemini, GEMINI_DEFAULT_MODELS, GEMINI_FREE_LIMITS, type GeminiPriority } from "@/lib/geminiGate";
 
 function freeModels(list: (string | undefined)[]): string[] {
   return Array.from(new Set(list.filter((m): m is string => Boolean(m) && Boolean(GEMINI_FREE_LIMITS[m as string]))));
@@ -13,7 +13,7 @@ export type GeminiJsonResult = { text: string | null; note: string };
 /** 글자 또는 사진(base64) 조각 — 사진은 응대 문구(AI-4)에서만 */
 export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
-export async function callGeminiJson(prompt: string | GeminiPart[], opts: { timeoutMs?: number; maxTokens?: number; temperature?: number; models?: string[] } = {}): Promise<GeminiJsonResult> {
+export async function callGeminiJson(prompt: string | GeminiPart[], opts: { timeoutMs?: number; maxTokens?: number; temperature?: number; models?: string[]; priority?: GeminiPriority; maxAttempts?: number } = {}): Promise<GeminiJsonResult> {
   const parts: GeminiPart[] = typeof prompt === "string" ? [{ text: prompt }] : prompt;
   const key = process.env.GEMINI_API_KEY || "";
   if (!key) return { text: null, note: "no_key" };
@@ -27,9 +27,13 @@ export async function callGeminiJson(prompt: string | GeminiPart[], opts: { time
     { temperature, responseMimeType: "application/json", maxOutputTokens: maxTokens * 2 },
   ];
   let note = "";
+  let attempts = 0;
+  const maxAttempts = Math.max(1, Math.min(9, opts.maxAttempts ?? 9));
   for (const model of models) {
     for (const generationConfig of configs) {
-      if (!(await acquireGemini(model))) { note = `${note ? `${note},` : ""}${model}:quota`; break; } // 무료 한도 보호 — 다음 모델
+      if (attempts >= maxAttempts) return { text: null, note };
+      if (!(await acquireGemini(model, Date.now(), opts.priority))) { note = `${note ? `${note},` : ""}${model}:quota`; break; }
+      attempts += 1;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {

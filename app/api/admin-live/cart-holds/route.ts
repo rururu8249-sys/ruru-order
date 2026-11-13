@@ -8,6 +8,7 @@ import { parseShopInfo, SHOP_INFO_KEYS, type ShopBankAccountId } from "@/lib/sho
 import { buildCartHoldSummary } from "@/lib/cartHoldSummary";
 import { sweepExpiredCartHolds } from "@/lib/cartHoldSweep";
 import { extendedHoldExpiry } from "@/lib/cartHoldExtend";
+import { readAutomationAdminActivity } from "@/lib/liveAutomationAdminActivity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,7 +88,8 @@ export async function GET(request: NextRequest) {
     const { data, error } = result;
     if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
 
-    let rows = (data || []) as Record<string, unknown>[];
+    const automation = await readAutomationAdminActivity(supabase);
+    let rows = [...(data || []), ...automation.holds] as Record<string, unknown>[];
     if (allowedProductIds) rows = rows.filter((r) => allowedProductIds!.has(String(r.product_id ?? "")));
 
     // 실시간 주문 상단 버튼은 상세 고객·상품·계좌 정보를 필요로 하지 않는다.
@@ -388,6 +390,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({} as any));
     const action = String(body?.action || "").trim();
     const supabase = getSupabaseAdmin();
+    if(['clear-all','remind-all','apply-hold'].includes(action)&&Array.isArray(body.sessionKeys)&&!body.sessionKey){
+      body.sessionKeys=body.sessionKeys.filter((key:unknown)=>!cleanKey(key).startsWith('live-auto:'));
+      if(body.sessionKeys.length===0)return NextResponse.json({ok:true,cleared:0,sent:0,extended:0,sessions:0});
+    }
+    const requestedKeys=[body?.sessionKey,...(Array.isArray(body?.sessionKeys)?body.sessionKeys:[])].map(cleanKey);
+    if(requestedKeys.some(key=>key.startsWith('live-auto:'))){
+      return NextResponse.json({ok:false,error:{message:'자동 실행 장바구니는 자동 실행을 중지하면 비워집니다.'}},{status:409});
+    }
 
     if (action === "set-bank-override") {
       const sessionKey = cleanKey(body?.sessionKey);

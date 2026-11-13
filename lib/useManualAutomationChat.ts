@@ -16,8 +16,8 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
  const lastVerified=useRef(0);
  openRef.current=open;
  const allow=useCallback((value:boolean)=>{readyRef.current=value;setReady(value)},[]);
- const post=useCallback(async(body:Record<string,unknown>,keepalive=false)=>{
-   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',...chatIdentityHeaders()},body:JSON.stringify({...body,clientId:client.current}),keepalive});
+ const post=useCallback(async(body:Record<string,unknown>,keepalive=false,clientId=client.current)=>{
+   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',...chatIdentityHeaders()},body:JSON.stringify({...body,clientId}),keepalive});
    const data=await response.json();
    if(!response.ok||!data.ok) throw Error(data.message||'사용 상태를 확인하지 못했어요.');
    return data;
@@ -29,7 +29,7 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
      const response=await fetch(endpoint+'?'+new URLSearchParams({bc:broadcastId,client:client.current}),{headers:chatIdentityHeaders(),cache:'no-store'});
      const data=await response.json();
      if(!mounted.current||epoch!==generation.current||stamp!==serial.current)return false;
-     if(response.status===403){access.current=false;setAvailable(false);allow(false);setActors([]);return false}
+     if(response.status===403){access.current=false;current.current=null;retry.current=null;setSelected(null);setAvailable(false);allow(false);setActors([]);return false}
      if(!response.ok||!data.ok)throw Error(data.message||'연결을 확인해 주세요.');
      access.current=true;lastVerified.current=Date.now();setAvailable(true);setActors(data.actors||[]);
      if(current.current) {
@@ -48,12 +48,14 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
    if(locked.current)return;
    const actor=actors.find(x=>x.id===id);
    if(!actor||actor.inUse&&!actor.mine)return;
-   if(Date.now()-lastVerified.current>6000 && !await refresh())return;
-   locked.current=true;setBusy(true);++serial.current;
-   const epoch=generation.current;
+   locked.current=true;setBusy(true);
+   const epoch=generation.current,clientId=client.current;
    try{
-     const data=await post({action:'select',bc:broadcastId,actorId:id});
-     if(!mounted.current||epoch!==generation.current){void post({action:'release',token:data.lease.token},true).catch(()=>{});return;}
+     if(Date.now()-lastVerified.current>6000 && !await refresh())return;
+     if(!mounted.current||epoch!==generation.current)return;
+     ++serial.current;
+     const data=await post({action:'select',bc:broadcastId,actorId:id},false,clientId);
+     if(!mounted.current||epoch!==generation.current){void post({action:'release',token:data.lease.token},true,clientId).catch(()=>{});return;}
      current.current={actor,lease:data.lease};setSelected(actor);allow(true);lastRenew.current=Date.now();
      setRecent(prev=>[id,...prev.filter(x=>x!==id)].slice(0,3));setMessage('');setOpen(false);
      await refresh();
@@ -94,6 +96,7 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
    const visibility=()=>{if(document.hidden){++serial.current;allow(false);}else void refresh()};
    const offline=()=>{++serial.current;allow(false);setMessage('연결이 끊겼어요. 연결 확인 후 보낼 수 있어요.');};
    const identity=()=>{clear();void refresh()};
+   const storage=(event:StorageEvent)=>{if(event.key===null||event.key==='ruru_chat_identity'||event.key==='ruru_kakao_id')identity()};
    const verified=(event:MessageEvent)=>{if(event.origin===location.origin&&event.data?.type==='ruru-chat-verified')identity();};
    void refresh();
    const timer=setInterval(()=>{
@@ -107,11 +110,11 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
      }).catch(()=>{if(mounted.current&&epoch===generation.current){allow(false);setMessage('사용권을 확인하지 못했어요. 다시 선택해 주세요.');}});
    },3000);
    document.addEventListener('visibilitychange',visibility);window.addEventListener('offline',offline);window.addEventListener('online',visibility);
-   window.addEventListener('pagehide',release);window.addEventListener('ruru-chat-logout',clear);window.addEventListener('storage',identity);window.addEventListener('message',verified);
+   window.addEventListener('pagehide',release);window.addEventListener('ruru-chat-logout',clear);window.addEventListener('storage',storage);window.addEventListener('message',verified);
    return ()=>{
      release();mounted.current=false;++generation.current;++serial.current;clearInterval(timer);
      document.removeEventListener('visibilitychange',visibility);window.removeEventListener('offline',offline);window.removeEventListener('online',visibility);
-     window.removeEventListener('pagehide',release);window.removeEventListener('ruru-chat-logout',clear);window.removeEventListener('storage',identity);window.removeEventListener('message',verified);
+     window.removeEventListener('pagehide',release);window.removeEventListener('ruru-chat-logout',clear);window.removeEventListener('storage',storage);window.removeEventListener('message',verified);
    };
  },[allow,broadcastId,enabled,post,refresh]);
  useEffect(()=>{
@@ -122,4 +125,3 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
  return {available,actors,selected,ready,busy,message,open,setOpen,recent,choose,reset,send,refresh};
 }
 export type ManualAutomationChat=ReturnType<typeof useManualAutomationChat>;
-

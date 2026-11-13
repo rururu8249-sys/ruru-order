@@ -89,13 +89,8 @@ export function cardHasTarget(targets: Array<{ productId: string; detailName: st
   return targets.some((t) => String(t.productId) === String(productId) && String(t.detailName || "") === String(detailName || ""));
 }
 
-/** 자동 테스트 채팅이 하루에 쓰는 Gemini 호출 상한 — 무료 한도(Lite 모델 하루 500회)를 AI 비서 등과 나눠 쓰려고 */
-export const AUTO_TEST_AI_DAILY_CAP = 150;
-/** 한도 초과(429)면 채팅만 쉬는 시간 */
-export const AUTO_TEST_AI_PAUSE_MS = 30 * 60_000;
-/** Gemini 무료 한도는 미국 서부 자정에 다시 채워짐 — 하루 셈도 그 날짜로 */
+/** 기존 자동 채팅 실행 통계용 한국 날짜. Gemini 호출 한도에는 사용하지 않는다. */
 export function aiQuotaDay(now = Date.now()): string {
-  // [2026-11-13 14:36] 사이트 하루 150회 = 한국 자정에 0으로(모델 자체 한도는 lib/geminiGate 가 미국 서부 자정 기준 따로)
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(now));
 }
 

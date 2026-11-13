@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+process.env.SUPABASE_SERVICE_ROLE_KEY='isolated-signing-key-with-at-least-32-characters';
+const load=createUiLoader();let W;try{W=load('lib/liveAutomationTransport.ts')}catch{}
+assert.ok(W,'automation must drive the existing customer transports with signed action scope');
+const id='00000000-0000-4000-8000-000000000001';
+const action={id,session_id:id,actor_id:id,revision:3,lease_token:id,order_group_id:id,manual:true,plan:{lines:[{productId:'10',productName:'item',color:'',size:'',qty:1,unitPrice:100}],groups:['normal']}};
+const ctx={campaign:{id,broadcast_id:id,revision:3},actor:{id,nickname:'Distinct'},session:{id,cart_key:'live-auto:cart-key',visitor_key:'live-auto:visitor-key'}};
+let soldOut=true,calls=[],rows=[],completed=[];
+const db={async rpc(name,args){
+ if(name==='live_automation_context')return {data:ctx,error:null};
+ if(name==='live_automation_check_items')return soldOut?{error:{message:'PRODUCT_UNAVAILABLE'}}:{data:null,error:null};
+ if(name==='live_automation_complete')completed.push(args);
+ return {data:{ok:true},error:null};
+},from(){const q={select(){return q},eq(){return q},then(resolve,reject){return Promise.resolve({data:rows,error:null}).then(resolve,reject)}};return q}};
+const settings={shipping:{normalFee:4000,normalRemoteFee:6000,vendorFee:4000,vendorRemoteFee:7000,overseasFee:0,overseasRemoteFee:0},customerCardRate:10,actualCardRate:7,cardMinAmount:100000};
+const transport=async(url,init)=>{const body=JSON.parse(init.body);calls.push({url,init,body});if(url.endsWith('/submit'))rows=body.orderRows.map(r=>({...r,automation_action_id:id,automation_actor_id:id}));return new Response(JSON.stringify({ok:true,allOk:true}));};
+await W.runOrderAction(db,'https://shop.test',action,settings,transport,()=>0);
+assert.equal(calls.length,0,'sold-out preflight sends no customer submit or cart request');
+soldOut=false;await W.runOrderAction(db,'https://shop.test',action,settings,transport,()=>0);
+assert.deepEqual(calls.map(c=>new URL(c.url).pathname),['/api/cart-reservations','/api/customer-orders/submit']);
+const auth=load('lib/liveAutomationAuth.ts');
+assert.ok(auth.verifyAutomationCapability(calls[0].init.headers['x-live-automation'],'cart'));
+assert.ok(auth.verifyAutomationCapability(calls[1].init.headers['x-live-automation'],'order'));
+assert.equal(calls[1].body.orderRows[0].youtube_nickname,'Distinct');assert.equal(calls[1].body.orderRows[0].order_group_id,id);
+assert.equal(calls[1].body.point_use_amount,0);assert.equal(calls[1].body.orderRows[0].exclude_from_shipping,true);
+calls=[];rows=[];await W.runOrderAction(db,'https://shop.test',{...action,manual:false},settings,transport,()=>0);
+assert.equal(calls.length,1,'automatic order first saves cart and persists delay, without sleeping or submitting immediately');
+calls=[];await W.runOrderAction(db,'https://shop.test',{...action,manual:false,plan:{...action.plan,stage:'submit'}},settings,transport,()=>0);
+assert.equal(calls.length,1);assert.ok(calls[0].url.endsWith('/submit'));
+console.log('PASS real API transport stages, sold-out zero requests, scoped signatures, stable group/nickname and no payment or cross-session cleanup');
