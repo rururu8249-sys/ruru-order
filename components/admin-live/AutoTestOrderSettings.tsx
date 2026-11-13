@@ -52,12 +52,23 @@ export default function AutoTestOrderSettings(){
    finally{setRunningOnce(false);void load()}
  };
  const remove=async()=>{
-   if(!await showAdminConfirm(`자동 생성된 주문서 ${orders}건을 삭제할까요? 일반 회원 주문은 유지됩니다.`,{title:'생성 주문 삭제',confirmText:'삭제'}))return;
-   setBusy(true);
-   try{const j=await post({action:'delete'});showAdminToast(`${j.groups}건을 삭제했어요.`,'success');window.dispatchEvent(new Event('ruru-admin-orders-refresh'));await load()}
-   catch(e){setError(e instanceof Error?e.message:'삭제하지 못했어요.')}
-   finally{setBusy(false)}
+   if(!state||writing.current||runningOnce)return;
+   writing.current=true;setBusy(true);++reads.current;
+   try{
+     const message=active
+       ? `자동 실행을 중지하고 생성 주문서 ${orders}건을 삭제할까요? 대기 중인 자동 알림도 중지됩니다. 일반 회원 주문은 유지됩니다.`
+       : `자동 생성된 주문서 ${orders}건을 삭제할까요? 일반 회원 주문은 유지됩니다.`;
+     if(!await showAdminConfirm(message,{title:'생성 주문 삭제',confirmText:active?'중지 후 삭제':'삭제'}))return;
+     setError('');
+     if(active)await post({action:'control',feature:'all',enabled:false,revision:state.revision});
+     const j=await post({action:'delete'});
+     showAdminToast(`${j.groups}건을 삭제했어요.`,'success');
+     window.dispatchEvent(new Event('ruru-admin-orders-refresh'));
+     writing.current=false;await load();
+   }catch(e){writing.current=false;await load();setError(e instanceof Error?e.message:'삭제하지 못했어요.')}
+   finally{writing.current=false;setBusy(false)}
  };
+
  return <section className="mt-3 border-t border-line pt-3" aria-label="자동 실행">
    <div className="mb-3 flex items-center justify-between gap-2">
      <div><div className="text-[16px] font-bold text-ink">자동 실행</div><div className="mt-1 text-[13px] text-ink-soft">주문 · 채팅 · 시청자</div></div>
@@ -69,20 +80,20 @@ export default function AutoTestOrderSettings(){
      <button type="button" className="min-h-11 text-[13px] text-ink-soft" aria-expanded={details} aria-controls="live-automation-details" onClick={()=>setDetails(!details)}>{details?'접기':'상세 설정'}</button>
    </div>
    {error?<p role="alert" className="mt-1 text-[13px] text-danger-tx">{error}</p>:null}
-   {state?.viewers?<p className="mt-1 text-[13px] text-ink-soft">시청 중 {state.activeViewers}명 · 50명 안팎으로 조절</p>:null}
+   {state?.viewers?<p className="mt-1 text-[13px] text-ink-soft">시청 중 {state.activeViewers}명 · 보통 2~30명 · 최대 50명</p>:null}
    {state?.orders&&state.nextOrderAt?<p className="mt-1 text-[13px] text-ink-soft" role="status">{Date.parse(state.nextOrderAt)>Date.now()?`다음 주문 ${time(state.nextOrderAt)}쯤`:'주문 준비·제출 확인 중'}</p>:null}
    {state?.last?<p className={`mt-1 text-[13px] leading-relaxed ${state.last.ok?'text-ink-soft':'text-danger-tx'}`}>{time(state.last.at)} · {state.last.message}</p>:null}
    {state&&!state.ready?<p className="text-[13px] text-ink-soft">실행 기능을 준비 중이에요.</p>:null}
    {details?<div id="live-automation-details" className="mt-2 space-y-3 border-t border-line pt-3">
      {([['orders','자동 주문'],['chat','AI 채팅'],['viewers','시청자 입장·퇴장']] as const).map(([key,label])=><button key={key} type="button" role="switch" aria-checked={Boolean(state?.[key])} aria-label={label} disabled={!state||busy||!state.ready} onClick={()=>void control(key,!state?.[key])} className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-[13px] disabled:opacity-50"><span>{label}</span><span className={`rounded-full px-3 py-1 text-[13px] font-bold ${state?.[key]?'bg-ink text-white':'bg-surface-2 text-ink-soft'}`}>{state?.[key]?'켜짐':'꺼짐'}</span></button>)}
-     <p className="text-[13px] leading-relaxed text-ink-soft">시청자는 보통 40~60명, 가끔 최대 100명까지 늘어요. 주문은 조용한 시간과 몰리는 시간을 섞습니다. 입금 알림은 생성 주문용이며 실제 입금 처리는 하지 않아요.</p>
+     <p className="text-[13px] leading-relaxed text-ink-soft">시청자는 보통 2~30명, 가끔 최대 50명까지 늘어요. 주문은 조용한 시간과 몰리는 시간을 섞습니다. 입금 알림은 생성 주문용이며 실제 입금 처리는 하지 않아요.</p>
      <div className="border-t border-line pt-3 text-[13px] text-ink-soft">
        <div className="mb-2 font-bold text-ink">AI 사용량</div>
        {usage.length?usage.map(g=><div key={g.model} className="mb-1 flex flex-wrap justify-between gap-x-2"><span>{g.model.replace('gemini-','').replace('-flash-lite',' Lite').replace('-flash',' Flash')}</span><span>{g.used===null?'확인 불가':`${g.used} / ${g.limit}회`}{g.blockedUntil>Date.now()?` · ${time(g.blockedUntil)}까지 대기`:''}</span></div>):<div>사용량을 확인하지 못했어요.</div>}
        <p className="mt-2 leading-relaxed">이 사이트에서 집계한 호출 수예요. 미국 서부 자정에 초기화됩니다. 질문·상품 인식·관리자 기능을 우선 처리하고 자동 채팅은 잠시 기다립니다.</p>
      </div>
      <button type="button" className={`${button} w-full border border-line text-ink`} disabled={!state?.ready||busy||runningOnce||Boolean(state.manualAction)} onClick={()=>void run()}>{runningOnce?'주문 처리 중…':'주문 1회 실행'}</button>
-     {orders>0?<button type="button" className={`${button} w-full text-danger-tx`} disabled={busy||active} onClick={()=>void remove()}>생성 주문 {orders}건 삭제</button>:null}
+     {orders>0?<button type="button" className={`${button} w-full text-danger-tx`} disabled={!state||busy||runningOnce} onClick={()=>void remove()}>생성 주문 {orders}건 삭제</button>:null}
    </div>:null}
  </section>;
 }
