@@ -13,7 +13,7 @@ import { useLiveFeaturedProducts, streamDelayFromIngestion } from "@/lib/useLive
 import { useReplayProductCard } from "@/lib/useReplayProductCard";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
 import { chatIdentityHeaders, verifyChatAccount } from "@/lib/useLiveChatPrivate";
-import ChatQuickPhrases from "@/components/customer/ChatQuickPhrases";
+import ChatQuickPhrases, { QUICK_PHRASE_COLUMN } from "@/components/customer/ChatQuickPhrases";
 import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
 import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
 import {
@@ -1011,6 +1011,10 @@ export default function LiveWatchView(props: Props) {
   const adminDual = Boolean(isWidePc && chat?.canModerate && videoId);
   const desktopChatWidth = adminDual ? "clamp(260px, 24vw, 440px)" : "clamp(280px, 35vw, 560px)";
   const videoRight = isDesktop && !focus ? (adminDual ? `calc(${desktopChatWidth} * 2)` : desktopChatWidth) : 0;
+  // [11:46 사장님] 자주 쓰는 말 판이 열려 있으면 영상 칸을 그만큼 좁혀 영상이 왼쪽으로 가고, 판은 영상과 채팅 사이 빈칸에(영상 안 가림)
+  const [quickOpen, setQuickOpen] = useState(false);
+  const quickShown = isDesktop && !!chat?.canModerate && !focus;
+  const videoAreaRight = quickShown && quickOpen ? `calc(${videoRight || "0px"} + ${QUICK_PHRASE_COLUMN}px)` : videoRight;
   const [pageHost, setPageHost] = useState("");
   useEffect(() => { setPageHost(window.location.hostname); }, []);
   // [2026-11-12] 관리자 — 숫자 누르면 «지금 방송 보는 사람» 목록(10초마다 새로)
@@ -1219,7 +1223,7 @@ export default function LiveWatchView(props: Props) {
       style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: LIVE_FONT, textRendering: "optimizeLegibility", overscrollBehavior: "none", outline: "none" }}
     >
       {/* PC 영상 영역 / 폰은 기존 화면 전체 배치 */}
-      <div data-live-video="1" style={isDesktop ? { position: "absolute", left: 0, right: videoRight, top: 0, bottom: 0, overflow: "hidden" } : { display: "contents" }}>
+      <div data-live-video="1" style={isDesktop ? { position: "absolute", left: 0, right: videoAreaRight, top: 0, bottom: 0, overflow: "hidden" } : { display: "contents" }}>
       <iframe
         ref={iframeRef}
         key={`${videoId}-${reloadKey}`}
@@ -1529,11 +1533,11 @@ export default function LiveWatchView(props: Props) {
         {isDesktop && chat?.canWrite && !focus ? composer : null}
       </div>
 
-      {rpsActive && !focus && <div ref={rpsOverlayRef} data-live-rps-overlay className="rps-live-overlay" style={{left:isDesktop?16:12,right:isDesktop?videoRight:12,paddingRight:isDesktop?16:0}}><RpsWidget key={rps.state?.id} game={rps} showSetup={rpsShowSetup} broadcastId={props.broadcastId} onAdmin={() => setRpsAdminOpen(true)}/></div>}
+      {rpsActive && !focus && <div ref={rpsOverlayRef} data-live-rps-overlay className="rps-live-overlay" style={{left:isDesktop?16:12,right:isDesktop?videoAreaRight:12,paddingRight:isDesktop?16:0}}><RpsWidget key={rps.state?.id} game={rps} showSetup={rpsShowSetup} broadcastId={props.broadcastId} onAdmin={() => setRpsAdminOpen(true)}/></div>}
       {rpsAdminOpen && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onSaved={() => { if (!rps.state?.id || rps.state.status === 'closed') setRpsLaunchKey(rpsSetupKey); }} onClose={() => setRpsAdminOpen(false)}/>}
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
-      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
+      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
         {/* [2026-11-12 사장님 그립 참고] 폰 = 가게 그림 + 빨간 숫자 + 「상품」(옆 주문서·더보기와 같은 모양), PC = 예전 넓은 버튼 */}
         {!isDesktop ? (
           <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ flexShrink: 0, width: "44px", padding: 0, border: "none", background: "transparent", color: "#FFFFFF", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer" }}>
@@ -1584,7 +1588,7 @@ export default function LiveWatchView(props: Props) {
           → 아래에서 올라오는 어두운 판 + 두 칸 큰 버튼(그림 왼쪽·글자 오른쪽). 손님이 자주 쓰는 것(주문내역·공지)부터. */}
       {moreOpen ? (
         <div role="dialog" aria-modal="true" aria-label="더보기" onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: isDesktop ? "flex-start" : "center" }}>
-          <div data-live-more-panel onClick={(e) => e.stopPropagation()} style={{ boxSizing: "border-box", width: isDesktop ? "360px" : "100%", maxWidth: "560px", ...(isDesktop ? { marginLeft: `calc((100% - ${videoRight || "0px"}) / 2 - 180px)`, marginBottom: "84px", borderRadius: "16px" } : { borderRadius: "16px 16px 0 0" }), background: "#1C1C1E", color: "#FFFFFF", padding: isDesktop ? "8px 12px 12px" : "8px 12px calc(12px + env(safe-area-inset-bottom))" }}>
+          <div data-live-more-panel onClick={(e) => e.stopPropagation()} style={{ boxSizing: "border-box", width: isDesktop ? "360px" : "100%", maxWidth: "560px", ...(isDesktop ? { marginLeft: `calc((100% - ${videoAreaRight || "0px"}) / 2 - 180px)`, marginBottom: "84px", borderRadius: "16px" } : { borderRadius: "16px 16px 0 0" }), background: "#1C1C1E", color: "#FFFFFF", padding: isDesktop ? "8px 12px 12px" : "8px 12px calc(12px + env(safe-area-inset-bottom))" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: "44px", padding: "0 4px 4px" }}>
               <span style={{ fontSize: "16px", fontWeight: 700 }}>더보기</span>
               <button type="button" onClick={() => setMoreOpen(false)} aria-label="더보기 닫기" style={{ width: "44px", height: "44px", marginRight: "-8px", border: "none", background: "transparent", color: "#FFFFFF", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -1669,11 +1673,11 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 관리자 PC — 자주 쓰는 말(영상 칸 왼쪽 아래) */}
-      {isDesktop && chat?.canModerate && !focus ? <ChatQuickPhrases right={videoRight} onNotice={setChatHint} onSendSite={(phrase) => chat.onSend(phrase).catch(() => ({ ok: false, message: "사이트 채팅에 못 보냈어요" }))} /> : null}
+      {quickShown && chat ? <ChatQuickPhrases right={videoRight} onOpenChange={setQuickOpen} onNotice={setChatHint} onSendSite={(phrase) => chat.onSend(phrase).catch(() => ({ ok: false, message: "사이트 채팅에 못 보냈어요" }))} /> : null}
 
       {/* 채팅 안내(보냄 실패·금지 등) */}
       {chatHint ? (
-        <div role="status" style={{ position: "absolute", left: "16px", right: videoRight ? `calc(${videoRight} + 16px)` : "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
+        <div role="status" style={{ position: "absolute", left: "16px", right: videoAreaRight ? `calc(${videoAreaRight} + 16px)` : "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
           {/* [2026-11-13 사장님] PC 는 오른쪽 채팅 칸(관리자는 두 칸)에 가려 글이 잘리던 것 → 영상 칸 안에서만 가운데, 길면 줄바꿈 */}
           <span style={{ maxWidth: "100%", boxSizing: "border-box", padding: "8px 14px", borderRadius: "20px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, lineHeight: 1.4, textAlign: "center", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{chatHint}</span>
         </div>

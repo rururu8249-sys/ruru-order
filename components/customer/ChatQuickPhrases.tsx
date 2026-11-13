@@ -12,7 +12,10 @@ import { DEFAULT_QUICK_PHRASES, QUICK_PHRASES_MAX, QUICK_PHRASE_MAX_LEN, cleanQu
 
 const OPEN_KEY = "ruru_quick_phrases_open_v1"; // 이 PC 에서 접어 뒀는지만(편의값)
 type SendResult = { ok: boolean; message?: string };
-export default function ChatQuickPhrases({ onSendSite, onNotice, right }: { onSendSite: (phrase: string) => Promise<SendResult>; onNotice?: (message: string) => void; right?: string | number }) {
+// 판이 열려 있으면 영상과 채팅 사이에 이만큼 자리를 비워 둠(영상은 왼쪽으로 밀림)
+export const QUICK_PHRASE_COLUMN = 420;
+
+export default function ChatQuickPhrases({ onSendSite, onNotice, right, onOpenChange }: { onSendSite: (phrase: string) => Promise<SendResult>; onNotice?: (message: string) => void; right?: string | number; onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(() => { try { return typeof window === "undefined" || localStorage.getItem(OPEN_KEY) !== "0"; } catch { return true; } });
   const toggle = (next: boolean) => { setOpen(next); try { localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch {} };
   const [phrases, setPhrases] = useState<string[]>([]);
@@ -83,6 +86,7 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right }: { onSe
   });
 
   useEffect(() => { live.current = { phrases, send, editing: editing !== null }; });
+  useEffect(() => { onOpenChange?.(loaded && open); }, [loaded, open]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!loaded) return null;
   const rightCss = typeof right === "number" ? `${right}px` : right || "0px";
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || "");
@@ -91,7 +95,7 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right }: { onSe
   const plain = { height: "32px", padding: "0 6px", border: "none", background: "transparent", color: "#AAAAAA", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 } as const;
   const openEdit = () => { setNote(""); setEditing(phrases.length ? [...phrases] : [""]); };
   // 영상 오른쪽 검은 여백(영상과 채팅 사이) 아래쪽에 떠 있는 판. 접으면 작은 버튼만.
-  const wrap = { position: "absolute", right: `calc(${rightCss} + 12px)`, bottom: "calc(96px + env(safe-area-inset-bottom))", zIndex: 3, pointerEvents: "auto" } as const;
+  const wrap = { position: "absolute", right: `calc(${rightCss} + 12px)`, bottom: "calc(16px + env(safe-area-inset-bottom))", zIndex: 3, pointerEvents: "auto" } as const;
   const btn = (primary: boolean, on: boolean) => ({ width: "100px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "4px", padding: "0 6px", border: primary ? "none" : "1px solid #555555", borderRadius: "9999px", background: primary ? "#FFFFFF" : "transparent", color: primary ? "#0F0F0F" : "#FFFFFF", fontSize: "13px", fontWeight: 700, fontFamily: "inherit", cursor: on ? "default" : "pointer", opacity: on ? 0.6 : 1, whiteSpace: "nowrap" as const });
   return (
     <>
@@ -99,7 +103,7 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right }: { onSe
         <button type="button" data-live-quick-phrases="closed" onClick={() => toggle(true)} style={{ ...wrap, height: "40px", padding: "0 14px", border: "1px solid #555555", borderRadius: "9999px", background: "rgba(15,15,15,0.86)", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>자주 쓰는 말 {phrases.length}</button>
       ) : (
         <section data-live-quick-phrases="open" aria-label="자주 쓰는 말" onClick={(e) => e.stopPropagation()}
-          style={{ ...wrap, width: `min(400px, calc(100vw - ${rightCss} - 24px))`, maxHeight: "calc(100% - 200px)", display: "flex", flexDirection: "column", background: "rgba(15,15,15,0.92)", border: "1px solid #333333", borderRadius: "12px", color: "#FFFFFF", overflow: "hidden" }}>
+          style={{ ...wrap, width: `${QUICK_PHRASE_COLUMN - 24}px`, maxHeight: "calc(100% - 32px)", display: "flex", flexDirection: "column", background: "rgba(15,15,15,0.92)", border: "1px solid #333333", borderRadius: "12px", color: "#FFFFFF", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "2px", padding: "8px 6px 4px 12px", flexShrink: 0 }}>
             <strong style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap" }}>자주 쓰는 말</strong>
             <button type="button" onClick={openEdit} style={plain} aria-label="자주 쓰는 말 편집">편집</button>
