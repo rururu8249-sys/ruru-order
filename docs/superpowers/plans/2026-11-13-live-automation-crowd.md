@@ -15,10 +15,10 @@ Spec: User 2026-11-13 request: average ~50, rare100, quiet/busy order/payment rh
 - No posts from real customer identities; manual selected persona suppresses AI as before. Official receipt bot is distinct from persona speech.
 
 ## Tasks
-- [ ] SQL migration: population cap/state/step, batch real presence, scaled order wave/admission, isolated payment queue/notice guard/dispatcher cancellation. Test with actual PostgreSQL behavior via PGlite:50/100/ramp, expiry/reconnect, OFF/revision, duplicate payment/no finance mutation/forged events.
-- [ ] Worker/API: prepare population+one batch HTTP heartbeat, <=8 wave, payment drain independent from AI; authenticated batching through presenceWrite. Tests pin100 sessions→one HTTP and ordinary callers cannot request a batch.
-- [ ] Read-only admin status: show actual active generated count and population goal, payment simulation status in details (no extra basic buttons). Preserve common customer count.
-- [ ] Run scoped regression/tsc/build/guards, independent review, migrate and deploy via GitHub. Start with user's explicit request; measure API/DB count and worker HTTP latency, ramp to~50, observe continued updates and orders/notices. Report exact verified bounds, no fabricated long-run spike observations.
+- [x] SQL migration: population cap/state/step, batch real presence, scaled order wave/admission, isolated payment queue/notice guard/dispatcher cancellation. Test with actual PostgreSQL behavior via PGlite:50/100/ramp, expiry/reconnect, OFF/revision, duplicate payment/no finance mutation/forged events.
+- [x] Worker/API: prepare population+one batch HTTP heartbeat, <=8 wave, payment drain independent from AI; authenticated batching through presenceWrite. Tests pin100 sessions→one HTTP and ordinary callers cannot request a batch.
+- [x] Read-only admin status: show actual active generated count and population goal, payment simulation status in details (no extra basic buttons). Preserve common customer count.
+- [x] Run scoped regression/tsc/build/guards, independent review, migrate and deploy via GitHub. Start with user's explicit request; measure API/DB count and worker HTTP latency, ramp to~50, observe continued updates and orders/notices. Report exact verified bounds, no fabricated long-run spike observations.
 
 ## Review focus
 - OFF concurrent with batch/late notice cannot reintroduce presence or publish payment.
@@ -26,3 +26,7 @@ Spec: User 2026-11-13 request: average ~50, rare100, quiet/busy order/payment rh
 - Financial flags/status/points remain identical when synthetic notification publishes.
 - Target reduction cannot cancel an in-progress order or manual chat lease; stop watching only, preserve session until normal expiry.
 - Worker crash/restart does not catch up an unlimited backlog; per-tick bounds and persistent due dates.
+
+## Rollout evidence
+- a0fc666 deployed; migrations applied; current run started18:53KST, actual presence15→30→50→53 and public count matches plus ordinary sessions. Worker HTTP200/failures0; orders saved and isolated receipts queued. Full long-run cadence/rare natural spike remains unobserved.
+- User cart-notice question exposed missing notification hook despite successful hold→submit. Added service-only validated cart-notice RPC and common formatter, tested before deployment.

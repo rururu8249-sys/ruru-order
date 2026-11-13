@@ -7,7 +7,7 @@ import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { CART_SEQ_NEW, cartClearNeedsNotice, cartItemClearedBy, normCartOpt, type CartClearMark, type CartIdentity } from "@/lib/cartClearMarks";
 import { sweepExpiredCartHolds } from "@/lib/cartHoldSweep";
 import { readExposedProductIds } from "@/lib/cartExposureServer";
-import { announceNewCartLines, type NewCartLine } from "@/lib/liveCartAnnounceServer";
+import { announceNewCartLines, announceAutomationCart, type NewCartLine } from "@/lib/liveCartAnnounceServer";
 import { readAutomationRequest, AutomationError } from "@/lib/liveAutomationAuth";
 
 export const runtime = "nodejs";
@@ -187,6 +187,13 @@ export async function POST(request: NextRequest) {
         ...(action === "sync" && items.length > 0 ? { p_items: items } : {}),
       });
       if (error) throw new Error(error.message);
+      if (action === "sync" && items.length) {
+        await announceAutomationCart(supabase, {
+          actionId: automation.capability.action!, leaseToken: automation.capability.lease!,
+          revision: automation.capability.revision, nickname: automation.actor.nickname,
+          sessionKey, lines: items,
+        });
+      }
       return NextResponse.json({ ok: true, allOk: true, holdMinutes: 5, results: items.map((it: ReturnType<typeof buildCartHoldSnapshotItem>) => ({ productId: it.productId, color: it.color, size: it.size, requested: it.qty, ok: true })), ...data });
     }
     if (action === "clear") {

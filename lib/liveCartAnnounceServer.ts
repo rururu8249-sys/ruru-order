@@ -40,6 +40,35 @@ function sweep(map: Map<string, number>, ms: number) {
 
 const OPT_OK = /^[^<>{}\[\]\\`]{1,20}$/;
 
+/** Same visible cart format, with a server-authorized persona and no external notification. */
+export async function announceAutomationCart(sb: SupabaseClient, input: {
+  actionId: string; leaseToken: string; revision: number; nickname: string;
+  sessionKey: string; lines: NewCartLine[];
+}): Promise<void> {
+  try {
+    if (!input.lines.length) return;
+    const [chatRes, botRes] = await Promise.all([
+      sb.from("settings").select("value").eq("key", LIVE_CHAT_KEY).maybeSingle(),
+      sb.from("settings").select("value").eq("key", LIVE_CHAT_BOT_KEY).maybeSingle(),
+    ]);
+    if (chatRes.error || botRes.error) throw Error("CART_NOTICE_SETTINGS_FAILED");
+    const bot = parseLiveChatBotSetting(botRes.data?.value);
+    if (!parseLiveChatSetting(chatRes.data?.value).enabled || !bot.enabled || !bot.cart) return;
+    const first = input.lines[0];
+    const body = cartAnnounceText(maskChatNick(input.nickname), input.lines.map(line => ({
+      name: line.productName, color: line.color, size: line.size, price: line.unitPrice,
+    })));
+    const ref = botRefOfCart({ productId: first.productId, detailName: first.productName }, cartOwnerTag(input.sessionKey));
+    const { error } = await sb.rpc("live_automation_announce_cart", {
+      p_action: input.actionId, p_lease: input.leaseToken, p_revision: input.revision,
+      p_body: body, p_ref: ref,
+    });
+    if (error) throw Error(error.message);
+  } catch (error) {
+    console.warn("[automation-cart-notice]", error instanceof Error ? error.message : "NOTICE_FAILED");
+  }
+}
+
 export async function announceNewCartLines(sb: SupabaseClient, input: { sessionKey: string; kakaoId: string | null; lines: NewCartLine[] }): Promise<void> {
   try {
     const kakaoId = String(input.kakaoId ?? "").trim();

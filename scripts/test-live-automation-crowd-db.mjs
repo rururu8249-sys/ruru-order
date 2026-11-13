@@ -45,6 +45,7 @@ await db.exec(readFileSync(new URL('../supabase/migrations/20261113092853_live_a
 await db.exec(`create function live_automation_dispatch() returns void language plpgsql as $$ begin if exists(select 1 from public.live_automation_campaigns where (orders_enabled and next_order_at<=now())) then return; end if; end $$;`);
 await db.exec(readFileSync(new URL('../supabase/migrations/20261113094047_live_automation_crowd_rhythm.sql',import.meta.url),'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/20261113095014_live_automation_order_dynamics.sql',import.meta.url),'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113095647_live_automation_cart_notice.sql',import.meta.url),'utf8'));
 assert.equal(await scalar("select to_regclass('public.live_automation_payment_events')"),'live_automation_payment_events','isolated simulated payment events must exist');
 let c=await ctl('all',true,0);
 assert.equal(c.max_active,100);
@@ -86,7 +87,15 @@ const actor=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,'
 const plan={lines:[{productId:'10',productName:'니트',color:'',size:'',unitPrice:100,qty:1}]};
 const action=await scalar('select live_automation_action($1,$2,$3,$4,$5,$6,$7)',[actor.session.id,'order',new Date().toISOString(),plan,false,null,c.revision]);
 const claim=await scalar('select live_automation_claim($1,$2)',[action.id,c.revision]);
+const cartBody='🛍️ 입*확인용님 장바구니 담음 · 니트 · 100원';
+const notice=()=>scalar('select live_automation_announce_cart($1,$2,$3,$4,$5)',[action.id,claim.lease_token,c.revision,cartBody,'c:10|니트']);
+await assert.rejects(notice(),/CART|CHAT|ACTIVITY|ACTION/,'no cart, no notice');
 await scalar('select live_automation_cart($1,$2,$3)',[actor.session.id,c.revision,plan.lines]);
+assert.equal(await scalar('select live_automation_cart_notice_valid($1,$2,$3,$4,$5,$6)',[action.id,actor.actor.id,actor.session.id,bc,cartBody,'c:10|니트']),false);
+const cartMessage=await notice();assert.ok(cartMessage);assert.equal(await notice(),cartMessage,'retry cannot duplicate cart notice');
+assert.equal(await scalar('select count(*)::int from live_chat_messages where automation_cart_action_id is not null'),1);
+await assert.rejects(db.query("insert into live_chat_messages(broadcast_id,kakao_id,nickname,body,badge,bot_ref,automation_actor_id,automation_session_id,automation_cart_action_id) values($1,'bot:ruru','루루동이',$2,'bot',$3,$4,$5,$6)",[bc,cartBody,'c:10|니트',actor.actor.id,actor.session.id,action.id]),/UNAUTHORIZED|AUTH|CHAT|ACTION/);
+
 await scalar('select live_automation_submit($1,$2,$3,$4)',[action.id,claim.lease_token,c.revision,[{product_id:10,product_name:'니트',color:'',size:'',qty:1,product_price:100,order_group_id:action.order_group_id}]]);
 assert.equal(await scalar('select count(*)::int from live_automation_payment_events'),1);
 await db.query("update live_automation_payment_events set status='pending',due_at=now()-interval '1 second' where order_action_id=$1",[action.id]);
@@ -104,6 +113,7 @@ assert.equal(await scalar('select count(*)::int from live_automation_payment_eve
 await db.query("update live_automation_payment_events set status='pending',due_at=now() where order_action_id=$1",[action.id]);
 await ctl('all',false,c.revision);
 await assert.rejects(step(),/STALE|OFF/);
+await assert.rejects(notice(),/STALE|ENDED|ACTION|OFF/);
 await assert.rejects(scalar('select live_automation_presence_batch($1,$2,$3)',[crowd.anchor,c.revision,'/order#live']),/STALE|ENDED/);
 assert.equal(await scalar('select count(*)::int from visitor_presence'),0);
 assert.equal(await scalar("select count(*)::int from live_automation_payment_events where status='pending'"),0,'OFF cancels delayed receipts');
