@@ -531,7 +531,9 @@ export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): P
     // 지우지 않고 «관리자 채팅 지우기»와 같은 칸(hidden_at)을 채움 → 기존 소식 길로 열려 있는 손님 화면에서도 바로 사라짐
     const nicknames = [...new Set(finalRows.map((r) => String(r.youtube_nickname ?? "").trim()).filter(Boolean))];
     const bcs = [...new Set(finalRows.map((r) => String(r.broadcast_id ?? "")).filter(Boolean))];
-    if (bcs.length) {
+    // 2026-11-14 사장님: 테스트 주문을 지워도 채팅 알림·글은 그대로 둠(숨기지 않음)
+    const HIDE_CHAT_ON_DELETE = false;
+    if (HIDE_CHAT_ON_DELETE && bcs.length) {
       const { data: msgs } = await sb.from("live_chat_messages").select("id, avatar_url, nickname, body, bot_ref")
         .in("broadcast_id", bcs).eq("avatar_url", AUTO_TEST_AVATAR).is("hidden_at", null).limit(3000);
       const hideIds = ((msgs ?? []) as Row[]).filter((m) => isTestOrderChatLine(m, finalGroups, nicknames)).map((m) => Number(m.id));
