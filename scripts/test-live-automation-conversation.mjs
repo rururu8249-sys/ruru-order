@@ -4,7 +4,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY='isolated-conversation-signature-over-32-c
 const id='00000000-0000-4000-8000-000000000001';
 let aiCalls=0,httpCalls=0,taken=false,admissions=0;
 const ctx={campaign:{id,broadcast_id:id,revision:1},session:{id},actor:{id,nickname:'달빛',profile:{seed:0,style:'간결한 존댓말'},order_count:1}};
-const db={from(){const q={select(){return q},eq(){return q},maybeSingle:async()=>({data:{status:'ON'}})};return q},async rpc(name){if(name==='live_automation_context')return {data:ctx};if(name==='live_automation_ai_admission'){admissions++;if(taken)return {error:{message:'MANUAL_CHAT_ACTIVE'}}}return {data:null}}};
+const db={from(table){const q={select(){return q},eq(){return q},is(){return q},not(){return q},gte(){return q},or(){return q},order(){return q},limit(){return q},maybeSingle:async()=>({data:{status:'ON'}}),then(resolve,reject){return Promise.resolve({data:table==='broadcasts'?{status:'ON'}:[],error:null}).then(resolve,reject)}};return q},async rpc(name){if(name==='live_automation_context')return {data:ctx};if(name==='live_automation_ai_admission'){admissions++;if(taken)return {error:{message:'MANUAL_CHAT_ACTIVE'}}}return {data:null}}};
 const load=createUiLoader({'./autoTestOrderServer':{streamModeOf:async()=>'live'},'./geminiJson':{callGeminiJson:async()=>{aiCalls++;taken=true;return {text:'{"text":"주문서 제출했어요"}',note:'model'}}}});
 let C;try{C=load('lib/liveAutomationConversation.ts')}catch{}
 assert.ok(C,'activity-aware conversation driver must exist');
@@ -24,7 +24,7 @@ const featuredLoader=createUiLoader({
  './autoTestOrderServer':{streamModeOf:async()=>'live'},
 });
 const withCard=featuredLoader('lib/liveAutomationConversation.ts');
-db.from=()=>{const q={select(){return q},eq(){return q},maybeSingle:async()=>({data:{status:'ON'}})};return q};
+
 taken=false;aiCalls=0;httpCalls=0;
 const question={...action,kind:'question',plan:{card,mode:'live',facts:{ordered:false,items:[{productId:'10',productName:'상품'}]}}};
 await withCard.runConversationAction(db,'https://shop.test',question,[],transport);
@@ -48,3 +48,22 @@ assert.equal(S.spokenProductName('CL-102',1),'쎌린102');
 assert.equal(S.spokenProductName('BC-101',2),'쿠치101');
 assert.equal(S.spokenProductName('LOE-1',0),'로에1');
 assert.equal(S.normalizeSpokenCodes('MX-117은요?',[{productName:'MIU-1'}],0),'MX-117은요?','unrelated product codes are never silently substituted');
+for(const [code,aliases] of Object.entries(S.BRAND_SPEECH_ALIASES)){
+ const spoken=new Set(Array.from({length:40},(_,i)=>S.spokenProductName(code+'-117',i).replace(/-?117$/,'')));
+ for(const alias of aliases)assert.ok(spoken.has(alias),code+' rotates '+alias);
+}
+assert.equal(C.acceptConversationText('miu1 주문했어요',{ordered:true,items:[{productName:'MIU-1'}]},[],'paused','chat',9),'miu-1 주문했어요');
+assert.equal(C.acceptConversationText('MX117 주문했어요',{ordered:true,items:[{productName:'MIU-1'}]},[],'paused'),null);
+
+const R=load('lib/liveAutomationRoom.ts');
+const now=Date.now();
+const bot=[0,1,2].map(i=>({badge:'bot',body:'🛒 주문 감사합니다',created_at:new Date(now-i*30000).toISOString()}));
+const quiet=R.conversationRoom(bot,'paused',now);
+assert.equal(quiet.quietWhileOrdering,true);
+assert.equal(R.conversationRoom([...bot,{body:'안녕하세요',created_at:new Date(now-20000).toISOString()}],'paused',now).quietWhileOrdering,false);
+assert.equal(R.conversationRoom(Array.from({length:40},()=>bot[0]),'paused',now).quietWhileOrdering,false,'truncated busy history cannot establish silence');
+assert.equal(R.conversationRoom([...bot,{body:'다들 조용하시네요',automation_actor_id:id,created_at:new Date(now-600000).toISOString()}],'paused',now).quietWhileOrdering,false,'room comments have a 15 minute cooldown');
+assert.equal(C.acceptConversationText('다들 조용히 주문만 하시네요ㅎㅎ',{ordered:true,room:quiet},[],'paused'),'다들 조용히 주문만 하시네요ㅎㅎ');
+assert.equal(C.acceptConversationText('다들 조용히 주문만 하시네요ㅎㅎ',{ordered:true},[],'paused'),null);
+
+assert.equal(R.conversationRoom(bot,'paused',now,new Date(now-600000).toISOString()).quietWhileOrdering,false,'independent room-comment history preserves cooldown beyond 40 recent rows');

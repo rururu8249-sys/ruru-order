@@ -6,10 +6,18 @@ export const BRAND_SPEECH_ALIASES: Record<string, readonly string[]> = {
 };
 export function spokenProductName(name: string, seed=0): string {
   return name.replace(/\b(MIU|MX|BB|MC|PD|CL|LOE|BC|CH|GC|DR)\s*-?\s*(\d+)\b/gi, (_,code:string,number:string)=>{
-    const choices=BRAND_SPEECH_ALIASES[code.toUpperCase()].filter(alias=>/[가-힣]/.test(alias));
+    const aliases=BRAND_SPEECH_ALIASES[code.toUpperCase()];
+    const korean=aliases.filter(alias=>/[가-힣]/.test(alias));
+    // Every supplied alias appears; Korean forms occur more frequently than Roman codes.
+    const choices=[...korean,...korean,...aliases];
     const index=Math.abs(Math.trunc(seed));
     return choices[index%choices.length]+(index%5===4?'-':'')+number;
   });
+}
+export function unsupportedProductCode(text:string,items:unknown[]):boolean {
+  const codes=(s:string)=>Array.from(s.matchAll(/\b([A-Z]{2,5})\s*-?\s*(\d+)\b/gi),m=>m[1].toLowerCase()+m[2]);
+  const allowed=new Set(items.flatMap(item=>codes(String((item as {productName?:unknown})?.productName||''))));
+  return codes(text).some(code=>!allowed.has(code));
 }
 export function normalizeSpokenCodes(text:string,items:unknown[],seed=0):string {
   let result=text;
@@ -22,7 +30,6 @@ export function normalizeSpokenCodes(text:string,items:unknown[],seed=0):string 
   return result;
 }
 export function unsuitableSpeech(text:string,mode:string,kind:string):boolean {
-  if(/\b[A-Z]{2,5}\s*-?\s*\d+\b/i.test(text))return true;
   if(/구성|조합.{0,8}(좋|깔끔|알차)|디테일.{0,8}(훌륭|만족)|탁월한 선택/.test(text))return true;
   if(kind==='chat'&&/\d+\s*(개|종)/.test(text))return true;
   if(mode!=='live'&&/(보여\s*(줘|주|주세요)|입어\s*(봐|주|줘)|착용해|설명\s*(해|부탁)|돌아\s*(봐|주|줘)|생방송|지금.{0,8}(입고|설명하고))/.test(text))return true;

@@ -46,6 +46,7 @@ await db.exec(`create function live_automation_dispatch() returns void language 
 await db.exec(readFileSync(new URL('../supabase/migrations/20261113094047_live_automation_crowd_rhythm.sql',import.meta.url),'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/20261113095014_live_automation_order_dynamics.sql',import.meta.url),'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/20261113095647_live_automation_cart_notice.sql',import.meta.url),'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113101312_live_automation_interleaved_events.sql',import.meta.url),'utf8'));
 assert.equal(await scalar("select to_regclass('public.live_automation_payment_events')"),'live_automation_payment_events','isolated simulated payment events must exist');
 let c=await ctl('all',true,0);
 assert.equal(c.max_active,100);
@@ -107,9 +108,19 @@ assert.equal(await scalar('select live_automation_drain_payments($1,$2)',[c.id,c
 assert.equal(await scalar('select live_automation_drain_payments($1,$2)',[c.id,c.revision]),0,'retries cannot duplicate a payment notice');
 assert.deepEqual(await scalar('select jsonb_agg(to_jsonb(o)) from orders o'),before,'receipt notification must not alter any order/financial field');
 assert.equal(await scalar('select count(*)::int from live_chat_messages where automation_payment_action_id is not null'),1);
-await db.query("insert into live_automation_actions(campaign_id,session_id,actor_id,kind,due_at,status,revision,completed_at) select $1,$2,$3,'order',now(),'succeeded',$4,clock_timestamp() from generate_series(1,119)",[c.id,actor.session.id,actor.actor.id,c.revision]);
+for(let i=0;i<2;i++){
+ const more=await scalar('select live_automation_action($1,$2,$3,$4,$5,$6,$7)',[actor.session.id,'order',new Date().toISOString(),plan,false,null,c.revision]);
+ const token=await scalar('select live_automation_claim($1,$2)',[more.id,c.revision]);
+ await scalar('select live_automation_cart($1,$2,$3)',[actor.session.id,c.revision,plan.lines]);
+ await scalar('select live_automation_submit($1,$2,$3,$4)',[more.id,token.lease_token,c.revision,[{product_id:10,product_name:'니트',color:'',size:'',qty:1,product_price:100,order_group_id:more.order_group_id}]]);
+ await db.query("update live_automation_payment_events set status='pending',due_at=now()-interval '1 second' where order_action_id=$1",[more.id]);
+}
+assert.equal(await scalar('select live_automation_drain_payments($1,$2)',[c.id,c.revision]),1);
+assert.equal(await scalar("select count(*)::int from live_automation_payment_events where status='pending'"),1,'simultaneously due receipts cannot publish as a block');
+assert.equal(await scalar('select live_automation_drain_payments($1,$2)',[c.id,c.revision]),1);
+await db.query("insert into live_automation_actions(campaign_id,session_id,actor_id,kind,due_at,status,revision,completed_at) select $1,$2,$3,'order',now(),'succeeded',$4,clock_timestamp() from generate_series(1,117)",[c.id,actor.session.id,actor.actor.id,c.revision]);
 await assert.rejects(scalar('select live_automation_order_admission($1,$2)',[c.id,null]),/HOURLY_LIMIT/);
-assert.equal(await scalar('select count(*)::int from live_automation_payment_events'),1,'actions without saved orders cannot create payment events');
+assert.equal(await scalar('select count(*)::int from live_automation_payment_events'),3,'actions without saved orders cannot create payment events');
 await db.query("update live_automation_payment_events set status='pending',due_at=now() where order_action_id=$1",[action.id]);
 await ctl('all',false,c.revision);
 await assert.rejects(step(),/STALE|OFF/);

@@ -21,3 +21,11 @@ assert.equal(T.maySpeak({kind:'proactive',now:3600000,hasActivity:true,manualUnt
 assert.equal(T.maySpeak({kind:'reply',now:3600000,hasActivity:true,manualUntil:0,quietUntil:0,actorLast:null,recent:[{at:3599000,kind:'reply'}]}),true);
 assert.equal(T.maySpeak({kind:'reply',now:3600000,hasActivity:true,manualUntil:0,quietUntil:0,actorLast:null,recent:[{at:3599000,kind:'reply'},{at:3599001,kind:'proactive'}]}),false);
 console.log('PASS variable quiet/steady/burst tempo, cart dwell, rolling limits and activity/manual-aware sparse AI');
+const j1=T.planOrderJourney(0,60000,0,()=>0),j2=T.planOrderJourney(0,60000,60000,()=>.9);
+assert.equal(j1.cartAt,30000);assert.equal(j1.submitAt,45000);
+assert.equal(j2.cartAt,90000);assert.ok(j2.submitAt>j2.cartAt);
+assert.ok(j1.submitAt<j2.cartAt,'one person can submit before another starts their cart');
+const queues=[...Array.from({length:8},(_,i)=>({id:'cart'+i,plan:{}})),...Array.from({length:3},(_,i)=>({id:'submit'+i,plan:{stage:'submit'}}))];
+assert.deepEqual(T.interleaveOrderStages(queues,()=>0).map(a=>a.id),['cart0','submit0','cart1']);
+assert.deepEqual(T.interleaveOrderStages(queues,()=>1).map(a=>a.id),['submit0','cart0','submit1']);
+assert.equal(T.interleaveOrderStages(queues.slice(0,8),()=>0).length,2,'single-stage backlog is bounded');

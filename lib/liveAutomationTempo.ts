@@ -14,6 +14,24 @@ export function planOrderTempo(now:number,previous:TempoMode|null,random=Math.ra
   return {mode,nextAt,offsets:Array.from({length:count},()=>between(0,90000,random)).sort((a,b)=>a-b)};
 }
 export const cartDelay=(random=Math.random)=>between(15000,150000,random);
+export function planOrderJourney(now:number,waveAt:number,offset:number,random=Math.random) {
+  const cartAt=Math.max(now,waveAt-30000+offset);
+  return {cartAt,submitAt:cartAt+cartDelay(random)};
+}
+export function interleaveOrderStages<T extends {plan:{stage?:unknown}}>(due:T[],random=Math.random):T[] {
+  const carts=due.filter(a=>a.plan.stage!=='submit'),submits=due.filter(a=>a.plan.stage==='submit');
+  const selected:T[]=[];let next=sample(random)<.5?carts:submits;
+  // At most two of either stage per dispatch; let independent journeys overlap.
+  const used=new Map<T[],number>();
+  for(let i=0;i<3;i++){
+    const other=next===carts?submits:carts;
+    if(!next.length||(used.get(next)||0)>=2)next=other;
+    if(!next.length||(used.get(next)||0)>=2)break;
+    selected.push(next.shift()!);used.set(next,(used.get(next)||0)+1);
+    next=next===carts?submits:carts;
+  }
+  return selected;
+}
 export const actorQuietDelay=(random=Math.random)=>between(300000,900000,random);
 export function nextAdmission(now:number,successfulAt:readonly number[],limit=MAX_HOURLY_ORDERS):number {
   const recent=successfulAt.filter(t=>Number.isFinite(t)&&t>now-3600000&&t<=now).sort((a,b)=>a-b);

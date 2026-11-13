@@ -61,16 +61,16 @@ function matchNormalized(normalizedTarget: string, normalizedQuery: string): boo
 //     한글은 브랜드 이름 앞부분(1글자 이상), 영어는 3글자 이상 맞아야 한다.
 const SEED_BRAND_CODES: Array<[string[], string[]]> = [
   [["샤넬", "chanel"], ["ch"]],
-  [["프라다", "prada"], ["pd"]],
+  [["프라다", "프라", "푸라닭", "prada"], ["pd"]],
   [["구찌", "gucci"], ["gc"]],
   [["버버리", "burberry"], ["bb"]],
   [["디올", "dior"], ["dr"]],
-  [["셀린느", "셀린", "celine"], ["cl"]],
-  [["로에베", "loewe"], ["loe"]],
-  [["미우미우", "miumiu"], ["miu"]],
-  [["막스마라", "maxmara"], ["mx"]],
+  [["셀린느", "셀린", "쎌린", "셀", "celine"], ["cl"]],
+  [["로에베", "로에", "loewe"], ["loe"]],
+  [["미우미우", "미워", "미우", "miumiu"], ["miu"]],
+  [["막스마라", "막스", "막땡", "maxmara"], ["mx"]],
   [["몽클레어", "몽클레르", "moncler"], ["mc"]],
-  [["브루넬로쿠치넬리", "쿠치넬리", "brunellocucinelli", "cucinelli"], ["bc"]],
+  [["브루넬로쿠치넬리", "브루넬로", "브루", "쿠치넬리", "쿠치", "brunellocucinelli", "cucinelli"], ["bc"]],
 ];
 
 type BrandAliasEntry = { names: Set<string>; codes: Set<string> };

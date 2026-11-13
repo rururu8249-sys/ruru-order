@@ -8,6 +8,7 @@ import {loadAutomationChoices,readAutomationSettings} from './liveAutomationCata
 import {automationPost,runOrderAction} from './liveAutomationTransport';
 import {pickOrderLines,type AutoTestSettings,type AutoTestPick} from './autoTestOrder';
 import {runConversations} from './liveAutomationConversation';
+import {interleaveOrderStages,planOrderJourney} from './liveAutomationTempo';
 type Wave={id:string;mode:string;at:string;offsets:number[];planned?:boolean};
 type LiveCampaign=Campaign & {tempo_plan?:Wave;next_chat_at?:string|null};
 const nowIso=()=>new Date().toISOString();
@@ -80,31 +81,39 @@ async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettin
    }
    if(!picks.length)continue;
    const actor=await orderActor(db,c,excluded);excluded.add(actor.actor.id);
-   const plannedSubmit=Math.max(Date.now()+15000,Date.parse(wave.at)+offset);
-   const cartAt=Math.max(Date.now(),plannedSubmit-150000);
+   const {cartAt,submitAt:plannedSubmit}=planOrderJourney(Date.now(),Date.parse(wave.at),offset);
    await automationRpc(db,'live_automation_action',{p_session:actor.session.id,p_kind:'order',p_due:new Date(cartAt).toISOString(),
      p_plan:{lines:planLines(picks),groups:picks.map(p=>p.group),submitAt:new Date(plannedSubmit).toISOString(),waveId:wave.id},p_manual:false,p_source:null,p_revision:c.revision});
  }
  if(!excluded.size)await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:true});
 }
 async function actionsTick(db:SupabaseClient,c:LiveCampaign,origin:string,transport:typeof fetch) {
+ const deadline=Date.now()+35000;
  await automationRpc(db,'live_automation_expire',{p_campaign:c.id});
  const results:PromiseSettledResult<unknown>[]=[];
- if(c.orders_enabled){
-   try{await automationRpc(db,'live_automation_drain_payments',{p_campaign:c.id,p_revision:c.revision})}catch(reason){results.push({status:'rejected',reason})}
- }
+ const record=async(work:()=>Promise<unknown>)=>{try{results.push({status:'fulfilled',value:await work()})}catch(reason){results.push({status:'rejected',reason})}};
+ let settings:AutoTestSettings|undefined;
  try {
-   const settings=await readAutomationSettings(db);
+   settings=await readAutomationSettings(db);
    if(c.orders_enabled)await planWave(db,c,settings);
-   const due=await rows<Action>(db.from('live_automation_actions').select('*').eq('campaign_id',c.id).eq('kind','order')
-     .in('status',['pending','claimed','uncertain']).lte('due_at',nowIso()).order('due_at').limit(3));
-   results.push(...await Promise.allSettled(due.map(async a=>{
-     const claimed=await automationRpc<Action|null>(db,'live_automation_claim',{p_action:a.id,p_revision:c.revision});
-     if(!claimed||claimed.status==='succeeded')return null;
-     return runOrderAction(db,origin,claimed,settings,transport);
-   })));
  }catch(reason){results.push({status:'rejected',reason})}
- if(c.chat_enabled){
+ try {
+   const due=await rows<Action>(db.from('live_automation_actions').select('*').eq('campaign_id',c.id).eq('kind','order')
+     .in('status',['pending','claimed','uncertain']).lte('due_at',nowIso()).order('due_at').limit(24));
+   const selected=settings?interleaveOrderStages(due):[];
+   const receiptAt=Math.floor(Math.random()*(selected.length+1));
+   for(let i=0;i<=selected.length;i++){
+     if(c.orders_enabled&&i===receiptAt)await record(()=>automationRpc(db,'live_automation_drain_payments',{p_campaign:c.id,p_revision:c.revision}));
+     const a=selected[i];if(!a)continue;
+     if(deadline-Date.now()<22000)break; // Leave unclaimed work for the next tick.
+     await record(async()=>{
+       const claimed=await automationRpc<Action|null>(db,'live_automation_claim',{p_action:a.id,p_revision:c.revision});
+       if(!claimed||claimed.status==='succeeded')return null;
+       return runOrderAction(db,origin,claimed,settings!,transport,Math.random,deadline);
+     });
+   }
+ }catch(reason){results.push({status:'rejected',reason})}
+ if(c.chat_enabled&&deadline-Date.now()>=30000){
    try{await runConversations(db,c,origin,transport)}catch(reason){results.push({status:'rejected',reason})}
  }
  return results;

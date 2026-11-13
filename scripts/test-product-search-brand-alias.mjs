@@ -38,3 +38,11 @@ assert.equal(productSearchMatches("XY-1", "기타1"), false);
 assert.equal(productSearchMatches("BC-201", "기타201"), true);
 
 console.log("brand alias search tests passed");
+
+for(const [code,aliases] of Object.entries({MIU:['미우미우','미워','미우','miu'],MX:['막스마라','막스','막땡','mx'],PD:['프라다','프라','푸라닭','pd'],CL:['셀린','쎌린','셀','cl'],BC:['브루','브루넬로','쿠치','bc'],LOE:['로에','로에베','loe']})){
+ for(const alias of aliases){
+  assert.equal(productSearchMatches(code+'-117',alias+'117'),true,alias+' must resolve to '+code);
+  assert.equal(productSearchMatches(code+'117',alias+'-117'),true,alias+' with hyphen resolves equally');
+  assert.equal(productSearchMatches(code+'-1170',alias+'117'),false,'number remains exact');
+ }
+}
