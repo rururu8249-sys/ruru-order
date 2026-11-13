@@ -118,6 +118,52 @@ const CONFETTI_RAIN = Array.from({ length: 18 }, (_, i) => {
     spin: `${(i % 2 ? 1 : -1) * (180 + i * 20)}deg`,
   };
 });
+// [2026-11-13 19:01 사장님 «밑에서도 불꽃놀이처럼 올라와야»] 아래에서 불꽃 4발이 솟아올라 위에서 터진다(마지막 알림에만).
+//   h = 이 층의 높이(px). 화면 전체 모드면 화면 높이, 카드 안이면 스티커 칸 높이. 표시 전용.
+const FIREWORK_SHOTS = [
+  { x: 12, apex: 0.30, delay: 0, color: "#FFD93D" },
+  { x: 88, apex: 0.26, delay: 0.25, color: "#FF8AD8" },
+  { x: 32, apex: 0.18, delay: 0.55, color: "#7DD3FC" },
+  { x: 70, apex: 0.22, delay: 0.8, color: "#FFFFFF" },
+];
+function Fireworks({ h }: { h: number }) {
+  return (
+    <div aria-hidden data-ruru-widget-confetti style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      {FIREWORK_SHOTS.map((f, i) => {
+        const rise = Math.round(h * (1 - f.apex));
+        const spark = Math.max(18, Math.round(h * 0.14));
+        const dot = Math.max(6, Math.round(h * 0.008));   // 화면 1920 → 15px
+        return (
+          <div key={i} style={{ position: "absolute", left: `${f.x}%`, bottom: 0, width: 0, height: 0 }}>
+            <span style={{
+              position: "absolute", left: `-${Math.ceil(dot / 3)}px`, top: 0, width: `${Math.max(4, Math.round(dot * 0.6))}px`, height: `${Math.max(10, Math.round(h * 0.05))}px`, borderRadius: "2px",
+              background: `linear-gradient(${f.color}, rgba(255,255,255,0))`, ["--rise" as any]: `-${rise}px`,
+              animation: `ruruRocket 0.7s cubic-bezier(0.2,0.7,0.4,1) ${f.delay}s both`,
+            }} />
+            <div style={{ position: "absolute", left: 0, top: `-${rise}px`, width: 0, height: 0 }}>
+              {/* 바깥 고리 22개 + 안쪽 고리 12개 */}
+              {Array.from({ length: 34 }, (_, k) => {
+                const inner = k >= 22;
+                const a = inner ? ((k - 22) / 12) * Math.PI * 2 + 0.26 : (k / 22) * Math.PI * 2;
+                const rr = inner ? spark * 0.55 : spark;
+                const d = inner ? Math.max(4, Math.round(dot * 0.7)) : dot;
+                return (
+                  <span key={k} style={{
+                    position: "absolute", left: `-${d / 2}px`, top: `-${d / 2}px`, width: `${d}px`, height: `${d}px`, borderRadius: "50%",
+                    background: k % 3 === 0 ? "#FFFFFF" : f.color, boxShadow: `0 0 ${d}px ${f.color}`,
+                    ["--sx" as any]: `${Math.round(Math.cos(a) * rr)}px`, ["--sy" as any]: `${Math.round(Math.sin(a) * rr)}px`,
+                    animation: `ruruSpark 1.3s ease-out ${(f.delay + 0.65).toFixed(2)}s both`,
+                  }} />
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // [2026-11-13 사장님 «마지막 알림은 폭죽 더 화려하게»] grand = 가운데 두 번(좌우 반대) + 색종이 두 배.
 function ConfettiBurst({ burstKey, grand }: { burstKey: number; grand?: boolean }) {
   const wave = (mirror: boolean, delay: number) =>
@@ -398,12 +444,14 @@ export default function ProductWidgetClient() {
   //   카드는 화면 오른쪽 위(r·t·w = 화면 % — 기본 오른쪽 3%·위 7%·폭 26%), 알림 스티커는 화면 정중앙. 주소에 full 없으면 예전 그대로.
   const [layout, setLayout] = useState(() => parseWidgetFullLayout(""));
   const [vpW, setVpW] = useState(1080);
+  const [vpH, setVpH] = useState(1920);
   useEffect(() => {
     const CARD_W = 200, CARD_H = CARD_FIXED_H;
     const calc = () => {
       const s = Math.min(window.innerWidth / CARD_W, window.innerHeight / CARD_H);
       setFitScale(Number.isFinite(s) && s > 0 ? Math.min(4, s) : 1);
       setVpW(window.innerWidth > 0 ? window.innerWidth : 1080);
+      setVpH(window.innerHeight > 0 ? window.innerHeight : 1920);
     };
     calc();
     window.addEventListener("resize", calc);
@@ -972,6 +1020,7 @@ export default function ProductWidgetClient() {
                   }}
                 >
                   {confettiOn ? <ConfettiBurst burstKey={confettiKey} grand /> : null}
+                  {confettiOn ? <Fireworks key={`fw${confettiKey}`} h={CARD} /> : null}
                   <ToastSticker key={`${currentToast.title}|${currentToast.name}|${currentToast.detail}|${confettiKey}`} toast={currentToast} durMs={toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS} />
                 </div> : null}
                 <span
@@ -1005,6 +1054,11 @@ export default function ProductWidgetClient() {
       </div>
 
       {/* [2026-11-13 사장님 «화면 정중앙»] ?full=1 이면 알림 스티커·폭죽을 화면 한가운데에(화면 폭의 약 46%) */}
+      {layout.full && currentToast && confettiOn ? (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+          <Fireworks key={`fwf${confettiKey}`} h={vpH} />
+        </div>
+      ) : null}
       {layout.full && currentToast ? (
         <div
           data-ruru-widget-center
@@ -1062,6 +1116,8 @@ export default function ProductWidgetClient() {
           100% { opacity: 0; }
         }
         @keyframes ruruDimOut { to { opacity: 0; } }
+        @keyframes ruruRocket { 0% { opacity: 0; transform: translateY(0); } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; transform: translateY(var(--rise)); } }
+        @keyframes ruruSpark { 0% { opacity: 0; transform: translate(0, 0) scale(0.4); } 8% { opacity: 1; } 70% { opacity: 1; transform: translate(var(--sx), var(--sy)) scale(1); } 100% { opacity: 0; transform: translate(var(--sx), calc(var(--sy) + 24px)) scale(0.6); } }
         @keyframes ruruStickerOut { to { opacity: 0; transform: rotate(-3deg) scale(0.96); } }
         @keyframes ruruLiveDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         @media (prefers-reduced-motion: reduce) {
