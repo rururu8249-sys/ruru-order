@@ -52,10 +52,20 @@ assert.equal(await scalar('select youtube_nickname from customers where id=4569'
 await db.exec("alter table orders add column created_at timestamptz default now()");
 await db.exec(readFileSync(new URL('../supabase/migrations/20261113074405_live_automation_manual_identity.sql',import.meta.url),'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/20261113075644_live_automation_variable_tempo.sql',import.meta.url),'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/20261113092853_live_automation_start_feedback.sql',import.meta.url),'utf8'));
+// Start/restart must be responsive even when ordinary randomized tempo would choose a quiet spell.
+const previousCampaign=c;
+await db.exec("begin; select setseed(-0.9)");
+c=await ctl('all',false,c.revision);
+c=await ctl('all',true,c.revision);
+let startupDelay=Date.parse(c.next_order_at)-Date.now();
+assert.ok(startupDelay>=30000&&startupDelay<=90000,`first order must be within 30–90 seconds, got ${startupDelay}`);
+assert.equal(c.tempo_plan.offsets.length,1,'startup creates only one initial form');
+await db.exec('rollback');c=previousCampaign;
 const seven=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,'Seven',{seed:1},1,7,false]);
 assert.equal(Math.round((Date.parse(seven.session.leave_at)-Date.parse(seven.session.joined_at))/60000),7,'dwell is not restricted to five old values');
 const generated=await scalar('select live_automation_plan_tempo($1,$2)',[c.id,false]);
-assert.ok(['quiet','steady','burst'].includes(generated.mode));
+assert.ok(['startup','quiet','steady','burst'].includes(generated.mode));
 assert.equal((await scalar('select live_automation_plan_tempo($1,$2)',[c.id,true])).mode,'quiet');
 const plan={lines:[{productId:'10',productName:'니트',color:'',size:'',unitPrice:100,qty:1}]};
 const submitNext=async(manual=false)=>{

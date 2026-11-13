@@ -1020,7 +1020,7 @@ export default function LiveWatchView(props: Props) {
   useEffect(() => { setPageHost(window.location.hostname); }, []);
   // [2026-11-12] 관리자 — 숫자 누르면 «지금 방송 보는 사람» 목록(10초마다 새로)
   const [watchersOpen, setWatchersOpen] = useState(false);
-  type WatcherRow = { key: string; nickname: string; name: string; member: boolean; lastSeenAt: string; staff?: boolean };
+  type WatcherRow = { key: string; nickname: string; name: string; member: boolean; lastSeenAt: string; staff?: boolean; test?: boolean };
   type WatcherTest = { site: number; watching: number; rows: Array<WatcherRow & { live?: boolean }>; orderedNicks: string[] };
   const [watchers, setWatchers] = useState<{ state: "loading" | "ready" | "error"; message?: string; total?: number; watching?: number; rows: WatcherRow[]; others: WatcherRow[]; test?: WatcherTest }>({ state: "loading", rows: [], others: [] });
   useEffect(() => {
@@ -1394,7 +1394,7 @@ export default function LiveWatchView(props: Props) {
                         <div key={w.key} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderBottom: "1px solid #F0F0F0", fontSize: "14px" }}>
                           <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.nickname || "닉네임 없음"}</span>
                           {w.name ? <span style={{ color: "#707072", whiteSpace: "nowrap" }}>{w.name}</span> : null}
-                          {w.staff ? <span style={{ marginLeft: "auto", flexShrink: 0, height: "24px", lineHeight: "24px", padding: "0 8px", borderRadius: "8px", background: "#111111", color: "#FFFFFF", fontSize: "12px", fontWeight: 600 }}>관리자</span>
+                          {w.test || w.staff ? <span style={{ marginLeft: "auto", flexShrink: 0, height: "24px", lineHeight: "24px", padding: "0 8px", borderRadius: "8px", background: "#111111", color: "#FFFFFF", fontSize: "12px", fontWeight: 600 }}>{w.test ? "테스트" : "관리자"}</span>
                             : !w.member ? <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: "12px", color: "#707072" }}>{w.nickname ? "회원 확인 안 됨" : "로그인 전"}</span> : null}
                         </div>
                       ))}

@@ -14,7 +14,7 @@ const COUNT_CACHE_MS = 2_000;
 const EXCLUDE_CACHE_MS = 60_000;
 
 type Row = Record<string, unknown>;
-export type AudienceRow = { visitorKey: string; nickname: string; kakaoId: string; lastSeenAt: string; staff: boolean };
+export type AudienceRow = { visitorKey: string; nickname: string; kakaoId: string; lastSeenAt: string; staff: boolean; automation: boolean };
 export type Audience = { total: number; watching: number; watchers: AudienceRow[]; others: AudienceRow[]; testSite: number; testWatching: number; testRows: AudienceRow[] };
 
 const clean = (v: unknown) => String(v ?? "").trim();
@@ -29,7 +29,7 @@ export function computeAudience(rows: Row[], ex: { kakaoIds?: Iterable<string>; 
   const fresh = fresh0.filter(r=>!isTest(r)||(Boolean(r.automation_session_id)&&validAutomation.get(clean(r.visitor_key))===clean(r.automation_session_id)));
   const testFresh = fresh.filter(isTest);
   const customers = new Set(excludePresenceRows(fresh, ex));
-  const toRow = (r: Row): AudienceRow => ({ visitorKey: clean(r.visitor_key), nickname: clean(r.nickname), kakaoId: clean(r.kakao_id), lastSeenAt: clean(r.last_seen_at), staff: !customers.has(r) });
+  const toRow = (r: Row): AudienceRow => ({ visitorKey: clean(r.visitor_key), nickname: clean(r.nickname), kakaoId: clean(r.kakao_id), lastSeenAt: clean(r.last_seen_at), staff: !isTest(r) && !customers.has(r), automation: isTest(r) });
   const byRecent = (a: AudienceRow, b: AudienceRow) => (a.lastSeenAt < b.lastSeenAt ? 1 : -1);
   const watchers = fresh.filter((r) => isLiveWatchPath(r.path)).map(toRow).sort(byRecent);
   const others = fresh.filter((r) => !isLiveWatchPath(r.path)).map(toRow).sort(byRecent);
@@ -96,10 +96,9 @@ export async function readLiveWatcherList(sb: SupabaseClient, nowMs = Date.now()
   }
   const view = (w: AudienceRow) => {
     const c = w.kakaoId===AUTO_TEST_KAKAO_ID?undefined:names.get(w.kakaoId);
-    return { key: w.visitorKey.slice(-8), nickname: c?.nick || w.nickname, name: c?.name || "", member: Boolean(c), lastSeenAt: w.lastSeenAt, staff: showStaff && w.staff };
+    return { key: w.visitorKey.slice(-8), nickname: c?.nick || w.nickname, name: c?.name || "", member: Boolean(c), lastSeenAt: w.lastSeenAt, staff: showStaff && w.staff, test: showTest && w.automation };
   };
   const base = { total: aud.total, watching: aud.watching, rows: aud.watchers.map(view), others: aud.others.map(view) };
-  // Retain the parameter for existing callers. Every role sees the same verified list.
-  void showTest;
+  // Same verified count/list; only authorized operators receive the test label.
   return base;
 }
