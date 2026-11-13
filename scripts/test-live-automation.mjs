@@ -36,3 +36,7 @@ assert.equal(P.safeConversationLine('AI 한도 초과로 잠시 테스트 중'),
 assert.equal(P.safeConversationLine('방금 입금 완료했어요'),false);
 assert.equal(P.safeConversationLine('옆모습도 보여주세요'),true);
 console.log('PASS scheduling boundaries, product/option/stock preflight, persistent diverse personas');
+
+assert.equal(P.duplicateLine('로에118 초코 결국 골랐어요',['다시 보다가 결국 골랐어요']),true);
+assert.equal(P.duplicateLine('미우1 주문했습니다',['막스117 주문했어요']),true);
+assert.equal(P.duplicateLine('기장은 어떤가요?',['배송 얼마나 걸려요?']),false);

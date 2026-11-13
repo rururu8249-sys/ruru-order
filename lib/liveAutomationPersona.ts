@@ -1,3 +1,4 @@
+import {BRAND_SPEECH_ALIASES} from './liveAutomationSpeech';
 /** Fictional presets, never inferred from a real customer's age or gender. */
 export type Persona = {seed:number;age:30|40|50;gender:'남성'|'여성';style:string;interest:string;emoji:'none'|'rare';length:'short'|'medium'};
 const STYLES = [
@@ -33,14 +34,27 @@ export function personaLine(profile:Persona,kind:'greeting'|'submitted',index:nu
   return choices[Math.abs(Math.trunc(index))%choices.length];
 }
 const norm=(s:string)=>s.normalize('NFC').toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
+function speechCore(text:string):string {
+ const aliases=Object.values(BRAND_SPEECH_ALIASES).flat().sort((a,b)=>b.length-a.length);
+ return norm(text.replace(new RegExp('(?:'+aliases.join('|')+')\\s*-?\\s*\\d+','gi'),'')
+  .replace(/블랙|화이트|아이보리|베이지|핑크|그레이|네이비|브라운|초코|와인|\b(?:XXL|XL|XS|S|M|L)\b|\d+/gi,'')
+  .replace(/주문(?:했습니다|했어요|했어용|했네용|했네요|완료했어요)/g,'주문완료')
+  .replace(/골랐(?:습니다|어요|어용|네요|네용)/g,'골랐어요'));
+}
 export function duplicateLine(text:string,recent:string[]):boolean {
   const key=norm(text);
   if(!key) return true;
   const grams=(s:string)=>new Set(Array.from({length:Math.max(0,s.length-2)},(_,i)=>s.slice(i,i+3)));
-  const a=grams(key);
+  const a=grams(key),core=speechCore(text);
   return recent.some(line=>{
     const other=norm(line);
     if(other===key) return true;
+    const otherCore=speechCore(line);
+    if(core.length>=4&&core===otherCore)return true;
+    if(Math.min(core.length,otherCore.length)>=6&&(core.includes(otherCore)||otherCore.includes(core)))return true;
+    // Catch repeated concluding phrases even when a different nickname/product leads the line.
+    let tail=0;while(tail<Math.min(core.length,otherCore.length)&&core.at(-1-tail)===otherCore.at(-1-tail))tail++;
+    if(tail>=6)return true;
     if(key.length<10 || other.length<10) return false;
     const b=grams(other); const intersection=[...a].filter(x=>b.has(x)).length;
     return intersection/(a.size+b.size-intersection)>=.8;

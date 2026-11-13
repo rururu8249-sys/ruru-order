@@ -64,6 +64,7 @@ export async function runConversationAction(db:SupabaseClient,origin:string,acti
      '나이·성별을 고정관념으로 과장하지 않는다. 문장은 한두 문장. 이번 표현 방식: '+expression,
      '저장된 주문·확인 상태만 말한다. paymentReport=true일 때 paymentKind가 bank이면 현재 입금 완료(입완처럼 짧게 말해도 됨), card이면 현재 카드결제 완료라는 짧은 상태 표현을 허용한다. 이 상태로 과거 구매·사용 경험을 만들어내지 않는다. firstOrder=true일 때만 첫 주문이라고 한다. 샀었어요/잘 입어요/써보니 좋아요/재구매/배송받았어요 등 구매·사용 경험을 절대 만들지 않는다. 친구 소개·인스타 방문·어제 시청 이력도 확인되지 않았으므로 만들지 않는다.',
      '현재 상품 질문·감상은 currentCard의 정확한 상품 ID와 세부상품만 허용한다. 다른 브랜드 비교·코디·옵션·재질·가격을 끌어오지 않는다. 상품 종류가 불명확하면 착용·키·체형 질문을 하지 않는다. 다이슨에 옷 사이즈 질문 금지. 별칭은 검색 참고일 뿐 다른 ID를 같은 상품으로 간주하지 않는다. 전지현 별칭은 등록 상품명에 그 이름이 있을 때만.',
+     '다른 닉네임의 최근 문장과 상품명만 바꾸거나 결국 골랐어요 같은 결론을 되풀이하지 않는다. recent의 최신 대화와 어휘·의도가 겹치면 억지로 바꾸지 말고 빈 text로 쉰다.',
      '상품 번호는 제공 별칭으로 자연스럽게 부르고 하이픈 유무를 섞는다. 구성 깔끔/디테일 좋아 같은 뜬금없는 칭찬, 구매수량을 세트구성으로 오해하는 말 금지.',
      scope==='product'?'이번에는 currentCard 한 상품만 짧게 언급한다. kind=chat이면 짧은 감상 또는 이미 주문한 현재 상품의 배송·품질 질문을 허용한다. overseas=true일 때만 해외배송이라고 하며 배송기간은 질문만 하고 지어내 답하지 않는다. 고퀄인가요/퀄리티 어떤가요처럼 확인 질문을 할 수 있고 고퀄이라고 단정하지 않는다. scope=product, productId와 detailName은 currentCard와 정확히 같아야 한다. 주문한 상품이라고 말하려면 ownCurrentCard가 true이고 ordered=true여야 한다.':
        scope==='history'?'이번에는 historicalTopics 중 하나의 다음 소개·재입고 예정만 질문한다. 이 자료는 과거 인기 주제이며 현재 판매 목록이 아니다. 현재 판매 여부·옵션·비교·구매 경험 금지. scope=history, productId/detailName은 빈 문자열.':
@@ -76,7 +77,7 @@ export async function runConversationAction(db:SupabaseClient,origin:string,acti
        scope,orderReport,paymentReport,currentTimeKst:new Date(Date.now()+9*3600000).toISOString().slice(0,16),mode,room:facts.room,
        currentCard:scope==='product'?{...currentCard,spokenName:spokenProductName(currentCard!.name,aliasIndex)}:null,
        historicalTopics:scope==='history'?HISTORICAL_TOPICS:undefined,brandAliases:BRAND_SPEECH_ALIASES,
-       facts:{ordered:facts.ordered,firstOrder:facts.firstOrder,paymentKind:paymentReport?facts.paymentKind:undefined,hasCart:!facts.ordered&&Boolean(facts.items?.length),ownCurrentCard:Boolean(currentCard&&facts.items?.some(i=>featuredMatches(i,currentCard))),question:facts.question},recent:recent.slice(-15)}),
+       facts:{ordered:facts.ordered,firstOrder:facts.firstOrder,paymentKind:paymentReport?facts.paymentKind:undefined,hasCart:!facts.ordered&&Boolean(facts.items?.length),ownCurrentCard:Boolean(currentCard&&facts.items?.some(i=>featuredMatches(i,currentCard))),question:facts.question},recent:recent.slice(0,15)}),
      'JSON만 반환: {"text":"...","scope":"'+scope+'","productId":"...","detailName":"..."}',
    ].join('\n');
    const answer=await callGeminiJson(prompt,{timeoutMs:8000,maxTokens:220,maxAttempts:1,temperature:.85,priority:action.kind==='reply'?'interactive':'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
@@ -123,7 +124,7 @@ export async function runConversations(db:SupabaseClient,c:Campaign,origin:strin
  if(bc.error||!bc.data)return;
  const mode=await streamModeOf(db,bc.data);
  const card=c.orders_enabled?await readAutomationFeatured(c.broadcast_id):null;
- const recent=messages.map(m=>String(m.body||''));
+ const recent=messages.filter(m=>m.badge!=='bot').map(m=>String(m.body||''));
  const replied=new Set(actions.map(a=>a.source_message_id));
  const candidates=actors.map(actor=>{
    const session=sessions.find(s=>s.actor_id===actor.id)!;
