@@ -16,7 +16,12 @@ assert.equal(C.acceptConversationText('배송은 언제쯤 오나요',{ordered:t
 assert.equal(C.mentionsNickname('양말한짝님 감사합니다. 좋은밤 되세요','[테스트]양말한짝수배53'),true);
 assert.equal(C.mentionsNickname('양말한짝수배53님 사이즈 뭐 하셨어요?','양말한짝수배53'),true);
 assert.equal(C.mentionsNickname('귤껍질님 안녕하세요','양말한짝수배53'),false);
+assert.equal(C.mentionsNickname('혜숙님 감사합니다','장혜숙'),true,'성 빼고 부른 이름');
+assert.equal(C.mentionsNickname('혜숙 씨가 그랬어요','장혜숙'),false);
 assert.equal(C.mentionsNickname('양말 사러 왔어요','양말한짝수배53'),false,'두 글자 겹침은 부른 게 아님');
+assert.match(C.fallbackThanksReply('혜숙님 감사합니다',[],0),/감사/);
+assert.match(C.fallbackThanksReply('양말한짝님 좋은밤 되세요',[],1),/밤/);
+assert.equal(C.fallbackThanksReply('혜숙님 사이즈 뭐 하셨어요?',[],0),null,'질문엔 지어낸 답 안 함');
 // 밤 12~6시
 assert.equal(T.isNightKst(Date.parse('2026-11-13T15:30:00Z')),true,'00:30 KST');
 assert.equal(T.isNightKst(Date.parse('2026-11-13T20:59:00Z')),true,'05:59 KST');

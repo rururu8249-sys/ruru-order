@@ -21,13 +21,24 @@ export function fallbackGreeting(recent:string[],seed:number):string{
  for(let i=0;i<FIRST_GREETINGS.length;i++){const g=FIRST_GREETINGS[(Math.abs(seed)+i)%FIRST_GREETINGS.length];if(!duplicateLine(g,recent.slice(0,15)))return g;}
  return FIRST_GREETINGS[Math.abs(seed)%FIRST_GREETINGS.length];
 }
+/** 이름 불러 인사·감사한 글에 제미나이 답이 안 나오면 쓰는 짧은 답 */
+export function fallbackThanksReply(question:string,recent:string[],seed:number):string|null{
+ if(!/감사|고마|안녕|반가|좋은\s*(밤|하루|저녁|아침)|잘\s*자|수고/.test(question))return null;
+ const night=/밤|잘\s*자/.test(question);
+ const list=night?['감사해요~ 좋은 밤 되세요','네 감사합니다 😊 좋은 밤 되세요','루루님도 좋은 밤 되세요~']:['감사해요~','네 감사합니다 😊','감사합니다~ 루루님','넵 감사해요!'];
+ for(let i=0;i<list.length;i++){const r=list[(Math.abs(seed)+i)%list.length];if(!duplicateLine(r,recent.slice(0,15)))return r;}
+ return null;
+}
 /** 닉네임을 부른 글인지 — [테스트]·끝 숫자 빼고, 앞 60%(최소 3글자)만 맞아도(「양말한짝님」 → 양말한짝수배53) */
 export function mentionsNickname(body:string,nickname:string):boolean{
  const base=nickname.replace(/^\[[^\]]*\]/,'').replace(/[0-9]+$/,'').replace(/\s+/g,'');
  const text=String(body||'').replace(/\s+/g,'');
  if(base.length<2)return text.includes(nickname.replace(/\s+/g,''));
  const head=base.slice(0,Math.max(Math.min(3,base.length),Math.ceil(base.length*.6)));
- return text.includes(base)||text.includes(head);
+ if(text.includes(base)||text.includes(head))return true;
+ // 사람 이름처럼 한글 3글자면 성 빼고 부르기도 함(장혜숙 → 「혜숙님」)
+ if(/^[가-힣]{3}$/.test(base)&&text.includes(base.slice(1)+'님'))return true;
+ return false;
 }
 /** 다른 닉네임이 방금 한 말과 글자가 절반 넘게 겹치면 비슷한 말로 본다 */
 function similarToRecent(line:string,recent:string[]):boolean{
@@ -114,8 +125,14 @@ export async function runConversationAction(db:SupabaseClient,origin:string,acti
      await automationRpc(db,'live_automation_ai_admission',{p_actor:action.actor_id,p_kind:action.kind});
      return automationPost(origin,'/api/live-chat',ctx,action,'chat',{kakao_id:AUTOMATION_OWNER,bc:ctx.campaign.broadcast_id,body},transport);
    };
+   const thanksOnly=async()=>{
+     const body=action.kind==='reply'?fallbackThanksReply(String(facts.question||''),recent,aliasIndex):null;
+     if(!body)return null;
+     await automationRpc(db,'live_automation_ai_admission',{p_actor:action.actor_id,p_kind:action.kind});
+     return automationPost(origin,'/api/live-chat',ctx,action,'chat',{kakao_id:AUTOMATION_OWNER,bc:ctx.campaign.broadcast_id,body},transport);
+   };
    const answer=await callGeminiJson(prompt,{timeoutMs:8000,maxTokens:220,maxAttempts:1,temperature:.85,priority:action.kind==='reply'?'interactive':'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
-   if(!answer.text){if(firstChat)return await greetOnly();throw Error('AI_WAIT');}
+   if(!answer.text){if(firstChat)return await greetOnly();const t=await thanksOnly();if(t)return t;throw Error('AI_WAIT');}
    const generated=JSON.parse(answer.text);
    const candidate=generated?.text;
    if(!validGroundedDialogue(generated,currentCard,scope,Date.now(),{firstOrder:facts.firstOrder,paymentKind:paymentReport?facts.paymentKind:undefined})||!dialogueActionAllowed(candidate,scope,action.kind,Boolean(facts.ordered&&currentCard&&facts.items?.some(i=>featuredMatches(i,currentCard))))||!expressionAllowed(candidate,expression))throw Error("UNGROUNDED_DIALOGUE");
@@ -126,7 +143,7 @@ export async function runConversationAction(db:SupabaseClient,origin:string,acti
    }
    const speechFacts=scope==='product'&&currentCard?{...facts,items:[...(facts.items||[]),{productName:currentCard.name}]}:facts;
    const body=acceptConversationText(candidate,speechFacts,recent,mode,action.kind,aliasIndex);
-   if(!body){if(firstChat)return await greetOnly();throw Error('NO_SUITABLE_MESSAGE');}
+   if(!body){if(firstChat)return await greetOnly();const t=await thanksOnly();if(t)return t;throw Error('NO_SUITABLE_MESSAGE');}
    await checkCard();
    if(scope==="product" && JSON.stringify(await readDialogueCard(db,ctx.campaign.broadcast_id))!==JSON.stringify(currentCard))throw Error("CURRENT_CARD_CHANGED");
    if(await readMode()!==mode)throw Error('BROADCAST_MODE_CHANGED');
@@ -168,13 +185,14 @@ export async function runConversations(db:SupabaseClient,c:Campaign,origin:strin
    const session=sessions.find(s=>s.actor_id===actor.id)!;
    const ordered=orders.filter(o=>o.automation_actor_id===actor.id),hold=holds.find(h=>h.session_id===session.id);
    const items=Array.isArray(hold?.items)?hold.items:[];
-   const reply=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&!replied.has(Number(m.id))&&Date.parse(String(m.created_at))>now-120000&&mentionsNickname(String(m.body),actor.nickname));
+   const reply=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&!replied.has(Number(m.id))&&Date.parse(String(m.created_at))>now-180000&&mentionsNickname(String(m.body),actor.nickname));
    return {actor,session,ordered,items,reply};
  }).filter(x=>x.ordered.length||x.items.length||x.reply).sort((a,b)=>Number(Boolean(b.reply))-Number(Boolean(a.reply)));
  for(const candidate of candidates){
    const {actor,session,ordered,items,reply}=candidate;
    // Back off on failed/empty model output too; never spend once every worker tick.
-   if(actions.some(a=>a.actor_id===actor.id&&a.kind!=='order'&&Date.parse((a as Action & {created_at:string}).created_at)>now-60000))continue;
+   // 불린 답(reply)은 방금 말했어도 15초만 기다림(1분 쉬는 동안 답할 차례를 놓치지 않게)
+   if(actions.some(a=>a.actor_id===actor.id&&a.kind!=='order'&&Date.parse((a as Action & {created_at:string}).created_at)>now-(reply?15000:60000)))continue;
    const target=card?actions.find(a=>a.actor_id===actor.id&&a.kind==='order'&&a.status==='pending'&&a.plan.stage==='submit'&&!a.asked_at&&Date.parse(a.due_at)>now+45000&&Date.parse(a.due_at)<now+90000&&Array.isArray(a.plan.lines)&&a.plan.lines.some(item=>featuredMatches(item,card))&&!actions.some(q=>q.kind==='question'&&q.plan.orderAction===a.id)):null;
    const kind=reply?'reply':target&&Math.random()<.5?'question':'chat';
    // Quiet intervals are a conversational pacing rule, independent of available AI quota.
