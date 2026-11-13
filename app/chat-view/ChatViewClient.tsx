@@ -317,7 +317,7 @@ export default function ChatViewClient() {
             const b = palette ? {label:"AI",bg:palette.badge,fg:palette.ink} : m.badge ? BADGE[m.badge] : null;
             return (
               <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "var(--chat-row-gap, 10px)", padding: "var(--chat-row-padding, 7px 8px)" }}>
-                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={m.nickname} size="1.6em" frame={palette?.frame} />
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size="1.6em" frame={palette?.frame} />
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}

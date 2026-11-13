@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         ? { ok: true, enabled: true, notice: setting.notice }
         : { ok: true, enabled: false, notice: "", messages: [], pinned: null });
     }
-    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, public_avatar_id, public_avatar_key, bot_ref";
+    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, public_avatar_id, public_avatar_version, public_avatar_key, bot_ref";
     const [setting, listRes, pinRes] = await Promise.all([
       readSetting(sb),
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).order("id", { ascending: false }).limit(LIVE_CHAT_RECENT),
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
     const { data: ins, error } = await sb
       .from("live_chat_messages")
       .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: finalBody, badge: role.badge ?? null, avatar_url: kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : (cleanKakaoPhotoUrl(c.kakao_profile_image) || null) })
-      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, public_avatar_id, public_avatar_key, bot_ref")
+      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, public_avatar_id, public_avatar_version, public_avatar_key, bot_ref")
       .single();
     if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);
     // [2026-11-10] 루루동이AI — 응답을 보낸 «뒤»에 상품 안내·자주 묻는 말(손님 글 쓰기를 늦추지 않음, 실패해도 무관)

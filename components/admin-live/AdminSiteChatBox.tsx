@@ -163,7 +163,7 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
         {list.map((m) => { const palette=notificationPresentation(m); return (
           <div key={m.id} onClick={() => { if (m.badge !== "bot") setMenuId((v) => (v === m.id ? null : m.id)); }}
             className={`relative flex items-start gap-2 rounded-lg px-1.5 py-1 ${m.badge === "bot" ? "" : "cursor-pointer"} ${menuId === m.id ? "bg-surface-2" : ""}`}>
-            <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={m.nickname} frame={palette?.frame} style={{marginTop:2}} />
+            <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} frame={palette?.frame} style={{marginTop:2}} />
             <div className="min-w-0 flex-1 text-[14px] leading-5 text-ink">
               <span className="mr-1 font-bold text-ink-soft" style={palette?{color:palette.light}:undefined}>{m.nickname}</span>
               {m.badge ? <span style={palette?{background:palette.badge,color:palette.ink}:undefined} className={`mr-1 inline-flex h-[18px] items-center rounded px-1 align-[1px] text-[11px] font-bold ${BADGE_CLS[m.badge] || ""}`}>{BADGE_LABEL[m.badge]}</span> : null}

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const UUID = /^[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}$/i;
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store", Vary: "Cookie, X-Chat-Account, X-Chat-Session" } });
 const fail = (message: string, status: number) => json({ ok: false, message }, status);
-const columns = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, public_avatar_id, public_avatar_key, bot_ref";
+const columns = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, public_avatar_id, public_avatar_version, public_avatar_key, bot_ref";
 
 export async function GET(request: NextRequest) {
   const bc = request.nextUrl.searchParams.get("bc") || "";

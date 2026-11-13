@@ -13,4 +13,6 @@ assert.equal(new Set(Array.from({length:5000},(_,i)=>JSON.stringify(P.avatarVari
 assert.equal(P.avatarVariant('https://private/photo.jpg'),null);
 assert.equal(P.avatarVariant('public:5000'),null);
 assert.ok(P.NOTIFICATION_NAMES.order.includes('품절임박'));
-console.log('PASS event identity, stable palette and 5000 avatar slots; duplicate images permitted by owner');
+assert.deepEqual(P.avatarVariant('public2:7:00000000-0000-4000-8000-000000000001'),{index:7,key:'00000000-0000-4000-8000-000000000001',version:2});
+assert.equal(P.publicChatRow({public_avatar_id:7,public_avatar_version:2,avatar_url:'https://private/photo'}).avatar_url,'public2:7');
+console.log('PASS event identity, stable palette, versioned public photo references and original-photo redaction');

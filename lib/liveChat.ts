@@ -169,7 +169,7 @@ export function parseChatMessage(raw: unknown): LiveChatMessage | null {
     badge: p.badge === "crown" || p.badge === "crown_pink" || p.badge === "mod" || p.badge === "bot" ? p.badge : null,
     pinned: !hidden && (p.pinned === true || Boolean(p.pinned_at)),
     botRef: String(p.bot_ref ?? p.botRef ?? "").slice(0, 300),
-    avatar: presentation?.avatar || (() => { const a = String(p.avatar_url ?? p.avatar ?? "").trim(); return a === "autotest" || /^public:[0-9]{1,4}(?::[a-f0-9-]{36})?$/i.test(a) ? a : /^https:\/\//i.test(a) ? a.slice(0, 500) : ""; })(), // "autotest" = 자동 테스트 글 표식(그림 아님)
+    avatar: presentation?.avatar || (() => { const a = String(p.avatar_url ?? p.avatar ?? "").trim(); return a === "autotest" || /^public2?:[0-9]{1,4}(?::[a-f0-9-]{36})?$/i.test(a) ? a : /^https:\/\//i.test(a) ? a.slice(0, 500) : ""; })(), // "autotest" = 자동 테스트 글 표식(그림 아님)
   };
 }
 

@@ -18,13 +18,13 @@ export function notificationPresentation(m:{id:number;badge:unknown;body:string;
  return {kind,nickname:NOTIFICATION_NAMES[kind][index],avatar:'notice:'+kind+':'+index,...PALETTES[kind]};
 }
 export function avatarVariant(src:string){
- const m=/^public:(\d{1,4})(?::([a-f0-9-]{36}))?$/i.exec(src);if(!m)return null;
- const index=Number(m[1]);return index<5000?{index,key:m[2]||''}:null;
+ const m=/^public(2)?:(\d{1,4})(?::([a-f0-9-]{36}))?$/i.exec(src);if(!m)return null;
+ const index=Number(m[2]);return index<5000?{index,key:m[3]||'',version:m[1]?2:1}:null;
 }
 /** Public API receipts too: never send original photo URLs, even for the apparent sender. */
 export function publicChatRow(row:Record<string,unknown>){
  const {avatar_url:discarded,avatar:discardedAlias,kakao_id:privateAccount,customer_id:privateCustomer,...safe}=row;
  void discarded;void discardedAlias;void privateAccount;void privateCustomer;
  const id=Number(row.public_avatar_id);
- return {...safe,avatar_url:Number.isInteger(id)&&id>=0&&id<5000?'public:'+id+(row.public_avatar_key?':'+String(row.public_avatar_key):''):''};
+ return {...safe,avatar_url:Number.isInteger(id)&&id>=0&&id<5000?(row.public_avatar_version===2?'public2:':'public:')+id+(row.public_avatar_key?':'+String(row.public_avatar_key):''):''};
 }
