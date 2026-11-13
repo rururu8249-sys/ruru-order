@@ -28,9 +28,9 @@ export function isAutoTestRow(r: { is_test_order?: unknown; test_order_reason?: 
 
 export type AutoTestLast = { at: number; ok: boolean; message: string; orderCode?: string; nickname?: string };
 /** [2026-11-13 14:02 사장님] 상품 카드 질문 → 1~2분 뒤 같은 상품·같은 닉네임으로 주문. 질문을 올린 뒤 주문 차례까지 기억해 두는 칸 */
-export type AutoTestPending = { bcId: string; nickname: string; productId: string; detailName: string; productName: string; askedAt: number; dueAt: number };
-export type AutoTestState = { enabled: boolean; chatEnabled: boolean; nextRunAt: number | null; lockUntil: number; last: AutoTestLast | null; screenSeenAt: number; pending: AutoTestPending | null };
-export const AUTO_TEST_DEFAULT: AutoTestState = { enabled: false, chatEnabled: false, nextRunAt: null, lockUntil: 0, last: null, screenSeenAt: 0, pending: null };
+export type AutoTestPending = { bcId: string; nickname: string; productId: string; detailName: string; productName: string; askedAt: number; dueAt: number; after?: string };
+export type AutoTestState = { enabled: boolean; chatEnabled: boolean; nextRunAt: number | null; lockUntil: number; last: AutoTestLast | null; screenSeenAt: number; pending: AutoTestPending | null; aiPausedUntil: number; aiDay: string; aiCount: number };
+export const AUTO_TEST_DEFAULT: AutoTestState = { enabled: false, chatEnabled: false, nextRunAt: null, lockUntil: 0, last: null, screenSeenAt: 0, pending: null, aiPausedUntil: 0, aiDay: "", aiCount: 0 };
 /** 질문 뒤 주문까지 1~2분 */
 export function pendingGapMs(rand = Math.random): number { return 60_000 + Math.floor(rand() * 60_001); }
 /** 관리자 화면(화면 테스트)이 이 시간 안에 신호를 보냈으면 서버 방식은 쉬고 화면이 맡는다 */
@@ -51,6 +51,9 @@ export function parseAutoTestState(raw: unknown): AutoTestState {
     last,
     screenSeenAt: num(o.screenSeenAt),
     pending: parsePending(o.pending),
+    aiPausedUntil: num(o.aiPausedUntil),
+    aiDay: String(o.aiDay ?? ""),
+    aiCount: num(o.aiCount),
   };
 }
 
@@ -58,13 +61,22 @@ function parsePending(v: unknown): AutoTestPending | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   const str = (x: unknown) => String(x ?? "").trim();
-  const p = { bcId: str(o.bcId), nickname: str(o.nickname), productId: str(o.productId), detailName: str(o.detailName), productName: str(o.productName), askedAt: Number(o.askedAt) || 0, dueAt: Number(o.dueAt) || 0 };
+  const p = { bcId: str(o.bcId), nickname: str(o.nickname), productId: str(o.productId), detailName: str(o.detailName), productName: str(o.productName), askedAt: Number(o.askedAt) || 0, dueAt: Number(o.dueAt) || 0, after: str(o.after).slice(0, 60) };
   return p.bcId && p.nickname && p.productId && p.productName && p.dueAt > 0 ? p : null;
 }
 
 /** 상품 카드(지금 도는 목록)에 그 상품이 아직 있는지 */
 export function cardHasTarget(targets: Array<{ productId: string; detailName: string }>, productId: string, detailName: string): boolean {
   return targets.some((t) => String(t.productId) === String(productId) && String(t.detailName || "") === String(detailName || ""));
+}
+
+/** 자동 테스트 채팅이 하루에 쓰는 Gemini 호출 상한 — 무료 한도(Lite 모델 하루 500회)를 AI 비서 등과 나눠 쓰려고 */
+export const AUTO_TEST_AI_DAILY_CAP = 150;
+/** 한도 초과(429)면 채팅만 쉬는 시간 */
+export const AUTO_TEST_AI_PAUSE_MS = 30 * 60_000;
+/** Gemini 무료 한도는 미국 서부 자정에 다시 채워짐 — 하루 셈도 그 날짜로 */
+export function aiQuotaDay(now = Date.now()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date(now));
 }
 
 export function randomGapMs(rand = Math.random): number {

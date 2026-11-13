@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
-import type { AutoTestState } from "@/lib/autoTestOrder";
+import { AUTO_TEST_AI_DAILY_CAP, aiQuotaDay, type AutoTestState } from "@/lib/autoTestOrder";
 import { SCREEN_TEST_EVENT } from "./ScreenTestHost";
 
 function Switch({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
@@ -85,7 +85,7 @@ export default function AutoTestOrderSettings() {
       <div className="mt-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[13px] font-bold text-ink">자동 테스트 채팅</div>
-          <div className="text-[12px] text-ink-mute">{state?.chatEnabled ? "켜짐 · 상품 카드 질문 → 1~2분 뒤 그 상품 주문" : "꺼짐"}</div>
+          <div className="text-[12px] text-ink-mute">{!state?.chatEnabled ? "꺼짐" : state.aiPausedUntil > Date.now() ? `AI 한도 보호 · ${hm(state.aiPausedUntil)}까지 채팅만 쉼` : `켜짐 · 오늘 AI ${state.aiDay === aiQuotaDay() ? state.aiCount : 0}/${AUTO_TEST_AI_DAILY_CAP}회`}</div>
         </div>
         <Switch on={state?.chatEnabled === true} disabled={!state || busy === "toggle"} onChange={(v) => void toggle(v, "chat")} label="자동 테스트 채팅" />
       </div>

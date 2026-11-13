@@ -63,7 +63,7 @@ function kstClock(): string {
 const TONES = ["짧고 상냥한 존댓말", "친근한 반말 섞인 존댓말", "물결(~)을 자주 쓰는 말투", "이모티콘 한 개 정도 쓰는 말투", "차분한 존댓말", "신난 말투"];
 
 /** 앞·뒤 두 문장 — 제미나이로 만들고, 안 되면 문장 목록. 절대 예외를 던지지 않음 */
-export async function makeChatLines(input: { nickname: string; mode: StreamMode; product: ChatProduct | null; withOrder: boolean }, rand = Math.random): Promise<{ before: string; after: string; source: "ai" | "list" }> {
+export async function makeChatLines(input: { nickname: string; mode: StreamMode; product: ChatProduct | null; withOrder: boolean }, rand = Math.random): Promise<{ before: string; after: string; source: "ai" | "list"; limited?: boolean }> {
   const live = input.mode === "live";
   const fb = { before: fallbackChatLine("before", input.mode, input.product, rand), after: fallbackChatLine("after", input.mode, input.product, rand), source: "list" as const };
   try {
@@ -87,8 +87,9 @@ export async function makeChatLines(input: { nickname: string; mode: StreamMode;
       "각 문장 30자 이내, 상품 이름을 통째로 반복하지 말고, 광고 문구처럼 쓰지 마. 운영자 이름·전화번호·링크 금지.",
       '답은 JSON 하나: {"before":"...","after":"..."}',
     ].join("\n");
-    const r = await callGeminiJson(rules, { timeoutMs: 6000, maxTokens: 200 });
-    if (!r.text) return fb;
+    // 무료 등급 Lite 모델 2개만(하루 500회씩) — 한도 적은 모델로 넘어가지 않게. 문장이 매번 달라지게 온도 0.9
+    const r = await callGeminiJson(rules, { timeoutMs: 6000, maxTokens: 200, temperature: 0.9, models: ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] });
+    if (!r.text) return { ...fb, limited: /http_429/.test(r.note) };
     const j = JSON.parse(r.text) as { before?: unknown; after?: unknown };
     const clean = (v: unknown) => String(v ?? "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
     let before = clean(j.before);

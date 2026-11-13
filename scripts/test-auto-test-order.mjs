@@ -230,4 +230,10 @@ assert.ok(dwellMin >= 2.4 && dwellMin <= 72, String(dwellMin));
   assert.equal(A.cardHasTarget(targets, "800", ""), true);
   assert.equal(A.cardHasTarget([], "800", ""), false);
 }
+{
+  const st = A.parseAutoTestState(JSON.stringify({ aiPausedUntil: 5, aiDay: "2026-11-12", aiCount: 7 }));
+  assert.equal(st.aiCount, 7); assert.equal(st.aiDay, "2026-11-12"); assert.equal(st.aiPausedUntil, 5);
+  assert.equal(A.aiQuotaDay(Date.parse("2026-11-13T07:00:00Z")), "2026-11-12"); // 미국 서부 자정 기준
+  assert.equal(A.aiQuotaDay(Date.parse("2026-11-13T09:00:00Z")), "2026-11-13");
+}
 console.log("test-auto-test-order: all passed");

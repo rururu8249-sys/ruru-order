@@ -7,6 +7,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { makeChatLines, type ChatProduct, type StreamMode } from "@/lib/autoTestChat";
+import { AUTO_TEST_AI_DAILY_CAP, AUTO_TEST_AI_PAUSE_MS, aiQuotaDay } from "@/lib/autoTestOrder";
 import { tickTestViewers } from "@/lib/autoTestViewers";
 import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
 import {
@@ -77,10 +78,27 @@ async function useFreshNickname(sb: Db): Promise<string> {
   return nickname;
 }
 
+/** [2026-11-13 14:15 사장님 「무료 한도 안에서, 넘으면 채팅만 멈춤」] Gemini 호출을 세고 지킴.
+ *  - 하루(미국 서부 날짜 = 무료 한도 새로 채워지는 기준) 150회까지, 한도 초과(429)면 30분 채팅만 쉼 → null(채팅 안 올림). 주문은 그대로. */
+async function aiChatLines(sb: Db, input: Parameters<typeof makeChatLines>[0]): Promise<{ before: string; after: string } | null> {
+  const now = Date.now();
+  const day = aiQuotaDay(now);
+  const { state } = await readStateRaw(sb);
+  const used = state.aiDay === day ? state.aiCount : 0;
+  if (state.aiPausedUntil > now || used >= AUTO_TEST_AI_DAILY_CAP) return null;
+  const cl = await makeChatLines(input);
+  for (let i = 0; i < 4; i += 1) {
+    const cur = await readStateRaw(sb);
+    const n = cur.state.aiDay === day ? cur.state.aiCount : 0;
+    if (await casState(sb, cur.raw, { ...cur.state, aiDay: day, aiCount: n + 1, aiPausedUntil: cl.limited ? now + AUTO_TEST_AI_PAUSE_MS : cur.state.aiPausedUntil })) break;
+  }
+  return cl.limited ? null : { before: cl.before, after: cl.after };
+}
+
 type Step =
   | { kind: "asked"; pending: AutoTestPending; last: AutoTestLast }
   | { kind: "cancelled"; last: AutoTestLast }
-  | { kind: "order"; fixed: { choices: AutoTestChoice[]; nickname: string; productName: string } | null; greet: boolean };
+  | { kind: "order"; fixed: { choices: AutoTestChoice[]; nickname: string; productName: string; after: string } | null; greet: boolean };
 
 /** 이번 차례에 할 일 — 채팅 켜짐이면: ①주문 대기 중인 질문이 있으면 그 상품이 카드에 아직 있는지 보고 주문/취소
  *  ②없으면 지금 카드 상품으로 질문만 올리고 1~2분 뒤로 미룸 ③카드가 없으면 상품 질문 없이(인사만) 보통 주문 */
@@ -96,7 +114,7 @@ async function decideStep(sb: Db, origin: string, bc: Row, state: AutoTestState)
     if (!choices.length) return { kind: "cancelled", last: { at, ok: true, message: `[질문] 상품 카드가 바뀌어 ${p.productName} 주문은 취소 — 다음엔 새 카드 상품으로`, nickname: p.nickname } };
     const { error } = await sb.from("customers").update({ youtube_nickname: p.nickname }).eq("kakao_id", AUTO_TEST_KAKAO_ID);
     if (error) throw new Error(`닉네임 맞추기 실패: ${error.message}`);
-    return { kind: "order", fixed: { choices, nickname: p.nickname, productName: p.productName }, greet: false };
+    return { kind: "order", fixed: { choices, nickname: p.nickname, productName: p.productName, after: p.after || "" }, greet: false };
   }
   const card = await currentCard(bcId);
   const choices = card ? await cardChoices(sb, card.productId, card.detailName, overseasOn) : [];
@@ -104,10 +122,12 @@ async function decideStep(sb: Db, origin: string, bc: Row, state: AutoTestState)
   const productName = choices[0].productName;
   const nickname = await useFreshNickname(sb);
   const product = await chatProductOf(sb, card.productId, productName, overseasOn);
-  const cl = await makeChatLines({ nickname, mode: await streamModeOf(sb, bc), product, withOrder: false });
+  // 질문·주문 뒤 한 줄을 한 번에 만듦(Gemini 1회) — 주문 뒤 한 줄은 pending 에 넣어 두고 1~2분 뒤 씀
+  const cl = await aiChatLines(sb, { nickname, mode: await streamModeOf(sb, bc), product, withOrder: true });
+  if (!cl) return { kind: "order", fixed: null, greet: false }; // AI 한도 — 채팅 없이 주문만
   const r = await postTestChat(origin, bcId, cl.before);
   const now = Date.now();
-  const pending: AutoTestPending = { bcId, nickname, productId: card.productId, detailName: card.detailName, productName, askedAt: now, dueAt: now + pendingGapMs() };
+  const pending: AutoTestPending = { bcId, nickname, productId: card.productId, detailName: card.detailName, productName, askedAt: now, dueAt: now + pendingGapMs(), after: cl.after };
   return { kind: "asked", pending, last: { at, ok: r.ok, message: r.ok ? `[질문] ${nickname}: ${cl.before} — ${productName} · 1~2분 뒤 같은 상품 주문` : `[질문] 채팅 실패 — ${r.message}`, nickname } };
 }
 
@@ -202,7 +222,8 @@ async function chatOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> 
       const ch = await cardChoices(sb, card.productId, card.detailName, overseasOn);
       if (ch.length) product = await chatProductOf(sb, card.productId, ch[0].productName, overseasOn);
     }
-    const lines = await makeChatLines({ nickname, mode: await streamModeOf(sb, bc), product, withOrder: false });
+    const lines = await aiChatLines(sb, { nickname, mode: await streamModeOf(sb, bc), product, withOrder: false });
+    if (!lines) return { at, ok: true, message: "[채팅] AI 무료 한도 보호로 채팅 쉬는 중 — 주문 테스트는 그대로", nickname };
     const r = await postTestChat(origin, bcId, lines.before);
     return { at, ok: r.ok, message: `[채팅] ${nickname}: ${r.ok ? lines.before : `실패 — ${r.message}`}`, nickname };
   } catch (e) {
@@ -420,12 +441,10 @@ async function runOnce(sb: Db, origin: string, bc: Row, withChat = false, step: 
     const { lines, paymentMethod, nickname, settings } = prep;
     // 채팅 켜짐: 질문은 1~2분 전에 이미 올림(fixed) / 카드가 없으면 상품 질문 없이 인사 한 줄 → 잠깐 기다림
     let chatAfter = "";
-    if (withChat) {
-      const { overseasOn } = await readSettings(sb);
-      const product = step.fixed ? await chatProductOf(sb, lines[0].productId, lines[0].productName, overseasOn) : null;
-      const cl = await makeChatLines({ nickname, mode: await streamModeOf(sb, bc), product, withOrder: true });
-      chatAfter = cl.after;
-      if (step.greet) { await postTestChat(origin, bcId, cl.before); await wait(between(6_000, 12_000)); }
+    if (withChat && step.fixed) chatAfter = step.fixed.after; // 질문 때 같이 만들어 둔 한 줄(추가 AI 호출 없음)
+    else if (withChat && step.greet) {
+      const cl = await aiChatLines(sb, { nickname, mode: await streamModeOf(sb, bc), product: null, withOrder: true });
+      if (cl) { chatAfter = cl.after; await postTestChat(origin, bcId, cl.before); await wait(between(6_000, 12_000)); }
     }
 
     // 3. 장바구니 담기(손님과 같은 주소) — 테스트마다 새 장바구니
@@ -562,11 +581,11 @@ export async function screenTestPlan(sb: Db, origin: string, scheduled = false):
   let chatAfter = "";
   if (state.chatEnabled) {
     try {
-      const { overseasOn } = await readSettings(sb);
-      const product = step.fixed ? await chatProductOf(sb, prep.lines[0].productId, prep.lines[0].productName, overseasOn) : null;
-      const cl = await makeChatLines({ nickname: prep.nickname, mode: await streamModeOf(sb, bc), product, withOrder: true });
-      if (step.greet) await postTestChat(origin, String(bc.id ?? ""), cl.before); // 카드 없을 때만 인사(상품 질문 아님)
-      chatAfter = cl.after;
+      if (step.fixed) chatAfter = step.fixed.after; // 질문 때 같이 만들어 둔 한 줄
+      else if (step.greet) {
+        const cl = await aiChatLines(sb, { nickname: prep.nickname, mode: await streamModeOf(sb, bc), product: null, withOrder: true });
+        if (cl) { await postTestChat(origin, String(bc.id ?? ""), cl.before); chatAfter = cl.after; } // 카드 없을 때만 인사(상품 질문 아님)
+      }
     } catch { /* 채팅 실패는 주문 테스트와 무관 */ }
   }
   return {

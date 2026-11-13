@@ -7,17 +7,18 @@ export type GeminiJsonResult = { text: string | null; note: string };
 /** 글자 또는 사진(base64) 조각 — 사진은 응대 문구(AI-4)에서만 */
 export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
-export async function callGeminiJson(prompt: string | GeminiPart[], opts: { timeoutMs?: number; maxTokens?: number } = {}): Promise<GeminiJsonResult> {
+export async function callGeminiJson(prompt: string | GeminiPart[], opts: { timeoutMs?: number; maxTokens?: number; temperature?: number; models?: string[] } = {}): Promise<GeminiJsonResult> {
   const parts: GeminiPart[] = typeof prompt === "string" ? [{ text: prompt }] : prompt;
   const key = process.env.GEMINI_API_KEY || "";
   if (!key) return { text: null, note: "no_key" };
   const timeoutMs = opts.timeoutMs ?? 6000;
   const maxTokens = opts.maxTokens ?? 1024;
-  const models = [process.env.GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"].filter(Boolean) as string[];
+  const models = opts.models?.length ? opts.models : [process.env.GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"].filter(Boolean) as string[];
+  const temperature = opts.temperature ?? 0;
   const configs = [
-    { temperature: 0, responseMimeType: "application/json", maxOutputTokens: maxTokens, thinkingConfig: { thinkingLevel: "minimal" } },
-    { temperature: 0, responseMimeType: "application/json", maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
-    { temperature: 0, responseMimeType: "application/json", maxOutputTokens: maxTokens * 2 },
+    { temperature, responseMimeType: "application/json", maxOutputTokens: maxTokens, thinkingConfig: { thinkingLevel: "minimal" } },
+    { temperature, responseMimeType: "application/json", maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
+    { temperature, responseMimeType: "application/json", maxOutputTokens: maxTokens * 2 },
   ];
   let note = "";
   for (const model of models) {
@@ -33,7 +34,7 @@ export async function callGeminiJson(prompt: string | GeminiPart[], opts: { time
         });
         if (res.status === 404) { note = `${model}:404`; break; } // 모델 이름이 없으면 다음 모델
         if (res.status === 400) { note = `${model}:400`; continue; } // 설정을 모르면 다음 설정
-        if (!res.ok) { note = `${model}:http_${res.status}`; break; } // 503(붐빔)·429(한도) → 다음 모델
+        if (!res.ok) { note = `${note ? `${note},` : ""}${model}:http_${res.status}`; break; } // 503(붐빔)·429(한도) → 다음 모델
         const data = await res.json().catch(() => null);
         const out = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p?.text || "").join("") || "";
         if (!out) { note = `${model}:empty_${data?.candidates?.[0]?.finishReason || "none"}`; continue; }
