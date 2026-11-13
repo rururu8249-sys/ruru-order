@@ -74,12 +74,17 @@ export type PaidHistory = {
 
 export type WelcomeDecision = { kind: WelcomeKind; amount: number; sourceKey: string } | null;
 
-/** 누가 어떤 선물을 받을 수 있는지. customerId = customers.id(카카오 계정). */
-export function decideWelcome(cfg: WelcomePointConfig, customerId: string, h: PaidHistory, nowMs: number): WelcomeDecision {
+/** [2026-11-13 사장님 12:04 「가입 직후만」] 처음 오신 선물 = 카카오로 처음 가입한 지 이 시간 안 + 결제 0번. */
+export const WELCOME_FIRST_JOIN_HOURS = 24;
+
+/** 누가 어떤 선물을 받을 수 있는지. customerId = customers.id(카카오 계정), joinedAt = 처음 가입 시각(모르면 처음 선물 안 줌). */
+export function decideWelcome(cfg: WelcomePointConfig, customerId: string, h: PaidHistory, nowMs: number, joinedAt?: string | null): WelcomeDecision {
   const id = String(customerId || "").trim();
   if (!id) return null;
   if (h.paidCount <= 0) {
     if (!cfg.first.on || cfg.first.amount <= 0) return null;
+    const joined = Date.parse(String(joinedAt || ""));
+    if (!Number.isFinite(joined) || nowMs - joined > WELCOME_FIRST_JOIN_HOURS * 3600000) return null;
     return { kind: "first", amount: cfg.first.amount, sourceKey: `welcome_first:${id}` };
   }
   if (!cfg.back.on || cfg.back.amount <= 0 || !h.lastPaidAt) return null;

@@ -56,7 +56,7 @@ export async function writeWelcomeConfig(sb: SupabaseClient, cfg: WelcomePointCo
   return clean;
 }
 
-export type WelcomeCustomer = { id: string; phone: string; nickname: string; name: string };
+export type WelcomeCustomer = { id: string; phone: string; nickname: string; name: string; joinedAt: string | null };
 
 /** 카카오 계정 + 지금 전화번호가 «같은 회원 줄»일 때만. 차단 회원은 null. */
 export async function findWelcomeCustomer(sb: SupabaseClient, kakaoId: string, phone: string): Promise<WelcomeCustomer | null> {
@@ -74,6 +74,7 @@ export async function findWelcomeCustomer(sb: SupabaseClient, kakaoId: string, p
     phone: p,
     nickname: String(row.youtube_nickname ?? row.nickname ?? "").slice(0, 80),
     name: String(row.customer_name ?? row.name ?? "").slice(0, 80),
+    joinedAt: String(row.first_login_at ?? row.created_at ?? "") || null,
   };
 }
 
@@ -160,7 +161,7 @@ export async function evaluateWelcome(sb: SupabaseClient, kakaoId: string, phone
   const customer = await findWelcomeCustomer(sb, kakaoId, phone);
   if (!customer) return { cfg, decision: null, customer: null };
   const history = await paidHistoryOf(sb, kakaoId, customer.phone);
-  const decision = decideWelcome(cfg, customer.id, history, nowMs);
+  const decision = decideWelcome(cfg, customer.id, history, nowMs, customer.joinedAt);
   if (!decision) return { cfg, decision: null, customer };
   if (await alreadyGranted(sb, decision.sourceKey)) return { cfg, decision: null, customer };
   if (decision.kind === "first" && (await phoneHadFirstGift(sb, customer.phone))) return { cfg, decision: null, customer };

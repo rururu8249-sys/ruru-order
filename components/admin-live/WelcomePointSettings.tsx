@@ -74,7 +74,7 @@ export default function WelcomePointSettings() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[13px] font-bold text-ink">처음 오신 선물</div>
-          <div className="text-[12px] text-ink-mute">결제한 적 없는 손님 · 한 분께 한 번</div>
+          <div className="text-[12px] text-ink-mute">카톡으로 처음 가입한 지 24시간 안 · 결제한 적 없는 손님 · 한 분께 한 번</div>
         </div>
         <Switch on={cfg.first.on} disabled={busy} label="처음 오신 선물" onChange={(v) => setCfg({ ...cfg, first: { ...cfg.first, on: v } })} />
       </div>

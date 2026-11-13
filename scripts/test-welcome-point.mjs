@@ -23,7 +23,11 @@ const now = Date.parse("2026-11-12T03:00:00Z");
 const day = 86400000;
 
 // 결제한 적 없음 → 처음 오신 선물
-assert.deepEqual(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now), { kind: "first", amount: 2000, sourceKey: "welcome_first:c1" });
+assert.deepEqual(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, new Date(now - 3600000).toISOString()), { kind: "first", amount: 2000, sourceKey: "welcome_first:c1" });
+// [11-13] 가입한 지 24시간 넘은 회원·가입 시각 모름 → 처음 선물 없음
+assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, new Date(now - 25 * 3600000).toISOString()), null);
+assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, null), null);
+assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now), null);
 // 처음 선물 꺼짐 → 없음
 assert.equal(W.decideWelcome({ ...cfg, first: { on: false, amount: 2000 } }, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now), null);
 // 최근에 산 손님 → 없음
@@ -129,8 +133,9 @@ assert.equal(await S.grantedTodayCount(db, "2026-11-11T15:00:00.000Z"), 1);
 function world({ cfg, on = true, rpcFail = false, ledger = [] }) {
   const tables = {
     customers: [
-      { id: "n1", kakao_id: "500", customer_phone: "01050005000", youtube_nickname: "새손님", customer_name: "이새봄", created_at: "2026-11-01" },
-      { id: "n2", kakao_id: "501", customer_phone: "01050005000", youtube_nickname: "새손님2", created_at: "2026-11-02" }, // 같은 번호 다른 카카오
+      { id: "n1", kakao_id: "500", customer_phone: "01050005000", youtube_nickname: "새손님", customer_name: "이새봄", created_at: "2026-11-12T01:00:00Z" },
+      { id: "n2", kakao_id: "501", customer_phone: "01050005000", youtube_nickname: "새손님2", created_at: "2026-11-12T02:00:00Z" }, // 같은 번호 다른 카카오
+      { id: "x1", kakao_id: "800", customer_phone: "01080008000", youtube_nickname: "예전회원", created_at: "2025-06-01", first_login_at: "2025-06-01T00:00:00Z" }, // 가입 오래됨·결제 0
       { id: "o1", kakao_id: "600", customer_phone: "01060006000", youtube_nickname: "옛손님", created_at: "2025-01-01" },
       { id: "r1", kakao_id: "700", customer_phone: "01070007000", youtube_nickname: "단골", created_at: "2025-01-01" },
     ],
@@ -163,6 +168,10 @@ const fresh = () => S.clearWelcomeConfigCache();
 fresh(); { const w = world({ cfg: { ...ON, first: { on: false, amount: 2000 }, back: { on: false, amount: 1000, days: 60 } } });
   assert.equal((await S.evaluateWelcome(w.db, "500", "01050005000", NOW)).decision, null);
   const r = await S.claimWelcome(w.db, "500", "01050005000", NOW); assert.equal(r.ok, false); assert.equal(w.calls.length, 0); }
+// 1-1) [11-13] 예전부터 회원인데 결제 0번 → 처음 선물 안 줌
+fresh(); { const w = world({ cfg: ON });
+  assert.equal((await S.evaluateWelcome(w.db, "800", "01080008000", NOW)).decision, null);
+  assert.equal((await S.claimWelcome(w.db, "800", "01080008000", NOW)).ok, false); assert.equal(w.calls.length, 0); }
 // 2) 방송 꺼짐 → 안 줌
 fresh(); { const w = world({ cfg: ON, on: false });
   assert.equal((await S.claimWelcome(w.db, "500", "01050005000", NOW)).ok, false); assert.equal(w.calls.length, 0); }
