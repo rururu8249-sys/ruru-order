@@ -649,7 +649,12 @@ const maskAddress = (base: string, detail: string) => {
 
 const blockCustomerCopyEvents = () => {
   // 방송 채팅 입력은 상품 복사 방지 대상이 아니다(⌘A/C/X/V·입력칸 기본 메뉴).
-  const isChatInput = (event: Event) => event.target instanceof Element && event.target.matches("input[data-live-chat-input]");
+  const isChatInput = (event: Event) => {
+    // [2026-11-13] 채팅 입력칸이 글자+그림 칸(contenteditable)이라 글자 조각(Text)에서 오는 이벤트도 채팅 입력으로 봄
+    const t = event.target as Node | null;
+    const el = t && t.nodeType === 1 ? (t as Element) : t?.parentElement ?? null;
+    return !!el?.closest("[data-live-chat-input]");
+  };
   const block = (event: Event) => { if (!isChatInput(event)) event.preventDefault(); };
 
   const blockKey = (event: KeyboardEvent) => {

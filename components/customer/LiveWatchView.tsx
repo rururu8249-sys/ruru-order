@@ -31,7 +31,8 @@ import { useCustomerOverlayClose } from "@/components/customer/CustomerBottomShe
 import { parseBotRef } from "@/lib/liveChatBot";
 import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 import { EMOJI_MAX_PER_MSG, chatBodyAsText, countEmojiTokens, encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
-import { removeEmojiTrigger, composeEmojiMessage } from "@/lib/chatEmojiComposer";
+import { emojiTriggerLength } from "@/lib/chatEmojiComposer";
+import ChatRichInput, { type ChatRichInputHandle } from "@/components/customer/ChatRichInput";
 import { lastTypedWord, suggestEmojis } from "@/lib/liveChatEmojiSuggest";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { setLiveWatching } from "@/lib/presenceActivity";
@@ -488,44 +489,36 @@ export default function LiveWatchView(props: Props) {
   const emojiMap = useMemo(() => emojiMapOf(emojiItems), [emojiItems]);
   const canEmoji = Boolean(chat?.canEmoji) && emojiItems.length > 0;
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const [selectedEmoji, setSelectedEmoji] = useState<ChatEmoji | null>(null);
   const [emojiSearchWord, setEmojiSearchWord] = useState("");
-  const composedDraft = composeEmojiMessage(draft, selectedEmoji?.name);
+  // [2026-11-13] 이모티콘은 입력칸 안 글 사이에 그림으로(여러 개·최대 5개) — 글은 «:이름:» 표식 그대로
+  const composedDraft = draft.trim();
   // [14:42 사장님 영상 「이모티콘 넣고 입력칸 다시 누르면 화면 꺼짐」] 원인: 입력칸을 누르는 순간(포커스) 이모티콘 판이 사라져
   //   쓰기 창이 232px 낮아지고, 같은 손가락의 «클릭»이 그 자리(이제 바깥 어두운 곳)에 떨어져 창이 닫혔음.
   //   → 바깥 누르기로 닫는 건 «누르기 시작도 바깥»일 때만.
   const composeDownOnBackdrop = useRef(false);
   const [composeHint, setComposeHint] = useState("");
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const caretRef = useRef<{ start: number; end: number } | null>(null);
+  const inputRef = useRef<ChatRichInputHandle | null>(null);
   const draftEmojiCount = canEmoji ? countEmojiTokens(composedDraft, emojiItems) : 0;
-  // 커서 자리 — 넣기용 ref + 추천 낱말 계산용 state(화면이 다시 그려지게)
-  const [caretEnd, setCaretEnd] = useState<number | null>(null);
-  const rememberCaret = (el: HTMLInputElement) => { caretRef.current = { start: el.selectionStart ?? el.value.length, end: el.selectionEnd ?? el.value.length }; setCaretEnd(caretRef.current.end); };
+  // 커서 앞 글(추천 낱말 계산용)
+  const [beforeCaretText, setBeforeCaretText] = useState("");
   const selectEmoji = (e: ChatEmoji, replaceTrigger = false) => {
     if (sending) return;
     const el = inputRef.current;
-    const value = el?.value ?? draft;
-    const at = el?.selectionEnd ?? caretRef.current?.end ?? value.length;
-    const next = replaceTrigger ? removeEmojiTrigger(value, at, e) : {text: value, caret: at, word: ""};
-    const body = composeEmojiMessage(next.text, e.name);
-    if (countEmojiTokens(body, emojiItems) > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; }
-    if (body.length > LIVE_CHAT_MAX_LEN) { setComposeHint("글이 너무 길어요."); return; }
-    // Finish Korean composition and release the phone keyboard before opening the drawer.
-    el?.blur(); composingRef.current = false;
-    setDraft(next.text); setSelectedEmoji(e); setComposeHint("");
-    caretRef.current = {start: next.caret, end: next.caret}; setCaretEnd(next.caret);
-    if (replaceTrigger) setEmojiSearchWord(next.word);
-    setEmojiOpen(true);
-    return body;
+    if (!el) return;
+    if (countEmojiTokens(draft, emojiItems) + 1 > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; }
+    const cut = replaceTrigger ? emojiTriggerLength(el.textBeforeCaret(), e) : 0;
+    if (draft.length - cut + e.name.length + 2 > LIVE_CHAT_MAX_LEN) { setComposeHint("글이 너무 길어요."); return; }
+    setComposeHint("");
+    el.insertEmoji(e, cut);
+    if (replaceTrigger) setEmojiSearchWord("");
   };
   // Recommendations replace their trigger; the selected image stays separate from typed text.
   const [suggestHiddenFor, setSuggestHiddenFor] = useState("");
-  const typedWord = canEmoji && (composeOpen || isDesktop) ? lastTypedWord(draft.slice(0, Math.min(caretEnd ?? draft.length, draft.length))) : "";
+  const typedWord = canEmoji && (composeOpen || isDesktop) ? lastTypedWord(beforeCaretText) : "";
   const wordSuggests = typedWord ? suggestEmojis(typedWord, emojiItems) : [];
   const pickerWord = emojiSearchWord || typedWord;
   const pickerSuggests = pickerWord ? suggestEmojis(pickerWord, emojiItems) : [];
-  const showSuggestRow = wordSuggests.length > 0 && !selectedEmoji && !emojiOpen && typedWord !== suggestHiddenFor && draftEmojiCount < EMOJI_MAX_PER_MSG;
+  const showSuggestRow = wordSuggests.length > 0 && !emojiOpen && typedWord !== suggestHiddenFor && draftEmojiCount < EMOJI_MAX_PER_MSG;
   const suggestRowRef = useRef<HTMLDivElement | null>(null);
   const [keyboardEmojiId, setKeyboardEmojiId] = useState<string | null>(null);
   const focusSuggestion = (index: number) => {
@@ -676,13 +669,13 @@ export default function LiveWatchView(props: Props) {
     const batch = target && "targets" in target;
     setSending(true);
     setComposeHint("");
-    const previousDraft = draft, previousEmoji = selectedEmoji, previousEmojiOpen = emojiOpen;
-    if (!batch) { setDraft(""); setSelectedEmoji(null); setEmojiOpen(false); setComposeOpen(false); }
+    const previousDraft = draft, previousEmojiOpen = emojiOpen;
+    if (!batch) { setDraft(""); setBeforeCaretText(""); setEmojiOpen(false); setComposeOpen(false); }
     // [2026-11-12 22:46 사장님] 인사하기 줄은 「보내기」를 눌러야만 사라짐 — 채팅을 써도 그대로
     const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
     const r = await chat.onSend(body, commandTarget).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     if (!r.ok && !batch) {
-      setDraft(previousDraft); setSelectedEmoji(previousEmoji); setEmojiOpen(previousEmojiOpen);
+      setDraft(previousDraft); setEmojiOpen(previousEmojiOpen);
       if (!isDesktop) setComposeOpen(true);
     }
     if (r.ok && batch && target.mode === "replace" && props.broadcastId) {
@@ -1080,20 +1073,10 @@ export default function LiveWatchView(props: Props) {
   const composer = (
           <form
             onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => { e.preventDefault(); if (composingRef.current || productPickerOpen) return; if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } if (!selectedEmoji) setEmojiOpen(false); void sendChat(); }}
+            onSubmit={(e) => { e.preventDefault(); if (composingRef.current || productPickerOpen) return; if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } setEmojiOpen(false); void sendChat(); }}
             style={{ position: "relative", width: "100%", maxWidth: "560px", margin: "0 auto", background: isDesktop ? "#0F0F0F" : "#FFFFFF", padding: isDesktop ? "12px 0 calc(12px + env(safe-area-inset-bottom))" : emojiOpen ? "12px 16px 0" : "12px 16px calc(12px + env(safe-area-inset-bottom))", borderRadius: isDesktop ? 0 : "16px 16px 0 0", boxSizing: "border-box", ...(isDesktop ? { position: "relative", flexShrink: 0, order: 5, borderTop: "1px solid #333333", pointerEvents: "auto" } : {}) }}
           >
             {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onIntro={chat?.canModerate ? (products) => { setIntroChosen(products.map(widgetTargetKey)); setIntroManage(products[0]?.texts[0] ?? ""); setDraft(""); } : undefined} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
-            {draftEmojiCount > 0 ? (
-              // Float above the input: only the picture has a translucent backing, leaving the video visible.
-              <div aria-label="미리보기" style={{ position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", width: "fit-content", maxWidth: "calc(100% - 32px)", maxHeight: "30dvh", overflowY: "auto", boxSizing: "border-box", padding: "12px", borderRadius: "12px", background: "rgba(0,0,0,0.38)", color: "#FFFFFF", fontSize: "15px", lineHeight: 1.45, wordBreak: "break-word", zIndex: 1 }}>
-                {selectedEmoji ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selectedEmoji.url} alt={`${selectedEmoji.name} 이모티콘 미리보기`} style={{display: "block", width: "min(88px, calc(30dvh - 24px))", height: "min(88px, calc(30dvh - 24px))", objectFit: "contain"}} />
-                ) : <ChatBodyView body={encodeEmojiTokens(draft, emojiItems).text} emojis={emojiMap} />}
-                {selectedEmoji ? <button type="button" aria-label="선택한 이모티콘 취소" onClick={() => setSelectedEmoji(null)} style={{position: "absolute", right: 0, top: 0, width: 44, height: 44, border: 0, background: "transparent", color: "#FFFFFF", cursor: "pointer"}}>✕</button> : null}
-              </div>
-            ) : null}
             {composeHint ? <div role="status" style={{ marginBottom: "8px", fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{composeHint}</div> : null}
             {showSuggestRow && !productPickerOpen ? (
               // Select a picture, replace its trigger, and open the keyboard-sized drawer.
@@ -1142,28 +1125,28 @@ export default function LiveWatchView(props: Props) {
             ) : null}
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <div style={{ flex: 1, minWidth: 0, height: "48px", boxSizing: "border-box", border: isDesktop ? "1px solid #555555" : "1px solid #E5E5E5", borderRadius: "9999px", display: "flex", alignItems: "center", background: isDesktop ? "#272727" : "#FFFFFF" }}>
-                <input
+                <ChatRichInput
                   ref={inputRef}
-                  data-live-chat-input
                   autoFocus={!isDesktop && !emojiOpen}
                   value={draft}
+                  emojis={emojiItems}
                   readOnly={sending}
-                  onChange={(e) => { setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN)); setEmojiSearchWord(""); if (e.target.value.trimStart().startsWith("/")) { setEmojiOpen(false); setSelectedEmoji(null); } rememberCaret(e.target); }}
-                  onSelect={(e) => rememberCaret(e.currentTarget)}
+                  maxLength={LIVE_CHAT_MAX_LEN}
+                  placeholder="채팅 입력"
+                  color={isDesktop ? "#FFFFFF" : "#111111"}
+                  placeholderColor={isDesktop ? "#AAAAAA" : "#707072"}
+                  onChange={(text, before) => { setDraft(text.slice(0, LIVE_CHAT_MAX_LEN)); setBeforeCaretText(before); setEmojiSearchWord(""); if (text.trimStart().startsWith("/")) setEmojiOpen(false); }}
+                  onCaret={setBeforeCaretText}
                   onFocus={() => setEmojiOpen(false)}
+                  onEnter={() => inputRef.current?.element()?.closest("form")?.requestSubmit()}
                   onKeyDown={isDesktop ? (e) => {
-                    if (e.nativeEvent.isComposing || composingRef.current || e.keyCode === 229) { if (e.key === "Enter") e.preventDefault(); return; }
-                    if (e.key === "Enter" && e.repeat) { e.preventDefault(); return; }
-                    if (e.key === "ArrowUp" && showSuggestRow) { e.preventDefault(); rememberCaret(e.currentTarget); focusSuggestion(0); }
+                    if (e.nativeEvent.isComposing || composingRef.current || e.keyCode === 229) return;
+                    if (e.key === "ArrowUp" && showSuggestRow) { e.preventDefault(); focusSuggestion(0); }
                     if (e.key === "Escape") { setEmojiOpen(false); inputRef.current?.focus(); }
                   } : undefined}
                   onCompositionStart={() => { composingRef.current = true; }}
                   onCompositionEnd={() => { composingRef.current = false; }}
-                  placeholder="채팅 입력"
-                  aria-label="채팅 메시지"
-                  enterKeyHint="send"
-                  maxLength={LIVE_CHAT_MAX_LEN}
-                  style={{ flex: 1, minWidth: 0, height: "100%", padding: canEmoji ? "0 4px 0 16px" : "0 16px", border: "none", borderRadius: "9999px", fontSize: "16px", fontFamily: "inherit", outline: "none", color: isDesktop ? "#FFFFFF" : "#111111", background: "transparent" }}
+                  style={{ padding: canEmoji ? "0 4px 0 16px" : "0 16px" }}
                 />
                 {canEmoji ? (
                   <button
@@ -1172,7 +1155,7 @@ export default function LiveWatchView(props: Props) {
                     aria-pressed={emojiOpen}
                     onClick={() => {
                       if (emojiOpen) { setEmojiOpen(false); inputRef.current?.focus(); }
-                      else { if (inputRef.current) rememberCaret(inputRef.current); inputRef.current?.blur(); setEmojiOpen(true); }
+                      else { inputRef.current?.blur(); setEmojiOpen(true); }
                     }}
                     style={{ flexShrink: 0, width: "44px", height: "44px", border: "none", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
                   >

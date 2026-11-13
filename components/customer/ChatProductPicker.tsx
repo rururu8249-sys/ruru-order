@@ -56,7 +56,7 @@ export function ChatProductPicker({ broadcastId, query, busy, onApply, onIntro, 
   // Capture the composer keys before its ordinary chat/emoji Enter handler.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (!(e.target instanceof HTMLInputElement) || !e.target.hasAttribute("data-live-chat-input") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!(e.target instanceof HTMLElement) || !e.target.hasAttribute("data-live-chat-input") || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.isComposing || e.keyCode === 229) { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); } return; }
       if (!["ArrowUp", "ArrowDown", "Enter", "Escape"].includes(e.key)) return;
       e.preventDefault(); e.stopPropagation();
