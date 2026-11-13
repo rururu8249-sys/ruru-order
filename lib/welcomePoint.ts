@@ -76,6 +76,9 @@ export type WelcomeDecision = { kind: WelcomeKind; amount: number; sourceKey: st
 
 /** [2026-11-13 사장님 12:04 「가입 직후만」] 처음 오신 선물 = 카카오로 처음 가입한 지 이 시간 안 + 결제 0번. */
 export const WELCOME_FIRST_JOIN_HOURS = 24;
+/** [2026-11-13 12:16 사장님 예외] 2026-11-01 ~ 2026-11-13(한국 시간) 사이 처음 가입한 손님은 24시간이 지나도 «신규»(결제 0번이면). */
+export const WELCOME_FIRST_GRACE_FROM = Date.parse("2026-11-01T00:00:00+09:00");
+export const WELCOME_FIRST_GRACE_TO = Date.parse("2026-11-14T00:00:00+09:00");
 
 /** 누가 어떤 선물을 받을 수 있는지. customerId = customers.id(카카오 계정), joinedAt = 처음 가입 시각(모르면 처음 선물 안 줌). */
 export function decideWelcome(cfg: WelcomePointConfig, customerId: string, h: PaidHistory, nowMs: number, joinedAt?: string | null): WelcomeDecision {
@@ -84,7 +87,9 @@ export function decideWelcome(cfg: WelcomePointConfig, customerId: string, h: Pa
   if (h.paidCount <= 0) {
     if (!cfg.first.on || cfg.first.amount <= 0) return null;
     const joined = Date.parse(String(joinedAt || ""));
-    if (!Number.isFinite(joined) || nowMs - joined > WELCOME_FIRST_JOIN_HOURS * 3600000) return null;
+    if (!Number.isFinite(joined)) return null;
+    const inGrace = joined >= WELCOME_FIRST_GRACE_FROM && joined < WELCOME_FIRST_GRACE_TO;
+    if (!inGrace && nowMs - joined > WELCOME_FIRST_JOIN_HOURS * 3600000) return null;
     return { kind: "first", amount: cfg.first.amount, sourceKey: `welcome_first:${id}` };
   }
   if (!cfg.back.on || cfg.back.amount <= 0 || !h.lastPaidAt) return null;

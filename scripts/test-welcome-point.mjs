@@ -25,8 +25,14 @@ const day = 86400000;
 // 결제한 적 없음 → 처음 오신 선물
 assert.deepEqual(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, new Date(now - 3600000).toISOString()), { kind: "first", amount: 2000, sourceKey: "welcome_first:c1" });
 // [11-13] 가입한 지 24시간 넘은 회원·가입 시각 모름 → 처음 선물 없음
-assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, new Date(now - 25 * 3600000).toISOString()), null);
+assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, "2026-10-01T00:00:00+09:00"), null);
 assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now, null), null);
+// [11-13 예외] 11/1~11/13 가입은 며칠 지나도 신규 / 10/31 가입은 아님
+{ const later = Date.parse("2026-11-20T03:00:00Z");
+  assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, later, "2026-11-01T00:30:00+09:00")?.kind, "first");
+  assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, later, "2026-11-13T23:00:00+09:00")?.kind, "first");
+  assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, later, "2026-10-31T23:59:00+09:00"), null);
+  assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, later, "2026-11-14T00:00:00+09:00"), null); }
 assert.equal(W.decideWelcome(cfg, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now), null);
 // 처음 선물 꺼짐 → 없음
 assert.equal(W.decideWelcome({ ...cfg, first: { on: false, amount: 2000 } }, "c1", { paidCount: 0, lastPaidAt: null, lastPaidKey: null }, now), null);
