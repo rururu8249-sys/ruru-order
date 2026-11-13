@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {PGlite} from '@electric-sql/pglite';
+const db=new PGlite();
+await db.exec(`
+create role anon; create role authenticated; create role service_role;
+create schema extensions; create schema cron; create schema net; create schema vault;
+create table cron.job(jobid bigserial primary key,jobname text unique,schedule text,command text);
+create function cron.schedule(text,text,text) returns bigint language plpgsql as $$ declare n bigint; begin insert into cron.job(jobname,schedule,command) values($1,$2,$3) on conflict(jobname) do update set schedule=$2 returning jobid into n; return n; end $$;
+create function cron.unschedule(bigint) returns boolean language plpgsql as $$ begin delete from cron.job where jobid=$1; return found; end $$;
+create table vault.secrets(id uuid primary key default gen_random_uuid(),secret text,name text,description text);
+create view vault.decrypted_secrets as select id,secret as decrypted_secret from vault.secrets;
+create function vault.create_secret(text,text,text) returns uuid language plpgsql as $$ declare n uuid; begin insert into vault.secrets(secret,name,description) values($1,$2,$3) returning id into n; return n; end $$;
+create table net.requests(id bigserial primary key,url text,body jsonb,headers jsonb);
+create function net.http_post(url text,body jsonb default '{}',params jsonb default '{}',headers jsonb default '{}',timeout_milliseconds integer default 1000) returns bigint language plpgsql as $$ declare n bigint; begin insert into net.requests(url,body,headers) values($1,$2,$4) returning id into n; return n; end $$;
+create table live_automation_campaigns(id uuid primary key default gen_random_uuid(),orders_enabled boolean default false,chat_enabled boolean default false,viewers_enabled boolean default false,next_order_at timestamptz,updated_at timestamptz default now());
+create table live_automation_actions(campaign_id uuid,status text,due_at timestamptz,manual boolean);
+create function live_automation_verified_order(text) returns boolean language sql as $$ select $1='authenticated-action-group' $$;
+create function submit_customer_order_with_points(jsonb,integer,text,text,text,text) returns jsonb language plpgsql as $$ declare v_matched boolean:=true; p_order_rows jsonb:=$1; begin IF v_matched THEN return '{"deduct":true}'; end if; return '{"deduct":false}'; end $$;
+`);
+const sql=readFileSync(new URL('../supabase/migrations/20261113072141_live_automation_runtime.sql',import.meta.url),'utf8').replace('create extension if not exists pg_net with schema extensions;','');
+await db.exec(sql);
+const scalar=async(sql,args=[])=>Object.values((await db.query(sql,args)).rows[0])[0];
+assert.equal(await scalar('select live_automation_runtime_ready()'),false);
+await assert.rejects(scalar('select live_automation_schedule(true)'),/NOT_READY/);
+await scalar(`select live_automation_configure('https://example.test')`);
+assert.equal(await scalar('select live_automation_runtime_ready()'),true);
+await scalar('select live_automation_schedule(true)'); await scalar('select live_automation_schedule(true)');
+assert.equal(await scalar('select count(*)::int from cron.job'),1,'ON retries cannot duplicate schedules');
+await scalar('select live_automation_dispatch()');
+assert.equal(await scalar('select count(*)::int from net.requests'),0,'no activity means no HTTP');
+await db.exec('insert into live_automation_campaigns(viewers_enabled) values(true)');
+await scalar('select live_automation_dispatch()');
+assert.equal(await scalar('select count(*)::int from net.requests'),1);
+assert.equal(await scalar(`select body->>'kind' from net.requests`),'presence');
+assert.equal(await scalar(`select command like '%Bearer%' from cron.job`),false,'cron command must not expose a credential');
+await scalar('select live_automation_schedule(false)');
+assert.equal(await scalar('select count(*)::int from cron.job'),0);
+assert.equal(await scalar(`select live_automation_authorize_tick('forged')`),false);
+for(const [group,deduct] of [['normal',true],['authenticated-action-group',false]]) {
+ const v=await scalar(`select submit_customer_order_with_points($1,0,'','','','')`,[[{order_group_id:group}]]);
+ assert.equal(v.deduct,deduct,'shared RPC suppresses inventory mutation only for verified context');
+}
+await db.exec('set role anon');
+await assert.rejects(scalar('select live_automation_configure($1)',['https://attacker.test']),/permission denied/);
+await db.close();
+console.log('PASS runtime readiness, atomic scheduling adapter, OFF unschedule, credential privacy, narrow inventory mutation guard');
