@@ -16,7 +16,7 @@ console.log('PASS signed chat identity: forged/expired/account mismatch/browser 
 const bc = '00000000-0000-0000-0000-000000000001';
 let admin = false, writes = [], readTables = [], failWrite = false;
 const row = (id, kid, hidden_by = null) => ({ id, kakao_id: kid, broadcast_id: bc, nickname: 'test', body: `original-${id}`, created_at: '2026-11-11', badge: null, automation_actor_id:null, avatar_url:"https://private.example/"+id, public_avatar_id:id, pinned_at: id === 1 ? '2026-11-11' : null, hidden_at: hidden_by ? '2026-11-11' : null, hidden_by });
-let rows = [row(1, '123456'), row(2, '999999'), row(3, '999999', 'author'), row(4, '999999', 'admin')];
+let rows = [row(1, '123456'), row(2, '999999'), row(3, '999999', 'author'), row(4, '999999', 'admin'), {...row(7,'bot:ruru'),badge:'bot',body:'💗 가상닉님 카드결제 확인! 감사합니다',bot_ref:'ap:action',automation_actor_id:'actor'}];
 const sb = { from(table) {
   const filters = []; let single = false, update = null;
   readTables.push(table);
@@ -41,11 +41,11 @@ const request = (options={}) => ({
 });
 let res = await route.GET(request({noAuth:true})); assert.equal(res.status,401);
 res = await route.GET(request());let body = await res.json();
-assert.deepEqual(body.ownIds,[1]);assert.deepEqual(body.deletedMessages,[]);assert.equal(body.canReviewDeleted,false);assert.deepEqual(body.avatars,{});assert.ok(!JSON.stringify(body).includes("private.example"));
+assert.deepEqual(body.ownIds,[1]);assert.deepEqual(body.deletedMessages,[]);assert.equal(body.canReviewDeleted,false);assert.deepEqual(body.avatars,{});assert.deepEqual(body.testMessages,{});assert.ok(!JSON.stringify(body).includes("private.example"));
 assert.ok(!JSON.stringify(body).includes('original-'));assert.ok(!readTables.includes('customers'),'editable profile phone must never authorize originals');
 const modToken = auth.signChatIdentity({...identity,phone:'01099999999'});
 res=await route.GET(request({token:modToken}));body=await res.json();
-assert.equal(body.canReviewDeleted,true);assert.equal(body.avatars['1'],'https://private.example/1');assert.equal(body.deletedMessages.length,1);assert.equal(body.deletedMessages[0].body,'original-3');assert.equal(body.deletedMessages[0].deletedByAuthor,true);
+assert.equal(body.canReviewDeleted,true);assert.equal(body.testMessages['7'].body,'💗 [테스트]가상닉님 카드결제 확인! 감사합니다');assert.equal(body.testMessages['2'],undefined,'real customer has no test label');assert.equal(body.avatars['1'],'https://private.example/1');assert.equal(body.deletedMessages.length,1);assert.equal(body.deletedMessages[0].body,'original-3');assert.equal(body.deletedMessages[0].deletedByAuthor,true);
 assert.ok(!JSON.stringify(body).includes('kakao_id'));assert.match(res.headers.get('cache-control'),/private, no-store/);
 admin=true;res=await route.GET(request({noAuth:true}));assert.equal((await res.json()).canReviewDeleted,true);admin=false;
 rows.push(row(5,'123456','command'),row(6,'999999','command'));

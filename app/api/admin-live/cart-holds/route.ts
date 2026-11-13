@@ -154,6 +154,7 @@ export async function GET(request: NextRequest) {
       const rawPrice = r.unit_price;
       const unitPrice = rawPrice === null || rawPrice === undefined || String(rawPrice).trim() === "" ? null : Math.max(0, Math.floor(Number(rawPrice) || 0));
       return {
+        isTest: Boolean(r.automation_actor_id),
         sessionKey: String(r.session_key ?? ""),
         kakaoId: String(r.kakao_id ?? "").trim(),
         phone: ph,

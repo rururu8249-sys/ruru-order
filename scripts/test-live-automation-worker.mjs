@@ -38,3 +38,18 @@ try{
  assert.equal(orderRuns,1,'slow first request defers the remaining actions before lease expiry');
  assert.equal(chats,0,'slow order tick defers AI instead of exceeding its runtime budget');
 }finally{Date.now=originalNow}
+
+// One already-staged slow shopper must not prevent the next independent wave.
+let admissions=0,plans=0;
+const slow={id:'slow',kind:'order',status:'pending',plan:{stage:'submit',waveId:'old-wave'},due_at:new Date(Date.now()+64*60000).toISOString()};
+const waveCampaign={...c,chat_enabled:false,tempo_plan:{id:'new-wave',at:new Date().toISOString(),offsets:[0]}};
+const waveDb={from(table){let select='',waveId=null,due=null;const q={select(v){select=v;return q},eq(k,v){if(k==='plan->>waveId')waveId=v;return q},or(){return q},in(){return q},limit(){return q},order(){return q},lte(k,v){due=v;return q},then(resolve,reject){let data=table==='live_automation_campaigns'?[waveCampaign]:table==='live_automation_actions'?[slow]:[];if(waveId)data=data.filter(a=>a.plan.waveId===waveId);if(due)data=data.filter(a=>Date.parse(a.due_at)<=Date.parse(due));return Promise.resolve({data,error:null}).then(resolve,reject)}};return q},async rpc(name){if(name==='live_automation_tick_claim')return {data:id};if(name==='live_automation_order_admission'){admissions++;return {error:{message:'STOP_BEFORE_WRITING_TEST'}}}if(name==='live_automation_plan_tempo'){plans++;return {data:{id:'future-wave',at:new Date(Date.now()+15*60000).toISOString(),offsets:[0]}}}return {data:null}}};
+await isolated.runAutomationTick(waveDb,'https://shop.test','actions',transport);
+assert.equal(admissions,1,'a 64-minute staged cart must allow next-wave admission');
+waveCampaign.tempo_plan.id='old-wave';admissions=0;
+await isolated.runAutomationTick(waveDb,'https://shop.test','actions',transport);
+assert.equal(plans,1);assert.equal(admissions,0,'already materialized wave gets a future schedule, never duplicate carts');
+slow.plan.stage='cart';plans=0;
+await isolated.runAutomationTick(waveDb,'https://shop.test','actions',transport);
+assert.equal(plans,0);assert.equal(admissions,0,'unstarted wave still blocks more backlog');
+console.log('PASS slow staged shopper coexists with later waves; no duplicate wave or unstarted backlog');

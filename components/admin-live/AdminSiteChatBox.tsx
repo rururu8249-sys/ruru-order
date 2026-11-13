@@ -13,7 +13,6 @@ import { showAdminToast } from "@/lib/adminToast";
 import { mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
 import type { ChatEmoji } from "@/lib/liveChatEmoji";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
-import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
 
 const BADGE_LABEL: Record<string, string> = { crown: "관리자", crown_pink: "관리자", mod: "R", bot: "AI" };
 const BADGE_CLS: Record<string, string> = {
@@ -83,7 +82,7 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
       const m = parseChatMessage((ev as CustomEvent).detail);
       if (!m || m.broadcastId !== broadcastId) return;
       setList((prev) => mergeChat(prev, [m]));
-      if(m.badge!=="bot") void load();
+      void load(); // Reload the authenticated test-label projection for bot events too.
       setPinned((prev) => (m.pinned ? m : prev && prev.id === m.id ? null : prev));
     };
     window.addEventListener("ruru-live-chat", onChat);

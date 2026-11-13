@@ -17,8 +17,8 @@ export function verifyChatAccount() {
   const popup = window.open(url, "ruru-chat-verification", "width=480,height=720");
   if (!popup) window.location.assign(url);
 }
-type PrivateState = { avatars: Record<string,string>; verified: boolean; canReviewDeleted: boolean; ownIds: number[]; hiddenIds: number[]; deletedMessages: LiveChatMessage[]; commandMessages: LiveChatMessage[] };
-const EMPTY: PrivateState = { avatars: {}, verified: false, canReviewDeleted: false, ownIds: [], hiddenIds: [], deletedMessages: [], commandMessages: [] };
+type PrivateState = { testMessages: Record<string,{nickname:string;body:string}>; avatars: Record<string,string>; verified: boolean; canReviewDeleted: boolean; ownIds: number[]; hiddenIds: number[]; deletedMessages: LiveChatMessage[]; commandMessages: LiveChatMessage[] };
+const EMPTY: PrivateState = { testMessages: {}, avatars: {}, verified: false, canReviewDeleted: false, ownIds: [], hiddenIds: [], deletedMessages: [], commandMessages: [] };
 function currentChatAccount() { try { return localStorage.getItem("ruru_kakao_id") || ""; } catch { return ""; } }
 
 export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveChatMessage[]) {
@@ -40,7 +40,7 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
   };
   const onPublicMessage = useCallback((m: LiveChatMessage) => {
     if (m.hidden) { knownHidden.current.add(m.id); refresh(); }
-    else if(access.current && m.badge!=="bot" && !photoRefresh.current) photoRefresh.current=setTimeout(()=>{photoRefresh.current=null;refresh();},500);
+    else if(access.current && !photoRefresh.current) photoRefresh.current=setTimeout(()=>{photoRefresh.current=null;refresh();},500);
   }, [refresh]);
   useEffect(() => {
     if(enabled&&bc){
@@ -68,7 +68,7 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
       const commandMessages = j.verified ? (j.commandMessages || []).map((raw: unknown) => {
         const m = parseChatMessage(raw); return m && m.broadcastId === bc ? { ...m, privateCommand: true } : null;
       }).filter(Boolean) as LiveChatMessage[] : [];
-      setState({ avatars: j.canReviewDeleted ? (j.avatars || {}) : {}, verified: j.verified === true, canReviewDeleted: j.canReviewDeleted === true, ownIds: j.ownIds || [], hiddenIds: j.hiddenIds || [], deletedMessages, commandMessages });
+      setState({ testMessages: j.canReviewDeleted ? (j.testMessages || {}) : {}, avatars: j.canReviewDeleted ? (j.avatars || {}) : {}, verified: j.verified === true, canReviewDeleted: j.canReviewDeleted === true, ownIds: j.ownIds || [], hiddenIds: j.hiddenIds || [], deletedMessages, commandMessages });
     }).catch(() => { if (!controller.signal.aborted) setState(EMPTY); });
     return () => { ++serial.current; controller.abort(); };
   }, [bc, enabled, revision]);
@@ -91,7 +91,7 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
     if (state.canReviewDeleted) for (const m of state.deletedMessages) if (m.broadcastId === bc) map.set(m.id, m);
     for (const m of state.commandMessages) if (m.broadcastId === bc) map.set(m.id, m);
     if (receipts.bc === bc && receipts.account === currentChatAccount()) for (const m of receipts.messages) map.set(m.id, m);
-    return [...map.values()].map(m=>state.canReviewDeleted && /^https:\/\//.test(state.avatars[m.id] || "") ? {...m,avatar:state.avatars[m.id]} : m).sort((a, b) => a.id - b.id).slice(-200);
+    return [...map.values()].map(m=>state.canReviewDeleted && !m.hidden && !m.deletedByAuthor && state.testMessages[m.id] ? {...m,body:state.testMessages[m.id].body,...(m.badge==='bot'?{}:{nickname:state.testMessages[m.id].nickname})} : m).map(m=>state.canReviewDeleted && /^https:\/\//.test(state.avatars[m.id] || "") ? {...m,avatar:state.avatars[m.id]} : m).sort((a, b) => a.id - b.id).slice(-200);
   }, [messages, state, revision, bc, receipts]);
   const deleteOwn = async (messageId: number) => {
     if (pending.current) return { ok: false, message: "삭제 중이에요." };

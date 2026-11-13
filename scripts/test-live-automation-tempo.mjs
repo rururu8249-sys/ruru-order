@@ -12,7 +12,7 @@ assert.equal(T.planOrderTempo(1000,'burst',sequence(.9,0)).mode,'quiet','a burst
 assert.equal(T.planOrderTempo(1000,'burst',sequence(.1,0)).mode,'quiet');
 plan=T.planOrderTempo(1000,null,sequence(.9,0,.99));assert.equal(plan.mode,'busy');assert.equal(plan.offsets.length,3);
 for(let i=0;i<100;i++)assert.notEqual(T.planOrderTempo(0,'burst',()=>i/100).mode,'burst');
-assert.equal(T.cartDelay(()=>0),15000);assert.equal(T.cartDelay(()=>.999999),150000);
+assert.equal(T.cartDelay(()=>0),16932);assert.equal(T.cartDelay(()=>.999999),3864834);
 assert.equal(T.nextAdmission(3_600_000,Array(12).fill(1)),3_600_001);
 assert.equal(T.nextAdmission(3_600_000,Array(12).fill(0)),3_600_000,'rolling boundary expires exactly');
 assert.equal(T.maySpeak({kind:'proactive',now:10000,hasActivity:false,manualUntil:0,quietUntil:0,actorLast:null,recent:[]}),false);
@@ -22,7 +22,7 @@ assert.equal(T.maySpeak({kind:'reply',now:3600000,hasActivity:true,manualUntil:0
 assert.equal(T.maySpeak({kind:'reply',now:3600000,hasActivity:true,manualUntil:0,quietUntil:0,actorLast:null,recent:[{at:3599000,kind:'reply'},{at:3599001,kind:'proactive'}]}),false);
 console.log('PASS variable quiet/steady/burst tempo, cart dwell, rolling limits and activity/manual-aware sparse AI');
 const j1=T.planOrderJourney(0,60000,0,()=>0),j2=T.planOrderJourney(0,60000,60000,()=>.9);
-assert.equal(j1.cartAt,30000);assert.equal(j1.submitAt,45000);
+assert.equal(j1.cartAt,30000);assert.equal(j1.submitAt,46932);
 assert.equal(j2.cartAt,90000);assert.ok(j2.submitAt>j2.cartAt);
 assert.ok(j1.submitAt<j2.cartAt,'one person can submit before another starts their cart');
 const queues=[...Array.from({length:8},(_,i)=>({id:'cart'+i,plan:{}})),...Array.from({length:3},(_,i)=>({id:'submit'+i,plan:{stage:'submit'}}))];

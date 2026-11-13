@@ -1470,8 +1470,7 @@ export default function LiveOrderTable({
                         className={`mb-2 rounded-xl border border-line bg-surface px-3 py-2.5 ${order.paymentStatus === "manual_match_needed" ? "border-l-[3px] border-l-rose-deep" : ""}`}>
                         <div className="flex items-center gap-2">
                           <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} className="h-5 w-5 shrink-0 accent-[var(--color-ink)]" />
-                          <span className="min-w-0 truncate text-[14px] font-bold text-ink">{order.nickname}</span>
-                          {order.isTestOrder ? <span className="shrink-0 text-[12px] font-bold text-ink-mute">[TEST]</span> : null}
+                          <span className="min-w-0 truncate text-[14px] font-bold text-ink">{order.isTestOrder ? "[테스트]" : ""}{order.nickname}</span>
                           {order.name ? <span className="shrink-0 text-[13px] text-ink-soft">{order.name}</span> : null}
                           <span className="ml-auto shrink-0 text-[12px] text-ink-mute tabular-nums">{when}</span>
                         </div>
@@ -1539,9 +1538,8 @@ export default function LiveOrderTable({
                       <div className="min-w-0 px-3 py-3 text-left">
                         <div className="mb-0.5">
                           <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[13px]">
-                            {order.nickname}
+                            {order.isTestOrder ? "[테스트]" : ""}{order.nickname}
                           </button>
-                          {order.isTestOrder ? <span className="ml-1 text-[12px] font-bold text-ink-mute">[TEST]</span> : null}
                         </div>
                         {/* [2026-10-22] 지난 주문 가상 묶음(가져온 줄만)은 금액이 주문서 전체가 아니므로 복사·쪽지는 원래 주문(상세)에서 */}
                         {order.pickPull && !order.pickPull.whole ? null : (

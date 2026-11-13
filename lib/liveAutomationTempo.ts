@@ -1,3 +1,4 @@
+import {journeyDelayMs} from './liveAutomationTiming';
 /** Server-owned scheduling: generate once, persist, then execute without re-rolling on retries. */
 export type TempoMode='quiet'|'steady'|'busy'|'burst';
 export const MAX_HOURLY_ORDERS=12;
@@ -12,7 +13,7 @@ export function planOrderTempo(now:number,previous:TempoMode|null,random=Math.ra
   if(mode==='busy'){const nextAt=now+between(480000,900000,random),count=between(2,3,random);return {mode,nextAt,offsets:Array.from({length:count},(_,i)=>i*between(30000,90000,random))};}
   const nextAt=now+between(600000,1200000,random),count=between(3,5,random);return {mode,nextAt,offsets:Array.from({length:count},(_,i)=>i*between(30000,75000,random))};
 }
-export const cartDelay=(random=Math.random)=>between(15000,150000,random);
+export const cartDelay=(random=Math.random)=>journeyDelayMs('cart',random);
 export function planOrderJourney(now:number,waveAt:number,offset:number,random=Math.random) {
   const cartAt=Math.max(now,waveAt-30000+offset);
   return {cartAt,submitAt:cartAt+cartDelay(random)};

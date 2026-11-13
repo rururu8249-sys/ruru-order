@@ -1,3 +1,4 @@
+import {adminTestChatRow} from "@/lib/adminTestChat";
 // app/api/admin-live/live-chat/route.ts
 // [2026-11-10] 「방송 보며 주문」 ③단계 — 사이트 채팅 관리(관리자만, middleware + verifyAdminSession).
 //   POST { action: "hide"|"mute30s"|"mute5m"|"ban", messageId }  → 글 지우기(+ 그 손님 잠깐 금지/차단)
@@ -20,10 +21,10 @@ import { koreanPhoneVariants } from "@/lib/order/phone";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const adminMessage=(row:unknown)=>{
- const r=row as Record<string,unknown>;
+ const r=adminTestChatRow(row as Record<string,unknown>);
  return parseChatMessage({...r,avatar_url:r.avatar_url&&r.avatar_url!=='autotest'?r.avatar_url:typeof r.public_avatar_id==='number'?(r.public_avatar_version===2?'public2:':'public:')+r.public_avatar_id+(r.public_avatar_key?':'+r.public_avatar_key:''):''});
 };
-const MSG_COLS = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, public_avatar_id, public_avatar_version, public_avatar_key, bot_ref";
+const MSG_COLS = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, public_avatar_id, public_avatar_version, public_avatar_key, bot_ref, automation_actor_id";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       ]);
       if (listRes.error) return fail("채팅을 못 불러왔어요.", 500);
       const messages = (listRes.data ?? []).map(adminMessage).filter(Boolean).reverse();
-      return NextResponse.json({ ok: true, messages, pinned: pinRes.data ? adminMessage(pinRes.data) : null });
+      return NextResponse.json({ ok: true, messages, pinned: pinRes.data ? adminMessage(pinRes.data) : null }, { headers: { "Cache-Control": "private, no-store", Vary: "Cookie" } });
     }
     const { data, error } = await sb
       .from("live_chat_bans")

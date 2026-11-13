@@ -194,4 +194,31 @@ crowd=await step();assert.ok(crowd.target>=42&&crowd.target<=50,'rare peak aroun
 await db.query("update live_automation_campaigns set population_plan=jsonb_build_object('phase','spike','target',100,'until',now()+interval '3 minutes') where id=$1",[c.id]);
 crowd=await step();assert.equal(crowd.target,50,'old target cannot exceed revised ceiling');
 console.log('PASS revised 2–30 ordinary range, 42–50 peak, gradual steps and old-plan ceiling');
+await db.exec(readFileSync('supabase/migrations/20261113121100_live_automation_measured_journey_timing.sql','utf8'));
+for(const [kind,n,mean] of [['cart',27,7.2197],['bank',48,69.2087],['card',21,66.4256]]){
+ const measured=await scalar('select avg(live_automation_timing_seconds($1,(i+0.5)/$2::float))/60 from generate_series(0,$2-1) i',[kind,n]);
+ assert.ok(Math.abs(measured-mean)<.001,'SQL must preserve measured mean including long tails');
+}
+assert.equal(await scalar("select has_function_privilege('anon','live_automation_timing_seconds(text,double precision)','execute')"),false);
+await db.exec(`create or replace function public.live_automation_timing_seconds(p_kind text,p_draw double precision default random()) returns double precision language sql as $$ select case $1 when 'cart' then 3864.834 when 'card' then 1800 else 600 end::double precision $$;`);
+const timedActor=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,'실측대기',{seed:2},1,5,false]);
+const timedAction=await scalar('select live_automation_action($1,$2,$3,$4,$5,$6,$7)',[timedActor.session.id,'order',new Date().toISOString(),plan,false,null,c.revision]);
+const timedClaim=await scalar('select live_automation_claim($1,$2)',[timedAction.id,c.revision]);
+await scalar('select live_automation_cart($1,$2,$3)',[timedActor.session.id,c.revision,plan.lines]);
+const staged=await scalar('select live_automation_stage_order($1,$2,$3,$4)',[timedAction.id,timedClaim.lease_token,c.revision,new Date(Date.now()+20000).toISOString()]);
+assert.equal(staged.plan.cartDelaySeconds,3864.834,'server replaces old 20-second request with measured delay');
+const timingActivity=await scalar('select live_automation_admin_activity()');
+const timingHold=timingActivity.holds.find(h=>h.session_key===timedActor.session.cart_key);
+assert.ok(timingHold && Date.parse(timingHold.created_at)<=Date.now()+1000,'extended cart does not appear created in the future');
+assert.ok(Date.parse(staged.due_at)>Date.now()+60*60000,'long cart delay survives');
+assert.ok(await scalar('select s.leave_at>a.due_at and h.expires_at>a.due_at from live_automation_sessions s join live_automation_actions a on a.session_id=s.id join live_automation_cart_holds h on h.session_id=s.id where a.id=$1',[timedAction.id]),'session and cart must not expire during measured wait');
+await assert.rejects(scalar('select live_automation_stage_order($1,$2,$3,$4)',[timedAction.id,timedClaim.lease_token,c.revision,new Date().toISOString()]),/ACTION|CLAIM|LEASE/,'old retry cannot redraw a delay');
+await db.query('update live_automation_actions set due_at=now() where id=$1',[timedAction.id]);
+const submitClaim=await scalar('select live_automation_claim($1,$2)',[timedAction.id,c.revision]);
+await scalar('select live_automation_submit($1,$2,$3,$4)',[timedAction.id,submitClaim.lease_token,c.revision,[{product_id:10,product_name:'니트',color:'',size:'',qty:1,product_price:100,payment_method:'무통장입금',order_group_id:timedAction.order_group_id}]]);
+const waitSecs=await scalar('select extract(epoch from due_at-created_at) from live_automation_payment_events where order_action_id=$1',[timedAction.id]);
+assert.ok(Math.abs(waitSecs-600)<2,'saved order queues empirically sampled payment delay');
+await ctl('all',false,c.revision);
+assert.equal(await scalar("select count(*)::int from live_automation_payment_events where status='pending'"),0,'OFF still cancels long delayed receipts');
+console.log('PASS measured long cart wait survives TTL, retry cannot redraw, payment timing and OFF cancellation');
 await db.close();console.log('PASS 50-person baseline, gradual 100-person peak/return, real batched presence, OFF and old revision fences');

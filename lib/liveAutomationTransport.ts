@@ -24,7 +24,7 @@ export async function runOrderAction(db:SupabaseClient,origin:string,action:Acti
      await automationPost(origin,'/api/cart-reservations',ctx,action,'cart',{action:'sync',sessionKey:ctx.session.cart_key,kakaoId:AUTOMATION_OWNER,phone:AUTOMATION_PHONE,nickname:ctx.actor.nickname,items:lines},transport,deadline);
      if(!action.manual) {
        const planned=Date.parse(String(action.plan.submitAt||'')),now=Date.now();
-       const submitAt=Number.isFinite(planned)?Math.min(now+150000,Math.max(now+15000,planned)):now+cartDelay(random);
+       const submitAt=Number.isFinite(planned)?Math.max(now+15000,planned):now+cartDelay(random);
        await automationRpc(db,'live_automation_stage_order',{p_action:action.id,p_lease:action.lease_token,p_revision:action.revision,p_submit_at:new Date(submitAt).toISOString()});
        return {ok:true,phase:'cart'};
      }

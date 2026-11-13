@@ -13,6 +13,7 @@ import { useAdminModalFocus } from "./useAdminModalFocus";
 
 type Props = { onClose: () => void };
 type Hold = {
+  isTest?: boolean;
   sessionKey: string; kakaoId: string; phone: string; nickname: string; name: string; productId: string; productName: string; fallbackProductName: string;
   detailName: string; unitPrice: number | null; legacySnapshot: boolean; color: string; size: string; qty: number; expiresAt: string; createdAt: string; lastSyncedAt: string;
 };
@@ -137,7 +138,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   // [2026-09-28] 요약용 — 담긴 금액 합계·30분 내 만료 그룹 수(30분 이하=danger).
   const grandKnown=groups.reduce((s,g)=>s+g.items.reduce((ss,it)=>ss+(it.unitPrice!==null?it.unitPrice*it.qty:0),0),0);
   const soonCount=groups.filter(g=>cartHoldTimeline({createdAtMs:g.minCreated,expiresAtMs:g.minExpires,nowMs:now}).remainMin<=30).length;
-  const groupLabel=(g:Group)=>{ const nick=[g.nickname,g.name&&g.nickname!==g.name?`(${g.name})`:""].filter(Boolean).join(" "); return nick||(g.phone?phoneFmt(g.phone):"번호 미입력 고객"); };
+  const groupLabel=(g:Group)=>{ const nick=[g.nickname,g.name&&g.nickname!==g.name?`(${g.name})`:""].filter(Boolean).join(" "); return (g.items.some(h=>h.isTest)?"[테스트]":"")+(nick||(g.phone?phoneFmt(g.phone):"번호 미입력 고객")); };
   const customerStatus=(g:Group)=>{ const meta=groupMeta[g.sessionKey]; if(!meta)return {label:"고객 확인 중",cls:"bg-surface-2 text-ink-mute"}; if(meta.validOrderCount>0)return {label:`기존회원 · 유효 주문 ${meta.validOrderCount}건`,cls:"bg-ok-bg text-ok-tx"}; if(meta.isRegistered)return {label:"신규회원 · 주문 없음",cls:"bg-warn-bg text-warn-tx"}; if(g.phone||g.items.some((item)=>Boolean(item.kakaoId)))return {label:"첫 주문 고객 · 주문 없음",cls:"bg-warn-bg text-warn-tx"}; return {label:"회원 확인 불가",cls:"bg-surface-2 text-ink-mute"}; };
 
   const setBankOverride=async(g:Group,accountId:string)=>{

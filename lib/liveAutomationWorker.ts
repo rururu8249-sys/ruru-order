@@ -64,16 +64,22 @@ function planLines(picks:AutoTestPick[]):AutomationLine[] {
  return picks.map(({productId,productName,color,size,unitPrice,qty})=>({productId,productName,color:color==='없음'?'':color,size:size==='없음'?'':size,unitPrice,qty}));
 }
 async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettings) {
- const pending=await rows<Action>(db.from('live_automation_actions').select('id').eq('campaign_id',c.id).eq('kind','order').in('status',['pending','claimed','uncertain']).limit(1));
- if(pending.length)return;
+ const pending=await rows<Action>(db.from('live_automation_actions').select('id,plan,status').eq('campaign_id',c.id).eq('kind','order').in('status',['pending','claimed','uncertain']).limit(12));
+ // A slow shopper must not pause everyone. Bound the backlog and finish starting
+ // the current wave before admitting another, but allow already-staged carts.
+ if(pending.length>=12||pending.some(a=>a.status!=='pending'||a.plan?.stage!=='submit'))return;
  let wave=c.tempo_plan;
  if(!wave)wave=await automationRpc<Wave>(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});
+ if(wave){
+   const started=await rows<Action>(db.from('live_automation_actions').select('id').eq('campaign_id',c.id).eq('kind','order').eq('plan->>waveId',wave.id).limit(1));
+   if(started.length)wave=await automationRpc<Wave>(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});
+ }
  if(!wave||Date.parse(wave.at)>Date.now()+150000)return;
  const choices=await loadAutomationChoices(db,c.broadcast_id,settings),excluded=new Set<string>();
  if(!choices.length){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:true});return;}
  // Expired schedules are replanned; resuming a worker never catches up a backlog.
  if(Date.parse(wave.at)<Date.now()-180000){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});return;}
- for(const offset of wave.offsets.slice(0,8)) {
+ for(const offset of wave.offsets.slice(0,Math.min(8,12-pending.length))) {
    await automationRpc(db,'live_automation_order_admission',{p_campaign:c.id,p_action:null});
    let picks:AutoTestPick[]=[];
    for(let attempt=0;attempt<5;attempt++){
