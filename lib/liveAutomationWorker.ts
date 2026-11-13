@@ -3,7 +3,7 @@ import {AUTOMATION_OWNER,dwellMinutes,orderTarget,type AutomationLine} from './l
 import type {AutomationContext} from './liveAutomationAuth';
 import {automationRpc,activeAutomationBroadcast,type Campaign,type Actor,type Session,type Action} from './liveAutomationServer';
 import {createPersona} from './liveAutomationPersona';
-import {NICKNAME_CANDIDATES} from './liveAutomationNicknames';
+import {NICKNAME_CANDIDATES,generatedNicknameCandidates} from './liveAutomationNicknames';
 import {loadAutomationChoices,readAutomationSettings} from './liveAutomationCatalog';
 import {automationPost,runOrderAction} from './liveAutomationTransport';
 import {pickOrderLines,type AutoTestSettings,type AutoTestPick} from './autoTestOrder';
@@ -34,7 +34,8 @@ async function ensurePool(db:SupabaseClient) {
   for(const r of (act.data||[]) as {nickname?:string|null}[])if(r.nickname)taken.add(r.nickname.trim().toLowerCase());
  }
  const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]$/.test(x.nickname)||!taken.has(baseOf(x.nickname).toLowerCase()));
- await automationRpc(db,'live_automation_pool_refill',{p_candidates:candidates});
+ // 후보 200개는 한 번씩 쓰면 끝이라, 숫자 없는 새 이름(낱말 두 개 이어 붙임) 80개를 같이 넣는다 — 후보가 바닥나 시청자가 한꺼번에 사라지는 것 방지.
+ await automationRpc(db,'live_automation_pool_refill',{p_candidates:[...candidates,...generatedNicknameCandidates(80)]});
 }
 async function freshActor(db:SupabaseClient,c:LiveCampaign,target:number,minutes:number,watch:boolean):Promise<{actor:Actor;session:Session}> {
  await ensurePool(db);

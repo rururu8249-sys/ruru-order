@@ -814,3 +814,19 @@ export function availableNicknameCandidates(memberNames:readonly string[],reserv
   const denied=new Set([...memberNames.map(nicknameCollisionKey),...reserved]);
   return NICKNAME_CANDIDATES.filter(x=>!denied.has(nicknameCollisionKey(x.nickname))).map(x=>({...x}));
 }
+
+// [2026-11-13 21:54 사장님 «53 같은 규칙적인 숫자 닉네임 금지»] 닉네임은 한 번 쓰면 다시 못 써서(시청자 한 명 들어올 때마다 1개) 후보 200개로는 금방 바닥난다.
+//   숫자를 붙이는 대신 낱말 두 개를 이어 새 이름을 만든다(노을한잔·달빛산책과 같은 모양, 숫자 없음). 한 묶음 안에서는 앞말·뒷말이 서로 안 겹친다.
+const NICK_HEAD=['노을','달빛','봄날','구름','보리','햇살','새벽','바람','은빛','여름','가을','겨울','봄빛','살구','꽃잎','반달','연두','귤빛','별빛','모란','자두','이슬','솔잎','단풍','유자','매실','앵두','호두','밤톨','도토리','민들레','수국','목련','동백','라일락','백합','튤립','솔방울','조약돌','모래','파도','물결','바다','호수','강변','언덕','들판','숲속','오솔길','골목','다락','창가','마루','초록','연분홍','보라','쪽빛','감빛','우유','아침','오후','저녁','한낮','주말','휴일','소풍','콧노래','휘파람','무지개','소나기','첫눈','봄비','햇님','달님','별님','꽃비','안개','서리','샘물','시냇물','옹달샘','대나무','버들','느티','은행잎','감나무','포도','복숭아','체리','레몬'];
+const NICK_TAIL=['한잔','산책','라떼','정원','한줌','마중','풀잎','여울','찻집','서랍','편지','수첩','커피','한아름','우체통','주머니','다락방','주전자','마당','찻잔','보자기','책방','수다','소쿠리','그늘','한송이','쉼터','향기','바느질','일기','노트','엽서','담요','베개','의자','창문','계단','우산','장화','모자','목도리','단추','리본','구슬','풍선','연필','물감','악보','멜로디','자장가','이야기','속삭임','발자국','나침반','지도','여행','기차','정류장','꽃집','빵집','방앗간','텃밭','화분','씨앗','새싹','꽃씨','나비','참새','고양이','강아지','다람쥐','토끼','별사탕','솜사탕','젤리','쿠키','식빵','호빵','경단','꿀떡','카페','식탁','오두막','나들이','한스푼','바구니','손수건','앞치마','털실','뜨개질'];
+export function generatedNicknameCandidates(count:number,random:()=>number=Math.random):NicknameCandidate[] {
+  const shuffle=<T,>(list:readonly T[]):T[]=>{const a=[...list];for(let i=a.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+  const heads=shuffle(NICK_HEAD),tails=shuffle(NICK_TAIL),fixed=new Set(NICKNAME_CANDIDATES.map(x=>nicknameCollisionKey(x.nickname)));
+  const out:NicknameCandidate[]=[];
+  for(let i=0;i<Math.min(heads.length,tails.length)&&out.length<count;i++){
+    const nickname=heads[i]+tails[i];
+    if(fixed.has(nicknameCollisionKey(nickname)))continue;
+    out.push({nickname,category:'korean'});
+  }
+  return out;
+}
