@@ -6,7 +6,7 @@
 //   - 삭제는 «자동 테스트 주문서»만(is_test_order=true + test_order_reason 자동 테스트, 주문서 줄 전부가 그럴 때만).
 import { randomBytes, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { makeChatLines, type ChatProduct, type StreamMode } from "@/lib/autoTestChat";
+import { fallbackChatLine, makeChatLines, type ChatProduct, type StreamMode } from "@/lib/autoTestChat";
 import { AUTO_TEST_AI_DAILY_CAP, AUTO_TEST_AI_PAUSE_MS, aiQuotaDay } from "@/lib/autoTestOrder";
 import { tickTestViewers } from "@/lib/autoTestViewers";
 import { AUTO_TEST_NICKNAME_POOL, numberedNicknameCandidates, pickNicknameCandidates } from "@/lib/autoTestNicknames";
@@ -155,6 +155,15 @@ export async function setAutoTestChatEnabled(sb: Db, on: boolean): Promise<AutoT
   throw new Error("저장이 겹쳤어요. 다시 눌러 주세요.");
 }
 
+export async function setAutoTestPublic(sb: Db, on: boolean): Promise<AutoTestState> {
+  for (let i = 0; i < 4; i += 1) {
+    const { raw, state } = await readStateRaw(sb);
+    const next: AutoTestState = { ...state, publicTest: on };
+    if (await casState(sb, raw, next)) return next;
+  }
+  throw new Error("저장이 겹쳤어요. 다시 눌러 주세요.");
+}
+
 /** 유튜브 라이브가 지금 진행 중인지 — 1분 기록기가 적는 동시 시청자 수가 최근(3분 안)에 있으면 진행 중 */
 export async function isYoutubeLiveNow(sb: Db, bcId: string): Promise<boolean> {
   try {
@@ -222,7 +231,9 @@ async function chatOnce(sb: Db, origin: string, bc: Row): Promise<AutoTestLast> 
       const ch = await cardChoices(sb, card.productId, card.detailName, overseasOn);
       if (ch.length) product = await chatProductOf(sb, card.productId, ch[0].productName, overseasOn);
     }
-    const lines = await aiChatLines(sb, { nickname, mode: await streamModeOf(sb, bc), product, withOrder: false });
+    const mode = await streamModeOf(sb, bc);
+    // 카드 상품이 없으면 준비된 인사(Gemini 안 씀), 있을 때만 Gemini
+    const lines = product ? await aiChatLines(sb, { nickname, mode, product, withOrder: false }) : { before: fallbackChatLine("before", mode, null), after: "" };
     if (!lines) return { at, ok: true, message: "[채팅] AI 무료 한도 보호로 채팅 쉬는 중 — 주문 테스트는 그대로", nickname };
     const r = await postTestChat(origin, bcId, lines.before);
     return { at, ok: r.ok, message: `[채팅] ${nickname}: ${r.ok ? lines.before : `실패 — ${r.message}`}`, nickname };
@@ -443,8 +454,9 @@ async function runOnce(sb: Db, origin: string, bc: Row, withChat = false, step: 
     let chatAfter = "";
     if (withChat && step.fixed) chatAfter = step.fixed.after; // 질문 때 같이 만들어 둔 한 줄(추가 AI 호출 없음)
     else if (withChat && step.greet) {
-      const cl = await aiChatLines(sb, { nickname, mode: await streamModeOf(sb, bc), product: null, withOrder: true });
-      if (cl) { chatAfter = cl.after; await postTestChat(origin, bcId, cl.before); await wait(between(6_000, 12_000)); }
+      // [2026-11-13] 인사·주문 뒤 한 줄은 준비된 문장(Gemini 안 씀 — 무료 한도는 카드 상품 질문에만)
+      const mode = await streamModeOf(sb, bc);
+      chatAfter = fallbackChatLine("after", mode, null); await postTestChat(origin, bcId, fallbackChatLine("before", mode, null)); await wait(between(6_000, 12_000));
     }
 
     // 3. 장바구니 담기(손님과 같은 주소) — 테스트마다 새 장바구니
@@ -583,8 +595,8 @@ export async function screenTestPlan(sb: Db, origin: string, scheduled = false):
     try {
       if (step.fixed) chatAfter = step.fixed.after; // 질문 때 같이 만들어 둔 한 줄
       else if (step.greet) {
-        const cl = await aiChatLines(sb, { nickname: prep.nickname, mode: await streamModeOf(sb, bc), product: null, withOrder: true });
-        if (cl) { await postTestChat(origin, String(bc.id ?? ""), cl.before); chatAfter = cl.after; } // 카드 없을 때만 인사(상품 질문 아님)
+        const mode = await streamModeOf(sb, bc); // 카드 없을 때만 인사(상품 질문 아님) — 준비된 문장, Gemini 안 씀
+        await postTestChat(origin, String(bc.id ?? ""), fallbackChatLine("before", mode, null)); chatAfter = fallbackChatLine("after", mode, null);
       }
     } catch { /* 채팅 실패는 주문 테스트와 무관 */ }
   }

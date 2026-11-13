@@ -21,6 +21,7 @@ const hm = (ms: number) => { const d = new Date(ms); return `${String(d.getHours
 
 export default function AutoTestOrderSettings() {
   const [state, setState] = useState<AutoTestState | null>(null);
+  const [gemini, setGemini] = useState<{ model: string; used: number; cap: number; blockedUntil: number }[]>([]);
   const [orders, setOrders] = useState(0);
   const [busy, setBusy] = useState<"" | "toggle" | "run" | "delete">("");
 
@@ -28,7 +29,7 @@ export default function AutoTestOrderSettings() {
     try {
       const r = await fetch("/api/admin-live/auto-test-order", { cache: "no-store" });
       const j = await r.json();
-      if (j?.ok) { setState(j.state); setOrders(Number(j.testOrders) || 0); }
+      if (j?.ok) { setState(j.state); setOrders(Number(j.testOrders) || 0); setGemini(Array.isArray(j.gemini) ? j.gemini : []); }
     } catch { /* 다음에 다시 */ }
   }, []);
   useEffect(() => { void load(); const t = window.setInterval(() => void load(), 30_000); return () => window.clearInterval(t); }, [load]);
@@ -50,9 +51,9 @@ export default function AutoTestOrderSettings() {
     if (!r.ok || !j?.ok) throw new Error(j?.message || "실패");
     return j;
   };
-  const toggle = async (on: boolean, kind: "order" | "chat" = "order") => {
+  const toggle = async (on: boolean, kind: "order" | "chat" | "public" = "order") => {
     setBusy("toggle");
-    try { const j = await post({ action: kind === "chat" ? "toggle-chat" : "toggle", enabled: on }); setState(j.state); } catch (e) { showAdminToast(e instanceof Error ? e.message : "실패", "error"); } finally { setBusy(""); }
+    try { const j = await post({ action: kind === "chat" ? "toggle-chat" : kind === "public" ? "toggle-public" : "toggle", enabled: on }); setState(j.state); } catch (e) { showAdminToast(e instanceof Error ? e.message : "실패", "error"); } finally { setBusy(""); }
   };
   const runNow = () => {
     setBusy("run");
@@ -89,6 +90,19 @@ export default function AutoTestOrderSettings() {
         </div>
         <Switch on={state?.chatEnabled === true} disabled={!state || busy === "toggle"} onChange={(v) => void toggle(v, "chat")} label="자동 테스트 채팅" />
       </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[13px] font-bold text-ink">손님 화면에도 보이기</div>
+          <div className="text-[12px] text-ink-mute">{state?.publicTest ? "켜짐 · 모든 손님 채팅에 테스트 글이 「(테스트)」 붙어서 보여요" : "꺼짐 · 관리자·채팅뷰어·「손님 화면으로 보기」에서만"}</div>
+        </div>
+        <Switch on={state?.publicTest === true} disabled={!state || busy === "toggle"} onChange={(v) => void toggle(v, "public")} label="손님 화면에도 보이기" />
+      </div>
+      <a href="/order?view=customer" target="_blank" rel="noreferrer" className="mt-2 inline-flex h-9 items-center rounded-lg border border-line px-3 text-[13px] font-bold text-ink">손님 화면으로 보기 (테스트 글 포함)</a>
+      {gemini.length ? (
+        <div className="mt-1 text-[12px] text-ink-mute">
+          Gemini 무료(오늘·여유 10% 남김): {gemini.map((g) => `${g.model.replace("gemini-", "").replace("-flash-lite", " Lite").replace("-flash", " Flash")} ${g.used}/${g.cap}${g.blockedUntil > Date.now() ? ` · 쉼 ${hm(g.blockedUntil)}까지` : ""}`).join(" · ")}
+        </div>
+      ) : null}
       {last ? (
         <div className={`mt-1 truncate text-[12px] ${last.ok ? "text-ink-soft" : "text-danger-tx"}`} title={last.message}>
           {hm(last.at)} {last.ok ? "성공" : "실패"} · {last.message.replace(/^\[화면\] /, "")}

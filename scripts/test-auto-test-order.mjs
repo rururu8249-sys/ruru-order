@@ -233,7 +233,7 @@ assert.ok(dwellMin >= 2.4 && dwellMin <= 72, String(dwellMin));
 {
   const st = A.parseAutoTestState(JSON.stringify({ aiPausedUntil: 5, aiDay: "2026-11-12", aiCount: 7 }));
   assert.equal(st.aiCount, 7); assert.equal(st.aiDay, "2026-11-12"); assert.equal(st.aiPausedUntil, 5);
-  assert.equal(A.aiQuotaDay(Date.parse("2026-11-13T07:00:00Z")), "2026-11-12"); // 미국 서부 자정 기준
-  assert.equal(A.aiQuotaDay(Date.parse("2026-11-13T09:00:00Z")), "2026-11-13");
+  assert.equal(A.aiQuotaDay(Date.parse("2026-11-12T14:30:00Z")), "2026-11-12"); // 한국 23:30
+  assert.equal(A.aiQuotaDay(Date.parse("2026-11-12T15:30:00Z")), "2026-11-13"); // 한국 00:30
 }
 console.log("test-auto-test-order: all passed");

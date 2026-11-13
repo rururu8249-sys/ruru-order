@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
   const state = await readAutoTestState(sb);
   const rows = await readAutoTestRows(sb, null).catch(() => []);
   const testOrders = new Set(rows.map((r) => String(r.order_group_id ?? ""))).size;
-  return NextResponse.json({ ok: true, state, testOrders });
+  const { readGeminiUsage } = await import("@/lib/geminiGate");
+  const gemini = await readGeminiUsage(sb).catch(() => []);
+  return NextResponse.json({ ok: true, state, testOrders, gemini });
 }
 
 export async function POST(request: NextRequest) {
@@ -41,6 +43,7 @@ export async function POST(request: NextRequest) {
       const plan = await screenTestPlan(sb, request.nextUrl.origin, body?.scheduled === true);
       return NextResponse.json({ ok: true, ...("skip" in plan ? { skip: plan.skip } : { plan }) });
     }
+    if (action === "toggle-public") { const { setAutoTestPublic } = await import("@/lib/autoTestOrderServer"); return NextResponse.json({ ok: true, state: await setAutoTestPublic(sb, body?.enabled === true) }); }
     if (action === "toggle-chat") return NextResponse.json({ ok: true, state: await setAutoTestChatEnabled(sb, body?.enabled === true) });
     if (action === "chat-after") {
       // 화면 테스트가 주문을 마친 뒤 — 그 닉네임이 아직 테스트 계정의 지금 닉네임일 때만(다음 테스트와 안 섞이게)
