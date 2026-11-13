@@ -15,6 +15,8 @@ export type ChatRichInputHandle = {
   /** 글(«:이름:» 표식) 기준 커서 앞쪽 글 */
   textBeforeCaret: () => string;
   element: () => HTMLDivElement | null;
+  /** 지금 입력칸 글 그대로(«:이름:») — 보낼 때 화면 갱신 전 값이라도 빠지지 않게 */
+  text: () => string;
 };
 
 type Props = {
@@ -131,11 +133,33 @@ const ChatRichInput = forwardRef<ChatRichInputHandle, Props>(function ChatRichIn
     if (sel) { const end = document.createRange(); end.selectNodeContents(el); end.collapse(false); sel.removeAllRanges(); sel.addRange(end); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // 진짜 beforeinput(React onBeforeInput 은 textInput 기반이라 줄바꿈·폰 → 키를 못 받음)
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const onBefore = (ev: InputEvent) => {
+      if (ev.inputType === "insertParagraph" || ev.inputType === "insertLineBreak") {
+        // 폰 키보드 «→» 키 — 안드로이드는 keydown 이 229 로 와서 여기로만 옴(PC Enter 는 keydown 이 먼저 막아 여기 안 옴)
+        ev.preventDefault();
+        propsRef.current.onEnter?.();
+        return;
+      }
+      if (!composing.current && ev.inputType?.startsWith("insert") && ev.inputType !== "insertCompositionText") {
+        const add = (ev.data ?? "").length;
+        if (serialize(el).length + add > propsRef.current.maxLength) ev.preventDefault();
+      }
+    };
+    el.addEventListener("beforeinput", onBefore);
+    return () => el.removeEventListener("beforeinput", onBefore);
+  }, []);
   // 밖에서 값이 바뀌었을 때만 다시 그림(보낸 뒤 비우기·실패 되돌리기·「/」 명령 등)
   useEffect(() => {
     const el = box.current;
-    if (!el || composing.current) return;
+    if (!el) return;
+    // 한글 조합 중엔 다시 그리지 않음 — 단 «비우기»(보낸 뒤)는 조합 중이어도 비움(안드로이드는 조합이 안 끝난 채 보내짐)
+    if (composing.current && props.value !== "") return;
     if (props.value === lastEmitted.current && serialize(el) === props.value) return;
+    composing.current = false;
     render(el, props.value, byName.current);
     lastEmitted.current = props.value;
     savedRange.current = null;
@@ -156,6 +180,7 @@ const ChatRichInput = forwardRef<ChatRichInputHandle, Props>(function ChatRichIn
     },
     blur: () => { remember(); box.current?.blur(); },
     element: () => box.current,
+    text: () => (box.current ? serialize(box.current) : ""),
     textBeforeCaret: () => beforeCaret(),
     insertEmoji: (e: EmojiLite, removeBefore = 0) => {
       const el = box.current;
@@ -208,17 +233,9 @@ const ChatRichInput = forwardRef<ChatRichInputHandle, Props>(function ChatRichIn
         suppressContentEditableWarning
         enterKeyHint="send"
         spellCheck={false}
-        onInput={() => { if (!composing.current) emit(); }}
+        onInput={() => emit()}
         onCompositionStart={() => { composing.current = true; p.onCompositionStart?.(); }}
         onCompositionEnd={() => { composing.current = false; p.onCompositionEnd?.(); emit(); }}
-        onBeforeInput={(e) => {
-          const ev = e.nativeEvent as InputEvent;
-          if (ev.inputType === "insertParagraph" || ev.inputType === "insertLineBreak") { e.preventDefault(); return; }
-          if (!composing.current && ev.inputType?.startsWith("insert") && ev.inputType !== "insertCompositionText") {
-            const add = (ev.data ?? "").length;
-            if (serialize(box.current!).length + add > p.maxLength) e.preventDefault();
-          }
-        }}
         onPaste={(e) => {
           e.preventDefault();
           const raw = e.clipboardData.getData("text/plain").replace(/[\r\n]+/g, " ");
