@@ -153,17 +153,27 @@ export function welcomeSecText(sec: number): string {
 export function welcomeHelpLines(kind: WelcomeKind, amountOrTiers: number | WelcomeTier[], watchSec = 0): { title: string; lines: string[] } {
   const tiers: WelcomeTier[] = Array.isArray(amountOrTiers) ? amountOrTiers : [{ sec: watchSec, amount: amountOrTiers }];
   const t0 = tiers[0] ?? { sec: 0, amount: 0 };
-  const first = t0.sec > 0 ? `방송을 ${welcomeSecText(t0.sec)} 이상 보시면 ${pointText(t0.amount)}를 드려요` : `${pointText(t0.amount)}를 드려요`;
-  const more = tiers.slice(1).map((t) => `${welcomeSecText(t.sec)}까지 보시면 ${pointText(t.amount)}를 더 드려요`);
-  return {
-    title: kind === "first" ? "처음 오신 분께 드리는 선물이에요" : "오랜만에 오신 분께 드리는 선물이에요",
-    lines: [
-      first,
-      ...more,
-      "구매할 때 바로 쓸 수 있어요",
-      kind === "first" ? "한 분께 한 번만 드려요" : "오랜만에 오실 때마다 한 번씩 드려요",
-    ],
-  };
+  const total = tiers.reduce((s, t) => s + t.amount, 0);
+  const lines: string[] = [];
+  if (tiers.length > 1) {
+    lines.push(t0.sec > 0 ? `방송을 ${welcomeSecText(t0.sec)} 보시면 ${pointText(t0.amount)}를 드려요` : `${pointText(t0.amount)}를 먼저 드려요`);
+    for (const t of tiers.slice(1)) lines.push(`${welcomeSecText(t.sec)}까지 보시면 ${pointText(t.amount)}를 더 드려요`);
+    lines.push(`끝까지 보시면 모두 ${pointText(total)}예요`);
+  } else {
+    lines.push(t0.sec > 0 ? `방송을 ${welcomeSecText(t0.sec)} 보시면 ${pointText(t0.amount)}를 드려요` : `${pointText(t0.amount)}를 드려요`);
+  }
+  if (t0.sec > 0) lines.push("다른 앱이나 탭으로 나가면 시간이 처음부터 다시 시작돼요");
+  lines.push("받은 포인트는 주문할 때 바로 쓸 수 있어요");
+  lines.push(kind === "first" ? "한 분께 한 번만 드려요" : "오랜만에 오실 때마다 다시 드려요");
+  return { title: kind === "first" ? "처음 오신 분께 드리는 시청 선물" : "오랜만에 오신 분께 드리는 시청 선물", lines };
+}
+
+/** 쿠폰 아래 한 줄 — 다음 구간 안내 또는 모두 받은 합계(표시 전용) */
+export function welcomeCouponHint(tiers: WelcomeTier[], gotIndex: number): string {
+  if (tiers.length < 2 || gotIndex < 0 || gotIndex >= tiers.length) return "";
+  const next = tiers[gotIndex + 1];
+  if (next) return `${welcomeSecText(next.sec)}까지 보시면 ${pointText(next.amount)} 더 드려요`;
+  return `모두 ${pointText(tiers.reduce((s, t) => s + t.amount, 0))} 받으셨어요`;
 }
 
 // ── 선물 받은 사람 목록(관리자) — 선물 뒤 주문했는지 «읽기만» 판정 ──

@@ -4,7 +4,7 @@
 //   지급되면 'ruru-point-gift-refresh' 소식 → 기존 포인트 선물 카드가 뜸. 「?」 = 설명 말풍선(「확인」으로 닫음).
 //   여기서는 금액을 정하지 않는다(서버가 정함) — 화면은 보여 주기만.
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {POINT_GIFT_REFRESH_EVENT} from '@/lib/welcomePoint';
+import {POINT_GIFT_REFRESH_EVENT, welcomeCouponHint} from '@/lib/welcomePoint';
 
 // [2026-11-14 사장님 「30초 얼마 60초 얼마 구간」] tiers = 구간들(done = 이미 받음), tierIndex = 다음 받을 구간, ticket = 서버가 서명한 보기 시작 시각.
 type Tier = {sec: number; amount: number; done?: boolean};
@@ -87,17 +87,19 @@ export function LiveWelcomeChip() {
     })
       .then((r) => r.json().catch(() => null))
       .then((j) => {
-        if (j?.ok) window.dispatchEvent(new Event(POINT_GIFT_REFRESH_EVENT));
+        if (j?.ok) window.dispatchEvent(new CustomEvent(POINT_GIFT_REFRESH_EVENT, {detail: {hint: welcomeCouponHint(tiers, idx)}}));
         const next = j?.ok && typeof j.next === 'number' && tiers[j.next] ? j.next : null;
         if (next != null) setIdx(next); // 같은 표로 다음 구간 이어서 셈(시간은 처음부터 누적)
         else { setOffer(null); setHelpOpen(false); }
       })
       .catch(() => { setOffer(null); setHelpOpen(false); })
       .finally(() => { claiming.current = false; });
-  }, [offer, target, left, tiers]);
+  }, [offer, target, left, tiers, idx]);
 
   if (!offer || !target) return null;
-  const amt = `${idx > 0 ? '+' : ''}${target.amount.toLocaleString('ko-KR')}P`;
+  const total = tiers.reduce((n, t) => n + t.amount, 0);
+  // [2026-11-14 사장님 「손님이 인지·체류」] 구간 여러 개면 처음엔 «최대 합계», 다음 구간부터는 «N P 더»
+  const amt = tiers.length > 1 ? (idx === 0 ? `최대 ${total.toLocaleString('ko-KR')}P` : `${target.amount.toLocaleString('ko-KR')}P 더`) : `${target.amount.toLocaleString('ko-KR')}P`;
   const multi = tiers.length > 1;
   const lastSec = tiers[tiers.length - 1].sec || 1;
   return <span style={{position: 'relative', display: 'inline-flex', pointerEvents: 'auto', maxWidth: '100%'}}>

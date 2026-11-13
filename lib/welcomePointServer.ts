@@ -239,7 +239,7 @@ export async function claimWelcome(
   if (tierIndex === 0 && (await grantedTodayCount(sb, kstDayStartIso(nowMs))) >= cfg.dailyCap) return { ok: false, status: 409, message: "오늘 선물이 모두 나갔어요" };
   const { data, error } = await sb.rpc("admin_change_customer_points", {
     p_phone: customer.phone, p_action: "grant", p_amount: tier.amount,
-    p_reason: WELCOME_REASON[decision.kind] + (tierIndex > 0 ? " (더 보기)" : ""), p_admin_memo: "방송 시청 선물 자동 지급",
+    p_reason: WELCOME_REASON[decision.kind] + (tierIndex > 0 ? " · 추가" : ""), p_admin_memo: "방송 시청 선물 자동 지급",
     p_nickname: customer.nickname, p_customer_name: customer.name,
     p_customer_visible: true, p_source_key: welcomeTierKey(decision.sourceKey, tierIndex),
   });

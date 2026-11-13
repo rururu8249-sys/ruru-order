@@ -54,11 +54,10 @@ assert.equal(W.kstDayStartIso(Date.parse("2026-11-11T16:00:00Z")), "2026-11-11T1
 
 // 설명 문구
 const h = W.welcomeHelpLines("first", 2000, 30);
-assert.equal(h.title, "처음 오신 분께 드리는 선물이에요");
-assert.deepEqual(h.lines, ["방송을 30초 이상 보시면 2,000P를 드려요", "구매할 때 바로 쓸 수 있어요", "한 분께 한 번만 드려요"]);
-assert.equal(W.welcomeHelpLines("back", 1000, 0).lines[0], "1,000P를 드려요");
-assert.equal(W.welcomeHelpLines("back", 1000, 30).title, "오랜만에 오신 분께 드리는 선물이에요");
-assert.equal(W.welcomeHelpLines("back", 1000, 30).lines[2], "오랜만에 오실 때마다 한 번씩 드려요");
+assert.equal(h.title, "처음 오신 분께 드리는 시청 선물");
+assert.deepEqual(h.lines, ["방송을 30초 보시면 2,000P를 드려요", "다른 앱이나 탭으로 나가면 시간이 처음부터 다시 시작돼요", "받은 포인트는 주문할 때 바로 쓸 수 있어요", "한 분께 한 번만 드려요"]);
+assert.deepEqual(W.welcomeHelpLines("back", 1000, 0).lines, ["1,000P를 드려요", "받은 포인트는 주문할 때 바로 쓸 수 있어요", "오랜만에 오실 때마다 다시 드려요"]);
+assert.equal(W.welcomeHelpLines("back", 1000, 30).title, "오랜만에 오신 분께 드리는 시청 선물");
 
 // ── 가짜 DB ──
 function fakeDb(tables) {
@@ -308,8 +307,12 @@ console.log("welcome-point OK");
   assert.equal(W.welcomeTierKey("welcome_first:c1", 1), "welcome_first:c1#2");
   assert.deepEqual(W.parseWelcomeSourceKey("welcome_first:c1#2"), { kind: "first", customerId: "c1", tier: 1 });
   assert.deepEqual(W.parseWelcomeSourceKey("welcome_back:c2:G7#3"), { kind: "back", customerId: "c2", tier: 2 });
-  assert.deepEqual(W.welcomeHelpLines("first", [{ sec: 30, amount: 1000 }, { sec: 60, amount: 1000 }]).lines.slice(0, 2),
-    ["방송을 30초 이상 보시면 1,000P를 드려요", "1분까지 보시면 1,000P를 더 드려요"]);
+  assert.deepEqual(W.welcomeHelpLines("first", [{ sec: 30, amount: 1000 }, { sec: 60, amount: 1000 }]).lines.slice(0, 4),
+    ["방송을 30초 보시면 1,000P를 드려요", "1분까지 보시면 1,000P를 더 드려요", "끝까지 보시면 모두 2,000P예요", "다른 앱이나 탭으로 나가면 시간이 처음부터 다시 시작돼요"]);
+  const T2 = [{ sec: 30, amount: 500 }, { sec: 60, amount: 500 }];
+  assert.equal(W.welcomeCouponHint(T2, 0), "1분까지 보시면 500P 더 드려요");
+  assert.equal(W.welcomeCouponHint(T2, 1), "모두 1,000P 받으셨어요");
+  assert.equal(W.welcomeCouponHint([{ sec: 30, amount: 500 }], 0), "");
 
   const TIERS = { ...ON, first: { on: true, tiers: [{ sec: 30, amount: 1000 }, { sec: 60, amount: 1000 }] }, back: { on: true, days: 60, tiers: [{ sec: 30, amount: 1000 }, { sec: 60, amount: 500 }] } };
   const START = NOW;
@@ -328,7 +331,7 @@ console.log("welcome-point OK");
     const r2 = await go(w, "500", "01050005000", START + 60_000, tk);
     assert.deepEqual(r2, { ok: true, granted: true, amount: 1000, kind: "first", tier: 1, next: null });
     assert.equal(w.calls[1].a.p_source_key, "welcome_first:n1#2");
-    assert.equal(w.calls[1].a.p_reason, "처음 오신 선물 (더 보기)");
+    assert.equal(w.calls[1].a.p_reason, "처음 오신 선물 · 추가");
     assert.equal((await go(w, "500", "01050005000", START + 300_000, tk)).ok, false); assert.equal(w.calls.length, 2);
     // 같은 번호 다른 카카오 계정은 여전히 못 받음
     const other = await ticketOf(w, "501", "01050005000");

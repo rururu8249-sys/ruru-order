@@ -12,9 +12,11 @@ type PointGift = {
   id: string;
   amount: number;
   reason?: string;
+  hint?: string;
 };
 
 const AUTO_CLOSE_MS = 3000;
+const AUTO_CLOSE_HINT_MS = 4500; // 안내 한 줄이 있으면 읽을 시간을 더 줌
 const CONFETTI = ["#D30005", "#FFC83D", "#7B61FF", "#FF8FA3", "#3DA5FF", "#FFC83D", "#D30005", "#7BD389", "#FF8FA3", "#7B61FF", "#3DA5FF", "#FFC83D", "#D30005", "#7BD389", "#FF8FA3", "#3DA5FF", "#7B61FF", "#FFC83D", "#D30005", "#3DA5FF", "#FF8FA3", "#7BD389", "#7B61FF", "#FFC83D"];
 
 function readPhone(): string {
@@ -29,6 +31,7 @@ export default function CustomerPointGiftPopup() {
   const [gift, setGift] = useState<PointGift | null>(null);
   const [reduce, setReduce] = useState(false);
   const shown = useRef(new Set<string>()); // 확인 저장이 실패해도 같은 선물을 계속 띄우지 않게
+  const hintRef = useRef(""); // 시청 선물이 보낸 안내(다음 구간·합계) — 다음에 뜨는 선물 하나에만 붙임
 
   const loadGift = useCallback(async () => {
     const phone = readPhone();
@@ -39,7 +42,9 @@ export default function CustomerPointGiftPopup() {
       const g = payload?.ok ? payload.gift : null;
       if (!g || !g.id || shown.current.has(String(g.id))) return;
       shown.current.add(String(g.id));
-      setGift({ id: String(g.id), amount: Math.max(0, Math.floor(Number(g.amount) || 0)), reason: String(g.reason || "").trim() });
+      const hint = hintRef.current;
+      hintRef.current = "";
+      setGift({ id: String(g.id), amount: Math.max(0, Math.floor(Number(g.amount) || 0)), reason: String(g.reason || "").trim(), hint });
     } catch {
       // 조회 실패는 화면 사용을 막지 않음
     }
@@ -48,7 +53,11 @@ export default function CustomerPointGiftPopup() {
   useEffect(() => {
     setReduce(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true);
     void loadGift();
-    const onRefresh = () => { void loadGift(); };
+    const onRefresh = (e: Event) => {
+      const h = (e as CustomEvent<{ hint?: string }>).detail?.hint;
+      if (typeof h === "string" && h) hintRef.current = h.slice(0, 60);
+      void loadGift();
+    };
     window.addEventListener(POINT_GIFT_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(POINT_GIFT_REFRESH_EVENT, onRefresh);
   }, [loadGift]);
@@ -72,7 +81,7 @@ export default function CustomerPointGiftPopup() {
 
   useEffect(() => {
     if (!gift) return;
-    const t = window.setTimeout(closeGift, AUTO_CLOSE_MS);
+    const t = window.setTimeout(closeGift, gift.hint ? AUTO_CLOSE_HINT_MS : AUTO_CLOSE_MS);
     return () => window.clearTimeout(t);
   }, [gift, closeGift]);
 
@@ -99,7 +108,7 @@ export default function CustomerPointGiftPopup() {
           position: "relative",
           width: "min(300px, calc(100vw - 48px))",
           filter: "drop-shadow(0 10px 24px rgba(0,0,0,0.30))",
-          animation: reduce ? undefined : `ruruGiftPop .35s ease-out, ruruGiftOut ${AUTO_CLOSE_MS}ms linear forwards`,
+          animation: reduce ? undefined : `ruruGiftPop .35s ease-out, ruruGiftOut ${gift.hint ? AUTO_CLOSE_HINT_MS : AUTO_CLOSE_MS}ms linear forwards`,
         }}
       >
         {reduce ? null : (
@@ -143,6 +152,7 @@ export default function CustomerPointGiftPopup() {
         >
           <div style={{ fontSize: 15, lineHeight: "20px", fontWeight: 700, color: "#111111" }}>{gift.reason || "포인트 선물"}</div>
           <div style={{ marginTop: 6, fontSize: 40, lineHeight: "46px", fontWeight: 800, color: "#D30005", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>{amountText}</div>
+          {gift.hint ? <div style={{ marginTop: 8, fontSize: 14, lineHeight: "20px", fontWeight: 700, color: "#111111", wordBreak: "keep-all" }}>{gift.hint}</div> : null}
           <div style={{ margin: "12px 0 0", paddingTop: 10, borderTop: "1px dashed #D9D9DE", fontSize: 13, lineHeight: "16px", fontWeight: 700, letterSpacing: "2px", color: "#8E8E93" }}>RURUDONGI</div>
         </div>
       </div>
