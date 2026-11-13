@@ -1,13 +1,14 @@
 /** Spoken aliases affect persona chat only; saved catalog/order names stay exact. */
-const ALIASES: Record<string, readonly string[]> = {
-  MIU:['미우','미우-'], MX:['막스','막스-'], BB:['버버','버'],
-  MC:['몽클','몽클-'], PD:['프라다','프라다-'], CL:['셀린','셀린-'],
-  LOE:['로에베','로에베-'], BC:['브루넬로','브루넬로-'], CH:['샤넬','샤넬-'], GC:['구찌','구찌-'], DR:['디올','디올-'],
+export const BRAND_SPEECH_ALIASES: Record<string, readonly string[]> = {
+  MIU:['미우','미워','미우미우','miu'], MX:['막스','막땡','막스마라','mx'], BB:['버버','버','버버리','bb'],
+  MC:['몽클','몽클레어','mc'], PD:['프라','프라다','푸라닭','pd'], CL:['셀린','쎌린','셀','cl'],
+  LOE:['로에','로에베','loe'], BC:['브루','브루넬로','쿠치','bc'], CH:['샤넬','ch'], GC:['구찌','gc'], DR:['디올','dr'],
 };
 export function spokenProductName(name: string, seed=0): string {
   return name.replace(/\b(MIU|MX|BB|MC|PD|CL|LOE|BC|CH|GC|DR)\s*-?\s*(\d+)\b/gi, (_,code:string,number:string)=>{
-    const choices=ALIASES[code.toUpperCase()];
-    return choices[Math.abs(Math.trunc(seed))%choices.length]+number;
+    const choices=BRAND_SPEECH_ALIASES[code.toUpperCase()].filter(alias=>/[가-힣]/.test(alias));
+    const index=Math.abs(Math.trunc(seed));
+    return choices[index%choices.length]+(index%5===4?'-':'')+number;
   });
 }
 export function normalizeSpokenCodes(text:string,items:unknown[],seed=0):string {

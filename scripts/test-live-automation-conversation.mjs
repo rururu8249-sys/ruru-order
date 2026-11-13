@@ -39,3 +39,12 @@ assert.equal(C.acceptConversationText('MX-117 주문했어요',{ordered:true,ite
 assert.equal(C.acceptConversationText('다시 보다가 결국 골랐어요ㅎㅎ',{ordered:true},[],'replay'),'다시 보다가 결국 골랐어요ㅎㅎ');
 assert.equal(C.acceptConversationText('아침 방송 보다가 주문했어요',{ordered:true},[],'paused'),null);
 console.log('PASS no invented submission/settlement, duplicate suppression and generation-time manual takeover fence');
+
+const S=load('lib/liveAutomationSpeech.ts');
+assert.equal(S.spokenProductName('MIU-1',1),'미워1');
+assert.equal(S.spokenProductName('MX-117',1),'막땡117');
+assert.equal(S.spokenProductName('PD-509',2),'푸라닭509');
+assert.equal(S.spokenProductName('CL-102',1),'쎌린102');
+assert.equal(S.spokenProductName('BC-101',2),'쿠치101');
+assert.equal(S.spokenProductName('LOE-1',0),'로에1');
+assert.equal(S.normalizeSpokenCodes('MX-117은요?',[{productName:'MIU-1'}],0),'MX-117은요?','unrelated product codes are never silently substituted');
