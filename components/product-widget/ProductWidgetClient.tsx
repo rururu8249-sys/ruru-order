@@ -126,6 +126,9 @@ const FIREWORK_SHOTS = [
   { x: 32, apex: 0.18, delay: 0.55, color: "#7DD3FC" },
   { x: 70, apex: 0.22, delay: 0.8, color: "#FFFFFF" },
 ];
+// [19:06 사장님 «밑에서 쉬유유융~ 쏘아 올리면서 터지는 느낌»] 로켓: 밝은 머리 + 긴 꼬리 + 지나간 자리에 반짝이 부스러기,
+//   1.2초 동안 위로 갈수록 느려지며(살짝 흔들림) 올라가 꼭대기에서 번쩍 → 두 겹 고리로 터짐.
+const ROCKET_S = 1.2;
 function Fireworks({ h }: { h: number }) {
   return (
     <div aria-hidden data-ruru-widget-confetti style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
@@ -133,14 +136,45 @@ function Fireworks({ h }: { h: number }) {
         const rise = Math.round(h * (1 - f.apex));
         const spark = Math.max(18, Math.round(h * 0.14));
         const dot = Math.max(6, Math.round(h * 0.008));   // 화면 1920 → 15px
+        const head = Math.max(5, Math.round(dot * 0.9));
+        const tail = Math.max(16, Math.round(h * 0.11));
+        const boom = f.delay + ROCKET_S - 0.05;
         return (
           <div key={i} style={{ position: "absolute", left: `${f.x}%`, bottom: 0, width: 0, height: 0 }}>
-            <span style={{
-              position: "absolute", left: `-${Math.ceil(dot / 3)}px`, top: 0, width: `${Math.max(4, Math.round(dot * 0.6))}px`, height: `${Math.max(10, Math.round(h * 0.05))}px`, borderRadius: "2px",
-              background: `linear-gradient(${f.color}, rgba(255,255,255,0))`, ["--rise" as any]: `-${rise}px`,
-              animation: `ruruRocket 0.7s cubic-bezier(0.2,0.7,0.4,1) ${f.delay}s both`,
-            }} />
+            {/* 로켓(머리+꼬리) — 위로 갈수록 느려짐 */}
+            <div style={{
+              position: "absolute", left: 0, top: 0, width: 0, height: 0, ["--rise" as any]: `-${rise}px`,
+              animation: `ruruRocket ${ROCKET_S}s cubic-bezier(0.12,0.62,0.3,1) ${f.delay}s both`,
+            }}>
+              <span style={{
+                position: "absolute", left: `-${Math.max(2, Math.round(head * 0.35))}px`, top: 0,
+                width: `${Math.max(3, Math.round(head * 0.7))}px`, height: `${tail}px`, borderRadius: "999px",
+                background: `linear-gradient(to bottom, ${f.color}, rgba(255,255,255,0))`, filter: "blur(0.5px)",
+              }} />
+              <span style={{
+                position: "absolute", left: `-${head / 2}px`, top: `-${head / 2}px`, width: `${head}px`, height: `${head}px`, borderRadius: "50%",
+                background: "#FFFFFF", boxShadow: `0 0 ${head}px ${f.color}, 0 0 ${head * 2}px ${f.color}`,
+              }} />
+            </div>
+            {/* 지나간 자리 반짝이 부스러기 */}
+            {Array.from({ length: 9 }, (_, k) => {
+              const frac = (k + 1) / 10;
+              const d = Math.max(3, Math.round(dot * 0.45));
+              return (
+                <span key={`t${k}`} style={{
+                  position: "absolute", left: `${((k % 2) ? 1 : -1) * Math.round(d * 0.8) - d / 2}px`, top: `-${Math.round(rise * frac)}px`,
+                  width: `${d}px`, height: `${d}px`, borderRadius: "50%", background: k % 3 === 0 ? "#FFFFFF" : f.color,
+                  animation: `ruruTrail 0.7s ease-out ${(f.delay + ROCKET_S * Math.pow(frac, 1.9)).toFixed(2)}s both`,
+                }} />
+              );
+            })}
             <div style={{ position: "absolute", left: 0, top: `-${rise}px`, width: 0, height: 0 }}>
+              {/* 터지는 순간 번쩍 */}
+              <span style={{
+                position: "absolute", left: `-${spark * 0.5}px`, top: `-${spark * 0.5}px`, width: `${spark}px`, height: `${spark}px`, borderRadius: "50%",
+                background: `radial-gradient(circle, rgba(255,255,255,0.95) 0%, ${f.color} 25%, rgba(255,255,255,0) 70%)`,
+                animation: `ruruFlash 0.45s ease-out ${boom.toFixed(2)}s both`,
+              }} />
               {/* 바깥 고리 22개 + 안쪽 고리 12개 */}
               {Array.from({ length: 34 }, (_, k) => {
                 const inner = k >= 22;
@@ -152,7 +186,7 @@ function Fireworks({ h }: { h: number }) {
                     position: "absolute", left: `-${d / 2}px`, top: `-${d / 2}px`, width: `${d}px`, height: `${d}px`, borderRadius: "50%",
                     background: k % 3 === 0 ? "#FFFFFF" : f.color, boxShadow: `0 0 ${d}px ${f.color}`,
                     ["--sx" as any]: `${Math.round(Math.cos(a) * rr)}px`, ["--sy" as any]: `${Math.round(Math.sin(a) * rr)}px`,
-                    animation: `ruruSpark 1.3s ease-out ${(f.delay + 0.65).toFixed(2)}s both`,
+                    animation: `ruruSpark 1.4s cubic-bezier(0.1,0.8,0.3,1) ${boom.toFixed(2)}s both`,
                   }} />
                 );
               })}
@@ -1116,8 +1150,10 @@ export default function ProductWidgetClient() {
           100% { opacity: 0; }
         }
         @keyframes ruruDimOut { to { opacity: 0; } }
-        @keyframes ruruRocket { 0% { opacity: 0; transform: translateY(0); } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; transform: translateY(var(--rise)); } }
-        @keyframes ruruSpark { 0% { opacity: 0; transform: translate(0, 0) scale(0.4); } 8% { opacity: 1; } 70% { opacity: 1; transform: translate(var(--sx), var(--sy)) scale(1); } 100% { opacity: 0; transform: translate(var(--sx), calc(var(--sy) + 24px)) scale(0.6); } }
+        @keyframes ruruRocket { 0% { opacity: 0; transform: translate(0, 0); } 6% { opacity: 1; } 35% { transform: translate(3px, calc(var(--rise) * 0.55)); } 65% { transform: translate(-3px, calc(var(--rise) * 0.88)); } 96% { opacity: 1; } 100% { opacity: 0; transform: translate(0, var(--rise)); } }
+        @keyframes ruruTrail { 0% { opacity: 0; transform: translateY(0) scale(1); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(28px) scale(0.4); } }
+        @keyframes ruruFlash { 0% { opacity: 0; transform: scale(0.2); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.4); } }
+        @keyframes ruruSpark { 0% { opacity: 0; transform: translate(0, 0) scale(0.4); } 6% { opacity: 1; } 65% { opacity: 1; transform: translate(var(--sx), var(--sy)) scale(1); } 100% { opacity: 0; transform: translate(var(--sx), calc(var(--sy) + 40px)) scale(0.5); } }
         @keyframes ruruStickerOut { to { opacity: 0; transform: rotate(-3deg) scale(0.96); } }
         @keyframes ruruLiveDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         @media (prefers-reduced-motion: reduce) {
