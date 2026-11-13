@@ -10,6 +10,8 @@ import { useWidgetRotationIndex } from "@/lib/useWidgetRotationIndex";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
+import { parseChatMessage } from "@/lib/liveChat";
+import { parseCartChatToast, parseWidgetFullLayout, WIDGET_TOAST_TAG } from "@/lib/widgetToast";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
 import { resolveBroadcastBrandProducts } from "@/lib/productBrandLinks";
@@ -87,7 +89,7 @@ const GLASS_BG = "rgba(20, 17, 24, 0.42)";   // 사진 빈칸 + 글자 띠 공�
 const CARD_FIXED_H_CONST = 200 + 120;
 
 // 주문성공(초록) / 입금·카드완료(파랑) 알림 배너
-type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue"; amount?: string };
+type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" | "pink"; amount?: string };
 
 // [2026-11-05 사장님] 닉네임은 가리지(마스킹) 않고, 너무 길면 뒤를 자른다(스티커 폭 기준 7글자 넘으면 6글자+…, 뒤 「님」은 항상 보이게).
 function clipNick(raw: string): string {
@@ -116,7 +118,8 @@ const CONFETTI_RAIN = Array.from({ length: 18 }, (_, i) => {
     spin: `${(i % 2 ? 1 : -1) * (180 + i * 20)}deg`,
   };
 });
-function ConfettiBurst({ burstKey }: { burstKey: number }) {
+// [2026-11-13 사장님 «마지막 알림은 폭죽 더 화려하게»] grand = 가운데 두 번(좌우 반대) + 색종이 두 배.
+function ConfettiBurst({ burstKey, grand }: { burstKey: number; grand?: boolean }) {
   const wave = (mirror: boolean, delay: number) =>
     CONFETTI_PIECES.map((p, i) => (
       <span
@@ -133,8 +136,9 @@ function ConfettiBurst({ burstKey }: { burstKey: number }) {
     <div key={burstKey} aria-hidden data-ruru-widget-confetti style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       <div style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0 }}>
         {wave(false, 0)}
+        {grand ? wave(true, 0.35) : null}
       </div>
-      {CONFETTI_RAIN.map((c, i) => (
+      {(grand ? [...CONFETTI_RAIN, ...CONFETTI_RAIN.map((c, i) => ({ ...c, left: `${(i * 53 + 21) % 96}%`, delay: (Number(c.delay) + 0.8).toFixed(2) }))] : CONFETTI_RAIN).map((c, i) => (
         <span
           key={`r${i}`}
           style={{
@@ -149,8 +153,8 @@ function ConfettiBurst({ burstKey }: { burstKey: number }) {
   );
 }
 
-function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: boolean }) {
-  const tagBg = toast.tone === "green" ? "#16A34A" : "#2563EB";
+function ToastSticker({ toast, standalone, durMs = TOAST_SHOW_MS }: { toast: ToastItem; standalone?: boolean; durMs?: number }) {
+  const tagBg = WIDGET_TOAST_TAG[toast.tone];
   return (
     <div
       data-ruru-widget-sticker
@@ -159,7 +163,7 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
         width: standalone ? "100%" : "86%",
         transform: "rotate(-5deg)",
         // [2026-11-07] 흔들기 빼고 톡 붙은 뒤 가만히 — 사라질 때만 0.5초 부드럽게
-        animation: `ruruStickerIn 0.55s cubic-bezier(0.18,0.89,0.32,1.2) both, ruruStickerOut 0.5s ease-in ${(TOAST_SHOW_MS - 500) / 1000}s forwards`,
+        animation: `ruruStickerIn 0.55s cubic-bezier(0.18,0.89,0.32,1.2) both, ruruStickerOut ${durMs <= 2500 ? 0.3 : 0.5}s ease-in ${(durMs - (durMs <= 2500 ? 300 : 500)) / 1000}s forwards`,
       }}
     >
       {/* [2026-11-06 사장님 «예수님처럼 빛만 비쳐»] 노란 별 모양 판·빛줄기는 뺐다 — 빛 고리 한 번만 남기고, 대신 폭죽을 크게 */}
@@ -325,8 +329,9 @@ function stockLabel(p: AnyProduct | null): string {
 }
 
 // [2026-11-07 사장님 «고개 돌리는 순간 사라짐»] 스티커 3초 → 6초. 기다리는 소식이 쌓여 있으면 4.5초로(밀리지 않게).
-const TOAST_SHOW_MS = 6000;
-const TOAST_SHOW_BUSY_MS = 4500;
+// [2026-11-13 사장님] 하나면 8초. 여러 개가 밀리면 앞의 것은 2초씩 빨리 넘기고, 마지막 것만 8초 + 큰 폭죽.
+const TOAST_SHOW_MS = 8000;
+const TOAST_SHOW_BUSY_MS = 2000;
 
 // 주문성공/입금완료/카드결제완료 폭죽(표시 전용) — 카드 밖에서 사방으로 시원하게 퍼진다.
 //   [2026-07-09] 방송에서 잘 보이도록 입자 14 → 26개, 크기·비산거리 확대.
@@ -389,11 +394,16 @@ export default function ProductWidgetClient() {
   //   네모를 어떻게 잡든 카드는 항상 그 안에 같은 비율로 들어가고, 네모를 키운 만큼만 커진다(갑자기 튀지 않음).
   //   세로 방송(1080×1920) 권장 네모 = 폭 280 × 높이 542 (화면 폭의 26% — 사장님이 «잘 나온다»고 한 실방송 캡처 실측).
   const [fitScale, setFitScale] = useState(1);
+  // [2026-11-13 사장님 «알림을 화면 정중앙에, 위젯은 하나로»] ?full=1 = 프리즘 소스를 «화면 전체»로 잡는 모드.
+  //   카드는 화면 오른쪽 위(r·t·w = 화면 % — 기본 오른쪽 3%·위 7%·폭 26%), 알림 스티커는 화면 정중앙. 주소에 full 없으면 예전 그대로.
+  const [layout, setLayout] = useState(() => parseWidgetFullLayout(""));
+  const [vpW, setVpW] = useState(1080);
   useEffect(() => {
     const CARD_W = 200, CARD_H = CARD_FIXED_H;
     const calc = () => {
       const s = Math.min(window.innerWidth / CARD_W, window.innerHeight / CARD_H);
       setFitScale(Number.isFinite(s) && s > 0 ? Math.min(4, s) : 1);
+      setVpW(window.innerWidth > 0 ? window.innerWidth : 1080);
     };
     calc();
     window.addEventListener("resize", calc);
@@ -411,6 +421,7 @@ export default function ProductWidgetClient() {
     try {
       const q = new URLSearchParams(window.location.search);
       setPreviewMode(q.get("preview") === "1");
+      setLayout(parseWidgetFullLayout(window.location.search));
       toastOffRef.current = q.get("toast") === "0";
     } catch { setPreviewMode(false); }
   }, []);
@@ -637,6 +648,15 @@ export default function ProductWidgetClient() {
         else if (e.type === "UPDATE") onOrderUpdate({ new: e.new as AnyProduct, old: e.old as AnyProduct });
       },
       onCatalog: () => scheduleStockReload(),
+      // [2026-11-13 사장님] 장바구니 담음 — 유튜브 채팅엔 안 올리고 위젯 스티커로만. 사이트 채팅에 저장된 루루동이 글(bot_ref c:)을 받아 쓴다.
+      onChat: (raw) => {
+        const toast = parseCartChatToast(parseChatMessage(raw));
+        if (!toast) return;
+        const key = `cart:${toast.key}`;
+        if (seenRef.current.has(key)) return;
+        seenRef.current.add(key);
+        push({ icon: "", title: "장바구니", name: `${clipNick(toast.nick)}님`, detail: toast.detail, tone: "pink" });
+      },
     });
     return () => {
       if (reloadTimer) window.clearTimeout(reloadTimer);
@@ -649,6 +669,7 @@ export default function ProductWidgetClient() {
   useEffect(() => {
     if (!previewMode || toastOffRef.current) return;
     const demo: ToastItem[] = [
+      { icon: "", title: "장바구니", name: `${clipNick("예*")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", tone: "pink" },
       { icon: "", title: "주문완료", name: `${clipNick("예시")}님`, detail: "예시 니트 가디건 블랙/M", tone: "green" },
       { icon: "", title: "결제완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", tone: "blue" },
     ];
@@ -665,7 +686,8 @@ export default function ProductWidgetClient() {
     toastBusyRef.current = toastQueue.length > 1;
     setCurrentToast(toastQueue[0]);
     setToastQueue((q) => q.slice(1));
-    // 어떤 토스트든(주문/입금확인/카드결제) 새로 표시되는 순간 폭죽 1회(표시 전용 — 큐/판정/금액 로직 무관)
+    // [2026-11-13] 밀린 알림(빨리 넘기는 것)엔 폭죽 없음, 마지막 알림에만 큰 폭죽(표시 전용)
+    if (toastQueue.length > 1) { setConfettiOn(false); return; }
     setConfettiKey((k) => k + 1);
     setConfettiOn(true);
   }, [currentToast, toastQueue]);
@@ -733,12 +755,11 @@ export default function ProductWidgetClient() {
       <div
         style={{
           position: "absolute",
-          left: 0,
-          bottom: 0,
+          ...(layout.full
+            ? { right: `${layout.right}%`, top: `${layout.top}%`, transform: `scale(${(vpW * layout.width) / 100 / CARD})`, transformOrigin: "top right" }
+            : { left: 0, bottom: 0, transform: fitScale !== 1 ? `scale(${fitScale})` : undefined, transformOrigin: "bottom left" }),
           width: `${CARD}px`,
           pointerEvents: "none",
-          transform: fitScale !== 1 ? `scale(${fitScale})` : undefined,
-          transformOrigin: "bottom left",
         }}
       >
 
@@ -944,21 +965,21 @@ export default function ProductWidgetClient() {
             {/* 주문 완료(초록) / 결제 완료(파랑) 스티커 — 6초(쌓이면 4.5초) 뒤 부드럽게 사라짐. 사진칸 가운데에 붙고, 카드 테두리가 그 색으로 한 번 번쩍 */}
             {currentToast ? (
               <>
-                <div
+                {!layout.full ? <div
                   style={{
                     position: "absolute", left: 0, right: 0, top: 0, height: `${CARD}px`, zIndex: 5,
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
-                  {confettiOn ? <ConfettiBurst burstKey={confettiKey} /> : null}
-                  <ToastSticker toast={currentToast} />
-                </div>
+                  {confettiOn ? <ConfettiBurst burstKey={confettiKey} grand /> : null}
+                  <ToastSticker key={`${currentToast.title}|${currentToast.name}|${currentToast.detail}|${confettiKey}`} toast={currentToast} durMs={toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS} />
+                </div> : null}
                 <span
                   aria-hidden
                   data-ruru-widget-flash
                   style={{
                     position: "absolute", inset: 0, zIndex: 6, borderRadius: "10px", pointerEvents: "none",
-                    border: `3px solid ${currentToast.tone === "green" ? "#22C55E" : "#3B82F6"}`,
+                    border: `3px solid ${WIDGET_TOAST_TAG[currentToast.tone]}`,
                     animation: `ruruRingFlash ${toastBusyRef.current ? TOAST_SHOW_BUSY_MS / 1000 : TOAST_SHOW_MS / 1000}s ease-out both`,
                   }}
                 />
@@ -966,22 +987,39 @@ export default function ProductWidgetClient() {
             ) : null}
 
           </div>
-        ) : currentToast ? (
+        ) : currentToast && !layout.full ? (
           // 띄운 상품이 없을 때도 주문/결제 소식은 보이게(카드 없이 스티커만)
           <div style={{ position: "relative", zIndex: 1, padding: "6px 4px" }}>
-            <ToastSticker toast={currentToast} standalone />
+            <ToastSticker toast={currentToast} standalone durMs={toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS} />
           </div>
         ) : null}
 
         {/* 폭죽 — 카드 밖(앵커)에서 터뜨려야 카드 overflow:hidden 에 안 잘리고 시원하게 퍼진다.
             주문성공/입금완료/카드결제완료 어떤 알림이든 1회 재생(표시 전용). */}
         {/* 카드가 없을 때만 앵커에서 폭죽(카드가 있으면 스티커 «뒤»에서 터져 글자를 안 가린다) */}
-        {confettiOn && !current ? (
+        {confettiOn && !current && !layout.full ? (
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0 }}>
-            <ConfettiBurst burstKey={confettiKey} />
+            <ConfettiBurst burstKey={confettiKey} grand />
           </div>
         ) : null}
       </div>
+
+      {/* [2026-11-13 사장님 «화면 정중앙»] ?full=1 이면 알림 스티커·폭죽을 화면 한가운데에(화면 폭의 약 46%) */}
+      {layout.full && currentToast ? (
+        <div
+          data-ruru-widget-center
+          style={{
+            position: "absolute", left: "50%", top: "50%", width: "300px", height: "320px",
+            transform: `translate(-50%, -50%) scale(${(vpW * 0.46) / 200})`, transformOrigin: "center",
+            display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none",
+          }}
+        >
+          {confettiOn ? <ConfettiBurst burstKey={confettiKey} grand /> : null}
+          <div style={{ width: "200px", position: "relative", zIndex: 1 }}>
+            <ToastSticker key={`${currentToast.title}|${currentToast.name}|${currentToast.detail}|${confettiKey}`} toast={currentToast} standalone durMs={toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS} />
+          </div>
+        </div>
+      ) : null}
 
       <style>{`
         @keyframes ruruWidgetIn { from { opacity: 0; transform: translate3d(8px, 0, 0) scale(0.992); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
