@@ -25,6 +25,7 @@ export type VariantRow = {
   size: string;
   stock: number;
   manual_soldout?: boolean;
+  limit_qty?: number | null;
   detail: string;
   colorOnly: string;
 };
@@ -76,6 +77,7 @@ export function buildRowsForDetail(
         size,
         stock: Number(before?.stock || 0),
         manual_soldout: before?.manual_soldout === true,
+        limit_qty: before?.limit_qty ?? null,
         detail,
         colorOnly: c,
       };

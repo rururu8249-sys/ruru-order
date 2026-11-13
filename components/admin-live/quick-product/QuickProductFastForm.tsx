@@ -51,6 +51,7 @@ type VariantStockRow = {
   size: string;
   stock: number;
   manual_soldout?: boolean;
+  limit_qty?: number | null; // [2026-11-14] 재고관리 꺼진 상품의 옵션별 판매 가능 수량(비우면 무제한)
   detail: string;  // 표시용 — 1번 축(세부상품) 값
   colorOnly: string; // 표시용 — 2번 축(색상) 값
 };
@@ -251,7 +252,7 @@ type ParsedProductNote = Record<string, unknown> & {
       // false여도 상품 자체는 '전체' 목록에서 정상 노출된다.
       customer_category_visible?: boolean;
       stock_mode?: "total" | "option";
-      stock_variants?: Array<{ color?: string; size?: string; stock?: number; manual_soldout?: boolean }>;
+      stock_variants?: Array<{ color?: string; size?: string; stock?: number; manual_soldout?: boolean; limit_qty?: number | null }>;
       stock_management_enabled?: boolean;
       registered_order_enabled?: boolean;
       name_suggestion_enabled?: boolean;
@@ -372,7 +373,8 @@ function buildVariantRows(details: string[], colors: string[], sizes: string[], 
         } else if (alt !== undefined) usedPrevKeys.add(altKey);
         const ownerKey = exact !== undefined ? key : loose !== undefined && loose !== null ? looseOwner.get(looseVariantKey(key)) : alt !== undefined ? altKey : undefined;
         const manual_soldout = previous.find(row => row.key === ownerKey)?.manual_soldout === true;
-        rows.push({ key, color, size, stock: resolved ?? 0, manual_soldout, detail, colorOnly });
+        const limit_qty = previous.find(row => row.key === ownerKey)?.limit_qty ?? null;
+        rows.push({ key, color, size, stock: resolved ?? 0, manual_soldout, limit_qty, detail, colorOnly });
         matchedFlags.push(resolved !== undefined && resolved !== null);
       }
     }
@@ -389,7 +391,7 @@ function buildVariantRows(details: string[], colors: string[], sizes: string[], 
     if (leftovers.length === unmatchedIdx.length) {
       unmatchedIdx.forEach((rowIdx, k) => {
         const carried = Number(leftovers[k]?.stock ?? 0);
-        rows[rowIdx] = { ...rows[rowIdx], manual_soldout: leftovers[k]?.manual_soldout === true };
+        rows[rowIdx] = { ...rows[rowIdx], manual_soldout: leftovers[k]?.manual_soldout === true, limit_qty: leftovers[k]?.limit_qty ?? null };
         if (Number.isFinite(carried) && carried > 0) rows[rowIdx] = { ...rows[rowIdx], stock: carried };
       });
     }
@@ -1086,6 +1088,7 @@ export default function QuickProductFastForm({
             size: row.size || "",
             stock: Number(row.stock || 0),
             manual_soldout: row.manual_soldout === true,
+            limit_qty: typeof row.limit_qty === "number" && row.limit_qty >= 0 ? row.limit_qty : null,
             detail: sepAt >= 0 ? savedColor.slice(0, sepAt) : savedColor,
             colorOnly: sepAt >= 0 ? savedColor.slice(sepAt + AXIS_JOIN.length) : "",
           };
@@ -1463,6 +1466,7 @@ export default function QuickProductFastForm({
         size: variant.size === "없음" ? "" : variant.size,
         stock: Number(previous?.stock || 0),
         manual_soldout: previous?.manual_soldout === true,
+        limit_qty: previous?.limit_qty ?? null,
         detail: nextName,
         colorOnly: variant.color,
       };
@@ -1924,6 +1928,7 @@ export default function QuickProductFastForm({
         size: row.size,
         stock: Number(row.stock || 0),
         manual_soldout: row.manual_soldout === true,
+        ...(typeof row.limit_qty === "number" && row.limit_qty >= 0 ? { limit_qty: Math.floor(row.limit_qty) } : {}),
       }));
 
       // 축 정의는 "세부상품 + (색상 또는 사이즈)" 3단 이상일 때만 기록 →
@@ -2229,7 +2234,7 @@ export default function QuickProductFastForm({
                         <input style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid var(--color-line)", borderRadius: "4px", textAlign: "right", width: "46px" }} type="text" inputMode="numeric" value={bulkStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setBulkStockText(e.target.value.replace(/[^0-9]/g, ""))} />
                         개
                         <button type="button" onClick={applyBulkStock} style={{ border: "1.5px dashed var(--color-rose-deep)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>일괄적용</button>
-                      </span> : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>수량을 세지 않아도 옵션별 품절 설정 가능</span>}
+                      </span> : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>수량 칸: 비우면 무제한 · 숫자를 넣으면 그만큼만 판매</span>}
                     </div>
 
                     <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", maxHeight: "260px", overflowY: "auto", border: "1px solid var(--color-line)" }}>
@@ -2313,11 +2318,11 @@ export default function QuickProductFastForm({
                             const sellable = Math.max(0, Number(row.stock || 0) - heldQty);
                             const soldOut = row.manual_soldout === true || (stockManagementEnabled && sellable <= 0);
                             return (
-                              <div key={row.key} style={{ display: "grid", gridTemplateColumns: stockManagementEnabled ? "minmax(0, 1fr) 74px 70px" : "minmax(0, 1fr) 70px", gap: "8px", alignItems: "center", padding: "6px 0 6px " + (group.detail ? "12px" : "2px") }}>
+                              <div key={row.key} style={{ display: "grid", gridTemplateColumns: stockManagementEnabled ? "minmax(0, 1fr) 74px 70px" : "minmax(0, 1fr) 74px 70px", gap: "8px", alignItems: "center", padding: "6px 0 6px " + (group.detail ? "12px" : "2px") }}>
                                 <span style={{ fontSize: "12px", color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {label || (group.detail ? "재고" : "기본")}
                                 </span>
-                                {stockManagementEnabled ? <input aria-label={`${label || "기본"} 재고 수량`} style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} /> : null}
+                                {stockManagementEnabled ? <input aria-label={`${label || "기본"} 재고 수량`} style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} /> : <input aria-label={`${[group.detail, label].filter(Boolean).join(" / ") || "기본"} 판매 가능 수량`} title="비우면 무제한 · 숫자를 넣으면 그 수량만 팔려요" placeholder="무제한" style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "100%" }} type="text" inputMode="numeric" value={typeof row.limit_qty === "number" ? String(row.limit_qty) : ""} onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g, ""); const next = raw === "" ? null : Math.min(9999, Number(raw)); setVariantRows(resolvedVariantRows.map(v => v.key === row.key ? { ...v, limit_qty: next } : v)); }} />}
                                 <label style={{ minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", borderRadius: "8px", background: row.manual_soldout ? "var(--color-danger-bg)" : "transparent", color: row.manual_soldout ? "var(--color-danger-tx)" : "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
                                   <input type="checkbox" aria-label={`${[group.detail, label].filter(Boolean).join(" / ") || "기본"} 품절`} checked={row.manual_soldout === true}
                                     onChange={(e) => { const checked = e.target.checked; setVariantRows(resolvedVariantRows.map(v => v.key === row.key ? {...v, manual_soldout: checked} : v)); }}
