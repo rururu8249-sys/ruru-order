@@ -71,3 +71,6 @@ assert.equal(C.acceptConversationText('다들 조용히 주문만 하시네요�
 assert.equal(R.conversationRoom(bot,'paused',now,new Date(now-600000).toISOString()).quietWhileOrdering,false,'independent room-comment history preserves cooldown beyond 40 recent rows');
 
 Math.random=savedRandom;
+
+assert.equal(C.acceptConversationText('넹',{ordered:true},[],'live','chat'),null);
+assert.equal(C.acceptConversationText('넹',{ordered:true,question:'확인해 주세요'},[],'live','reply'),'넹');

@@ -15,6 +15,7 @@ type Row=Record<string,unknown>;
 type Facts={ordered:boolean;firstOrder?:boolean;paymentKind?:'bank'|'card';paymentActionId?:string;items?:unknown[];question?:string;room?:ReturnType<typeof conversationRoom>};
 export function acceptConversationText(text:unknown,facts:Facts,recent:string[],mode='live',kind='chat',seed=0):string|null{
  if(typeof text!=='string')return null;
+ if(kind!=='reply'&&/^(?:네|넹|넵|네네|아니요|알겠어요|알겠어용|그럴게요|오키)[!?.~\sㅎㅋ]*$/.test(text.trim()))return null;
  const line=normalizeSpokenCodes(text.replace(/\s+/g,' ').trim(),facts.items||[],seed);
  if(unsupportedProductCode(line,facts.items||[])||unsuitableSpeech(line,mode,kind))return null;
  if(/조용|주문만|말이 없|말씀.{0,4}없/.test(line)&&!facts.room?.quietWhileOrdering)return null;
@@ -59,6 +60,7 @@ export async function runConversationAction(db:SupabaseClient,origin:string,acti
    const prompt=[
      '가상 참여자의 짧은 한국어 쇼핑 채팅을 새롭게 생성한다. 짧게 한두 어절도 허용하고 보통 2~30자, 최대 60자. 말할 이유나 사실이 부족하면 빈 text. 제공 예시를 고정 문장처럼 복사하지 않는다. 인물별 어휘와 길이를 유지하고 고객센터 말투, 반복 감사, 과장된 광고·상품 후기 금지.',
      '실제 방송 대화의 특징: 상품명 없이 가격요/기장은요 같은 짧은 질문, 고민을 말하다 결정을 내리는 흐름, 답변을 듣고 넹/그럴게요 같은 짧은 반응, 서로 다른 존댓말 어미와 가벼운 웃음이다. 이 표현들은 말투 참고이며 복사 목록이 아니다. 모든 발화에 인사·상품명·주문 보고를 붙이지 않는다. 답을 듣지 않았는데 알겠어요/그럴게요로 가짜 대화의 다음 차례를 만들지 않는다. reply일 때만 전달된 question에 맞춰 짧게 호응한다. 실제 고객의 닉네임·신체수치·개인 경험·계좌·가격을 예시에서 옮기지 않는다.',
+     '영상과 방송 음성을 인식하는 기능은 없다. 진행자가 방금 한 말·표정·옷 갈아입기·소리 문제를 보거나 들은 척하지 않는다. 서버가 제공한 현재 카드와 실제 최근 채팅, 본인 주문 상태만 맥락으로 삼는다. 반응할 대상이 없으면 침묵한다.',
      '나이·성별을 고정관념으로 과장하지 않는다. 문장은 한두 문장. 이번 표현 방식: '+expression,
      '저장된 주문·확인 상태만 말한다. paymentReport=true일 때 paymentKind가 bank이면 현재 입금 완료(입완처럼 짧게 말해도 됨), card이면 현재 카드결제 완료라는 짧은 상태 표현을 허용한다. 이 상태로 과거 구매·사용 경험을 만들어내지 않는다. firstOrder=true일 때만 첫 주문이라고 한다. 샀었어요/잘 입어요/써보니 좋아요/재구매/배송받았어요 등 구매·사용 경험을 절대 만들지 않는다. 친구 소개·인스타 방문·어제 시청 이력도 확인되지 않았으므로 만들지 않는다.',
      '현재 상품 질문·감상은 currentCard의 정확한 상품 ID와 세부상품만 허용한다. 다른 브랜드 비교·코디·옵션·재질·가격을 끌어오지 않는다. 상품 종류가 불명확하면 착용·키·체형 질문을 하지 않는다. 다이슨에 옷 사이즈 질문 금지. 별칭은 검색 참고일 뿐 다른 ID를 같은 상품으로 간주하지 않는다. 전지현 별칭은 등록 상품명에 그 이름이 있을 때만.',
