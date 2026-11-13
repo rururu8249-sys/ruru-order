@@ -13,6 +13,10 @@ export const AUTO_TEST_REASON = "자동 테스트";
 export const AUTO_TEST_KAKAO_ID = "990000000077";
 export const AUTO_TEST_PHONE = "0200000077";
 export const AUTO_TEST_NAME = "자동테스트";
+/** 테스트 채팅의 표식(채팅 글 avatar_url 자리) — 화면은 닉네임 첫 글자 동그라미로 그림 */
+export const AUTO_TEST_AVATAR = "autotest";
+/** 테스트 글·주문에 「TEST」 표시를 보는 사람(채팅 관리자 말고 따로) — 사장님 지정 부계정 관리자 김현아(문성) */
+export const AUTO_TEST_VIEWER_PHONES = ["01083388860"];
 export const AUTO_TEST_MIN_GAP_MS = 5 * 60_000;
 export const AUTO_TEST_MAX_GAP_MS = 10 * 60_000;
 
@@ -23,8 +27,8 @@ export function isAutoTestRow(r: { is_test_order?: unknown; test_order_reason?: 
 }
 
 export type AutoTestLast = { at: number; ok: boolean; message: string; orderCode?: string; nickname?: string };
-export type AutoTestState = { enabled: boolean; nextRunAt: number | null; lockUntil: number; last: AutoTestLast | null; screenSeenAt: number };
-export const AUTO_TEST_DEFAULT: AutoTestState = { enabled: false, nextRunAt: null, lockUntil: 0, last: null, screenSeenAt: 0 };
+export type AutoTestState = { enabled: boolean; chatEnabled: boolean; nextRunAt: number | null; lockUntil: number; last: AutoTestLast | null; screenSeenAt: number };
+export const AUTO_TEST_DEFAULT: AutoTestState = { enabled: false, chatEnabled: false, nextRunAt: null, lockUntil: 0, last: null, screenSeenAt: 0 };
 /** 관리자 화면(화면 테스트)이 이 시간 안에 신호를 보냈으면 서버 방식은 쉬고 화면이 맡는다 */
 export const SCREEN_HOST_FRESH_MS = 90_000;
 
@@ -37,6 +41,7 @@ export function parseAutoTestState(raw: unknown): AutoTestState {
   const last = o.last && typeof o.last === "object" ? (o.last as AutoTestLast) : null;
   return {
     enabled: o.enabled === true,
+    chatEnabled: o.chatEnabled === true,
     nextRunAt: o.nextRunAt == null ? null : num(o.nextRunAt) || null,
     lockUntil: num(o.lockUntil),
     last,
