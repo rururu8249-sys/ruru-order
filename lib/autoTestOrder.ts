@@ -3,7 +3,7 @@
 //   주문 줄 모양은 손님 화면(app/order/page.tsx submitOrder)과 같다. 실제 저장은 손님과 같은 주소
 //   (/api/cart-reservations → /api/customer-orders/submit)로 보낸다 — 가짜 주문 저장 경로 없음.
 //   재고 무제한 상품만 고른다(사장님 선택 — 테스트 주문이 실제 재고를 안 건드리게).
-import { isOptionManuallySoldOut } from "@/lib/productOptionAvailability";
+import { AUTO_TEST_BLOCKED_DETAILS, isOptionManuallySoldOut, isOptionQuantityLimited } from "@/lib/productOptionAvailability";
 import { customerDetailInputEnabled } from "@/lib/customerDetailProductName";
 import { assignRowShippingFees, hasOverseasBadge, resolveShippingGroup, shippingFeeByGroup, type ShippingFeeSettings, type ShippingGroup } from "@/lib/shippingGroups";
 
@@ -164,6 +164,7 @@ export function productChoices(row: Row, overseasFeeOn: boolean): AutoTestChoice
       const price = base + Math.max(0, Math.floor(Number(pricing[detail]) || 0));
       for (const v of variants) {
         if (isOptionManuallySoldOut(n, v.color, v.size, detail)) continue;
+        if (isOptionQuantityLimited(n, v.color, v.size, detail) || AUTO_TEST_BLOCKED_DETAILS.some((re) => re.test(detail))) continue; // [2026-11-14] 수량 지정·사장님 지정 상품은 테스트 주문 금지
         out.push({ productId: id, productName: detail, color: v.color || "없음", size: v.size, unitPrice: price, group });
       }
     }
@@ -176,7 +177,7 @@ export function productChoices(row: Row, overseasFeeOn: boolean): AutoTestChoice
   const seen = new Set<string>();
   const add = (c: string, s: string) => {
     const k = `${c}|${s}`;
-    if (seen.has(k) || isOptionManuallySoldOut(n, c, s)) return;
+    if (seen.has(k) || isOptionManuallySoldOut(n, c, s) || isOptionQuantityLimited(n, c, s) || AUTO_TEST_BLOCKED_DETAILS.some((re) => re.test(name))) return;
     seen.add(k);
     out.push({ productId: id, productName: name, color: c, size: s, unitPrice: base, group });
   };
