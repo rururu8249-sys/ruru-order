@@ -735,6 +735,35 @@ async function assertCartHoldAlive(
 }
 
 
+// YouTube 실시간 채팅 주문 알림 — 손님 주문·자동 테스트 주문 공용(after 안에서 부름, 실패해도 주문 무관).
+//   [2026-11-06] 하루 한도 아끼기 — 대기열에 넣은 뒤 20초 묶어 한 줄로(lib/orderChatBatch). 대기열 저장 실패면 이 주문만 바로.
+//   [2026-11-14 사장님 「사이트 테스트 중 — 기존 알림대로 전송」] 테스트 주문도 똑같이 올림(11/13 제외 폐기).
+async function postYoutubeOrderChat(nickname: string, rows: AnyRow[]): Promise<void> {
+  try {
+    const { postOrderChatEverywhere, getServiceClient } = await import("@/lib/youtube");
+    const batch = await import("@/lib/orderChatBatch");
+    const db = getServiceClient();
+    const queued = await batch.enqueueOrderChat(db, batch.orderChatEntry(nickname, rows, Date.now()));
+    if (!queued) {
+      const messages = buildYoutubeOrderAnnouncementMessages({ nickname, rows, maxChars: 180 });
+      for (let i = 0; i < messages.length; i += 1) {
+        await postOrderChatEverywhere(messages[i]);
+        if (i < messages.length - 1) await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, batch.ORDER_CHAT_BATCH_MS));
+    const due = await batch.takeDueOrderChats(db, Date.now());
+    const messages = batch.buildOrderChatBatchMessages(due);
+    for (let i = 0; i < messages.length; i += 1) {
+      await postOrderChatEverywhere(messages[i]);
+      if (i < messages.length - 1) await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  } catch {
+    /* 유튜브 게시 실패는 주문과 완전히 무관하게 무시 */
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => null)) as OrderSubmitPayload | null;
@@ -807,6 +836,8 @@ export async function POST(request: NextRequest) {
         const {announceOrderThanks}=await import('@/lib/liveOrderChatServer');
         await announceOrderThanks(supabase,text((normalizedSubmit.orderRows[0] as AnyRow)?.order_group_id));
       });
+      // [2026-11-14] 자동 테스트 주문도 유튜브 채팅 주문 알림(손님 주문과 같은 함수)
+      after(() => postYoutubeOrderChat(youtubeNickname || customerName, normalizedSubmit.orderRows as AnyRow[]));
       return NextResponse.json({ ...(data as Record<string, unknown>), customerOrderSegment: assigned.customerOrderSegment, bankAccount: assigned.bankAccount });
     }
 
@@ -920,38 +951,7 @@ export async function POST(request: NextRequest) {
         /* 채팅 글 실패는 주문과 무관 */
       }
     });
-    after(async () => {
-      try {
-        const rows = normalizedSubmit.orderRows;
-        // [2026-11-14 사장님 「사이트 테스트 중 — 기존 알림대로 전송」] 테스트 주문도 실제 주문과 똑같이 유튜브 채팅에 올림
-        //   (11/13 「테스트 주문은 유튜브 안 올림」 폐기)
-        // YouTube 실시간 채팅은 메시지당 200자 제한. 180자로 여유를 두고 분할한다.
-        // 모든 상품/옵션/색상/사이즈/수량/상품별 금액을 생략 없이 보낸다("외 N개" 축약 금지).
-        // [2026-11-06] 하루 한도 아끼기 — 주문마다 바로 올리지 않고 대기열에 넣은 뒤 20초 묶어 한 줄로(lib/orderChatBatch).
-        //   대기열 저장이 실패하면 예전처럼 이 주문만 바로 올린다.
-        const { postOrderChatEverywhere, getServiceClient } = await import("@/lib/youtube");
-        const batch = await import("@/lib/orderChatBatch");
-        const db = getServiceClient();
-        const queued = await batch.enqueueOrderChat(db, batch.orderChatEntry(youtubeNickname || customerName, rows, Date.now()));
-        if (!queued) {
-          const messages = buildYoutubeOrderAnnouncementMessages({ nickname: youtubeNickname || customerName, rows, maxChars: 180 });
-          for (let i = 0; i < messages.length; i += 1) {
-            await postOrderChatEverywhere(messages[i]);
-            if (i < messages.length - 1) await new Promise((resolve) => setTimeout(resolve, 3000));
-          }
-          return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, batch.ORDER_CHAT_BATCH_MS));
-        const due = await batch.takeDueOrderChats(db, Date.now());
-        const messages = batch.buildOrderChatBatchMessages(due);
-        for (let i = 0; i < messages.length; i += 1) {
-          await postOrderChatEverywhere(messages[i]);
-          if (i < messages.length - 1) await new Promise((resolve) => setTimeout(resolve, 3000));
-        }
-      } catch {
-        /* 유튜브 게시 실패는 주문과 완전히 무관하게 무시 */
-      }
-    });
+    after(() => postYoutubeOrderChat(youtubeNickname || customerName, normalizedSubmit.orderRows as AnyRow[]));
 
     return NextResponse.json({
       ...(data as Record<string, unknown>),
