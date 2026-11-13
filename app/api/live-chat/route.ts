@@ -34,6 +34,7 @@ import { chatRoleOfKakao, moderateChatMessage, pinChatMessage, setChatManager } 
 import { normalizeWidgetTarget } from "@/lib/widgetProductLibrary";
 import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { manualChatOperator, validManualSelection, manualChatFailure } from "@/lib/liveAutomationManualChat";
 import { AUTO_TEST_AVATAR, AUTO_TEST_KAKAO_ID, AUTO_TEST_KEY, parseAutoTestState } from "@/lib/autoTestOrder";
 
 export const runtime = "nodejs";
@@ -101,6 +102,14 @@ export async function POST(request: NextRequest) {
 
     const sb = getServiceClient();
     // 빠르게 — 서로 상관없는 읽기는 한꺼번에
+    let manualOperator: string | null = null;
+    if (raw.manual !== undefined) {
+      if (!sameChatOrigin(request)) return fail("잘못된 요청입니다.", 403);
+      if (!validManualSelection(raw.manual)) return fail("닉네임을 다시 선택해 주세요.");
+      manualOperator = await manualChatOperator(request, sb);
+      if (!manualOperator || (manualOperator.startsWith("kakao:") && manualOperator !== `kakao:${kakaoId}`)) return fail("관리자 본인 확인이 필요해요.", 403);
+      if (body.startsWith("/")) return fail("선택한 닉네임으로는 채팅만 보낼 수 있어요.", 403);
+    }
     const [setting, role, bcRes, custRes, bansRes, lastRes] = await Promise.all([
       readSetting(sb),
       chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null, isMod: false })),
@@ -173,6 +182,14 @@ export async function POST(request: NextRequest) {
           finalBody = encodeEmojiTokens(finalBody, emojiSetting.items).text;
         }
       } catch { /* 이모티콘 확인 실패 — 글자 그대로 */ }
+    }
+    if (manualOperator && validManualSelection(raw.manual)) {
+      const { data, error } = await sb.rpc("live_automation_manual_send", {
+        p_broadcast: bc, p_token: raw.manual.token, p_operator: manualOperator,
+        p_client: raw.manual.clientId, p_request: raw.manual.requestId, p_body: finalBody,
+      });
+      if (error) { const e = manualChatFailure(error.message); return fail(e.message, e.status); }
+      return NextResponse.json({ ok: true, message: parseChatMessage(data) }, { headers: { "Cache-Control": "private, no-store" } });
     }
     const { data: ins, error } = await sb
       .from("live_chat_messages")

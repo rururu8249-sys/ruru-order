@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const load=createUiLoader();
+let N;
+try { N=load('lib/liveAutomationNicknames.ts'); } catch {}
+assert.ok(N,'the reviewed nickname pool and normalization must exist');
+const pool=N.NICKNAME_CANDIDATES;
+assert.equal(pool.length,200);
+assert.equal(new Set(pool.map(x=>N.nicknameCollisionKey(x.nickname))).size,200);
+assert.deepEqual(Object.fromEntries([...new Set(pool.map(x=>x.category))].map(c=>[c,pool.filter(x=>x.category===c).length])),{korean:60,humor:50,celebrity:20,english:8,hangul_number:30,english_number:4,real_name:28});
+assert.equal(pool.filter(x=>/[a-z]/i.test(x.nickname)).length,12);
+assert.ok(pool.every(x=>x.nickname.length>=2 && x.nickname.length<=14));
+assert.ok(pool.every(x=>!/(test|admin|official|AI|\[|\])/i.test(x.nickname)));
+assert.equal(N.nicknameCollisionKey('  Jo Y  '),'joy');
+assert.equal(N.nicknameCollisionKey('\u1100\u1161 \u1102\u1161'),'\uac00\ub098');
+const fresh=N.availableNicknameCandidates(['  MOMO ',pool[0].nickname],new Set([N.nicknameCollisionKey(pool[1].nickname)]));
+assert.equal(fresh.length,197);
+assert.ok(!fresh.some(x=>N.nicknameCollisionKey(x.nickname)==='momo'));
+assert.equal(N.availableNicknameCandidates(pool.map(x=>x.nickname),new Set()).length,0);
+console.log('PASS 200 unique candidates, requested category balance, low English ratio, collision normalization and exclusions');

@@ -8465,15 +8465,15 @@ export default function OrderPage() {
                 canModerate: !viewAsCustomer && (operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null),
                 emojis: liveChatEmojis,
                 canEmoji: liveChatCanEmoji,
-                onSend: async (body, target) => {
+                onSend: async (body, target, manual) => {
                   const commandContext = privateChat.commandContext();
                   // 누르자마자 화면에 먼저 띄움(임시 번호) — 서버 답이 오면 진짜 글로 바꿈, 실패하면 뺌
                   const tempId = CHAT_TEMP_ID_BASE + Date.now();
-                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body: liveChatCanEmoji ? encodeEmojiTokens(body, liveChatEmojis).text : body, createdAt: new Date().toISOString(), hidden: false, badge: chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false, botRef: "", avatar: (() => { try { return cleanKakaoPhotoUrl(window.localStorage.getItem("ruru_kakao_profile_image")); } catch { return ""; } })() };
+                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: manual?.nickname || youtubeNickname.trim(), body: liveChatCanEmoji ? encodeEmojiTokens(body, liveChatEmojis).text : body, createdAt: new Date().toISOString(), hidden: false, badge: manual ? null : chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false, botRef: "", avatar: manual ? "" : (() => { try { return cleanKakaoPhotoUrl(window.localStorage.getItem("ruru_kakao_profile_image")); } catch { return ""; } })() };
                   if (!body.trimStart().startsWith("/")) setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {
-                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body, target }) });
+                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body, target, manual }) });
                     const json = await res.json().catch(() => null);
                     if (json?.ok && json.message) {
                       const m = parseChatMessage(json.message);

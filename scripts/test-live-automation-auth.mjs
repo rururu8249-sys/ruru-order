@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const load=createUiLoader(); let A;
+try { A=load('lib/liveAutomationAuth.ts'); } catch {}
+assert.ok(A,'signed per-session automation authentication must exist');
+const secret='a'.repeat(64), now=100000, sid='00000000-0000-4000-8000-000000000001';
+const action='00000000-0000-4000-8000-000000000002';
+const claims={session:sid,action,lease:action,revision:2,scope:'order'};
+const token=A.signAutomationCapability(claims,secret,now);
+assert.equal(A.verifyAutomationCapability(token,'order',secret,now+1000).session,sid);
+assert.equal(A.verifyAutomationCapability(token,'chat',secret,now+1000),null);
+assert.equal(A.verifyAutomationCapability(token,'order','b'.repeat(64),now+1000),null);
+assert.equal(A.verifyAutomationCapability(token,'order',secret,now+61000),null);
+assert.equal(A.verifyAutomationCapability(token+'x','order',secret,now+1000),null);
+assert.equal(A.verifyAutomationCapability('x.y','order',secret,now+1000),null);
+assert.throws(()=>A.signAutomationCapability(claims,''));
+assert.equal(A.reservedAutomationIdentity({owner:'990000000077'}),true);
+assert.equal(A.reservedAutomationIdentity({phone:'0200000077'}),true);
+assert.equal(A.reservedAutomationIdentity({sessionKey:'live-auto:'+sid}),true);
+assert.equal(A.reservedAutomationIdentity({owner:'normal'}),false);
+await assert.rejects(A.readAutomationRequest(new Request('https://example.test'),{owner:'990000000077'},'order',{}),/AUTH/);
+assert.equal(await A.readAutomationRequest(new Request('https://example.test'),{owner:'normal'},'order',{}),null);
+console.log('PASS scoped capabilities, expiry, forgery rejection and reserved-owner fail-closed authentication');

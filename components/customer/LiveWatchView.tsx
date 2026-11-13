@@ -50,6 +50,9 @@ import { ChatProductThumb } from "./ChatProductThumb";
 import { chatProductPhoto } from "@/lib/chatProductPhoto";
 import { LiveWelcomeChip } from "./LiveWelcomeChip";
 import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
+import { useManualAutomationChat } from "@/lib/useManualAutomationChat";
+import type { ManualChatSelection } from "@/lib/liveAutomationManualChat";
+import { AutomationNicknamePicker } from "./AutomationNicknamePicker";
 
 export type LiveWatchPinned = {
   productId: string;
@@ -105,7 +108,7 @@ type Props = {
     canWrite: boolean;
     /** 관리자(시험 계정·허용 번호) — 글을 길게 누르면 지우기·금지 */
     canModerate: boolean;
-    onSend: (body: string, target?: ChatProductSelection) => Promise<{ ok: boolean; message?: string }>;
+    onSend: (body: string, target?: ChatProductSelection, manual?: ManualChatSelection) => Promise<{ ok: boolean; message?: string }>;
     /** 고정 댓글(없으면 null) */
     pinned: LiveChatMessage | null;
     /** 총관리자 — 길게 눌러 채팅 관리자 지정·해제 */
@@ -433,6 +436,7 @@ export default function LiveWatchView(props: Props) {
   // ── 사이트 채팅 ──
   const chat = props.chat ?? null;
   const [composeOpen, setComposeOpen] = useState(false);
+  const manualChat = useManualAutomationChat(props.broadcastId || "", Boolean(chat?.canWrite));
   // PC는 상시 입력칸. 폰 쓰기 창을 연 채 PC 폭으로 바뀌면 방문 기록도 기존 정리 절차로 되돌린다.
   useEffect(() => { if (isDesktop) setComposeOpen(false); setEmojiOpen(false); }, [isDesktop]);
   const downAt = useRef<{ x: number; y: number } | null>(null);
@@ -663,7 +667,7 @@ export default function LiveWatchView(props: Props) {
   }, [chatHint]);
   const [introManage, setIntroManage] = useState<string | null>(null);
   const [introChosen, setIntroChosen] = useState<string[]>([]);
-  const productPickerOpen = Boolean(chat?.canModerate && draft.trimStart().startsWith("/"));
+  const productPickerOpen = Boolean(!manualChat.selected && chat?.canModerate && draft.trimStart().startsWith("/"));
   const sendChat = async (bodyOverride?: string, target?: ChatProductSelection) => {
     if (!chat || sending) return;
     const body = (bodyOverride ?? composedDraft).trim();
@@ -676,7 +680,9 @@ export default function LiveWatchView(props: Props) {
     if (!batch) { setDraft(""); setBeforeCaretText(""); setEmojiOpen(false); setComposeOpen(false); }
     // [2026-11-12 22:46 사장님] 인사하기 줄은 「보내기」를 눌러야만 사라짐 — 채팅을 써도 그대로
     const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
-    const r = await chat.onSend(body, commandTarget).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
+    const r = await (manualChat.selected
+      ? manualChat.send(body, (text, identity) => chat.onSend(text, undefined, identity))
+      : chat.onSend(body, commandTarget)).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     if (!r.ok && !batch) {
       setDraft(previousDraft); setEmojiOpen(previousEmojiOpen);
       if (!isDesktop) setComposeOpen(true);
@@ -722,7 +728,7 @@ export default function LiveWatchView(props: Props) {
   const sendGreet = async () => {
     if (!chat) return;
     closeGreet();
-    const r = await chat.onSend("👋").catch(() => ({ ok: false, message: "못 보냈어요." }));
+    const r = await (manualChat.selected ? manualChat.send("👋", (text, identity) => chat.onSend(text, undefined, identity)) : chat.onSend("👋")).catch(() => ({ ok: false, message: "못 보냈어요." }));
     if (!r.ok) setChatHint(r.message || "못 보냈어요.");
   };
   const startPress = (m: LiveChatMessage) => {
@@ -1080,6 +1086,7 @@ export default function LiveWatchView(props: Props) {
             onSubmit={(e) => { e.preventDefault(); if (productPickerOpen) return; if (composingRef.current) { composingRef.current = false; inputRef.current?.blur(); } if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } setEmojiOpen(false); void sendChat(inputRef.current?.text() || undefined); }}
             style={{ position: "relative", width: "100%", maxWidth: "560px", margin: "0 auto", background: isDesktop ? "#0F0F0F" : "#FFFFFF", padding: isDesktop ? "12px 0 calc(12px + env(safe-area-inset-bottom))" : emojiOpen ? "12px 16px 0" : "12px 16px calc(12px + env(safe-area-inset-bottom))", borderRadius: isDesktop ? 0 : "16px 16px 0 0", boxSizing: "border-box", ...(isDesktop ? { position: "relative", flexShrink: 0, order: 5, borderTop: "1px solid #333333", pointerEvents: "auto" } : {}) }}
           >
+            <AutomationNicknamePicker state={manualChat} dark={isDesktop} disabled={sending} onPicked={() => { if (composeOpen && !emojiOpen) inputRef.current?.focus(); }} />
             {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onIntro={chat?.canModerate ? (products) => { setIntroChosen(products.map(widgetTargetKey)); setIntroManage(products[0]?.texts[0] ?? ""); setDraft(""); } : undefined} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
             {composeHint ? <div role="status" style={{ marginBottom: "8px", fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{composeHint}</div> : null}
             {showSuggestRow && !productPickerOpen ? (
@@ -1550,7 +1557,8 @@ export default function LiveWatchView(props: Props) {
       {rpsAdminOpen && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onSaved={() => { if (!rps.state?.id || rps.state.status === 'closed') setRpsLaunchKey(rpsSetupKey); }} onClose={() => setRpsAdminOpen(false)}/>}
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
-      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
+      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
+        {!isDesktop && !composeOpen && !focus ? <AutomationNicknamePicker state={manualChat} dark disabled={sending} /> : null}
         {/* [2026-11-12 사장님 그립 참고] 폰 = 가게 그림 + 빨간 숫자 + 「상품」(옆 주문서·더보기와 같은 모양), PC = 예전 넓은 버튼 */}
         {!isDesktop ? (
           <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ flexShrink: 0, width: "44px", padding: 0, border: "none", background: "transparent", color: "#FFFFFF", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer" }}>
