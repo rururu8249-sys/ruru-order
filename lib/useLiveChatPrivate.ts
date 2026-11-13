@@ -74,9 +74,14 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
   }, [bc, enabled, revision]);
   useEffect(() => {
     if (!enabled) return;
-    const clear = () => { ++serial.current; ++receiptEpoch.current; setState(EMPTY); setReceipts({ account: "", bc: "", messages: [] }); };
-    const storage = () => { clear(); refresh(); };
-    const message = (e: MessageEvent) => { if (e.origin === location.origin && e.data?.type === "ruru-chat-verified") storage(); };
+    const clear = () => { ++serial.current; ++receiptEpoch.current; access.current = false; setState(EMPTY); setReceipts({ account: "", bc: "", messages: [] }); };
+    const identityChanged = () => { clear(); refresh(); };
+    // Other tabs frequently save carts, product views and display preferences.
+    // Those writes must not briefly replace authenticated chat with public rows.
+    const storage = (e: StorageEvent) => {
+      if (e.key === null || e.key === "ruru_chat_identity" || e.key === "ruru_kakao_id") identityChanged();
+    };
+    const message = (e: MessageEvent) => { if (e.origin === location.origin && e.data?.type === "ruru-chat-verified") identityChanged(); };
     const visible = () => { if (document.visibilityState === "visible") {refresh();void refreshPublicAvatars(bc);} };
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") { void refreshPublicAvatars(bc); if (access.current || Object.keys(chatIdentityHeaders()).length) refresh(); } }, 15000);
     window.addEventListener("storage", storage); window.addEventListener("message", message);
