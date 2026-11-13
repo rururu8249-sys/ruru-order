@@ -49,7 +49,10 @@ export function mentionsNickname(body:string,nickname:string):boolean{
  // 사람 이름처럼 한글 3글자면 성 빼고 부르기도 함(장혜숙 → 「혜숙님」)
  if(/^[가-힣]{3}$/.test(base)&&text.includes(base.slice(1)+'님'))return true;
  // [2026-11-13 23:44 사장님] 앞 두 글자 + 님으로 줄여 부르기(별님찻집 → 「별님」)
- if(base.length>=3&&text.includes(base.slice(0,2)+'님'))return true;
+ if(base.length>=3&&base.slice(0,2)!=='루루'&&text.includes(base.slice(0,2)+'님'))return true;
+ // [2026-11-14 00:10 사장님] 뒤 2~3글자 + 님으로 불러도(여름한아름 → 「한아름님」). 「루루님」은 사장님 부르는 말이라 제외
+ if(base.length>=4&&text.includes(base.slice(-3)+'님'))return true;
+ if(base.length>=3&&base.slice(-2)!=='루루'&&text.includes(base.slice(-2)+'님'))return true;
  return false;
 }
 /** 다른 닉네임이 방금 한 말과 글자가 절반 넘게 겹치면 비슷한 말로 본다 */
