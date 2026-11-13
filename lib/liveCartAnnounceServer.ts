@@ -19,7 +19,6 @@ import {
 } from "@/lib/liveChatBot";
 import { loadCandidates } from "@/lib/liveChatBotServer";
 import { isBlockedValue } from "@/lib/assistantSearchServer";
-import { postOrderChatEverywhere, readActiveBroadcastId } from "@/lib/youtube";
 import { AUTO_TEST_AVATAR, AUTO_TEST_KAKAO_ID } from "@/lib/autoTestOrder";
 
 export type NewCartLine = { productId: string; productName: string; color: string; size: string; unitPrice: number | null };
@@ -95,15 +94,9 @@ export async function announceNewCartLines(sb: SupabaseClient, input: { sessionK
     lastBroadcast.set(bc, now);
     sweep(lastPerson, PER_PERSON_MS);
     const { error } = await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: items[0].ref, avatar_url: input.kakaoId === AUTO_TEST_KAKAO_ID ? AUTO_TEST_AVATAR : null });
-    // Existing after() task: reuse the masked site notice and the configured
-    // YouTube notification switch/main+second destinations, without blocking cart success.
-    // [2026-11-13] 자동 테스트 담기는 유튜브 채팅에 안 올림(사이트 채팅엔 테스트 표식으로만 — 관리자 화면에서만 보임)
-    if (!error && input.kakaoId !== AUTO_TEST_KAKAO_ID && await readActiveBroadcastId(sb) === bc) {
-      const results = await postOrderChatEverywhere(body);
-      for (const [channel, result] of Object.entries(results)) {
-        if (!result.ok && !result.skipped) console.warn("[cart-chat] YouTube notice failed", { channel, reason: result.reason });
-      }
-    }
+    // [2026-11-13 18:42 사장님 «장바구니 담음은 유튜브 채팅에 안 올림 — 유튜브 한도 아끼고 위젯 스티커로만»]
+    //   사이트 채팅 글은 그대로 남고, 상품 위젯이 이 글(bot_ref c:)을 받아 「장바구니」 스티커로 보여 준다.
+    void error;
   } catch {
     /* 알림 실패는 담기와 무관 */
   }
