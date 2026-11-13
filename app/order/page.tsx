@@ -8454,6 +8454,7 @@ export default function OrderPage() {
                 canPin: !viewAsCustomer && ["crown", "crown_pink"].includes(String(chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? "")),
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
                 canModerate: !viewAsCustomer && (operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null),
+                canManage: !viewAsCustomer && (operatorTestAccount !== null || isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone))),
                 emojis: liveChatEmojis,
                 canEmoji: liveChatCanEmoji,
                 onSend: async (body, target, manual) => {

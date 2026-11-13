@@ -64,3 +64,6 @@ _cowork_tmp/
 !.claude/
 .claude/*
 !.claude/skills/
+
+_to_delete*/
+supabase/.temp/

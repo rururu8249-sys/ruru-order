@@ -16,7 +16,7 @@ async function authorized(request: NextRequest): Promise<{ owner: boolean; test:
   const role = await verifiedChatRole(getServiceClient(), identity);
   // 테스트 표시는 총관리자·부계정 관리자만(채팅 관리자 R 에겐 안 보임)
   const test = role.isOwner || AUTO_TEST_VIEWER_PHONES.includes(String(identity.phone ?? ""));
-  return role.isMod || test ? { owner: role.isOwner, test } : null;
+  return role.isManager || test ? { owner: role.isOwner, test } : null;
 }
 export async function GET(request: NextRequest) {
   try {

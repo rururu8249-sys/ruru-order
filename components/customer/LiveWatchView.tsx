@@ -110,6 +110,8 @@ type Props = {
     canWrite: boolean;
     /** 관리자(시험 계정·허용 번호) — 글을 길게 누르면 지우기·금지 */
     canModerate: boolean;
+    /** [2026-11-13] 그 밖의 관리(상품 선택·소개영상·카드·자주 쓰는 말·보는 사람·PC 두 칸) — 총관리자·관리자 시험 계정만. 채팅 관리자(R)는 일반 손님 화면 */
+    canManage?: boolean;
     onSend: (body: string, target?: ChatProductSelection, manual?: ManualChatSelection) => Promise<{ ok: boolean; message?: string }>;
     /** 고정 댓글(없으면 null) */
     pinned: LiveChatMessage | null;
@@ -658,7 +660,7 @@ export default function LiveWatchView(props: Props) {
   }, [chatHint]);
   const [introManage, setIntroManage] = useState<string | null>(null);
   const [introChosen, setIntroChosen] = useState<string[]>([]);
-  const productPickerOpen = Boolean(!manualChat.selected && chat?.canModerate && draft.trimStart().startsWith("/"));
+  const productPickerOpen = Boolean(!manualChat.selected && chat?.canManage && draft.trimStart().startsWith("/"));
   const sendChat = async (bodyOverride?: string, target?: ChatProductSelection) => {
     if (!chat || sending) return;
     const body = (bodyOverride ?? composedDraft).trim();
@@ -1001,12 +1003,12 @@ export default function LiveWatchView(props: Props) {
 
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
   // [2026-11-12 사장님 22:34] 관리자(채팅 관리 권한)는 넓은 PC에서 유튜브 채팅창을 사이트 채팅 옆에 나란히 — 두 칸이면 조금 좁게
-  const adminDual = Boolean(isWidePc && chat?.canModerate && videoId);
+  const adminDual = Boolean(isWidePc && chat?.canManage && videoId);
   const desktopChatWidth = adminDual ? "clamp(260px, 24vw, 440px)" : "clamp(280px, 35vw, 560px)";
   const videoRight = isDesktop && !focus ? (adminDual ? `calc(${desktopChatWidth} * 2)` : desktopChatWidth) : 0;
   // [11:46 사장님] 자주 쓰는 말 판이 열려 있으면 영상 칸을 그만큼 좁혀 영상이 왼쪽으로 가고, 판은 영상과 채팅 사이 빈칸에(영상 안 가림)
   const [quickOpen, setQuickOpen] = useState(false);
-  const quickShown = isDesktop && !!chat?.canModerate && !focus;
+  const quickShown = isDesktop && !!chat?.canManage && !focus;
   const videoAreaRight = quickShown && quickOpen ? `calc(${videoRight || "0px"} + ${QUICK_PHRASE_COLUMN}px)` : videoRight;
   const [pageHost, setPageHost] = useState("");
   useEffect(() => { setPageHost(window.location.hostname); }, []);
@@ -1036,7 +1038,7 @@ export default function LiveWatchView(props: Props) {
     return () => { alive = false; window.clearInterval(t); };
   }, [watchersOpen]);
   // [2026-11-12 사장님] 사이트 상품 카드 켬/끔 — 채팅 관리자만(서버가 다시 확인). 유튜브 위젯·순환은 그대로.
-  const cardAdmin = Boolean(chat?.canModerate && props.broadcastId);
+  const cardAdmin = Boolean(chat?.canManage && props.broadcastId);
   const siteCardOff = cardOffLocal && cardOffLocal.bc === props.broadcastId ? cardOffLocal.off : liveFeatured.siteCardOff;
   const setSiteCard = async (off: boolean) => {
     if (!props.broadcastId || cardBusy) return;
@@ -1418,7 +1420,7 @@ export default function LiveWatchView(props: Props) {
         {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
           <span style={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>루루동이 실시간 채팅</span>
           {/* [2026-11-12] 관리자 — 방송 보는 중 / 사이트 전체, 누르면 누가 보는지 */}
-          {chat?.canModerate ? <button type="button" onClick={() => setWatchersOpen(true)} aria-label="지금 방송 보는 사람 목록 보기"
+          {chat?.canManage ? <button type="button" onClick={() => setWatchersOpen(true)} aria-label="지금 방송 보는 사람 목록 보기"
             style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 10px", border: "1px solid #444444", borderRadius: "9999px", background: "#1F1F1F", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>
             <IconEyeSmall size={14} />{props.watchingViewers ?? "-"}<span style={{ color: "#AAAAAA", fontWeight: 400 }}>· 사이트 {props.siteViewers ?? "-"}</span>
           </button> : null}
@@ -1750,7 +1752,7 @@ export default function LiveWatchView(props: Props) {
         </div>
       ) : null}
 
-      {introManage !== null && chat?.canModerate && props.broadcastId ? <ProductIntroManager key={props.broadcastId} broadcastId={props.broadcastId} initialQuery={introManage} initialChosen={introChosen} capture={introPlayer.capture} onClose={() => { setIntroManage(null); setIntroChosen([]); }} /> : null}
+      {introManage !== null && chat?.canManage && props.broadcastId ? <ProductIntroManager key={props.broadcastId} broadcastId={props.broadcastId} initialQuery={introManage} initialChosen={introChosen} capture={introPlayer.capture} onClose={() => { setIntroManage(null); setIntroChosen([]); }} /> : null}
 
       {/* 상품 목록 창 */}
       {listOpen ? (
@@ -1763,7 +1765,7 @@ export default function LiveWatchView(props: Props) {
               </span>
               <button type="button" onClick={() => setListOpen(false)} aria-label="닫기" style={{ width: "44px", height: "44px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><IconClose /></button>
             </div>
-            {chat?.canModerate && props.broadcastId ? <div style={{padding:"0 16px 10px",flexShrink:0}}><button type="button" onClick={() => { setIntroChosen([]); setIntroManage(""); }} style={{width:"100%",minHeight:44,border:"1px solid #ddd",borderRadius:10,background:"#f5f5f5",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer"}}>관리자 · 소개영상 등록 / 위젯 순환</button></div> : null}
+            {chat?.canManage && props.broadcastId ? <div style={{padding:"0 16px 10px",flexShrink:0}}><button type="button" onClick={() => { setIntroChosen([]); setIntroManage(""); }} style={{width:"100%",minHeight:44,border:"1px solid #ddd",borderRadius:10,background:"#f5f5f5",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer"}}>관리자 · 소개영상 등록 / 위젯 순환</button></div> : null}
             {listMode === "featured" ? <div style={{padding: "0 16px 10px", flexShrink: 0}}>
               <p style={{fontSize: 13, color: "#666", margin: "0 0 8px"}}>전체 {totalCount}개 중 소개 중인 상품이에요.</p>
               <button type="button" onClick={() => openProductList("all")} style={{width: "100%", minHeight: 44, borderRadius: 10, border: "1px solid #d5d5d5", background: "#f5f5f5", color: "#111", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>전체 상품 {totalCount}개 보기 →</button>

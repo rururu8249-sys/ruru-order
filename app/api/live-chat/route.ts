@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
     const [setting, role, bcRes, custRes, bansRes, lastRes] = await Promise.all([
       readSetting(sb),
-      chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null, isMod: false })),
+      chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null, isMod: false, isManager: false })),
       sb.from("broadcasts").select("id, status, widget_card_enabled, youtube_live_url").eq("id", bc).maybeSingle(),
       sb.from("customers").select("id, youtube_nickname, is_blocked, kakao_profile_image").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("live_chat_bans").select("until_at, lifted_at").eq("kakao_id", kakaoId).is("lifted_at", null).order("id", { ascending: false }).limit(5),
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     if (Number.isFinite(lastAt) && Date.now() - lastAt < LIVE_CHAT_MIN_GAP_MS) return fail("조금 천천히 써 주세요.", 429);
 
     if (body.startsWith("/")) {
-      if (!role.isMod) return fail("상품 순환 명령은 채팅 관리자만 사용할 수 있어요.", 403);
+      if (!role.isManager) return fail("상품 순환 명령은 관리자만 사용할 수 있어요.", 403);
       const query = parseChatProductQueries(body);
       const target = raw.target && typeof raw.target === "object" && "targets" in raw.target
         ? parseChatProductSelection(raw.target) : normalizeWidgetTarget(raw.target);
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
           try {
             if (!capture) { introNotice = "상품 소개 완료 · 현재 영상 위치를 확인하지 못했어요. 영상이 열린 상태에서 다시 선택해 주세요."; return; }
             const identity = chatIdentityFromRequest(request);
-            const verified = sameChatOrigin(request) && (await verifyAdminSessionFromRequest(request) || (identity?.sub === kakaoId && (await verifiedChatRole(sb, identity)).isMod));
+            const verified = sameChatOrigin(request) && (await verifyAdminSessionFromRequest(request) || (identity?.sub === kakaoId && (await verifiedChatRole(sb, identity)).isManager));
             if (!verified) { introNotice = "상품 소개 완료 · 영상 연결은 채팅 본인 확인 후 사용할 수 있어요."; return; }
             const result = await saveProductIntros(sb, bc, targets, capture, "first");
             introNotice = result.kept ? "상품 소개 완료 · 기존 소개영상 위치는 유지했어요." : "상품 소개 완료 · 소개영상도 연결했어요.";

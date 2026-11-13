@@ -26,19 +26,19 @@ async function readWatchSetting(sb: SupabaseClient) {
 }
 
 /** 이 카카오 계정의 채팅 역할 — 표시(badge)·관리 가능·총관리자. 관리자 시험 계정 표(켜진 것)도 채팅 관리자. */
-export async function chatRoleOfKakao(sb: SupabaseClient, kakaoId: string): Promise<{ phone: string; badge: LiveChatBadge | null; isMod: boolean; isOwner: boolean }> {
+export async function chatRoleOfKakao(sb: SupabaseClient, kakaoId: string): Promise<{ phone: string; badge: LiveChatBadge | null; isMod: boolean; isOwner: boolean; isManager: boolean }> {
   // 서로 독립적인 조회를 함께 시작 — 글마다 회원 조회가 끝날 때까지 기다리지 않는다.
   const [phone, setting, opsRes] = await Promise.all([
     phoneOfKakao(sb, kakaoId),
     readWatchSetting(sb),
     sb.from("operator_test_accounts").select("customer_phone, is_active").eq("is_active", true),
   ]);
-  if (!phone) return { phone: "", badge: null, isMod: false, isOwner: false };
+  if (!phone) return { phone: "", badge: null, isMod: false, isOwner: false, isManager: false };
   const isOwner = isChatOwnerPhone(setting, phone);
   // [2026-11-13] 자동 테스트 회원 번호는 시험 계정 표에 있어도 채팅에선 평범한 손님(R 표시·관리 권한 없음)
   const isOp = phone !== AUTO_TEST_PHONE && (opsRes.data ?? []).some((o) => String((o as { customer_phone?: string }).customer_phone ?? "").replace(/[^0-9]/g, "") === phone);
   const badge = chatBadgeOf(setting, phone) ?? (isOp ? "mod" : null);
-  return { phone, badge, isMod: isOwner || isOp || setting.mods.includes(phone), isOwner };
+  return { phone, badge, isMod: isOwner || isOp || setting.mods.includes(phone), isOwner, isManager: isOwner || isOp };
 }
 
 /** 이 카카오 계정이 채팅 관리자인지 — 총관리자·관리자 시험 계정 표(켜진 것)·설정 mods 번호 */

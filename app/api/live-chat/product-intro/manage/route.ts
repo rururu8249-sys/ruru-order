@@ -16,7 +16,7 @@ const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 async function authorized(request: NextRequest) {
   if (await verifyAdminSessionFromRequest(request)) return true;
   const identity = chatIdentityFromRequest(request);
-  return identity ? (await verifiedChatRole(getServiceClient(), identity)).isMod : false;
+  return identity ? (await verifiedChatRole(getServiceClient(), identity)).isManager : false;
 }
 async function broadcast(sb: ReturnType<typeof getServiceClient>, bc: string) {
   const result = await sb.from("broadcasts").select("status,is_deleted,youtube_live_url,widget_card_enabled").eq("id", bc).maybeSingle();

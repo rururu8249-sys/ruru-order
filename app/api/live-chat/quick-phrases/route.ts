@@ -11,7 +11,7 @@ const fail = (message: string, status = 400) => reply({ ok: false, message }, st
 async function authorized(request: NextRequest) {
   if (await verifyAdminSessionFromRequest(request)) return true;
   const identity = chatIdentityFromRequest(request);
-  return identity ? (await verifiedChatRole(getServiceClient(), identity)).isMod : false;
+  return identity ? (await verifiedChatRole(getServiceClient(), identity)).isManager : false;
 }
 export async function GET(request: NextRequest) {
   try {

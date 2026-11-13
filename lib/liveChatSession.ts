@@ -41,7 +41,7 @@ export function sameChatOrigin(request: NextRequest) {
 }
 /** Provider-verified phone only. Never use editable customer profile phone for private originals. */
 export async function verifiedChatRole(sb: SupabaseClient, identity: ChatIdentity | null) {
-  if (!identity?.phone) return { isOwner: false, isMod: false };
+  if (!identity?.phone) return { isOwner: false, isMod: false, isManager: false };
   const [st, ops] = await Promise.all([
     sb.from("settings").select("value").eq("key", LIVE_WATCH_KEY).maybeSingle(),
     sb.from("operator_test_accounts").select("customer_phone").eq("is_active", true),
@@ -49,5 +49,7 @@ export async function verifiedChatRole(sb: SupabaseClient, identity: ChatIdentit
   if (st.error || ops.error) throw new Error("Chat role unavailable");
   const setting = parseLiveWatchSetting(st.data?.value);
   const isOwner = isChatOwnerPhone(setting, identity.phone);
-  return { isOwner, isMod: isOwner || setting.mods.includes(identity.phone) || (ops.data ?? []).some(o => String(o.customer_phone).replace(/\D/g, "") === identity.phone) };
+  const isOp = (ops.data ?? []).some(o => String(o.customer_phone).replace(/\D/g, "") === identity.phone);
+  // [2026-11-13] 채팅 관리자(mods·R) = 글 삭제·금지·차단·지운 글 원문만. 그 밖의 관리는 총관리자·관리자 시험 계정(isManager)만
+  return { isOwner, isMod: isOwner || setting.mods.includes(identity.phone) || isOp, isManager: isOwner || isOp };
 }

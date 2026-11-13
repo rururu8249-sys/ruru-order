@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const sb = getServiceClient();
     const role = await chatRoleOfKakao(sb, request.nextUrl.searchParams.get("kakao_id") || "");
-    if (!role.isMod) return NextResponse.json({ ok: false, message: "관리자만 상품을 선택할 수 있어요." }, { status: 403 });
+    if (!role.isManager) return NextResponse.json({ ok: false, message: "관리자만 상품을 선택할 수 있어요." }, { status: 403 });
     const items = await loadChatCommandProducts(sb, bc);
     return NextResponse.json({ ok: true, items }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
