@@ -275,7 +275,7 @@ export async function resolveLiveChatId(sb: SupabaseClient, accessToken: string)
 
 // [2026-11-06] 하루 한도 아끼기 — 같은 방송(영상)이면 찾아 둔 채팅방 번호를 다시 쓴다(글 하나에 1씩 아낌).
 //   방송 URL 이 바뀌거나 저장값이 비면 새로 찾는다. 글 올리기 실패 시엔 위에서 저장값을 비우고 다시 찾는다.
-async function cachedLiveChatId(sb: SupabaseClient, accessToken: string): Promise<string> {
+export async function cachedLiveChatId(sb: SupabaseClient, accessToken: string): Promise<string> {
   try {
     const videoId = extractVideoId(await readActiveBroadcastLiveUrl(sb));
     if (videoId) {

@@ -32,6 +32,9 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("state", state);
 
   const res = NextResponse.redirect(url.toString());
+  // [2026-11-13] ?for=owner = 자주 쓰는 말을 나야루루 이름으로 보낼 «채널 주인» 계정(주문 알림 봇 계정과 따로 저장)
+  const forOwner = new URL(request.url).searchParams.get("for") === "owner";
+  res.cookies.set("ruru_yt_oauth_for", forOwner ? "owner" : "", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: forOwner ? 600 : 0 });
   res.cookies.set("ruru_yt_oauth_state", state, {
     httpOnly: true,
     sameSite: "lax",

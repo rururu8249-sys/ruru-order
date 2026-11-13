@@ -3,6 +3,7 @@ import { getServiceClient } from "@/lib/youtube";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
 import { QUICK_PHRASES_KEY, cleanQuickPhrases, readQuickPhrases } from "@/lib/liveChatQuickPhrases";
+import { readYoutubeOwner } from "@/lib/youtubeOwnerServer";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const reply = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
@@ -16,9 +17,13 @@ async function authorized(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     if (!await authorized(request)) return fail("관리자 로그인 또는 채팅 본인 확인이 필요해요.", 403);
-    const { data, error } = await getServiceClient().from("settings").select("value").eq("key", QUICK_PHRASES_KEY).maybeSingle();
+    const sb = getServiceClient();
+    const [{ data, error }, owner] = await Promise.all([
+      sb.from("settings").select("value").eq("key", QUICK_PHRASES_KEY).maybeSingle(),
+      readYoutubeOwner(sb).catch(() => null),
+    ]);
     if (error) return fail("자주 쓰는 말을 읽지 못했어요.", 503);
-    return reply({ ok: true, phrases: readQuickPhrases(data?.value) });
+    return reply({ ok: true, phrases: readQuickPhrases(data?.value), youtube: { connected: !!owner, channel: owner?.channelTitle || "" } });
   } catch { return fail("자주 쓰는 말을 읽지 못했어요.", 503); }
 }
 export async function POST(request: NextRequest) {

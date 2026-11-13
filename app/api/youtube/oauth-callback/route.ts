@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { exchangeCodeForRefreshToken, saveRefreshToken } from "@/lib/youtube";
+import { exchangeCodeForRefreshToken, getAccessToken, getServiceClient, saveRefreshToken } from "@/lib/youtube";
+import { fetchMyChannel, saveYoutubeOwner } from "@/lib/youtubeOwnerServer";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,15 @@ export async function GET(request: NextRequest) {
   try {
     const redirectUri = `${origin}/api/youtube/oauth-callback`;
     const refreshToken = await exchangeCodeForRefreshToken(code, redirectUri);
+    if (request.cookies.get("ruru_yt_oauth_for")?.value === "owner") {
+      // 채널 주인 계정 — 주문 알림 봇 토큰(1번 줄)은 그대로 두고 따로 저장
+      const ch = await fetchMyChannel(await getAccessToken(refreshToken)).catch(() => ({ channelId: "", channelTitle: "" }));
+      await saveYoutubeOwner(getServiceClient(), { refreshToken, channelId: ch.channelId, channelTitle: ch.channelTitle, connectedAt: new Date().toISOString() });
+      const res = back(true, `자주 쓰는 말 유튜브 계정 연결 완료${ch.channelTitle ? ` (채널: ${ch.channelTitle})` : ""}`);
+      res.cookies.set("ruru_yt_oauth_state", "", { path: "/", maxAge: 0 });
+      res.cookies.set("ruru_yt_oauth_for", "", { path: "/", maxAge: 0 });
+      return res;
+    }
     await saveRefreshToken(refreshToken);
     const res = back(true, "유튜브 연결 완료");
     res.cookies.set("ruru_yt_oauth_state", "", { path: "/", maxAge: 0 });

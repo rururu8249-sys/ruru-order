@@ -1,7 +1,8 @@
 "use client";
 /**
  * [2026-11-13 사장님] 관리자 PC 사이트 채팅 «자주 쓰는 말».
- *   영상 칸 왼쪽 아래 판(11/13 08:16 「채팅창 위라 보기 힘들다·왼쪽 빈 곳 써라」) — 말을 누르거나 Alt(맥 Option)+숫자 → 입력칸에 들어감(보내기는 Enter, 저절로 안 보냄).
+ *   영상과 채팅 사이(영상 오른쪽 검은 여백) 판(11/13 08:41 사장님). 말마다 [유튜브][사이트] 버튼 — 누르면 바로 올라감.
+ *   유튜브 = 나야루루(채널 주인) 계정으로 API 전송(연결 안 됐으면 복사). 유튜브 채팅칸은 남의 화면이라 글을 넣을 수도, 거기서 누른 키를 받을 수도 없음.
  *   「편집」 = 말 넣기·고치기·지우기·순서. 저장은 서버(관리자·채팅 관리자만) — 다른 PC 에서도 같은 목록.
  */
 import { useEffect, useRef, useState } from "react";
@@ -10,45 +11,71 @@ import { chatIdentityHeaders } from "@/lib/useLiveChatPrivate";
 import { DEFAULT_QUICK_PHRASES, QUICK_PHRASES_MAX, QUICK_PHRASE_MAX_LEN, cleanQuickPhrases, quickPhraseIndexFromKey } from "@/lib/liveChatQuickPhrases";
 
 const OPEN_KEY = "ruru_quick_phrases_open_v1"; // 이 PC 에서 접어 뒀는지만(편의값)
-export default function ChatQuickPhrases({ onPick, onNotice, disabled, right }: { onPick: (phrase: string) => void; onNotice?: (message: string) => void; disabled?: boolean; right?: string | number }) {
+type SendResult = { ok: boolean; message?: string };
+export default function ChatQuickPhrases({ onSendSite, onNotice, right }: { onSendSite: (phrase: string) => Promise<SendResult>; onNotice?: (message: string) => void; right?: string | number }) {
   const [open, setOpen] = useState(() => { try { return typeof window === "undefined" || localStorage.getItem(OPEN_KEY) !== "0"; } catch { return true; } });
-  // 방금 쓰던 채팅 쪽으로: 유튜브 채팅칸(남의 화면)을 마지막에 눌렀으면 복사, 아니면 사이트 입력칸에 넣기. 스위치 없음.
-  const target = useRef<"site" | "copy">("site");
-  useEffect(() => {
-    const onBlur = () => window.setTimeout(() => { const el = document.activeElement; if (el instanceof HTMLIFrameElement && el.closest("[data-live-yt-chat-panel]")) target.current = "copy"; }, 0);
-    const onFocusIn = (e: FocusEvent) => { if (e.target instanceof HTMLInputElement && e.target.matches("input[data-live-chat-input]") && !e.target.closest("[data-quick-phrase-edit]")) target.current = "site"; };
-    window.addEventListener("blur", onBlur); document.addEventListener("focusin", onFocusIn);
-    return () => { window.removeEventListener("blur", onBlur); document.removeEventListener("focusin", onFocusIn); };
-  }, []);
   const toggle = (next: boolean) => { setOpen(next); try { localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch {} };
-  const copy = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); onNotice?.("복사했어요 · 유튜브 채팅칸에 붙여넣기(⌘V)"); }
-    catch { onNotice?.("복사하지 못했어요. 다시 눌러 주세요"); }
-  };
   const [phrases, setPhrases] = useState<string[]>([]);
+  const [yt, setYt] = useState<{ connected: boolean; channel: string }>({ connected: false, channel: "" });
   const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(""); // "yt:3" / "site:3" — 보내는 중인 버튼
   const [editing, setEditing] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
-  const live = useRef({ phrases, use: (() => {}) as (p: string) => void, disabled, editing: false });
+  const live = useRef({ phrases, send: (async () => {}) as (p: string, i: number, to: "yt" | "site") => Promise<void>, editing: false });
 
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let alive = true;
     fetch("/api/live-chat/quick-phrases", { cache: "no-store", headers: { ...chatIdentityHeaders() } })
       .then((r) => r.json())
-      .then((j) => { if (!alive) return; setPhrases(j?.ok && Array.isArray(j.phrases) ? cleanQuickPhrases(j.phrases) : [...DEFAULT_QUICK_PHRASES]); setLoaded(true); })
-      .catch(() => { if (alive) { setPhrases([...DEFAULT_QUICK_PHRASES]); setLoaded(true); } });
+      .then((j) => {
+        if (!alive) return;
+        setPhrases(j?.ok && Array.isArray(j.phrases) ? cleanQuickPhrases(j.phrases) : [...DEFAULT_QUICK_PHRASES]);
+        if (j?.youtube) setYt({ connected: !!j.youtube.connected, channel: String(j.youtube.channel || "") });
+        setLoaded(true);
+      })
+      .catch(() => { if (alive) { setPhrases((cur) => cur.length ? cur : [...DEFAULT_QUICK_PHRASES]); setLoaded(true); } });
     return () => { alive = false; };
+  }, [reloadKey]);
+  useEffect(() => {
+    // 계정 연결을 다른 탭에서 하고 돌아오면 다시 읽음
+    const onFocus = () => setReloadKey((k) => k + 1);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  // Alt(Option)+1~9 → 그 번호 말을 입력칸에. 편집 창이 열려 있으면 안 함.
+  const copy = async (text: string, why: string) => {
+    try { await navigator.clipboard.writeText(text); onNotice?.(`${why} · 복사했어요, 유튜브 채팅칸에 붙여넣기(⌘V)`); }
+    catch { onNotice?.(why); }
+  };
+  // 유튜브 = 나야루루 이름으로 바로 올림(계정 연결 필요, 안 됐으면 복사). 사이트 = 사이트 채팅에 바로 올림(쓰던 글은 그대로).
+  const send = async (p: string, i: number, to: "yt" | "site") => {
+    if (busy) return;
+    if (to === "yt" && !yt.connected) { await copy(p, "유튜브 계정이 연결 안 됐어요"); return; }
+    setBusy(`${to}:${i}`);
+    try {
+      if (to === "site") {
+        const r = await onSendSite(p).catch(() => ({ ok: false, message: "사이트 채팅에 못 보냈어요" }));
+        onNotice?.(r.ok ? "사이트 채팅에 보냈어요" : r.message || "사이트 채팅에 못 보냈어요");
+        return;
+      }
+      const r = await fetch("/api/live-chat/quick-phrases/youtube", { method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() }, body: JSON.stringify({ text: p }) });
+      const j = await r.json().catch(() => null);
+      if (j?.ok) { onNotice?.("유튜브 채팅에 보냈어요"); return; }
+      if (j?.notConnected) setYt({ connected: false, channel: "" });
+      await copy(p, j?.message || "유튜브에 못 보냈어요");
+    } finally { setBusy(""); }
+  };
+
+  // Alt(맥 Option)+1~9 = 유튜브로, Alt+Shift+1~9 = 사이트로. (유튜브 채팅칸 안에 커서가 있으면 키가 유튜브로 가서 안 먹음)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const i = quickPhraseIndexFromKey(e);
       const cur = live.current;
-      if (i < 0 || cur.editing || cur.disabled || e.isComposing || !cur.phrases[i]) return;
+      if (i < 0 || cur.editing || e.isComposing || !cur.phrases[i]) return;
       e.preventDefault();
-      cur.use(cur.phrases[i]);
+      void cur.send(cur.phrases[i], i, e.shiftKey ? "site" : "yt");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -72,37 +99,53 @@ export default function ChatQuickPhrases({ onPick, onNotice, disabled, right }: 
     const next = [...list]; [next[i], next[j]] = [next[j], next[i]]; return next;
   });
 
-  const use = (p: string) => { if (target.current === "copy") void copy(p); else onPick(p); };
-  useEffect(() => { live.current = { phrases, use, disabled, editing: editing !== null }; });
+  useEffect(() => { live.current = { phrases, send, editing: editing !== null }; });
   if (!loaded) return null;
-  const small = { height: "32px", padding: "0 12px", border: "1px solid #555555", borderRadius: "9999px", background: "transparent", color: "#DDDDDD", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 } as const;
-  const rightCss = typeof right === "number" ? `${right}px` : right || "0px"; // 세로 영상 옆 검은 여백 폭에 맞춤(좁으면 196px 로 영상 가장자리를 살짝 덮음)
+  const connectYt = () => { window.open("/api/youtube/oauth-start?for=owner", "_blank", "noopener"); };
+  const rightCss = typeof right === "number" ? `${right}px` : right || "0px";
   const plain = { height: "32px", padding: "0 6px", border: "none", background: "transparent", color: "#AAAAAA", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 } as const;
   const openEdit = () => { setNote(""); setEditing(phrases.length ? [...phrases] : [""]); };
-  // 영상 칸 왼쪽 아래(검은 여백)에 떠 있는 판. 접으면 작은 버튼만.
-  const wrap = { position: "absolute", left: "12px", bottom: "calc(96px + env(safe-area-inset-bottom))", zIndex: 3, pointerEvents: "auto" } as const;
+  // 영상 오른쪽 검은 여백(영상과 채팅 사이) 아래쪽에 떠 있는 판. 접으면 작은 버튼만.
+  const wrap = { position: "absolute", right: `calc(${rightCss} + 12px)`, bottom: "calc(96px + env(safe-area-inset-bottom))", zIndex: 3, pointerEvents: "auto" } as const;
+  const btn = (primary: boolean, on: boolean) => ({ flex: 1, minWidth: 0, height: "36px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "4px", padding: "0 6px", border: primary ? "none" : "1px solid #555555", borderRadius: "9999px", background: primary ? "#FFFFFF" : "transparent", color: primary ? "#0F0F0F" : "#FFFFFF", fontSize: "13px", fontWeight: 700, fontFamily: "inherit", cursor: on ? "default" : "pointer", opacity: on ? 0.6 : 1, whiteSpace: "nowrap" as const });
   return (
     <>
       {!open ? (
-        <button type="button" data-live-quick-phrases="closed" onClick={() => toggle(true)} style={{ ...wrap, ...small, height: "40px", background: "rgba(15,15,15,0.86)", color: "#FFFFFF" }}>자주 쓰는 말 {phrases.length}</button>
+        <button type="button" data-live-quick-phrases="closed" onClick={() => toggle(true)} style={{ ...wrap, height: "40px", padding: "0 14px", border: "1px solid #555555", borderRadius: "9999px", background: "rgba(15,15,15,0.86)", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>자주 쓰는 말 {phrases.length}</button>
       ) : (
         <section data-live-quick-phrases="open" aria-label="자주 쓰는 말" onClick={(e) => e.stopPropagation()}
-          style={{ ...wrap, width: `clamp(196px, calc((100vw - ${rightCss} - 100dvh * 0.5625) / 2 - 24px), 300px)`, maxHeight: "calc(100% - 200px)", display: "flex", flexDirection: "column", background: "rgba(15,15,15,0.9)", border: "1px solid #333333", borderRadius: "12px", color: "#FFFFFF", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 10px 8px", flexShrink: 0 }}>
+          style={{ ...wrap, width: `clamp(200px, calc((100vw - ${rightCss} - 100dvh * 0.5625) / 2 - 24px), 300px)`, maxHeight: "calc(100% - 200px)", display: "flex", flexDirection: "column", background: "rgba(15,15,15,0.92)", border: "1px solid #333333", borderRadius: "12px", color: "#FFFFFF", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "2px", padding: "8px 6px 4px 12px", flexShrink: 0 }}>
             <strong style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap" }}>자주 쓰는 말</strong>
             <button type="button" onClick={openEdit} style={plain} aria-label="자주 쓰는 말 편집">편집</button>
             <button type="button" onClick={() => toggle(false)} style={plain} aria-label="자주 쓰는 말 접기">접기</button>
           </div>
+          {!yt.connected ? (
+            <button type="button" onClick={connectYt} style={{ margin: "0 8px 6px", padding: "8px 10px", border: "1px dashed #555555", borderRadius: "8px", background: "transparent", color: "#DDDDDD", fontSize: "13px", fontWeight: 600, lineHeight: 1.4, fontFamily: "inherit", textAlign: "left", cursor: "pointer", flexShrink: 0 }}>
+              <u>나야루루 계정 연결</u>하면 유튜브에 바로 올라가요 (지금은 복사)
+            </button>
+          ) : null}
           <div data-live-scroll style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: "6px" }}>
             {phrases.length === 0 ? <div style={{ padding: "8px 4px", fontSize: "13px", color: "#AAAAAA", lineHeight: 1.5 }}>「편집」에서 자주 쓰는 말을 넣어 두세요.</div> : null}
             {phrases.map((p, i) => (
-              <button key={p} type="button" disabled={disabled} onClick={() => use(p)} title={i < 9 ? `Alt+${i + 1}` : undefined}
-                style={{ minHeight: "44px", display: "flex", alignItems: "flex-start", gap: "8px", padding: "10px", border: "1px solid #3A3A3A", borderRadius: "8px", background: "#272727", color: "#FFFFFF", fontSize: "14px", fontWeight: 500, lineHeight: 1.45, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>
-                {i < 9 ? <span aria-hidden style={{ flexShrink: 0, width: "18px", height: "18px", marginTop: "1px", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "13px", fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{i + 1}</span> : null}
-                <span style={{ minWidth: 0, wordBreak: "keep-all", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p}</span>
-              </button>
+              <div key={p} style={{ padding: "8px", border: "1px solid #3A3A3A", borderRadius: "8px", background: "#222222" }}>
+                <div title={p} style={{ display: "flex", alignItems: "flex-start", gap: "6px", fontSize: "14px", fontWeight: 500, lineHeight: 1.45 }}>
+                  {i < 9 ? <span aria-hidden style={{ flexShrink: 0, width: "18px", height: "18px", marginTop: "1px", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "12px", fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{i + 1}</span> : null}
+                  <span style={{ minWidth: 0, wordBreak: "keep-all", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p}</span>
+                </div>
+                <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                  <button type="button" onClick={() => void send(p, i, "yt")} disabled={!!busy} aria-label={`${i + 1}번 유튜브 채팅에 보내기`} title={i < 9 ? `Alt+${i + 1}` : undefined} style={btn(true, busy === `yt:${i}`)}>
+                    <svg aria-hidden width="16" height="12" viewBox="0 0 16 12"><rect width="16" height="12" rx="3" fill="#FF0000" /><path d="M6.5 3.5v5l4-2.5z" fill="#FFFFFF" /></svg>
+                    {busy === `yt:${i}` ? "보내는 중" : "유튜브"}
+                  </button>
+                  <button type="button" onClick={() => void send(p, i, "site")} disabled={!!busy} aria-label={`${i + 1}번 사이트 채팅에 보내기`} title={i < 9 ? `Alt+Shift+${i + 1}` : undefined} style={btn(false, busy === `site:${i}`)}>
+                    {busy === `site:${i}` ? "보내는 중" : "사이트"}
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
+          <div style={{ padding: "6px 12px 8px", borderTop: "1px solid #333333", fontSize: "12px", color: "#999999", lineHeight: 1.4, flexShrink: 0 }}>단축키 Alt+숫자 유튜브 · Shift 더하면 사이트</div>
         </section>
       )}
       {editing ? createPortal(
@@ -112,7 +155,7 @@ export default function ChatQuickPhrases({ onPick, onNotice, disabled, right }: 
           <div style={{ width: "100%", maxWidth: "520px", maxHeight: "86vh", display: "flex", flexDirection: "column", background: "#FFFFFF", borderRadius: "16px", color: "#111111", overflow: "hidden" }}>
             <div style={{ padding: "16px 16px 8px", flexShrink: 0 }}>
               <div style={{ fontSize: "17px", fontWeight: 700 }}>자주 쓰는 말</div>
-              <div style={{ marginTop: "4px", fontSize: "13px", color: "#707072", lineHeight: 1.5 }}>말을 누르면 방금 쓰던 채팅 쪽으로 가요. 사이트 채팅은 입력칸에 들어가고, 유튜브 채팅은 복사돼서 붙여넣기만 하면 돼요.</div>
+              <div style={{ marginTop: "4px", fontSize: "13px", color: "#707072", lineHeight: 1.5 }}>「유튜브」 = 나야루루 이름으로 유튜브 채팅에 바로 올라가요. 「사이트」 = 사이트 채팅에 바로 올라가요.</div>
             </div>
             <div data-live-scroll style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
               {editing.map((p, i) => (

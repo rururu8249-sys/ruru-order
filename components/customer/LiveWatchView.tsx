@@ -14,7 +14,6 @@ import { useReplayProductCard } from "@/lib/useReplayProductCard";
 import { LiveFeaturedProductCard } from "./LiveFeaturedProductCard";
 import { chatIdentityHeaders, verifyChatAccount } from "@/lib/useLiveChatPrivate";
 import ChatQuickPhrases from "@/components/customer/ChatQuickPhrases";
-import { insertQuickPhrase } from "@/lib/liveChatQuickPhrases";
 import type { WidgetProductTarget } from "@/lib/widgetProductLibrary";
 import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
 import {
@@ -1670,7 +1669,7 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 관리자 PC — 자주 쓰는 말(영상 칸 왼쪽 아래) */}
-      {isDesktop && chat?.canModerate && !focus ? <ChatQuickPhrases disabled={sending} right={videoRight} onNotice={setChatHint} onPick={(phrase) => { setEmojiOpen(false); setDraft((d) => insertQuickPhrase(d, phrase, LIVE_CHAT_MAX_LEN)); requestAnimationFrame(() => { const el = inputRef.current; if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} rememberCaret(el); } }); }} /> : null}
+      {isDesktop && chat?.canModerate && !focus ? <ChatQuickPhrases right={videoRight} onNotice={setChatHint} onSendSite={(phrase) => chat.onSend(phrase).catch(() => ({ ok: false, message: "사이트 채팅에 못 보냈어요" }))} /> : null}
 
       {/* 채팅 안내(보냄 실패·금지 등) */}
       {chatHint ? (
