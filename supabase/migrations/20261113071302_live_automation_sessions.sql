@@ -231,7 +231,7 @@ declare item jsonb; p public.products; n jsonb; v jsonb; inventory_color text; s
   if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)<1 or jsonb_array_length(p_items)>30 then raise exception 'INVALID_ITEMS'; end if;
   for item in select value from jsonb_array_elements(p_items) order by (value->>'productId')::bigint loop
     select * into p from public.products where id=(item->>'productId')::bigint for update;
-    if p.id is null or p.is_visible is false or p.status in('hidden','숨김','deleted','판매중지','품절') or not exists(select 1 from public.broadcast_products where broadcast_id=p_broadcast and product_id=p.id) then raise exception 'PRODUCT_UNAVAILABLE'; end if;
+    if p.id is null or (to_jsonb(p)->>'is_visible')::boolean is false or p.status in('hidden','숨김','deleted','판매중지','품절') or p.product_status in('hidden','숨김','deleted','판매중지','품절') or not exists(select 1 from public.broadcast_products where broadcast_id=p_broadcast and product_id=p.id) then raise exception 'PRODUCT_UNAVAILABLE'; end if;
     n:=coalesce(nullif(p.product_note,'')::jsonb,'{}');
     wanted:=(item->>'qty')::integer;
     if wanted<1 or wanted>3 then raise exception 'INVALID_QUANTITY'; end if;

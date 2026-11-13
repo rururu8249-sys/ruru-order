@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
+process.on('uncaughtException',e=>{console.error(e.message,e.where||'');process.exit(1)});
 const db=new PGlite();
 await db.exec(`
   create role anon; create role authenticated; create role service_role;
@@ -9,7 +10,7 @@ await db.exec(`
   create table visitor_presence(id bigserial primary key,visitor_key text unique,nickname text,page_type text,path text,last_seen_at timestamptz,created_at timestamptz default now(),updated_at timestamptz,kakao_id text);
   create table live_chat_messages(id bigserial primary key,broadcast_id uuid,kakao_id text,customer_id bigint,nickname text,body text,created_at timestamptz default now(),hidden_at timestamptz,hidden_by text,avatar_url text);
   create table orders(id bigserial primary key,order_group_id text,kakao_id text,customer_id bigint,youtube_nickname text,is_test_order boolean,test_order_reason text,operator_test_phone text,exclude_from_settlement boolean,exclude_from_payment_match boolean,exclude_from_shipping boolean,exclude_from_picking boolean,order_status text,admin_status text,shipping_status text);
-  create table products(id bigint primary key,product_name text,price numeric,product_note text,status text,is_visible boolean default true);
+  create table products(id bigint primary key,product_name text,price numeric,product_note text,status text,product_status text);
   create table broadcast_products(broadcast_id uuid,product_id bigint);
   create table cart_reservations(id bigserial primary key,session_key text,product_id text,color text,size text,qty int,expires_at timestamptz);
   create table settings(key text primary key,value text);
@@ -32,7 +33,7 @@ await db.exec(`create table test_schedule(enabled boolean); insert into test_sch
 create or replace function live_automation_schedule(p_enabled boolean) returns void language plpgsql as $$ begin update test_schedule set enabled=p_enabled; end $$;`);
 const bc='00000000-0000-4000-8000-000000000001';
 await db.query(`insert into broadcasts values($1,'ON',false)`,[bc]);
-await db.exec(`insert into customers values(4569,'990000000077','original'); insert into products values(10,'니트',100,'{}','판매중',true);`);
+await db.exec(`insert into customers values(4569,'990000000077','original'); insert into products values(10,'니트',100,'{}','판매중','판매중');`);
 await db.query(`insert into broadcast_products values($1,10)`,[bc]);
 const scalar=async(sql,args=[])=>Object.values((await db.query(sql,args)).rows[0])[0];
 const ctl=async(feature,on,rev)=>scalar(`select live_automation_control($1,$2,$3,$4)`,[bc,feature,on,rev]);
