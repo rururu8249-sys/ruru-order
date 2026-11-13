@@ -8,7 +8,7 @@ import {loadAutomationChoices,readAutomationSettings} from './liveAutomationCata
 import {automationPost,runOrderAction} from './liveAutomationTransport';
 import {pickOrderLines,type AutoTestSettings,type AutoTestPick} from './autoTestOrder';
 import {runConversations} from './liveAutomationConversation';
-import {interleaveOrderStages,planOrderJourney} from './liveAutomationTempo';
+import {interleaveOrderStages,planOrderJourney,isNightKst} from './liveAutomationTempo';
 type Wave={id:string;mode:string;at:string;offsets:number[];planned?:boolean};
 type LiveCampaign=Campaign & {tempo_plan?:Wave;next_chat_at?:string|null};
 const nowIso=()=>new Date().toISOString();
@@ -88,6 +88,8 @@ async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettin
    if(started.length)wave=await automationRpc<Wave>(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});
  }
  if(!wave||Date.parse(wave.at)>Date.now()+150000)return;
+ // [2026-11-13 사장님] 밤 12~6시는 주문이 거의 없게 — 차례가 와도 90%는 조용한 차례로 미룬다(20~30분 뒤 다시).
+ if(isNightKst()&&Math.random()<.9){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:true});return;}
  const choices=await loadAutomationChoices(db,c.broadcast_id,settings),excluded=new Set<string>();
  if(!choices.length){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:true});return;}
  // Expired schedules are replanned; resuming a worker never catches up a backlog.
@@ -123,7 +125,8 @@ async function actionsTick(db:SupabaseClient,c:LiveCampaign,origin:string,transp
    const selected=settings?interleaveOrderStages(due):[];
    const receiptAt=Math.floor(Math.random()*(selected.length+1));
    for(let i=0;i<=selected.length;i++){
-     if(c.orders_enabled&&i===receiptAt)await record(()=>automationRpc(db,'live_automation_drain_payments',{p_campaign:c.id,p_revision:c.revision}));
+     // 밤 12~6시는 입금 알림도 드물게(그 틱의 10%만)
+     if(c.orders_enabled&&i===receiptAt&&(!isNightKst()||Math.random()<.1))await record(()=>automationRpc(db,'live_automation_drain_payments',{p_campaign:c.id,p_revision:c.revision}));
      const a=selected[i];if(!a)continue;
      if(deadline-Date.now()<22000)break; // Leave unclaimed work for the next tick.
      await record(async()=>{

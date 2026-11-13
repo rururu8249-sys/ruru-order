@@ -53,3 +53,6 @@ export function maySpeak(input:{kind:SpeechEvent['kind'];now:number;hasActivity:
 export function repeatOrderDelay(random=Math.random):number {
  const r=sample(random);return Math.round((r<.8?8+r*24:30+(r-.8)*150)*60000);
 }
+
+/** [2026-11-13 사장님] 한국 시각 밤 12시~새벽 6시 = 조용한 시간(주문·입금·채팅 드물게) */
+export function isNightKst(now=Date.now()):boolean{return new Date(now+9*3600000).getUTCHours()<6;}
