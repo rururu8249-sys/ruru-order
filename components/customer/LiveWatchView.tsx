@@ -889,6 +889,7 @@ export default function LiveWatchView(props: Props) {
   // [09:08 사장님 「좌우 여백」] 화면이 9:16 보다 넓으면(카톡 브라우저 등) 세로 영상 좌우에 검은 띠 → 영상을 그만큼 키워 꽉 채움(위아래 조금 잘림, 최대 1.12배).
   // 돌려보기 중엔 원래 크기(유튜브 막대가 잘리지 않게).
   const [videoScale, setVideoScale] = useState(1);
+  const [videoFrame, setVideoFrame] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   useEffect(() => {
     const el = iframeRef.current;
     if (!el) return;
@@ -898,6 +899,10 @@ export default function LiveWatchView(props: Props) {
       if (w <= 0 || h <= 0) return;
       const s = w / (h * 9 / 16);
       setVideoScale(s > 1.005 ? Math.min(1.12, s) : 1);
+      // [2026-11-15] 9:16 영상이 실제로 그려지는 칸(검은 띠 뺀 자리) — PC 쉬는 중 안내 상자를 영상 속 채널 배너 위에 맞추려고
+      const fw = Math.min(w, h * 9 / 16);
+      const fh = fw * 16 / 9;
+      setVideoFrame({ x: el.offsetLeft + (w - fw) / 2, y: el.offsetTop + (h - fh) / 2, w: fw, h: fh });
     };
     calc();
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(calc) : null;
@@ -905,6 +910,19 @@ export default function LiveWatchView(props: Props) {
     window.addEventListener("resize", calc);
     return () => { ro?.disconnect(); window.removeEventListener("resize", calc); };
   }, [videoId, reloadKey]);
+  // [2026-11-15 사장님] 쉬는 중 안내 — 폰은 위 줄 아래, PC 는 영상 속 채널 배너 자리를 덮음
+  const pausedNotice = paused && !(rpsActive && !focus);
+  const PAUSED_BOX: React.CSSProperties = { padding: "8px 12px", borderRadius: "12px", background: "rgba(17,17,17,0.94)", border: "1px solid rgba(255,255,255,0.18)", lineHeight: 1.35, textAlign: "center", opacity: settling ? 0 : 1, transition: "opacity 0.2s" };
+  // 폰은 영상을 가운데 기준으로 키우므로(videoScale) 실제 영상 칸도 같이 키워 계산 → 영상 속 채널 배너 위를 덮음
+  const pausedScale = isDesktop ? 1 : videoScale;
+  const pausedFrame = videoFrame ? { x: videoFrame.x + videoFrame.w / 2 - (videoFrame.w * pausedScale) / 2, y: videoFrame.y + videoFrame.h / 2 - (videoFrame.h * pausedScale) / 2, w: videoFrame.w * pausedScale, h: videoFrame.h * pausedScale } : null;
+  const pausedLines = (
+    <>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#FFD54F", wordBreak: "keep-all" }}>지금은 라이브 방송이 아니에요</div>
+              <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 700, color: "#FFFFFF", whiteSpace: "pre-line", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{pausedText}</div>
+              <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 400, color: "#CCCCCC" }}>상품은 지금도 구매할 수 있어요</div>
+    </>
+  );
   const [behindLive, setBehindLive] = useState(false);
   // [08:35 사장님 「녹화 영상인데 왜 실시간으로 돌아가기가 떠」] 녹화 영상은 길이(duration) 전체가 끝이라 늘 «30초 넘게 뒤»로 잡혔음.
   //   이제 «진짜 라이브»일 때만: 유튜브가 알려 주는 isLive, 또는 영상 길이가 시간 따라 계속 늘어날 때(라이브는 길이가 자람).
@@ -1264,9 +1282,9 @@ export default function LiveWatchView(props: Props) {
           {behindLive ? <button type="button" onClick={backToLive} style={{ flex: "1 1 0", minWidth: 0, minHeight: 44, alignSelf: "stretch", wordBreak: "keep-all", padding: "8px 10px", lineHeight: 1.35, borderRadius: 10, border: "1px solid #999999", background: "#333333", color: "#FFFFFF", font: "inherit", fontWeight: 600, cursor: "pointer" }}><span aria-hidden="true">● </span>실시간 방송으로 돌아가기</button> : null}
         </div>
       ) : null}
-      <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: paused ? "flex-start" : "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s", zIndex: 4 }}>
+      <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: paused ? "flex-start" : "center", justifyContent: "space-between", gap: "8px", pointerEvents: "none", background: seekMode ? "none" : "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", zIndex: 4 }}>
         {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0, width: paused && !(rpsActive && !focus) ? "min(300px, 58%)" : undefined }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0, opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
           {/* [07:05 사장님] LIVE + 시청자 수(유튜브 동시 시청자) — 오늘만셀러처럼 한 알약 */}
           <span style={{ display: "inline-flex", alignItems: "stretch", height: "28px", borderRadius: "9999px", overflow: "hidden", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 10px", background: paused ? "#707072" : "#D30005" }}>
@@ -1281,13 +1299,7 @@ export default function LiveWatchView(props: Props) {
             ) : null}
           </span>
           {/* [2026-11-15 사장님 03:25] 쉬는 동안엔 제목 대신 진한 안내 상자(위쪽 채널 배너 자리 — 사이트 손님은 이미 채널로 들어옴). 라이브로 착각 안 하게 첫 줄 고정 문구 */}
-          {paused && !(rpsActive && !focus) ? (
-            <div role="status" data-live-paused-box style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: "12px", background: "rgba(17,17,17,0.92)", border: "1px solid rgba(255,255,255,0.18)", lineHeight: 1.35, textAlign: "center", opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#FFD54F", wordBreak: "keep-all" }}>지금은 라이브 방송이 아니에요</div>
-              <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 700, color: "#FFFFFF", whiteSpace: "pre-line", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{pausedText}</div>
-              <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 400, color: "#CCCCCC" }}>상품은 지금도 구매할 수 있어요</div>
-            </div>
-          ) : (
+          {pausedNotice ? null : (
             <span style={{ maxWidth: "100%", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>{title || "라이브 방송"}</span>
           )}
           {/* [2026-11-12] 처음/오랜만에 오신 선물 — 받을 손님에게만 보임(서버 설정 꺼지면 안 보임) */}
@@ -1311,6 +1323,12 @@ export default function LiveWatchView(props: Props) {
             </button>
           </div>
       </div>
+
+      {pausedNotice && pausedFrame ? (
+        <div role="status" data-live-paused-box style={{ position: "absolute", left: pausedFrame.x + pausedFrame.w * 0.02, top: `max(calc(52px + env(safe-area-inset-top)), ${Math.round(pausedFrame.y + pausedFrame.h * 0.075)}px)`, width: Math.max(220, pausedFrame.w * 0.58), minHeight: pausedFrame.h * 0.135, boxSizing: "border-box", display: "flex", flexDirection: "column", justifyContent: "center", pointerEvents: "none", zIndex: 3, ...PAUSED_BOX }}>
+          {pausedLines}
+        </div>
+      ) : null}
 
       {!soundPromptDone && !guideOpen && !(rpsActive && !focus) ? (
         <div style={{ position: "absolute", left: "16px", right: "16px", top: showIntroBanner ? "max(calc(232px + env(safe-area-inset-top)), 25%)" : "50%", transform: showIntroBanner ? undefined : "translateY(-50%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
