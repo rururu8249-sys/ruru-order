@@ -454,6 +454,7 @@ export default function ProductWidgetClient() {
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
   const [currentToast, setCurrentToast] = useState<ToastItem | null>(null);
   const toastBusyRef = useRef(false);
+  const toastSeqRef = useRef(0);
   const seenRef = useRef<Set<string>>(new Set());
   // 입금확인 폭죽(표시 전용). key 증가로 애니메이션 재시작, on으로 1회 표시.
   const [confettiKey, setConfettiKey] = useState(0);
@@ -758,6 +759,7 @@ export default function ProductWidgetClient() {
   useEffect(() => {
     if (currentToast || toastQueue.length === 0) return;
     toastBusyRef.current = toastQueue.length > 1;
+    toastSeqRef.current += 1; // 글자가 같은 알림이 연달아 와도 스티커를 새로 그림(안 그리면 앞 스티커의 사라진 상태로 남아 안 보였음)
     setCurrentToast(toastQueue[0]);
     setToastQueue((q) => q.slice(1));
     // [2026-11-13] 밀린 알림(빨리 넘기는 것)엔 폭죽 없음, 마지막 알림에만 큰 폭죽(표시 전용)
@@ -790,13 +792,12 @@ export default function ProductWidgetClient() {
   const releaseIdxRef = useRef<number | null>(null);
   // [2026-11-15 08:37 사장님 «알림 보여주는 게 우선»] 알림이 끝나도 바로 다음 상품으로 넘기지 않음 —
   //   남은 순환 몇 초 동안 다음 상품이 잠깐 떴다 바로 흐려지던 것. 알림 끝난 뒤 «다음 순환 차례»가 올 때까지 같은 상품 그대로.
-  const sameProduct = (a: AnyProduct | null, b: AnyProduct | null) =>
-    String(a?.id ?? a?.product_id ?? "") === String(b?.id ?? b?.product_id ?? "") && String(a?.__detail_name ?? "") === String(b?.__detail_name ?? "");
   if (toastActive) {
     if (!heldRef.current && liveCurrent) heldRef.current = liveCurrent;
     releaseIdxRef.current = null;
   } else if (heldRef.current) {
-    if (!rotationAdvances || sameProduct(heldRef.current, liveCurrent)) { heldRef.current = null; releaseIdxRef.current = null; }
+    // [08:47 사장님 «떴다 사라졌다 다시 보였다»] 같은 상품이어도 순환 중이면 다음 차례까지 그대로(중간에 풀면 순환 흐려짐 한가운데로 튀어 깜박였음)
+    if (!rotationAdvances) { heldRef.current = null; releaseIdxRef.current = null; }
     else if (releaseIdxRef.current === null) releaseIdxRef.current = rotIndex;
     else if (rotIndex !== releaseIdxRef.current) { heldRef.current = null; releaseIdxRef.current = null; }
   }
@@ -809,6 +810,11 @@ export default function ProductWidgetClient() {
   //   재시도마다 캐시 우회 쿼리(wr=n)로 강제 재요청. 상품이 바뀌면 카운터 리셋. 표시 전용.
   const [imgRetry, setImgRetry] = useState(0);
   const currentKey = `${String(current?.id ?? current?.product_id ?? "")}|${String(current?.__detail_name ?? "")}`;
+  // [2026-11-15 08:47] 나타나기(0.34초)는 그 상품 카드가 «처음 그려질 때»만. 알림이 끝나 애니메이션이 none → 나타나기로 바뀌며
+  //   카드가 0에서 다시 떠오르던(깜박) 것 막음
+  const firstSeenRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
+  if (firstSeenRef.current.key !== currentKey) firstSeenRef.current = { key: currentKey, at: Date.now() };
+  const justMounted = Date.now() - firstSeenRef.current.at < 400;
   useEffect(() => {
     setImgRetry(0);
   }, [currentKey]);
@@ -881,7 +887,7 @@ export default function ProductWidgetClient() {
                 ? "none"
                 : rotationAdvances
                   ? "ruruWidgetCycle 5s linear both"
-                  : "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
+                  : justMounted ? "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)" : "none",
               animationDelay: !toastActive && !holding && rotationAdvances
                 ? `-${Math.max(0, Date.now() - (rotationConfig.startedAt ?? 0)) % WIDGET_ROTATION_INTERVAL_MS}ms`
                 : undefined,
@@ -1076,7 +1082,7 @@ export default function ProductWidgetClient() {
                 >
                   {confettiOn ? <ConfettiBurst burstKey={confettiKey} grand /> : null}
                   {confettiOn ? <Fireworks key={`fw${confettiKey}`} h={CARD_FIXED_H} /> : null}
-                  <ToastSticker key={`${currentToast.title}|${currentToast.name}|${currentToast.detail}|${confettiKey}`} toast={currentToast} durMs={toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS} />
+                  <ToastSticker key={`${toastSeqRef.current}|${currentToast.title}|${currentToast.name}|${currentToast.detail}|${confettiKey}`} toast={currentToast} durMs={toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS} />
                 </div>
                 <span
                   aria-hidden
@@ -1094,7 +1100,7 @@ export default function ProductWidgetClient() {
         ) : currentToast ? (
           // 띄운 상품이 없을 때도 주문/결제 소식은 보이게(카드 없이 스티커만)
           <div style={{ position: "relative", zIndex: 1, padding: "6px 4px" }}>
-            <ToastSticker toast={currentToast} standalone durMs={toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS} />
+            <ToastSticker key={toastSeqRef.current} toast={currentToast} standalone durMs={toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS} />
           </div>
         ) : null}
 

@@ -180,6 +180,51 @@ async function noteDecision(db:SupabaseClient,entry:Record<string,unknown>){
   await db.from('settings').upsert([{key:'live_automation_director_log',value:JSON.stringify([entry,...list].slice(0,30))}],{onConflict:'key'});
  }catch{/* 기록 실패는 무시 */}
 }
+// [2026-11-15 08:49 사장님 «대답이 엄청 늦음 — 빨리·늦게·적당히 섞어서»] 실측: 올리비아 카결 링크 안내 08:26:38 → 「넵알겠습니당」 08:46:12(20분 뒤).
+//   Gemini 가 그 손님에게 «넵 확인했어용»(링크 봤다는 보고 — 금지)·«카결했어요»(결제 전이라 금지)만 계속 골라 30초마다 버려졌음.
+//   → 카결 링크 안내 답은 Gemini 없이 코드가 정함: 안내마다 반은 답 안 함, 반은 8~60초 사이 아무 때나 짧게(넵!·넹~·알겠습니당…).
+//   2분 30초 지나면 늦은 답은 안 함.
+export const humanReplyDelay=(id:number)=>4000+(Math.abs(id*104729)%41000);
+export function cardAckPlan(noticeId:number,noticeAt:number,now:number):'wait'|'go'|'skip'{
+ if(Math.abs(noticeId)%2===1)return 'skip';
+ const age=now-noticeAt;
+ if(!(age>=0)||age>150000)return 'skip';
+ return age>=8000+(Math.abs(noticeId*7919)%52000)?'go':'wait';
+}
+const CARD_ACKS=['넵!','넹~','네 알겠습니다','알겠습니당','넵넵','네엥','넵 알겠어요'];
+async function cardLinkAck(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch,now:number,sessions:Session[],actors:Actor[],messages:Row[],actions:Action[],mode:string):Promise<boolean>{
+ for(const n of messages){
+  if(n.badge!=='bot'||!/카톡\s*카드결제\s*링크/.test(String(n.body||'')))continue;
+  const nid=Number(n.id),at=Date.parse(String(n.created_at));
+  if(cardAckPlan(nid,at,now)!=='go')continue;
+  const body=String(n.body||'').replace(/\s+/g,'');
+  const actor=actors.find(a=>{const nick=String(a.nickname||'').replace(/\[[^\]]*\]/g,'').replace(/\s+/g,'');return nick.length>=1&&body.includes(nick+'님');});
+  const s=actor&&sessions.find(x=>x.actor_id===actor.id);
+  if(!actor||!s)continue;
+  if(messages.some(m=>String(m.automation_actor_id||'')===String(actor.id)&&Number(m.id)>nid))continue; // 이미 그 뒤에 말함
+  if(actions.some(a=>Number(((a as unknown as {plan?:{ackFor?:unknown}}).plan?.ackFor))===nid))continue; // 이미 답 차례를 만듦
+  const recent=messages.filter(m=>m.badge!=='bot').map(m=>clean(m.body));
+  const seed=Math.abs(seedOf(actor)+nid);
+  let text='';
+  for(let i=0;i<CARD_ACKS.length;i++){const r=CARD_ACKS[(seed+i)%CARD_ACKS.length];if(!duplicateLine(r,recent.slice(0,10))){text=r;break;}}
+  if(!text)return false;
+  text=varySurface(text,seed);
+  try{
+   await automationRpc(db,'live_automation_ai_admission',{p_actor:actor.id,p_kind:'chat'});
+   const action=await automationRpc<Action>(db,'live_automation_action',{p_session:s.id,p_kind:'chat',p_due:new Date().toISOString(),p_plan:{director:true,text,mode,ackFor:nid},p_manual:false,p_source:null,p_revision:c.revision});
+   const claimed=await automationRpc<Action|null>(db,'live_automation_claim',{p_action:action.id,p_revision:c.revision});
+   if(!claimed)return true;
+   try{
+    const ctx=await automationRpc<AutomationContext>(db,'live_automation_context',{p_session:claimed.session_id,p_revision:claimed.revision,p_scope:'chat'});
+    await automationRpc(db,'live_automation_ai_admission',{p_actor:claimed.actor_id,p_kind:claimed.kind});
+    await automationPost(origin,'/api/live-chat',ctx,claimed,'chat',{kakao_id:AUTOMATION_OWNER,bc:c.broadcast_id,body:text},transport);
+    void noteDecision(db,{at:new Date(now).toISOString(),human:false,speaker:String(actor.nickname||''),raw:text,result:'sent(카결 링크 답)'});
+   }catch(e){await automationRpc(db,'live_automation_complete',{p_action:claimed.id,p_lease:claimed.lease_token,p_status:'skipped',p_result:{ok:false,message:e instanceof Error?e.message:'ACK_SKIPPED'}}).catch(()=>{});}
+   return true;
+  }catch{return false;}
+ }
+ return false;
+}
 export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch=fetch){
  if(!c.chat_enabled)return;
  // [2026-11-14] 학습 노트 — 3시간마다(새 채팅 40개 이상) 자동 정리, 실패해도 대화는 계속
@@ -201,12 +246,14 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   db.from('settings').select('value').eq('key',CHAT_PACE_KEY).maybeSingle().then(r=>(r.data as {value?:unknown}|null)?.value,()=>null),
  ]);
  if(bc.error||!bc.data||!actors.length)return;
+ if(await cardLinkAck(db,c,origin,transport,now,sessions,actors,messages,actions,await streamModeOf(db,bc.data)).catch(()=>false))return;
  // 언제 판단할지: 사람이 새 글을 쓰면(아직 판단 안 한 글) 10초 뒤 바로, 아니면 AI 글 사이 20~45초 + 확률(밤엔 아주 드물게)
  const considered=Math.max(0,...actions.map(a=>Number((a as Action&{source_message_id?:unknown}).source_message_id)||0));
  const newestHuman=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&Number(m.id)>considered&&Date.parse(String(m.created_at))>now-180000)||null;
  const lastAi=Math.max(0,...messages.filter(m=>m.automation_actor_id).map(m=>Date.parse(String(m.created_at))||0));
  const lastAction=Math.max(0,...actions.filter(a=>a.kind!=='order').map(a=>Date.parse(String((a as Action&{created_at?:unknown}).created_at))||0));
- if(newestHuman){if(now-lastAction<10000)return;}
+ // [2026-11-15 08:49 사장님 «빨리 할 때도·늦게 할 때도·적당히»] 사람 글에 답하는 시각을 글마다 다르게 4~45초(그 안에서 고르게)
+ if(newestHuman){if(now-lastAction<10000)return;if(now-Date.parse(String(newestHuman.created_at))<humanReplyDelay(Number(newestHuman.id)))return;}
  else{
   // DB 가 정한 방 쉬는 시간(auto_chat_after) 안이면 Gemini 를 부르지 않음(불러도 글이 막힘)
   const restUntil=Date.parse(String((c as Row).auto_chat_after||''));
@@ -248,6 +295,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const transcript=[...messages].reverse().map(m=>`#${m.id} ${hhmm(m.created_at)} ${clean(m.nickname)||'알림'}(${roleOf(m)}): ${clean(m.body).slice(0,140)}`).join('\n');
  const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?(r.paid.includes('card')?'(카드결제 주문 — 결제 완료됨)':'(카드결제 주문 — 아직 결제 전, 카톡·링크 얘기 금지)'):''}${r.bankOrder&&!r.cardOrder?'(무통장 주문 — 계좌로 입금, 카드 결제 링크 없음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
  const cardText=card?`${spokenCardName(card.name)} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
+ // [2026-11-15 08:49] 최근 10분 걸러진 말(규칙 위반) — 같은 말을 계속 골라 30초마다 버려지며 조용해지던 것 막기
+ const rejectedLines=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle().then(r=>{try{const v=JSON.parse(String((r.data as {value?:unknown}|null)?.value??'[]'));return Array.isArray(v)?v.filter((e:Row)=>e&&e.result==='rejected'&&Date.parse(String(e.at))>now-600000).map((e:Row)=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6):[];}catch{return [];}},()=>[] as string[]);
  const prompt=[
   '너는 유튜브 라이브커머스 「루루동이」 사이트 채팅방에 있는 가상 손님들의 다음 한 마디를 정한다. 진짜 사람처럼 자연스러워야 한다.',
   '[할 일] 아래 대화 전체를 시간순으로 읽고, 가상 손님 목록 중 지금 말하는 게 자연스러운 한 명과 그 한 마디를 고른다. '+(newestHuman?'자연스러운 말이 정말 없을 때만 speaker를 빈 문자열로 둔다(침묵).':'지금은 말할 차례다(얼마나 자주 말할지는 이미 정해져 있다). speaker를 비우지 말고 반드시 한 명이 짧게 한마디(인사·가격·사이즈 질문·짧은 반응·대화 이어 가기) 한다.'),
@@ -262,6 +311,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   '[사실] 상품 얘기는 지금 상품 카드 정보만 근거로 한다(없는 색·사이즈·소재·가격을 지어내지 않는다). 해 본 적 없는 구매·사용·배송받은 경험, 친구 소개 같은 이야기를 지어내지 않는다. 주문했다는 말은 주문이 있는 손님만, 결제 완료 말은 결제확인 받은 손님만. 영상·소리를 보거나 들은 척하지 않는다. 자기가 지금 뭘 보는 중인지 설명하지 않는다. 테스트·AI·가상·시스템 같은 말 금지.',
   `[상황] 지금 ${mode==='live'?'생방송 중':'지금은 방송 시간이 아니다(라이브 아님 — 다시보기/쉬는 중). 상품은 지금도 담고 주문할 수 있다. 가끔 «방송 중이 아닌데도 다시보기 보면서 주문할 수 있어 좋네요» 같은 뜻을 매번 다른 말로 해도 된다. 주말·요일 때문에 담을 수 있다는 말은 틀린 말이니 금지(주말에도 방송함). 지금 입어 달라·보여 달라 같은 실시간 요청 금지'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
   `[지금 상품 카드] ${cardText}`,
+  ...(rejectedLines.length?[`[방금 규칙에 걸려 버려진 말 — 이런 말·비슷한 말은 다시 고르지 말 것(다른 손님이나 다른 얘기, 또는 침묵)]\n${rejectedLines.join('\n')}`]:[]),
   subscribeOn?'[구독 무배] 지금 «유튜브 구독 인증하면 배송비 무료» 행사 중 — 처음 온 손님이 가끔 «구독하면 무배?»«구독 인증 어디서 해요?»처럼 물어도 자연스럽다.':'[구독 무배] 지금 구독 무료배송 행사 없음 — 구독·무배·무료배송 얘기 금지.',
   card?.overseas?'[해외배송 상품] 지금 카드 상품은 해외배송이다 — 가끔 «해외배송인가요?»«해배인가요?»«배송 얼마나 걸려요?»«주문하면 언제쯤 받아요?» 같은 질문이 자연스럽다(답은 하지 않음).':'[배송] 지금 카드 상품은 해외배송이 아니다 — 해외배송·해배 질문 금지.',
   `[가상 손님 목록 — 이 중에서만 고른다]\n${rosterText}`,

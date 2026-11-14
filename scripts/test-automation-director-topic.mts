@@ -104,3 +104,21 @@ console.log('ok pay talk');}
   if (kept === 0 || kept > 100 || kinds.size < 8) throw new Error(`웃음 섞기 이상 kept=${kept} kinds=${kinds.size}`);
   console.log('stock laugh mix ok', kept, kinds.size);
 }
+
+// [2026-11-15 08:49] 카결 링크 답: 안내마다 반은 답 안 함, 반은 8~60초 사이, 2분 30초 지나면 안 함
+{
+  const {cardAckPlan} = await import('../lib/liveAutomationDirector');
+  let skip = 0, delays: number[] = [];
+  for (let id = 1000; id < 1400; id++) {
+    const p0 = cardAckPlan(id, 0, 0);
+    if (p0 === 'skip') { skip++; continue; }
+    let d = 0; while (cardAckPlan(id, 0, d) === 'wait') d += 1000;
+    if (cardAckPlan(id, 0, d) !== 'go' || d < 8000 || d > 60000) throw new Error('카결 답 시각 ' + id + ' ' + d);
+    if (cardAckPlan(id, 0, 151000) !== 'skip') throw new Error('늦은 답');
+    delays.push(d);
+  }
+  if (skip < 150 || skip > 250) throw new Error('반반 아님 ' + skip);
+  const lo = delays.filter((d) => d < 20000).length, hi = delays.filter((d) => d > 45000).length;
+  if (!lo || !hi) throw new Error('빠르게·늦게 섞이지 않음');
+  console.log('card ack plan ok', skip, Math.min(...delays), Math.max(...delays));
+}
