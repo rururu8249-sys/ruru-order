@@ -59,6 +59,14 @@ console.log('ok pay talk');}
  console.log('PASS 카결 링크 대화 규칙',cases.length);
 }
 
+{
+ const {cardAckBlocked,cardLinkTalkBlocked}=await import('../lib/liveAutomationDirector');
+ for(const t of ['넵!','넹~','네 알겠습니다','알겠습니당'])if(cardLinkTalkBlocked(t,true,false)||cardAckBlocked(t,true,false))throw new Error('짧은 대답은 돼야 함 '+t);
+ for(const t of ['확인했어용 감사합니당','네 볼게요','받았어요~'])if(!cardAckBlocked(t,true,false))throw new Error('확인 보고 막아야 함 '+t);
+ if(cardAckBlocked('확인했어요',true,true))throw new Error('결제 뒤엔 상관없음');
+ console.log('PASS 카결 링크 짧은 대답');
+}
+
 // [2026-11-15 07:40] 상품번호 줄임말·웃음 끝맺음 바꾸기
 {
  const {shortProductCodes,varyLaughTail}=await import('../lib/liveAutomationVoice');
