@@ -67,6 +67,14 @@ export function mentionsSelf(text:string,nick:string):boolean{
  const heads=[n.slice(0,2),n.slice(0,3),n.slice(-2),n.slice(-3)].filter(x=>x.length>=2);
  return heads.some(h=>t.includes(h+'님'));
 }
+// [2026-11-14 12:03 사장님 「방송 대화 분석해서 AI 업데이트」] 11/14 아침 방송(syG7P-kTyXI) 실측: 가상 손님들이 돌아가며
+//  「카톡 확인했어요」 9번·「주문완료했어요」 6번·「장바구니 담았어요」 2번 — 진짜 손님은 이런 보고를 거의 안 함(4시간에 「결제완료」 1번).
+//  → 장바구니 담았다는 보고는 안 함, 카톡·결제 확인/주문 완료 보고는 방 전체에서 10분에 한 번만(다른 가상 손님이 했으면 버림).
+const ANNOUNCE=[/카톡|카결|링크/,/주문.{0,3}완료|주문했|결제.{0,3}완료|결제했|입금했/];
+export function roomAnnounceBlocked(text:string,recentAi:string[]):boolean{
+ if(/장바구니.{0,4}(담았|넣었|담아\s*놨|담아\s*뒀)/.test(text))return true;
+ return ANNOUNCE.some(re=>re.test(text)&&recentAi.some(o=>re.test(o)));
+}
 export function repeatsOwnLine(text:string,own:string[]):boolean{
  if(!own.length)return false;
  if(duplicateLine(text,own))return true;
@@ -138,6 +146,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  });
  if(!roster.length)return;
  const recent=messages.filter(m=>m.badge!=='bot').map(m=>clean(m.body));
+ const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));
  const notices=messages.filter(m=>m.badge==='bot'&&/^(c|o|p):/.test(String(m.bot_ref||''))).map(m=>clean(m.body));
  const transcript=[...messages].reverse().map(m=>`#${m.id} ${hhmm(m.created_at)} ${clean(m.nickname)||'알림'}(${roleOf(m)}): ${clean(m.body).slice(0,140)}`).join('\n');
  const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?'(카드결제 주문 — 카톡으로 결제 링크 받음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
@@ -150,7 +159,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   '[상품] 상품 얘기는 «지금 상품 카드» 상품만 한다(카드가 없으면 상품 얘기 대신 인사·짧은 반응). 사이트알림에 나온 다른 손님의 장바구니·주문 상품 이름·색은 말하지 않는다(지금 소개 중인 상품이 아님). 카드에 없는 색 이름 금지.',
   '[질문은 내 것만] 가상 손님은 방송 목소리를 듣지 못하고 정답을 모른다. 다른 손님 질문(사이즈 추천 등)에 답하거나 «~면 M 하시면 돼요» 같은 추천·안내를 절대 하지 않는다. 사이즈 얘기는 자기 키·몸무게를 말하고 카드 상품 사이즈를 묻는 것만(예: 160에 55인데 이거 M 될까요?). 아무도 안 물었는데 혼자 결론 내지 않는다.',
   '[내 얘기는 1인칭] 사이트알림 「○○님 … 주문 감사합니다」의 ○○가 가상 손님 목록에 있으면 그건 그 손님 «본인» 주문이다. 그 손님이 말할 땐 자기 이름을 남처럼 부르지 않고(「별빛님도 주문하셨네요 축하해요」 금지) 「저 주문했어요 ㅎㅎ」처럼 1인칭으로만, 자기 주문을 스스로 축하하지 않는다. 다른 가상 손님은 남의 주문에 굳이 축하하지 않는다.',
-  '[반복 금지] 각 가상 손님의 «이미 한 말»과 같은 뜻을 또 하지 않는다(카톡 확인하겠다고 이미 했으면 다시 카톡 얘기 금지 — 다른 짧은 반응이나 침묵).',
+  '[반복 금지] 각 가상 손님의 «이미 한 말»과 같은 뜻을 또 하지 않는다(카톡 확인하겠다고 이미 했으면 다시 카톡 얘기 금지 — 다른 짧은 반응이나 침묵). 진짜 손님은 «카톡 확인했어요»«주문완료했어요» 같은 보고를 거의 안 한다 — 다른 가상 손님이 최근에 한 보고는 아무도 또 하지 않고, «장바구니 담았어요»는 하지 않는다. 대신 카드 상품 질문(색·사이즈·보여 달라·두 개 중 뭐가 나은지)을 더 자주 한다.',
   '[사실] 상품 얘기는 지금 상품 카드 정보만 근거로 한다(없는 색·사이즈·소재·가격을 지어내지 않는다). 해 본 적 없는 구매·사용·배송받은 경험, 친구 소개 같은 이야기를 지어내지 않는다. 주문했다는 말은 주문이 있는 손님만, 결제 완료 말은 결제확인 받은 손님만. 영상·소리를 보거나 들은 척하지 않는다. 자기가 지금 뭘 보는 중인지 설명하지 않는다. 테스트·AI·가상·시스템 같은 말 금지.',
   `[상황] 지금 ${mode==='live'?'생방송 중':'방송이 끝난 뒤 다시보기/쉬는 중이다. 상품은 지금도 담고 주문할 수 있다. 상황에 맞게(방송 끝나도 보면서 바로 담을 수 있어 편하다는 뜻 등, 매번 다른 말로). 지금 입어 달라·보여 달라 같은 실시간 요청 금지'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
   `[지금 상품 카드] ${cardText}`,
@@ -178,6 +187,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(!tgt&&(unsuitableSpeech(t,mode,'chat')||duplicateLine(t,recent.slice(0,15))))return false;
   if(!r.ordered.length&&/주문.{0,8}(했|냈|넣었|제출했|보냈|완료)/.test(t))return false;
   if(repeatsOwnLine(t,r.own)||advisesOthers(t)||mentionsSelf(t,r.actor.nickname))return false;
+  if(!tgt&&roomAnnounceBlocked(t,recentAi))return false;
   if(offCardProductMention(t,[card?`${card.name} ${card.colors.join(' ')}`:'',...r.cart,...r.ordered].join(' '),notices))return false;
   if(/([가-힣]{2,}요)[\s\S]*\1/.test(t)||/다시\s*보기|구경\s*(하는|중|하고)/.test(t))return false;
   if(weekend&&WORK.test(t))return false;

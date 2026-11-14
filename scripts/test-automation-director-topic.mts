@@ -12,3 +12,11 @@ if(!self('별빛향기님 축하해요','[테스트]별빛향기'))throw Error('
 if(self('저도 주문완료했어용 ㅎㅎ','체리산책'))throw Error('self3');
 if(self('블랙 이쁘다','별빛향기'))throw Error('self4');
 console.log('ok');
+// [2026-11-14 12:03] 방 전체 보고 반복 막기
+import {roomAnnounceBlocked as rab} from '../lib/liveAutomationDirector';
+if(!rab('장바구니 담았어유',[]))throw Error('rab cart');
+if(!rab('카톡 확인했어용',['카결 링크 확인했어유']))throw Error('rab kakao');
+if(rab('카톡 확인했어용',['요거 블랙 이뿌네유']))throw Error('rab kakao first');
+if(!rab('저도 주문완료했어용 ㅎㅎ',['주문완료했어유 ㅎㅎ']))throw Error('rab order');
+if(rab('블랙 4사이즈 이뿌당..',['카톡 확인했어용','주문완료용']))throw Error('rab product');
+console.log('ok room announce');
