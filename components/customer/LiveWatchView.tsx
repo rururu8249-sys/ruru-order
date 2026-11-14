@@ -375,7 +375,7 @@ function IconEyeSmall({ size = 14, color = "#FFFFFF" }: { size?: number; color?:
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
 }
 
-const YT_EDGE_CROP = 76;
+const YT_EDGE_CROP = 54; // 유튜브 공유·로고·제목은 어떤 크기든 가장자리 48~52px 안 (2026-11-15 실측 300·360·600·1300폭) → 최소로만 자름
 
 export default function LiveWatchView(props: Props) {
   // Live view splits by available width, including unfolded foldables and landscape phones.
