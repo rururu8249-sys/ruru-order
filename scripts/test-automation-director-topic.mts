@@ -94,3 +94,13 @@ console.log('ok pay talk');}
   if (varySurface('버58 160에 52인데 몇 입으면 될까요?', 5).indexOf('버58') !== 0 || !varySurface('버58 160에 52인데', 3).includes('160에 52')) throw new Error('숫자 건드림');
   console.log('varySurface ok', outs.size);
 }
+
+// [2026-11-15 08:28] 최근 웃음이 없어도 «ㅋㅋ/ㅎㅎ» 두 개 끝맺음은 늘 바꿈 + 주말이라 담는다는 말 금지
+{
+  const {varyLaughTail} = await import('../lib/liveAutomationVoice');
+  for (let i = 1; i < 60; i++) for (const t of ['좋네용 ㅎㅎ', '이쁘다 ㅋㅋ']) {
+    const o = varyLaughTail(t, [], i * 13);
+    if (/(^|[^ㅎ])ㅎㅎ$|(^|[^ㅋ])ㅋㅋ$/.test(o)) throw new Error('ㅋㅋ/ㅎㅎ 그대로 ' + o);
+  }
+  console.log('stock laugh ok');
+}

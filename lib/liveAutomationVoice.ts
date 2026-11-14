@@ -55,8 +55,10 @@ export function varyLaughTail(text: string, recentAi: string[], seed = 0): strin
   const laughs = recentAi.slice(0, 4).map(laughTail).filter((t) => /[ㅋㅎ]/.test(t)).length;
   const serious = /죄송|미안|ㅠ|ㅜ|\?$|까요|나요|인가요|될까/.test(body);
   const sameRecent = recentTails.includes(tail) || (kindOf(tail) && recentTails.slice(0, 3).some((t) => kindOf(t) === kindOf(tail)));
-  if (!sameRecent && !(laughs >= 2 && /[ㅋㅎ]/.test(tail))) return text;
-  const pool = VARIANTS.filter((v) => !recentTails.includes(v) || v === '').filter((v) => !(serious && /[ㅋㅎ😆🥰]/u.test(v)));
+  // [2026-11-15 08:28 사장님] Gemini 는 거의 늘 «ㅋㅋ/ㅎㅎ» 두 개로 끝냄 → 그 두 모양은 겹치지 않아도 늘 다른 꼬리로(웃음 빼기 포함)
+  const stock = tail === 'ㅋㅋ' || tail === 'ㅎㅎ';
+  if (!stock && !sameRecent && !(laughs >= 2 && /[ㅋㅎ]/.test(tail))) return text;
+  const pool = VARIANTS.filter((v) => v !== tail && (!recentTails.includes(v) || v === '')).filter((v) => !(serious && /[ㅋㅎ😆🥰]/u.test(v)));
   const pick = laughs >= 2 ? '' : pool[Math.abs(Math.trunc(seed)) % pool.length] ?? '';
   if (!pick) return body;
   return /^[~!]/.test(pick) ? body + pick : body + ' ' + pick;
