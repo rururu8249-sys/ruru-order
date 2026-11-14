@@ -1254,9 +1254,9 @@ export default function LiveWatchView(props: Props) {
         {/* 워터마크(사장님 06:08 「강아지 왼쪽 필수·오른쪽 글씨」) — 영상은 그대로, 그림만 위에.
             유튜브 공유·나중에 보기(왼쪽 아래)·YouTube 로고(오른쪽 아래)는 iframe 크기와 상관없이 가장자리 고정 px(실측)라 그림도 고정 px.
             강아지: 불투명, 아래 가장자리에서 빼꼼(가슴은 칸 밖) → 공유 버튼 완전히 덮음.
-            RURU: 글자 둘레 어두운 그림자를 그림에 넣어(yt-cover-ruru-v2) 글자 사이로 로고가 비치지 않게. */}
-        <img aria-hidden="true" src="/yt-cover-dog-v2.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 3 : 2, bottom: isDesktop ? -54 : -34, width: isDesktop ? 170 : 140, height: "auto", pointerEvents: "none" }} />
-        <img aria-hidden="true" src="/yt-cover-ruru-v2.png" alt="" draggable={false} style={{ position: "absolute", right: -1, bottom: isDesktop ? -9 : -6, width: isDesktop ? 208 : 164, height: "auto", pointerEvents: "none" }} />
+            RURU: 유튜브 로고와 같은 크기·자리, 얇은 글씨 반투명 워터마크(yt-cover-ruru-v3, 06:18). */}
+        <img aria-hidden="true" src="/yt-cover-dog-v2.png" alt="" draggable={false} style={{ position: "absolute", left: 0, bottom: isDesktop ? -20 : -18, width: isDesktop ? 90 : 80, height: "auto", pointerEvents: "none" }} />
+        <img aria-hidden="true" src="/yt-cover-ruru-v3.png" alt="" draggable={false} style={{ position: "absolute", right: "clamp(36px, calc((100cqw - 360px) * 0.08 + 36px), 55px)", bottom: 24, width: 88, height: "auto", opacity: 0.55, filter: "blur(0.3px)", pointerEvents: "none" }} />
       </div>
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
