@@ -46,3 +46,30 @@ console.log('ok pay talk');}
  for (const t of ["와 블랙 예쁘다","PD-530 와인 핏 예쁘네요","ㅋㅋㅋ 귀여워","가격요"]) { if (vq(t)) throw new Error("막히면 안 됨: " + t); }
  console.log("✓ 사이즈 집은 감탄·번호 없는 핏 얘기 버림");
 }
+
+// [2026-11-15 07:36] 카결 링크 — 결제 전엔 카톡·링크 얘기 금지, 결제 뒤엔 «결제완료»만
+{
+ const {cardLinkTalkBlocked}=await import('../lib/liveAutomationDirector');
+ const cases:Array<[string,boolean,boolean,boolean]>=[
+  ['링크 바로 확인했어용 ㅋㅋ',true,false,true],['네 카톡 볼게요~',true,false,true],['카결 완료했어요~',true,false,true],
+  ['카결 완료했어요~',true,true,false],['결제완료했습니다!',true,true,false],['링크 확인했어요',true,true,true],
+  ['확인했어용 감사합니당 ㅎㅎ',true,false,false],['계좌 입금하고 왔어용',false,false,false],['아이보리 예뻐요',true,false,false],
+ ];
+ for(const [t,card,paid,want] of cases){if(cardLinkTalkBlocked(t,card,paid)!==want)throw new Error('cardLinkTalkBlocked '+t);}
+ console.log('PASS 카결 링크 대화 규칙',cases.length);
+}
+
+// [2026-11-15 07:40] 상품번호 줄임말·웃음 끝맺음 바꾸기
+{
+ const {shortProductCodes,varyLaughTail}=await import('../lib/liveAutomationVoice');
+ if(shortProductCodes('PD-222 이거 38사이즈면 맞을까요?',0)!=='프222 이거 38사이즈면 맞을까요?')throw new Error('PD 줄임');
+ if(!/^(버|버버)58 /.test(shortProductCodes('BB-58 XL',1)))throw new Error('BB 줄임');
+ if(/[A-Z]{2}-?\d/.test(shortProductCodes('MC-319 아이보리 MX117',2)))throw new Error('영어 코드 남음');
+ const recent=['링크 확인했어요 ㅎㅎ','네~','좋아요','아하'];
+ const outs=new Set<string>();
+ for(let i=0;i<12;i++){const o=varyLaughTail('입금했어용 ㅎㅎ',recent,i);if(o.endsWith('ㅎㅎ')&&!o.endsWith('ㅎㅎㅎ'))throw new Error('같은 ㅎㅎ 반복 '+o);outs.add(o);}
+ if(outs.size<3)throw new Error('끝맺음이 다양하지 않음 '+[...outs]);
+ if(varyLaughTail('이쁘다 ㅋㅋㅋ',['네네'],1)!=='이쁘다 ㅋㅋㅋ')throw new Error('안 겹치면 그대로');
+ if(/[ㅋㅎ]/.test(varyLaughTail('사이즈 될까요 ㅋㅋ',['오 ㅋㅋ'],2)))throw new Error('질문엔 웃음 금지');
+ console.log('PASS 줄임말·웃음 끝맺음',[...outs].join(' / '));
+}

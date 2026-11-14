@@ -18,6 +18,7 @@ import {readDialogueCard} from './liveAutomationDialogueServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
 import {readLearning,refreshLearning} from './liveAutomationLearningServer';
+import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
 type Row=Record<string,unknown>;
@@ -30,8 +31,10 @@ const clean=(s:unknown)=>String(s??'').replace(/\uE000[^\uE001]*\uE001/g,'(이�
 const roleOf=(m:Row)=>m.badge==='bot'?'사이트알림':m.automation_actor_id?'가상손님':m.badge==='crown'||m.badge==='crown_pink'?'사장님':m.badge==='mod'?'채팅관리자':'손님';
 const seedOf=(a:Actor)=>Number((a as unknown as {profile?:{seed?:unknown}}).profile?.seed)||0;
 /** Gemini 답이 없거나 걸러졌을 때만 쓰는 짧은 답 */
-function shortReply(q:string,recent:string[],seed:number,own:string[]=[]):string|null{
- const sets:Array<[RegExp,string[]]>=[[/카톡|링크|결제/,['네 카톡 볼게요~','넵 링크 확인할게요!','카톡 확인해볼게요 😊']],[/감사|고마|안녕|반가|좋은\s*(밤|하루|저녁|아침|꿈)|잘\s*자|수고|평안|편안|굿밤|쉬세요/,['감사해요~','네 감사합니다 😊','넵 감사해요!']]];
+function shortReply(q:string,recent:string[],seed:number,own:string[]=[],cardPaid=false):string|null{
+ // [2026-11-15 07:36 사장님] 카결 링크 안내엔 «확인할게요» 답 안 함 — 결제완료 알림 뒤에만 «결제완료했어요»
+ if(/카톡|링크|결제/.test(q)&&!cardPaid)return null;
+ const sets:Array<[RegExp,string[]]>=[[/카톡|링크|결제/,['카결 완료했어요~','결제완료했습니다!','카드결제 했어요 😊']],[/감사|고마|안녕|반가|좋은\s*(밤|하루|저녁|아침|꿈)|잘\s*자|수고|평안|편안|굿밤|쉬세요/,['감사해요~','네 감사합니다 😊','넵 감사해요!']]];
  for(const [re,list] of sets)if(re.test(q)){for(let i=0;i<list.length;i++){const r=list[(Math.abs(seed)+i)%list.length];if(!duplicateLine(r,recent.slice(0,15))&&!repeatsOwnLine(r,own))return r;}return null;}
  return null;
 }
@@ -81,6 +84,16 @@ export function namesSize(text:string):boolean{
 // [2026-11-14 21:57 사장님 「무통장 해놓고 카결 링크 달라고」] 결제 얘기는 그 손님 주문 결제 방법과 맞아야 함
 const CARD_TALK=/카결|카드\s*결제|결제\s*링크|카드\s*링크|링크/;
 const BANK_TALK=/입금|계좌|무통장|이체/;
+// [2026-11-15 07:36 사장님 「카결링크 확인해 달라 = 결제하라는 것. 결제완료 알림 뜬 다음 «결제완료했어요»라고 해야지 확인했다고 채팅하냐」]
+//   카드 주문인데 결제확인 전이면 카톡·링크·카결 얘기 자체를 안 함(«확인했어요·볼게요» 금지),
+//   결제확인(카드) 뒤엔 «결제완료·카결 완료»만 되고 «확인했/볼게요»는 안 됨.
+export function cardLinkTalkBlocked(text:string,card:boolean,cardPaid:boolean):boolean{
+ if(!card)return false;
+ const talk=/카톡|카결|카드|링크|결제/.test(text);
+ if(!talk)return false;
+ if(!cardPaid)return true;
+ return !/(결제|카결).{0,4}(완료|했어|했습|했당|했어용)/.test(text);
+}
 export function wrongPaymentTalk(text:string,card:boolean,bank:boolean):boolean{
  if(CARD_TALK.test(text)&&!card)return true;
  if(BANK_TALK.test(text)&&card&&!bank)return true;
@@ -218,13 +231,13 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));
  const notices=messages.filter(m=>m.badge==='bot'&&/^(c|o|p):/.test(String(m.bot_ref||''))).map(m=>clean(m.body));
  const transcript=[...messages].reverse().map(m=>`#${m.id} ${hhmm(m.created_at)} ${clean(m.nickname)||'알림'}(${roleOf(m)}): ${clean(m.body).slice(0,140)}`).join('\n');
- const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?'(카드결제 주문 — 카톡으로 결제 링크 받음)':''}${r.bankOrder&&!r.cardOrder?'(무통장 주문 — 계좌로 입금, 카드 결제 링크 없음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
- const cardText=card?`${card.name} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
+ const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?(r.paid.includes('card')?'(카드결제 주문 — 결제 완료됨)':'(카드결제 주문 — 아직 결제 전, 카톡·링크 얘기 금지)'):''}${r.bankOrder&&!r.cardOrder?'(무통장 주문 — 계좌로 입금, 카드 결제 링크 없음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
+ const cardText=card?`${spokenCardName(card.name)} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
  const prompt=[
   '너는 유튜브 라이브커머스 「루루동이」 사이트 채팅방에 있는 가상 손님들의 다음 한 마디를 정한다. 진짜 사람처럼 자연스러워야 한다.',
   '[할 일] 아래 대화 전체를 시간순으로 읽고, 가상 손님 목록 중 지금 말하는 게 자연스러운 한 명과 그 한 마디를 고른다. '+(newestHuman?'자연스러운 말이 정말 없을 때만 speaker를 빈 문자열로 둔다(침묵).':'지금은 말할 차례다(얼마나 자주 말할지는 이미 정해져 있다). speaker를 비우지 말고 반드시 한 명이 짧게 한마디(인사·가격·사이즈 질문·짧은 반응·대화 이어 가기) 한다.'),
-  '[답하기] 사장님·손님이 가상 손님을 부르거나 말을 걸었으면 그 가상 손님이 답한다. 줄임말·별명·닉네임 일부·오타로 불러도 문맥으로 판단한다(예: 여름한아름 → 한아름님, 포도다람쥐 → 포도님). 사이트알림(주문 감사·카드결제 링크·결제 확인)과 이어지는 말이면 그 흐름대로 답한다(카드결제 링크 안내 뒤 카톡 확인 부탁 → 카톡 확인하겠다는 답). 답할 때 replyTo에 그 글 번호를 넣는다.',
-  '[말투] 실제 방송 채팅처럼 보통 2~25자 한 문장. 띄어쓰기·맞춤법은 느슨해도 된다. 사람마다 어미를 다르게(~요/~용/~여/~유/~당/~죠?), ㅋㅋ ㅎㅎ ~ 이모지는 가끔 하나. 브랜드는 줄여 부르기도 한다(몽·몽클·버버·막스). 흔한 유형: 가격 질문, 사이즈 고민(66이면 라지 될까요?), 번호로 묻기, 짧은 감탄(이쁘다/요고 귀엽네요), 결제·배송 질문, 다른 손님 질문에 짧게 거들기, 인사. 예시를 그대로 쓰지 말고 매번 새로 쓴다. 바로 앞 글들의 첫 단어·어미·문장 모양을 따라 하지 않는다(누가 하이 했으면 하이 금지). 한 글 안에서 같은 말을 두 번 쓰지 않는다. 고객센터·광고·설명 말투 금지.',
+  '[답하기] 사장님·손님이 가상 손님을 부르거나 말을 걸었으면 그 가상 손님이 답한다. 줄임말·별명·닉네임 일부·오타로 불러도 문맥으로 판단한다(예: 여름한아름 → 한아름님, 포도다람쥐 → 포도님). 사이트알림(주문 감사·카드결제 링크·결제 확인)과 이어지는 말이면 그 흐름대로 답한다(카드결제 링크 안내는 «결제하라»는 뜻 — «확인했어요·볼게요» 답 금지. 그 손님 결제확인 알림(카드결제 확인)이 뜬 뒤에만 «카결 완료했어요·결제완료했습니다»처럼 짧게). 답할 때 replyTo에 그 글 번호를 넣는다.',
+  '[말투] 실제 방송 채팅처럼 보통 2~25자 한 문장. 띄어쓰기·맞춤법은 느슨해도 된다. 사람마다 어미를 다르게(~요/~용/~여/~유/~당/~죠?), 웃음·이모지는 사람마다·상황마다 다르게: 대부분은 안 붙이고, 붙일 땐 ㅋ 하나·ㅋㅋㅋㅋㅋ·ㅎ·ㅎㅎㅎ·😊🥰😆 같은 이모지·~·!! 중 바로 앞 글들과 다른 것으로(매번 ㅋㅋ·ㅎㅎ 두 개 금지, 진지한 질문·아쉬운 말엔 웃음 금지). 문장도 «입금했습니다 확인 부탁드려요»처럼 간결하게 끝내기도 한다. 상품번호는 손님처럼 줄여 부른다: PD-222 → 프222, BB-58 → 버58, MC-319 → 몽319, MX-117 → 막스117(PD-222처럼 영어 코드 그대로 쓰지 않는다). 흔한 유형: 가격 질문, 사이즈 고민(66이면 라지 될까요?), 번호로 묻기, 짧은 감탄(이쁘다/요고 귀엽네요), 결제·배송 질문, 다른 손님 질문에 짧게 거들기, 인사. 예시를 그대로 쓰지 말고 매번 새로 쓴다. 바로 앞 글들의 첫 단어·어미·문장 모양을 따라 하지 않는다(누가 하이 했으면 하이 금지). 한 글 안에서 같은 말을 두 번 쓰지 않는다. 고객센터·광고·설명 말투 금지.',
   '[상품] 상품 얘기는 «지금 상품 카드» 상품만 한다(카드가 없으면 상품 얘기 대신 인사·짧은 반응). 사이트알림에 나온 다른 손님의 장바구니·주문 상품 이름·색은 말하지 않는다(지금 소개 중인 상품이 아님). 카드에 없는 색 이름 금지.',
   '[질문은 내 것만] 가상 손님은 방송 목소리를 듣지 못하고 정답을 모른다. 다른 손님 질문(사이즈 추천 등)에 답하거나 «~면 M 하시면 돼요» 같은 추천·안내를 절대 하지 않는다. 사이즈 얘기는 자기 키·몸무게를 말하고 몇 사이즈를 입으면 되는지 «추천을 받는» 질문만 한다 — S·M·L·엑라·2 같은 사이즈를 먼저 말하지 않는다. 아무도 안 물었는데 혼자 결론 내지 않는다. 상품 치수·핏·소재를 물을 땐 반드시 어느 상품인지 상품번호(줄임말+번호, 예: 버110·몽346)를 넣고, 사이즈 질문은 키·몸무게를 같이 말하고 사이즈는 묻기만 한다 — 예: 「버110 160에 52인데 몇 입으면 될까요?」「BB-58 안에 두꺼운 거 입으려면 168에 62인데 뭐가 맞을까요?」「몽346 키 165 몸무게 58이면 몇 사이즈요?」. «블랙 XL도 핏 예쁘겠당»처럼 사이즈를 집어 감탄하거나 상품번호 없이 핏·치수 얘기를 하지 않는다. 주어 없이 «베이지 엑라 커요?»·«요고 품번이 뭐예여?»처럼 묻지 않는다 — 무엇을 가리키는지 꼭 말한다: 「지금 입으신 거 품번이 뭐예요?」「방금 보여주신 와인색 품번 알려주세요」. «요고·이거·그거»만 쓰지 않는다. «S면 맞을까요?»처럼 사이즈를 콕 집어 묻지 않는다. 같은 손님은 사이즈 질문을 한 번만 한다(이미 물었으면 다시 묻지 않음 — 표현만 바꿔 다시 묻는 것도 금지).',
   '[내 얘기는 1인칭] 사이트알림 「○○님 … 주문 감사합니다」의 ○○가 가상 손님 목록에 있으면 그건 그 손님 «본인» 주문이다. 그 손님이 말할 땐 자기 이름을 남처럼 부르지 않고(「별빛님도 주문하셨네요 축하해요」 금지) 「저 주문했어요 ㅎㅎ」처럼 1인칭으로만, 자기 주문을 스스로 축하하지 않는다. 다른 가상 손님은 남의 주문에 굳이 축하하지 않는다.',
@@ -258,6 +271,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(repeatsOwnLine(t,r.own)||advisesOthers(t)||mentionsSelf(t,r.actor.nickname))return false;
   if(vagueProductQuestion(t)||sizeBodyMismatch(t))return false;
   if(wrongPaymentTalk(t,r.cardOrder,r.bankOrder))return false;
+  if(cardLinkTalkBlocked(t,r.cardOrder,r.paid.includes('card')))return false;
   if(!tgt&&roomAnnounceBlocked(t,recentAi))return false;
   if(offCardProductMention(t,[card?`${card.name} ${card.colors.join(' ')}`:'',...r.cart,...r.ordered].join(' '),notices))return false;
   if(/([가-힣]{2,}요)[\s\S]*\1/.test(t)||/다시\s*보기|구경\s*(하는|중|하고)/.test(t))return false;
@@ -270,8 +284,10 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const rawText=text;
  if(speaker&&text&&!acceptable(text,speaker,target))text='';
  void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent':text?'sent':'rejected'});
- if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor),speaker.own)||'';
- if(speaker&&text&&wrongPaymentTalk(text,speaker.cardOrder,speaker.bankOrder))text='';
+ if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor),speaker.own,speaker.paid.includes('card'))||'';
+ if(speaker&&text&&(wrongPaymentTalk(text,speaker.cardOrder,speaker.bankOrder)||cardLinkTalkBlocked(text,speaker.cardOrder,speaker.paid.includes('card'))))text='';
+ // [2026-11-15 07:40 사장님] 상품번호는 손님처럼 줄여 부름(프222·버58·몽319), 웃음·이모지 끝맺음은 최근 AI 글과 안 겹치게
+ if(speaker&&text){const sd=seedOf(speaker.actor)+now;text=varyLaughTail(shortProductCodes(text,sd),recentAi,sd);}
  // 사람 글은 한 번만 판단 — 침묵이어도 그 글 번호를 남겨 같은 글로 Gemini 를 다시 부르지 않음
  const sourceId=target?Number(target.id):newestHuman?Number(newestHuman.id):null;
  const who=speaker&&text?speaker:(sourceId?roster[0]:null);
