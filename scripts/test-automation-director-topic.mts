@@ -30,3 +30,11 @@ console.log('ok size ask');}
 if(!w('카결 링크 주세여~',false,true)||!w('결제 링크 언제 와요',false,false)||!w('입금했어요',true,false))throw Error('pay');
 if(w('카결 링크 주세여~',true,false)||w('입금 계좌 어디예요',false,true)||w('가격요',false,true))throw Error('pay ok');
 console.log('ok pay talk');}
+
+// 2026-11-14 22:08 «요고 품번이 뭐예여?» — 무엇을 가리키는지 없는 질문은 버림
+{
+ const { vagueProductQuestion: vq } = await import("../lib/liveAutomationDirector");
+ for (const t of ["요고 품번이 뭐예여?","이거 몇 번이에요?","품번이 뭐예요?","그거 블랙도 있나요?"]) { if (!vq(t)) throw new Error("가리키는 대상 없는 질문 통과: " + t); }
+ for (const t of ["지금 입으신 거 품번이 뭐예요?","언니가 입은 패딩 몇 번이에요?","PD-530 와인 따뜻해요?","와 이쁘다"]) { if (vq(t)) throw new Error("정상 질문 막힘: " + t); }
+ console.log("✓ 대상 없는 «요고·이거» 질문 버림");
+}
