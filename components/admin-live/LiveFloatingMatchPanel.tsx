@@ -95,6 +95,8 @@ export default function LiveFloatingMatchPanel({
   // [2026-11-15] 추가 입금 기다리는 주문(입금확인 뒤 금액이 늘어 차액이 남은 무통장 주문) — 같은 이름 입금이 오면 바로 붙이게
   type Shortage = { groupId: string; nickname: string; name: string; orderNo: string; total: number; linked: number; shortage: number };
   const [shortages, setShortages] = useState<Shortage[]>([]);
+  // 붙인 입금은 전체 다시 불러오기(10초쯤)를 기다리지 않고 목록에서 바로 뺀다
+  const [linkedDepIds, setLinkedDepIds] = useState<Set<number>>(new Set());
   async function loadShortages() {
     try {
       const res = await fetch("/api/admin-live/order-extra-deposit?list=shortage", { cache: "no-store" });
@@ -129,8 +131,10 @@ export default function LiveFloatingMatchPanel({
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) throw new Error(json?.message || `요청 실패(${res.status})`);
       showAdminToast(json.kind === "exact" ? "추가 입금을 붙였어요. 딱 맞아요." : "추가 입금을 붙였어요.", "success");
-      await onMatched();
-      await loadShortages();
+      setLinkedDepIds(p => new Set(p).add(Number(dep.id)));
+      setShortages(p => p.filter(o => o.groupId !== target.groupId));
+      setMatchSaving(false);
+      void Promise.all([onMatched(), loadShortages()]);
     } catch (e: any) {
       showAdminToast(`추가 입금 연결 실패: ${e?.message ?? e}`, "error");
     } finally {
@@ -177,6 +181,7 @@ export default function LiveFloatingMatchPanel({
 
     // 미매칭/전체
     if (!showAll) list = list.filter(d => isUnmatchedLiveDeposit(d));
+    if (linkedDepIds.size) list = list.filter(d => !linkedDepIds.has(Number(d.id)));
 
     // 검색
     const q = search.trim().toLowerCase();
@@ -196,7 +201,7 @@ export default function LiveFloatingMatchPanel({
     });
 
     return list;
-  }, [deposits, period, calFrom, calTo, showAll, search]);
+  }, [deposits, period, calFrom, calTo, showAll, search, linkedDepIds]);
 
   // 날짜 그룹핑
   const grouped = useMemo(() => {

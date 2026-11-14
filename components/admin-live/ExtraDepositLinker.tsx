@@ -5,14 +5,17 @@ import { useCallback, useEffect, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 
-type Cand = { id: number; name: string; amount: number; at: string; nameMatch: boolean; exact: boolean };
+type Cand = { id: number; name: string; amount: number; at: string; time?: string; nameMatch: boolean; exact: boolean };
 type Info = { total: number; linkedSum: number; shortage: number; block: string | null; extras: { id: number; name: string; amount: number }[]; candidates: Cand[] };
 
 const won = (v: number) => `${Number(v || 0).toLocaleString("ko-KR")}원`;
-const when = (s: string) => {
+// 입금 날짜(created_at) + 은행 시각(deposited_time, 시각만 오는 경우) — 「11.14 11:04」
+const when = (s: string, time?: string) => {
   const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+  if (Number.isNaN(d.getTime())) return time || "";
+  const md = d.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit" }).replace(/\s/g, "").replace(/\.$/, "");
+  const hm = time || d.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${md} ${hm}`;
 };
 
 export default function ExtraDepositLinker({ groupId, nickname, mode, onChanged }: { groupId: string; nickname: string; mode: "short" | "extras"; onChanged: () => void | Promise<void> }) {
@@ -48,8 +51,7 @@ export default function ExtraDepositLinker({ groupId, nickname, mode, onChanged 
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) { showAdminToast("연결 취소 실패\n\n" + (json?.message || `요청 실패(${res.status})`), "error"); return; }
       showAdminToast("추가 입금 연결을 취소했어요.", "success");
-      await load();
-      await onChanged();
+      await Promise.all([load(), onChanged()]);
     } finally { setBusy(false); }
   };
 
@@ -90,8 +92,7 @@ export default function ExtraDepositLinker({ groupId, nickname, mode, onChanged 
       if (!res.ok || !json?.ok) { showAdminToast("추가 입금 연결 실패\n\n" + (json?.message || `요청 실패(${res.status})`), "error"); await load(); return; }
       showAdminToast(json.kind === "exact" ? "입금을 붙였어요. 딱 맞아요." : "입금을 붙였어요.", "success");
       setOpen(false);
-      await load();
-      await onChanged();
+      await Promise.all([load(), onChanged()]);
     } finally { setBusy(false); }
   };
 
@@ -119,7 +120,7 @@ export default function ExtraDepositLinker({ groupId, nickname, mode, onChanged 
                     <input type="checkbox" checked={on} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })} className="h-4 w-4" />
                     <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{c.name || "(이름 없음)"}</span>
                     {c.nameMatch && c.exact ? <span className="text-[12px] font-semibold text-ok-tx">딱 맞음</span> : null}
-                    <span className="text-[12px] text-ink-mute">{when(c.at)}</span>
+                    <span className="text-[12px] text-ink-mute">{when(c.at, c.time)}</span>
                     <span className="w-20 text-right text-[13px] font-bold tabular-nums text-ink">{won(c.amount)}</span>
                   </label>
                 );

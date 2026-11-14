@@ -97,7 +97,8 @@ export async function GET(request: NextRequest) {
       id: Number(d.id),
       name: String(d.depositor_name ?? ""),
       amount: Number(d.amount || 0),
-      at: String(d.deposited_time || d.created_at || ""),
+      at: String(d.created_at || ""),
+      time: /^\d{1,2}:\d{2}/.test(String(d.deposited_time || "")) ? String(d.deposited_time).slice(0, 5) : "",
       nameMatch: d.nameMatch,
       exact: d.exact,
     }));

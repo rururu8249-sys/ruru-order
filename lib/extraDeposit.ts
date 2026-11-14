@@ -69,7 +69,8 @@ export function rankExtraDeposits<T extends Row>(deposits: T[], names: string[],
     const exact = Number(d.amount || 0) === shortage;
     return { ...d, nameMatch, exact };
   });
-  const when = (d: Row) => Date.parse(text(d.deposited_time) || text(d.created_at)) || 0;
+  // deposited_time 은 「11:04:39」처럼 시각만 오기도 한다 → 날짜가 안 읽히면 created_at
+  const when = (d: Row) => Date.parse(text(d.deposited_time)) || Date.parse(text(d.created_at)) || 0;
   out.sort((a, b) => Number(b.nameMatch) - Number(a.nameMatch) || Number(b.exact) - Number(a.exact) || when(b) - when(a));
   return out;
 }
