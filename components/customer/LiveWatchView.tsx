@@ -926,6 +926,8 @@ export default function LiveWatchView(props: Props) {
   const [behindLive, setBehindLive] = useState(false);
   // [08:35 사장님 「녹화 영상인데 왜 실시간으로 돌아가기가 떠」] 녹화 영상은 길이(duration) 전체가 끝이라 늘 «30초 넘게 뒤»로 잡혔음.
   //   이제 «진짜 라이브»일 때만: 유튜브가 알려 주는 isLive, 또는 영상 길이가 시간 따라 계속 늘어날 때(라이브는 길이가 자람).
+  // [2026-11-15 사장님 화면 테스트] 유튜브가 멈춤·첫 화면·막대 때 왼쪽 아래 공유 / 오른쪽 아래 YouTube 표시를 띄움 → 그때만 RURU 그림으로 덮음
+  const [ytPlaying, setYtPlaying] = useState(false);
   const playerInfo = useRef<{ t: number; d: number; state: number; live: boolean; d0: number; d0at: number; seekableEnd: number | null; atLiveHead: boolean | null }>({ t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0, seekableEnd: null, atLiveHead: null });
   const lastTick = useRef<{ t: number; at: number; state: number }>({ t: 0, at: 0, state: -1 });
   useEffect(() => {
@@ -954,7 +956,7 @@ export default function LiveWatchView(props: Props) {
       }
       const vd = info.videoData as { isLive?: unknown } | undefined;
       if (typeof vd?.isLive === "boolean") cur.live = vd.isLive;
-      if (typeof info.playerState === "number") { cur.state = info.playerState; pausedRef.current = info.playerState === 2; }
+      if (typeof info.playerState === "number") { cur.state = info.playerState; pausedRef.current = info.playerState === 2; setYtPlaying(info.playerState === 1 || info.playerState === 3); }
       // 실제 라이브 응답에서 duration(5767초)과 이동 가능한 끝(2170초)이 달랐다.
       // progressState는 현재 DVR 범위와 실제 실시간 도착 여부. 부분 응답에서도 마지막 값을 유지한다.
       const progress = info.progressState as { seekableEnd?: unknown; isAtLiveHead?: unknown } | undefined;
@@ -984,6 +986,7 @@ export default function LiveWatchView(props: Props) {
   };
   const reloadPlayer = () => {
     playerInfo.current = { t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0, seekableEnd: null, atLiveHead: null };
+    setYtPlaying(false);
     lastTick.current = { t: 0, at: 0, state: -1 };
     setBehindLive(false);
     setMuted(true);
@@ -1245,6 +1248,15 @@ export default function LiveWatchView(props: Props) {
         style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}
       />
 
+      {/* [2026-11-15 사장님 화면 테스트] 유튜브 공유(왼쪽 아래)·YouTube 표시(오른쪽 아래) 덮개 — 영상과 같은 크기·같은 배율 칸 안에 두어 폰·PC 모두 그 자리에 맞음, 어둡게 할 땐 영상과 같이 어두워짐 */}
+      <div aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s, opacity 0.25s", opacity: seekMode || !ytPlaying ? 1 : 0 }}>
+        <div style={{ position: "absolute", left: 22, bottom: -2, width: 118, height: 60, borderRadius: 30, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.35)" }}>
+          <img src="/yt-cover-share.jpg" alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0.94 }} />
+        </div>
+        <div style={{ position: "absolute", right: 44, bottom: 4, width: 108, height: 44, borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.35)" }}>
+          <img src="/yt-cover-logo.jpg" alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0.94 }} />
+        </div>
+      </div>
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
       {/* 돌려보기 중 — 영상 전체를 반투명 검정으로 어둡게(유튜브 막대는 빨강·흰색이라 그대로 보임) */}
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
