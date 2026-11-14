@@ -220,3 +220,27 @@ export function buildExtraDepositRequestNote(nick: string, shortage: number, ord
     message: `${nick}님, 주문 내용이 바뀌어서 금액이 조금 달라졌어요.\n\n더 입금하실 금액: ${money(shortage)}\n💳 입금계좌: ${bankLineForOrder(order)}\n\n입금해주시면 바로 확인해드릴게요 🙂`,
   };
 }
+
+// ── [2026-11-15 사장님 「주문서 복사 — 간단하게 주문내용만, 상세 복사 등등」] ──
+//   「주문내용 복사」 = 닉네임 + 상품·옵션·수량만(금액·주소·계좌 없음). 업체 주문·손님 확인용.
+//   「상세 복사」 = 위 buildCustomerOrderCopyText(주소·금액·입금 안내) 그대로.
+//   여러 주문 선택 → 한 번에 주문내용 복사. 읽기 전용.
+export function buildOrderItemsCopyText(order: LiveOrder, opts: { withHeader?: boolean } = {}): string {
+  const items = Array.isArray(order.items) ? order.items : [];
+  const lines: string[] = [];
+  const who = [clean(order.nickname), clean(order.name) && clean(order.name) !== clean(order.nickname) ? `(${clean(order.name)})` : ""].filter(Boolean).join(" ");
+  if (opts.withHeader !== false) lines.push(`${who || "손님"} 주문내용`);
+  let totalQty = 0;
+  for (const item of items) {
+    const qty = Number(item.qty) || 1;
+    totalQty += qty;
+    const opt = formatOrderOptionText(item.color, item.size);
+    lines.push(`- ${clean(item.productName)}${opt ? ` (${opt})` : ""} ${qty}개`);
+  }
+  if (items.length > 1) lines.push(`총 ${totalQty}개`);
+  return lines.join("\n");
+}
+
+export function buildManyOrderItemsCopyText(orders: LiveOrder[]): string {
+  return orders.map((o) => buildOrderItemsCopyText(o)).join("\n\n");
+}

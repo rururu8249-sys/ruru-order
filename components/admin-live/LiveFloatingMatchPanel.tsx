@@ -92,6 +92,52 @@ export default function LiveFloatingMatchPanel({
 
   const matchMode = !!selectedOrderForMatch;
 
+  // [2026-11-15] 추가 입금 기다리는 주문(입금확인 뒤 금액이 늘어 차액이 남은 무통장 주문) — 같은 이름 입금이 오면 바로 붙이게
+  type Shortage = { groupId: string; nickname: string; name: string; orderNo: string; total: number; linked: number; shortage: number };
+  const [shortages, setShortages] = useState<Shortage[]>([]);
+  async function loadShortages() {
+    try {
+      const res = await fetch("/api/admin-live/order-extra-deposit?list=shortage", { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      setShortages(json?.ok && Array.isArray(json.items) ? json.items : []);
+    } catch { setShortages([]); }
+  }
+  useEffect(() => { void loadShortages(); }, [deposits]);
+  function shortageFor(dep: any): Shortage | null {
+    const amt = Number(dep?.amount ?? 0);
+    if (amt <= 0) return null;
+    const hits = shortages.filter(o => liveDepositNameScore(String(dep?.depositor_name || ""), o.nickname, o.name) >= 75);
+    if (hits.length === 0) return null;
+    return hits.find(o => o.shortage === amt) ?? (hits.length === 1 ? hits[0] : null);
+  }
+  async function linkExtraDeposit(dep: any, target: Shortage) {
+    if (matchSaving) return;
+    const amt = Number(dep.amount ?? 0);
+    const after = target.linked + amt;
+    const diff = after - target.total;
+    const ok = await showAdminConfirm(
+      `${target.nickname || target.name}님 주문(${target.orderNo})에 이 입금 ${won(amt)}을 붙일까요?\n\n받은 돈 ${won(target.linked)} + ${won(amt)} = ${won(after)}\n주문 금액 ${won(target.total)} → ${diff === 0 ? "딱 맞아요" : diff < 0 ? `아직 ${won(-diff)} 부족` : `${won(diff)} 더 받음`}\n\n주문 상태(입금확인)는 그대로예요.`,
+      { title: "추가 입금 연결", confirmText: "붙이기" },
+    );
+    if (!ok) return;
+    setMatchSaving(true);
+    try {
+      const res = await fetch("/api/admin-live/order-extra-deposit", {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        body: JSON.stringify({ groupId: target.groupId, depositIds: [Number(dep.id)], selectedTotal: amt }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.message || `요청 실패(${res.status})`);
+      showAdminToast(json.kind === "exact" ? "추가 입금을 붙였어요. 딱 맞아요." : "추가 입금을 붙였어요.", "success");
+      await onMatched();
+      await loadShortages();
+    } catch (e: any) {
+      showAdminToast(`추가 입금 연결 실패: ${e?.message ?? e}`, "error");
+    } finally {
+      setMatchSaving(false);
+    }
+  }
+
   // 선택된 주문 기대 금액
   const { expectedAmount: baseExpectedAmount } = useMemo(() => {
     if (!selectedOrderForMatch) return { expectedAmount: 0 };
@@ -295,6 +341,7 @@ export default function LiveFloatingMatchPanel({
   //   빼는 것: 연결 추천 주문이 있는 입금 + 같은 이름(점수 80↑) 미입금 무통장 주문이 있는 입금.
   function hasPossibleOrder(dep: any): boolean {
     if (findBestOrder(dep)) return true;
+    if (shortageFor(dep)) return true; // [2026-11-15] 추가 입금 기다리는 주문 손님 입금은 전체 정리에서 빼기
     return (allOrders || orders).some(o =>
       ["unpaid", "manual_match_needed"].includes(String(o.paymentStatus)) &&
       !String(o.paymentMethod || "").includes("카드") &&
@@ -302,7 +349,7 @@ export default function LiveFloatingMatchPanel({
   }
   const bulkTargets = useMemo(() => filtered.filter(d => isUnmatchedLiveDeposit(d) && !hasPossibleOrder(d)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtered, orders, allOrders]);
+    [filtered, orders, allOrders, shortages]);
   const bulkKept = filtered.filter(d => isUnmatchedLiveDeposit(d)).length - bulkTargets.length;
 
   async function settleAll(reason: string) {
@@ -504,6 +551,7 @@ export default function LiveFloatingMatchPanel({
               const checked = selectedDepIds.has(depId);
               const rec = matchMode ? isRecommended(dep) : !!findBestOrder(dep);
               const bestOrder = !matchMode ? findBestOrder(dep) : null;
+              const extraTarget = !matchMode && !bestOrder && !isMatched ? shortageFor(dep) : null;
               const diff = matchMode ? Number(dep.amount ?? 0) - expectedAmount : 0;
               const selectable = matchMode && !isMatched;
 
@@ -534,6 +582,11 @@ export default function LiveFloatingMatchPanel({
                     </div>
                     <div className="text-[12px] text-ink-mute">{dep.deposited_time ?? ""}</div>
                     {/* 추천 연결 대상 — 누르기 전에 어느 주문에 붙는지 보이게(표시만) */}
+                    {extraTarget && (
+                      <div className="mt-0.5 truncate text-[12px] font-semibold text-warn-tx">
+                        추가 입금? → {extraTarget.nickname || extraTarget.name} 주문 {won(extraTarget.shortage)} 부족
+                      </div>
+                    )}
                     {bestOrder && !isMatched && (
                       <div className="mt-0.5 truncate text-[12px] font-semibold text-ink-soft">
                         → {bestOrder.nickname || bestOrder.name || "-"}{bestOrder.name && bestOrder.nickname && bestOrder.name !== bestOrder.nickname ? ` (${bestOrder.name})` : ""} 주문
@@ -557,7 +610,12 @@ export default function LiveFloatingMatchPanel({
                         disabled={matchSaving}
                         className="mt-1 h-8 rounded-lg bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50">연결</button>
                     )}
-                    {!matchMode && !isMatched && !bestOrder && (
+                    {extraTarget && (
+                      <button type="button" onClick={e => { e.stopPropagation(); void linkExtraDeposit(dep, extraTarget); }}
+                        disabled={matchSaving}
+                        className="mt-1 h-8 rounded-lg bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50">붙이기</button>
+                    )}
+                    {!matchMode && !isMatched && !bestOrder && !extraTarget && (
                       <button type="button" onClick={e => { e.stopPropagation(); onSearchFilter(dep.depositor_name ?? ""); }}
                         title="뒤 주문표를 이 입금자명으로 검색해요"
                         className="mt-1 h-8 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">주문 찾기</button>

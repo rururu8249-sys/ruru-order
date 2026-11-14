@@ -1,5 +1,6 @@
 "use client";
 
+import ExtraDepositLinker from "./ExtraDepositLinker";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { cardPaymentStatusPatch } from "@/lib/cardPaymentStatusUpdate";
@@ -14,7 +15,7 @@ import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderI
 import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
 import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
-import { buildCustomerOrderCopyText, buildExtraDepositRequestNote, buildPaymentRequestNote, buildPaymentRequestKakao, paymentRequestToast } from "./liveOrderCustomerCopy";
+import { buildCustomerOrderCopyText, buildOrderItemsCopyText, buildExtraDepositRequestNote, buildPaymentRequestNote, buildPaymentRequestKakao, paymentRequestToast } from "./liveOrderCustomerCopy";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
@@ -1492,10 +1493,19 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             </div>
             <button
               type="button"
+              title="상품·옵션·수량만 복사"
+              onClick={() => { void navigator.clipboard.writeText(buildOrderItemsCopyText(orderForView)).then(() => showAdminToast("주문내용이 복사됐어요.", "success"), () => showAdminToast("복사에 실패했어요. 다시 눌러 주세요.", "error")); }}
+              className="h-8 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
+            >
+              주문내용 복사
+            </button>
+            <button
+              type="button"
+              title="주소·금액·입금 안내까지 복사"
               onClick={() => void copyCustomerOrderSummary()}
               className="h-8 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
             >
-              고객용 복사
+              상세 복사
             </button>
             {["unpaid", "manual_match_needed", "card_unpaid"].includes(orderForView.paymentStatus) ? (
               <button
@@ -1647,6 +1657,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             return (
               <div className="mt-2 rounded-lg bg-ok-bg px-3 py-2 text-[13px] font-semibold leading-5 text-ok-tx">
                 받은 돈 {money(balanceInfo.depositSum)} = 주문 금액 {money(balanceOrderTotal)} — 딱 맞아요.
+                {balanceInfo.depositCount > 1 ? <div className="mt-1"><ExtraDepositLinker groupId={balanceGroupId} nickname={String(orderForView.nickname || "")} mode="extras" onChanged={loadBalanceInfo} /></div> : null}
               </div>
             );
           }
@@ -1654,6 +1665,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             return (
               <div className="mt-2 space-y-2 rounded-lg bg-warn-bg px-3 py-2.5 leading-5">
                 <div className="text-[13px] font-bold text-warn-tx">손님이 {money(diff)} 더 냈어요.</div>
+                {balanceInfo.depositCount > 1 ? <ExtraDepositLinker groupId={balanceGroupId} nickname={String(orderForView.nickname || "")} mode="extras" onChanged={loadBalanceInfo} /> : null}
                 <div className="text-[11px] font-bold text-warn-tx">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
                 {refundDone && balanceInfo.lastRefund ? (
                   <div className="rounded-lg bg-ok-bg px-2.5 py-1.5 text-[12px] font-bold text-ok-tx">이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요.</div>
@@ -1678,6 +1690,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <button type="button" disabled={balanceWorking} onClick={() => void handleRequestShortageDeposit(-diff)} className="h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3 disabled:text-ink-mute">
                 {balanceWorking ? "처리 중…" : `${money(-diff)} 더 입금해달라고 쪽지 보내기`}
               </button>
+              {/* [2026-11-15] 차액이 들어오면 입금확인 취소 없이 이 주문에 붙이기 */}
+              <ExtraDepositLinker groupId={balanceGroupId} nickname={String(orderForView.nickname || orderForView.name || "고객")} mode="short" onChanged={loadBalanceInfo} />
             </div>
           );
         })() : null}

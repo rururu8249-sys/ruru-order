@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
+import { splitBrandDetailForOrder } from "@/lib/brandDetailOrderRow";
 import { detailProducts } from "@/lib/productDetailModel";
 import type { LiveOrderRegisteredAddInput } from "./useLiveOrderItemAdd";
 import { toOptionList } from "@/lib/optionSplit";
@@ -336,10 +337,17 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
       showAdminToast("사이즈를 선택해주세요.", "warning");
       return;
     }
-    const input: LiveOrderRegisteredAddInput = {
-      productId: Number(productId(selected)),
+    // [2026-11-15] 브랜드 묶음(재고 안 셈)은 손님 주문과 같은 모양으로 — 상품명=세부상품, 색상=나머지
+    const shaped = splitBrandDetailForOrder({
+      note: note as Record<string, unknown>,
       productName: productName(selected),
       color: colorMode === "none" ? "" : color.trim(),
+      detailNames: detailNamesById.get(productId(selected)) ?? [],
+    });
+    const input: LiveOrderRegisteredAddInput = {
+      productId: Number(productId(selected)),
+      productName: shaped.productName,
+      color: shaped.color,
       size: sizeMode === "none" ? "" : size.trim(),
       qty: Number(String(qty).replace(/[^\d]/g, "")) || 0,
       unitPrice: Number(String(unitPrice).replace(/[^\d]/g, "")) || 0,

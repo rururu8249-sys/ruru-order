@@ -14,7 +14,7 @@ import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 import { paymentStatusDetail, shippingStatusLabel } from "@/lib/orderLabels";
 import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./BroadcastCalendarPicker";
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
-import { buildCustomerOrderCopyText, buildPaymentRequestNote, buildPaymentRequestKakao, paymentRequestToast } from "./liveOrderCustomerCopy";
+import { buildCustomerOrderCopyText, buildManyOrderItemsCopyText, buildOrderItemsCopyText, buildPaymentRequestNote, buildPaymentRequestKakao, paymentRequestToast } from "./liveOrderCustomerCopy";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { isAutoTestRow } from "@/lib/autoTestOrder";
 import { pickingProgress, isPickingComplete, pickingScope } from "@/lib/orderPicking";
@@ -568,7 +568,18 @@ export default function LiveOrderTable({
     const text = buildCustomerOrderCopyText(order);
     try {
       await navigator.clipboard.writeText(text);
-      showAdminToast(`${order.nickname || order.name} 주문서가 복사됐어요\n\n카톡 등에 붙여넣기 하세요.`, "success");
+      showAdminToast(`${order.nickname || order.name} 주문서(상세)가 복사됐어요\n\n카톡 등에 붙여넣기 하세요.`, "success");
+    } catch {
+      showAdminToast("복사에 실패했어요. 한 번 더 눌러주세요.", "error");
+    }
+  };
+  // [2026-11-15] 주문내용만(상품·옵션·수량) — 한 건 / 선택한 여러 건
+  const copyOrderItemsOnly = async (list: LiveOrder[]) => {
+    if (list.length === 0) return;
+    const text = list.length === 1 ? buildOrderItemsCopyText(list[0]) : buildManyOrderItemsCopyText(list);
+    try {
+      await navigator.clipboard.writeText(text);
+      showAdminToast(list.length === 1 ? `${list[0].nickname || list[0].name} 주문내용이 복사됐어요.` : `주문 ${list.length}건 주문내용이 복사됐어요.`, "success");
     } catch {
       showAdminToast("복사에 실패했어요. 한 번 더 눌러주세요.", "error");
     }
@@ -1159,6 +1170,14 @@ export default function LiveOrderTable({
             <>
               <button
                 type="button"
+                onClick={() => void copyOrderItemsOnly(workFilteredOrders.filter((o) => selectedOrderIds.has(String(o.id)) && !(o.pickPull && !o.pickPull.whole)))}
+                className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink hover:bg-surface-2"
+                title="선택한 주문의 상품·옵션·수량만 한 번에 복사"
+              >
+                주문내용 복사
+              </button>
+              <button
+                type="button"
                 onClick={handleMarkShipped}
                 disabled={shippedSaving !== ""}
                 className="rounded-xl border border-info-tx bg-info-bg px-3 py-2 text-xs font-black text-[var(--color-info-tx)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1499,8 +1518,12 @@ export default function LiveOrderTable({
                                 className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink-soft disabled:opacity-40">쪽지</button>
                             ) : null}
                             {order.pickPull && !order.pickPull.whole ? null : (
-                            <button type="button" onClick={() => void copyOrderForCustomer(order)}
-                              className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink">주문서 복사</button>
+                              <>
+                                <button type="button" onClick={() => void copyOrderItemsOnly([order])} title="상품·옵션·수량만 복사"
+                                  className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink">주문내용 복사</button>
+                                <button type="button" onClick={() => void copyOrderForCustomer(order)} title="주소·금액·입금 안내까지 복사"
+                                  className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink">상세 복사</button>
+                              </>
                             )}
                           </span>
                         </div>
@@ -1543,14 +1566,24 @@ export default function LiveOrderTable({
                         </div>
                         {/* [2026-10-22] 지난 주문 가상 묶음(가져온 줄만)은 금액이 주문서 전체가 아니므로 복사·쪽지는 원래 주문(상세)에서 */}
                         {order.pickPull && !order.pickPull.whole ? null : (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); void copyOrderForCustomer(order); }}
-                          title="이 주문서 한 건을 상세 안 열고 고객용 형식(주소·입금상태·계좌 안내 포함)으로 복사"
-                          className="mt-0.5 rounded-lg border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep"
-                        >
-                          주문서 복사
-                        </button>
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void copyOrderItemsOnly([order]); }}
+                            title="상품·옵션·수량만 복사"
+                            className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[11px] font-bold text-ink hover:bg-surface-2"
+                          >
+                            주문내용
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void copyOrderForCustomer(order); }}
+                            title="이 주문서 한 건을 상세 안 열고 고객용 형식(주소·입금상태·계좌 안내 포함)으로 복사"
+                            className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[11px] font-bold text-ink hover:bg-surface-2"
+                          >
+                            상세 복사
+                          </button>
+                        </div>
                         )}
                         {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order) || pickPullBadge(order) || subscribeBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
