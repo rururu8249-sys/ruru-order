@@ -375,6 +375,8 @@ function IconEyeSmall({ size = 14, color = "#FFFFFF" }: { size?: number; color?:
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
 }
 
+const YT_EDGE_CROP = 76;
+
 export default function LiveWatchView(props: Props) {
   // Live view splits by available width, including unfolded foldables and landscape phones.
   const isDesktop = useIsDesktop(640);
@@ -890,7 +892,6 @@ export default function LiveWatchView(props: Props) {
   // 돌려보기 중엔 원래 크기(유튜브 막대가 잘리지 않게).
   const [videoScale, setVideoScale] = useState(1);
   const [videoFrame, setVideoFrame] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [iframeH, setIframeH] = useState(0);
   useEffect(() => {
     const el = iframeRef.current;
     if (!el) return;
@@ -900,7 +901,6 @@ export default function LiveWatchView(props: Props) {
       if (w <= 0 || h <= 0) return;
       const s = w / (h * 9 / 16);
       setVideoScale(s > 1.005 ? Math.min(1.12, s) : 1);
-      setIframeH(h);
       // [2026-11-15] 9:16 영상이 실제로 그려지는 칸(검은 띠 뺀 자리) — PC 쉬는 중 안내 상자를 영상 속 채널 배너 위에 맞추려고
       const fw = Math.min(w, h * 9 / 16);
       const fh = fw * 16 / 9;
@@ -1236,38 +1236,22 @@ export default function LiveWatchView(props: Props) {
     >
       {/* PC 영상 영역 / 폰은 기존 화면 전체 배치 */}
       <div data-live-video="1" style={isDesktop ? { position: "absolute", left: 0, right: videoAreaRight, top: 0, bottom: 0, overflow: "hidden" } : { display: "contents" }}>
-      <iframe
-        ref={iframeRef}
-        key={`${videoId}-${reloadKey}`}
-        onLoad={listenPlayer}
-        src={embedSrc}
-        title={`${title || "라이브 방송"} 영상`}
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-        allowFullScreen
-        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}
-      />
+      {/* [2026-11-15 사장님 04:51 「스티커 말고 화면과 하나로」] 덮개 대신 유튜브 공유·로고·제목이 그려지는 위아래 가장자리를 잘라냄.
+          영상(iframe)을 위아래로 YT_EDGE_CROP 만큼 더 크게 그리고, 원래 크기 칸(overflow hidden)으로 잘라 보여줌 → 유튜브가 가장자리에 띄우는 것이 칸 밖으로 나감.
+          PC 는 영상이 조금 커지고(위아래 약간 잘림), 폰은 키우는 배율이 그만큼 줄어듦. */}
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", overflow: "hidden", background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
+        <iframe
+          ref={iframeRef}
+          key={`${videoId}-${reloadKey}`}
+          onLoad={listenPlayer}
+          src={embedSrc}
+          title={`${title || "라이브 방송"} 영상`}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          style={{ position: "absolute", left: 0, top: -YT_EDGE_CROP, width: "100%", height: `calc(100% + ${YT_EDGE_CROP * 2}px)`, border: 0, background: "#000000" }}
+        />
+      </div>
 
-      {/* [2026-11-15 사장님 화면 테스트] 유튜브 공유(왼쪽 아래)·YouTube 표시(오른쪽 아래)를 늘 가림.
-          영상(iframe)과 같은 크기·같은 배율 칸 안에 두어 폰·PC(손님·관리자 칸 너비가 달라도) 유튜브가 버튼을 그리는 모서리에 맞음.
-          폰은 영상을 키워(videoScale) 맨 아래가 아래 버튼 줄 뒤로 숨으므로, 그만큼 위로 올려 잘리지 않게(coverLift).
-          왼쪽 = 강아지 얼굴 큰 동그라미(사장님 04:40 — 알약·글자 없이 얼굴만, PC 104·폰 66px), 오른쪽 = 흰 RURU 글씨(배경 없음, 뒤만 살짝 흐림). 채팅·상품 카드보다는 뒤. */}
-      {(() => {
-        // 키운 영상이 아래로 넘친 만큼 − (영상 칸 아래 84px 중 버튼 줄이 덮지 않는 틈) = 버튼 줄 뒤로 숨은 높이(화면 px) → 영상 배율로 나눔
-        const coverLift = isDesktop || videoScale === 1 || !iframeH ? 0 : Math.max(0, ((videoScale - 1) * iframeH) / 2 - (84 - (bottomBarHeight ?? 84))) / videoScale;
-        const bottom = Math.max(4, Math.round(coverLift));
-        return (
-          <div aria-hidden="true" data-yt-cover style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
-            {/* 왼쪽 — 강아지 얼굴 프로필(흰 테두리 + 얇은 유리 고리 + 부드러운 그림자) */}
-            <div style={{ position: "absolute", left: isDesktop ? 32 : 18, bottom: isDesktop ? 6 : bottom, width: isDesktop ? 108 : 70, height: isDesktop ? 108 : 70, borderRadius: "50%", padding: isDesktop ? 4 : 3, boxSizing: "border-box", background: "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(255,255,255,0.55))", boxShadow: "0 6px 18px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.12)" }}>
-              <img src="/yt-cover-dog-face.jpg" alt="" draggable={false} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", objectPosition: "50% 42%", display: "block" }} />
-            </div>
-            {/* 오른쪽 — RURU 유리 알약(진한 흐림이라 뒤 유튜브 로고가 비치지 않음) */}
-            <div style={{ position: "absolute", right: isDesktop ? 20 : 22, bottom: isDesktop ? 10 : bottom, width: isDesktop ? 140 : 124, height: isDesktop ? 64 : 60, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(160deg, rgba(40,40,40,0.62), rgba(8,8,8,0.72))", backdropFilter: "blur(26px) saturate(140%)", WebkitBackdropFilter: "blur(26px) saturate(140%)", border: "1px solid rgba(255,255,255,0.45)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 18px rgba(0,0,0,0.35)" }}>
-              <img src="/yt-cover-logo.png" alt="" draggable={false} style={{ width: isDesktop ? 98 : 86, height: "auto", display: "block", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }} />
-            </div>
-          </div>
-        );
-      })()}
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
       {/* 돌려보기 중 — 영상 전체를 반투명 검정으로 어둡게(유튜브 막대는 빨강·흰색이라 그대로 보임) */}
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
