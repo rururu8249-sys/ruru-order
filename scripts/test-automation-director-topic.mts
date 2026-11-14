@@ -83,3 +83,14 @@ console.log('ok pay talk');}
  if(/[ㅋㅎ]/.test(varyLaughTail('사이즈 될까요 ㅋㅋ',['오 ㅋㅋ'],2)))throw new Error('질문엔 웃음 금지');
  console.log('PASS 줄임말·웃음 끝맺음',[...outs].join(' / '));
 }
+
+// [2026-11-15 08:18] 같은 말도 띄어쓰기·마침표·^^·어미가 사람마다 다르게
+{
+  const {varySurface} = await import('../lib/liveAutomationVoice');
+  const outs = new Set<string>();
+  for (let i = 1; i < 200; i++) outs.add(varySurface('베이지도 예쁘네요', i * 97));
+  if (outs.size < 10) throw new Error('varySurface 다양성 부족 ' + outs.size);
+  if (![...outs].some((x) => x.includes('베이지도예쁘')) || ![...outs].some((x) => /\^\^$/.test(x)) || ![...outs].some((x) => /용/.test(x))) throw new Error('varySurface 종류 누락');
+  if (varySurface('버58 160에 52인데 몇 입으면 될까요?', 5).indexOf('버58') !== 0 || !varySurface('버58 160에 52인데', 3).includes('160에 52')) throw new Error('숫자 건드림');
+  console.log('varySurface ok', outs.size);
+}

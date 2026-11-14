@@ -61,3 +61,33 @@ export function varyLaughTail(text: string, recentAi: string[], seed = 0): strin
   if (!pick) return body;
   return /^[~!]/.test(pick) ? body + pick : body + ' ' + pick;
 }
+
+// [2026-11-15 08:18 사장님] 같은 말이라도 사람마다 미세하게 다르게 — 띄어쓰기 잘함/못함, 마침표, ^^, ~당·~여·~용 어미.
+//   Gemini 글을 마지막에 «가끔»만 손봄(뜻·상품번호·숫자는 그대로).
+const END_SWAP: [RegExp, string[]][] = [
+  [/요$/, ['요', '여', '용', '욤']],
+  [/다$/, ['다', '당']],
+  [/네$/, ['네', '넹', '네용']],
+  [/죠$/, ['죠', '쥬', '지요']],
+];
+export function varySurface(text: string, seed = 0): string {
+  let s = text;
+  let r = Math.abs(Math.trunc(seed)) || 1;
+  const rnd = () => { r = (r * 1103515245 + 12345) % 2147483648; return r / 2147483648; };
+  // ① 띄어쓰기: 가끔 다 붙여 씀, 가끔 한 군데만 붙임(숫자·영어 사이는 안 건드림)
+  const sp = rnd();
+  if (sp < 0.18) s = s.replace(/([가-힣])\s+([가-힣])/g, '$1$2');
+  else if (sp < 0.4) { let done = false; s = s.replace(/([가-힣])\s+([가-힣])/g, (m, a, b) => (done ? m : ((done = true), a + b))); }
+  // ② 어미: 끝 글자만 가끔 바꿈(문장부호·이모지 앞)
+  const m = s.match(/^(.*?)([.!?~^ㅋㅎㅠㅜ\s\u{1F300}-\u{1FAFF}☀-➿]*)$/u);
+  if (m && rnd() < 0.35) {
+    const [, body, tail] = m;
+    for (const [re, opts] of END_SWAP) if (re.test(body)) { s = body.replace(re, opts[Math.floor(rnd() * opts.length)]) + tail; break; }
+  }
+  // ③ 끝 부호: 아무것도 없을 때만 가끔 . / .. / ^^ / ~ / !
+  if (!/[.!?~^ㅋㅎㅠㅜ\u{1F300}-\u{1FAFF}☀-➿]$/u.test(s)) {
+    const e = rnd();
+    s += e < 0.12 ? '.' : e < 0.18 ? '..' : e < 0.28 ? '^^' : e < 0.38 ? '~' : e < 0.44 ? '!' : '';
+  }
+  return s;
+}
