@@ -902,7 +902,7 @@ export default function LiveWatchView(props: Props) {
       const h = el.clientHeight;
       if (w <= 0 || h <= 0) return;
       const s = w / (h * 9 / 16);
-      void s; setVideoScale(1); // 원본 그대로(키우지 않음)
+      setVideoScale(Math.min(1.12, Math.max(1, s))); // 07:17 사장님: 좌우 검은 띠 없게 키움(로고·워터마크도 같은 칸 안이라 같이 맞춰짐)
       setIframeH(h - YT_EDGE_CROP * 2);
       // [2026-11-15] 9:16 영상이 실제로 그려지는 칸(검은 띠 뺀 자리) — PC 쉬는 중 안내 상자를 영상 속 채널 배너 위에 맞추려고
       const fw = Math.min(w, h * 9 / 16);
