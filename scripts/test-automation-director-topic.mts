@@ -98,9 +98,9 @@ console.log('ok pay talk');}
 // [2026-11-15 08:28] 최근 웃음이 없어도 «ㅋㅋ/ㅎㅎ» 두 개 끝맺음은 늘 바꿈 + 주말이라 담는다는 말 금지
 {
   const {varyLaughTail} = await import('../lib/liveAutomationVoice');
-  for (let i = 1; i < 60; i++) for (const t of ['좋네용 ㅎㅎ', '이쁘다 ㅋㅋ']) {
-    const o = varyLaughTail(t, [], i * 13);
-    if (/(^|[^ㅎ])ㅎㅎ$|(^|[^ㅋ])ㅋㅋ$/.test(o)) throw new Error('ㅋㅋ/ㅎㅎ 그대로 ' + o);
-  }
-  console.log('stock laugh ok');
+  // [08:45 사장님] ㅋㅋ·ㅎㅎ도 써도 됨 — 여러 모양이 섞이는지(두 개짜리 그대로는 절반 아래)
+  let kept = 0; const kinds = new Set<string>();
+  for (let i = 1; i < 200; i++) { const o = varyLaughTail('좋네용 ㅎㅎ', [], i * 13); if (/(^|[^ㅎ])ㅎㅎ$/.test(o)) kept++; kinds.add(o); }
+  if (kept === 0 || kept > 100 || kinds.size < 8) throw new Error(`웃음 섞기 이상 kept=${kept} kinds=${kinds.size}`);
+  console.log('stock laugh mix ok', kept, kinds.size);
 }

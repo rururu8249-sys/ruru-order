@@ -19,6 +19,8 @@ import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
 import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail,varySurface} from './liveAutomationVoice';
+import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
+import {isSubscribeFreeShipActive} from './subscribeFreeShip';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
 type Row=Record<string,unknown>;
@@ -217,6 +219,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const spoke=new Set(spokeRows.map(r=>String(r.automation_actor_id)));
  const mode=await streamModeOf(db,bc.data);
  const card=await readDialogueCard(db,c.broadcast_id).catch(()=>null);
+ // [2026-11-15 08:44 사장님] «구독하면 무배?»는 관리자에서 구독 인증 무료배송이 켜져 있을 때만
+ const subscribeOn=await readSubscribeFreeShipConfig(db).then(cfg=>isSubscribeFreeShipActive(cfg)).catch(()=>false);
  const weekday=['일','월','화','수','목','금','토'][k.getUTCDay()],weekend=k.getUTCDay()===0||k.getUTCDay()===6;
  const roster=actors.flatMap(a=>{
   const s=sessions.find(x=>x.actor_id===a.id);if(!s)return [];
@@ -258,6 +262,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   '[사실] 상품 얘기는 지금 상품 카드 정보만 근거로 한다(없는 색·사이즈·소재·가격을 지어내지 않는다). 해 본 적 없는 구매·사용·배송받은 경험, 친구 소개 같은 이야기를 지어내지 않는다. 주문했다는 말은 주문이 있는 손님만, 결제 완료 말은 결제확인 받은 손님만. 영상·소리를 보거나 들은 척하지 않는다. 자기가 지금 뭘 보는 중인지 설명하지 않는다. 테스트·AI·가상·시스템 같은 말 금지.',
   `[상황] 지금 ${mode==='live'?'생방송 중':'지금은 방송 시간이 아니다(라이브 아님 — 다시보기/쉬는 중). 상품은 지금도 담고 주문할 수 있다. 가끔 «방송 중이 아닌데도 다시보기 보면서 주문할 수 있어 좋네요» 같은 뜻을 매번 다른 말로 해도 된다. 주말·요일 때문에 담을 수 있다는 말은 틀린 말이니 금지(주말에도 방송함). 지금 입어 달라·보여 달라 같은 실시간 요청 금지'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
   `[지금 상품 카드] ${cardText}`,
+  subscribeOn?'[구독 무배] 지금 «유튜브 구독 인증하면 배송비 무료» 행사 중 — 처음 온 손님이 가끔 «구독하면 무배?»«구독 인증 어디서 해요?»처럼 물어도 자연스럽다.':'[구독 무배] 지금 구독 무료배송 행사 없음 — 구독·무배·무료배송 얘기 금지.',
+  card?.overseas?'[해외배송 상품] 지금 카드 상품은 해외배송이다 — 가끔 «해외배송인가요?»«해배인가요?»«배송 얼마나 걸려요?»«주문하면 언제쯤 받아요?» 같은 질문이 자연스럽다(답은 하지 않음).':'[배송] 지금 카드 상품은 해외배송이 아니다 — 해외배송·해배 질문 금지.',
   `[가상 손님 목록 — 이 중에서만 고른다]\n${rosterText}`,
   `[대화 — 오래된 것부터]\n${transcript}`,
   `[진짜 유튜브 손님 말투 — 지난 방송 채팅 분석]\n${YOUTUBE_STYLE_RULES.map(x=>`- ${x}`).join('\n')}\n예(그대로 베끼지 말고 느낌만): ${pickStyleLines(now,30).filter(x=>!namesSize(x)&&!vaguePointerQuestion(x)).slice(0,12).join(' / ')}\n주문 있는 가상 손님만 쓸 수 있는 말투 예: ${ORDERED_STYLE_LINES.join(' / ')}\n결제확인 받은 가상 손님만 쓸 수 있는 말투 예: ${PAID_STYLE_LINES.join(' / ')}`,
@@ -288,7 +294,11 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(cardAckBlocked(t,r.cardOrder,r.paid.includes('card')))return false;
   if(!tgt&&roomAnnounceBlocked(t,recentAi))return false;
   if(offCardProductMention(t,[card?`${card.name} ${card.colors.join(' ')}`:'',...r.cart,...r.ordered].join(' '),notices))return false;
-  if(/([가-힣]{2,}요)[\s\S]*\1/.test(t)||/다시\s*보기|구경\s*(하는|중|하고)/.test(t))return false;
+  if(/([가-힣]{2,}요)[\s\S]*\1/.test(t))return false;
+  // 시청 상태 혼잣말은 금지 — 단 방송 시간이 아닐 때 «다시보기 보면서 주문/담기» 얘기는 사장님 요청(08:26)이라 허용
+  if(/다시\s*보기|구경\s*(하는|중|하고)/.test(t)&&!(mode!=='live'&&/다시\s*보기/.test(t)&&/주문|담/.test(t)))return false;
+  if(!subscribeOn&&/무배|무료\s*배송|구독.{0,6}(하면|인증|무료)/.test(t))return false;
+  if(!card?.overseas&&/해외\s*배송|해배/.test(t))return false;
   if(weekend&&WORK.test(t))return false;
   // [2026-11-15 08:26 사장님] 주말이라서 담는 게 아님(주말에도 방송함) — «방송 시간 아닌데도 다시보기로 주문» 이 맞는 말
   if(/(주말|평일|휴일|일요일|토요일)(에도|이라|이니|인데)/.test(t)&&/담|주문|사|구매|편하/.test(t))return false;

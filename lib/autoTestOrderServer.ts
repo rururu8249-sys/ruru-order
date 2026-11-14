@@ -4,6 +4,7 @@
 //   - 주문은 손님과 같은 주소로 보낸다: /api/cart-reservations(담기) → /api/customer-orders/submit(제출). 가짜 저장 경로 없음.
 //   - 저장 뒤 DB 를 다시 읽어 보낸 줄과 맞는지 확인하고 결과 한 줄만 남긴다(별도 기록 화면 없음).
 //   - 삭제는 «자동 테스트 주문서»만(is_test_order=true + test_order_reason 자동 테스트, 주문서 줄 전부가 그럴 때만).
+import { keepPaymentNoticesForDeleted } from "./autoTestOrphanPayment";
 import { randomBytes, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fallbackChatLine, makeChatLines, type ChatProduct, type StreamMode } from "@/lib/autoTestChat";
@@ -506,7 +507,7 @@ export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): P
   for (let i = 0; i < groups.length; i += 100) {
     const batch = groups.slice(i, i + 100);
     // 주문서의 «모든» 줄 다시 읽기 — 하나라도 자동 테스트가 아니면 그 주문서는 손대지 않음
-    const { data: all, error: allErr } = await sb.from("orders").select("id, order_group_id, is_test_order, test_order_reason, operator_test_phone, youtube_nickname, broadcast_id").in("order_group_id", batch);
+    const { data: all, error: allErr } = await sb.from("orders").select("id, order_group_id, is_test_order, test_order_reason, operator_test_phone, youtube_nickname, broadcast_id, automation_action_id").in("order_group_id", batch);
     if (allErr) throw new Error(allErr.message);
     const rows = (all ?? []) as Row[];
     const bad = new Set(rows.filter((r) => !isAutoTestRow(r)).map((r) => String(r.order_group_id)));
@@ -522,6 +523,8 @@ export async function deleteAutoTestOrders(sb: Db, groupIds: string[] | null): P
     const finalRows = okRows.filter((r) => !ledgerGroups.has(String(r.order_group_id)));
     const finalGroups = [...new Set(finalRows.map((r) => String(r.order_group_id)))];
     if (!finalRows.length) continue;
+    // [2026-11-15 사장님] 주문 감사 알림이 이미 채팅에 뜬 주문은, 지워도 예정된 결제 알림은 원래 시각에 나가게(지우기 «전»에 옮겨 둠)
+    await keepPaymentNoticesForDeleted(sb, finalRows);
     const { data: del, error: delErr } = await sb.from("orders").delete()
       .in("id", finalRows.map((r) => Number(r.id))).eq("is_test_order", true).select("id");
     if (delErr) throw new Error(delErr.message);

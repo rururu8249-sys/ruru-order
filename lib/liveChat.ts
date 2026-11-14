@@ -198,10 +198,14 @@ export function chatHueGap(a: number, b: number): number {
 }
 const NEAR_GAP = 50; // 바로 위 다른 사람과 이 각도보다 가까우면 «비슷한 색»
 const NEAR_GAP2 = 30; // 두 줄 위 다른 사람
-// [2026-11-15 08:31 사장님] 「프로필·닉네임 색은 본인이 쓰던 색 그대로, 앞뒤로 겹쳐 헷갈릴 때만 바꿈」
-//   ① 사람마다 정해진 자기 색(chatBaseColorIndex)을 먼저 씀(목록 첫 글 색을 따라가지 않음)
-//   ② 한 번 정해진 글 색은 기억(CHAT_COLOR_MEMO) — 위 글이 화면에서 빠지거나 새 글이 와도 이미 보인 글 색이 안 바뀜
+// [2026-11-15 08:31·08:47 사장님] 「프로필·닉네임 색은 그 사람이 쓰던 색 그대로 — 한 방송·비슷한 시간대 동안만.
+//   색은 몇 개뿐이니 몇 달씩 한 사람 전용은 아님. 앞뒤로 겹쳐 헷갈릴 때만 그 글만 다른 색」
+//   ① 사람 색(PERSON_COLOR): 처음 나올 때 «최근에 말한 다른 사람들이 안 쓰는 색» 중에서 정해 기억(닉네임 기본색 우선)
+//   ② 그 사람이 한동안(글 300개 넘게) 말이 없으면 기억을 놓아 그 색을 다른 사람이 쓸 수 있음
+//   ③ 바로 위·두 줄 위와 비슷하면 그 글만 다른 색(사람 색은 그대로) ④ 한 번 보인 글 색은 기억(CHAT_COLOR_MEMO) — 스크롤해도 안 바뀜
 const CHAT_COLOR_MEMO = new Map<number, number>();
+const PERSON_COLOR = new Map<string, { idx: number; last: number }>();
+const PERSON_IDLE_GAP = 300;
 export function chatColors(list: { id: number; nickname: string }[]): Map<number, string> {
   const out = new Map<number, string>();
   let prevNick = "";
@@ -209,18 +213,31 @@ export function chatColors(list: { id: number; nickname: string }[]): Map<number
   let prev2Idx = -1;
   const score = (i: number) => Math.min(prevIdx < 0 ? 999 : chatHueGap(i, prevIdx), prev2Idx < 0 ? 999 : chatHueGap(i, prev2Idx) + (NEAR_GAP - NEAR_GAP2));
   const ok = (i: number) => (prevIdx < 0 || chatHueGap(i, prevIdx) >= NEAR_GAP) && (prev2Idx < 0 || chatHueGap(i, prev2Idx) >= NEAR_GAP2);
+  const personColor = (nick: string, id: number): number => {
+    const had = PERSON_COLOR.get(nick);
+    if (had && id - had.last <= PERSON_IDLE_GAP) { had.last = Math.max(had.last, id); return had.idx; }
+    // 최근(글 번호 기준) 말한 다른 사람들이 쓰는 색은 피함
+    const busy = new Set<number>();
+    for (const [n, v] of PERSON_COLOR) if (n !== nick && id - v.last <= 60 && v.last <= id + 60) busy.add(v.idx);
+    const base = chatBaseColorIndex(nick);
+    let idx = base;
+    for (let k = 0; k < CHAT_COLORS.length; k++) { const c = (base + k) % CHAT_COLORS.length; if (!busy.has(c)) { idx = c; break; } }
+    PERSON_COLOR.set(nick, { idx, last: id });
+    if (PERSON_COLOR.size > 2000) PERSON_COLOR.delete(PERSON_COLOR.keys().next().value as string);
+    return idx;
+  };
   for (const m of list) {
     let idx: number;
     const memo = CHAT_COLOR_MEMO.get(m.id);
+    const own = personColor(m.nickname, m.id);
     if (m.nickname === prevNick && prevIdx >= 0) idx = prevIdx; // 같은 사람이 이어 쓰면 같은 색
     else {
       if (memo !== undefined) idx = memo;
       else {
-        const base = chatBaseColorIndex(m.nickname);
         idx = -1;
-        if (ok(base)) idx = base;
-        if (idx < 0) for (let k = 1; k < CHAT_COLORS.length; k++) { const c = (base + k) % CHAT_COLORS.length; if (ok(c)) { idx = c; break; } }
-        if (idx < 0) { idx = base; for (let c = 0; c < CHAT_COLORS.length; c++) if (score(c) > score(idx)) idx = c; }
+        if (ok(own)) idx = own;
+        if (idx < 0) for (let k = 1; k < CHAT_COLORS.length; k++) { const c = (own + k) % CHAT_COLORS.length; if (ok(c)) { idx = c; break; } }
+        if (idx < 0) { idx = own; for (let c = 0; c < CHAT_COLORS.length; c++) if (score(c) > score(idx)) idx = c; }
       }
       prev2Idx = prevIdx;
     }

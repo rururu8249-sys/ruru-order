@@ -40,7 +40,7 @@ export function laughTail(text: string): string {
 }
 const kindOf = (tail: string) => (/ㅋ/.test(tail) ? 'k' : /ㅎ/.test(tail) ? 'h' : /[ㅠㅜ]/.test(tail) ? 'u' : tail ? 'e' : '');
 
-const VARIANTS = ['', 'ㅋ', 'ㅋㅋㅋㅋ', 'ㅎ', 'ㅎㅎㅎ', '😊', '🥰', '~', '!!', 'ㅋㅋㅋㅋㅋ', '😆', '^^', ''];
+const VARIANTS = ['', 'ㅋ', 'ㅋㅋ', 'ㅋㅋㅋㅋ', 'ㅎ', 'ㅎㅎ', 'ㅎㅎㅎ', '😊', '🥰', '~', '!!', 'ㅋㅋㅋㅋㅋ', '😆', '^^', '🤣', ''];
 
 /**
  * 최근 AI 글 끝맺음과 같으면(같은 웃음 같은 개수) 다른 꼬리로, 최근 4개 중 2개 이상 웃음이었으면 이번엔 웃음 빼기.
@@ -56,10 +56,11 @@ export function varyLaughTail(text: string, recentAi: string[], seed = 0): strin
   const serious = /죄송|미안|ㅠ|ㅜ|\?$|까요|나요|인가요|될까/.test(body);
   const sameRecent = recentTails.includes(tail) || (kindOf(tail) && recentTails.slice(0, 3).some((t) => kindOf(t) === kindOf(tail)));
   // [2026-11-15 08:28 사장님] Gemini 는 거의 늘 «ㅋㅋ/ㅎㅎ» 두 개로 끝냄 → 그 두 모양은 겹치지 않아도 늘 다른 꼬리로(웃음 빼기 포함)
-  const stock = tail === 'ㅋㅋ' || tail === 'ㅎㅎ';
-  if (!stock && !sameRecent && !(laughs >= 2 && /[ㅋㅎ]/.test(tail))) return text;
+  // [2026-11-15 08:45 사장님] ㅋㅋ·ㅎㅎ 써도 됨 — 늘 그것만 쓰는 게 문제. 두 개짜리는 약 35%만 그대로, 나머지는 다른 모양으로 섞음
+  const stock = (tail === 'ㅋㅋ' || tail === 'ㅎㅎ') && Math.abs(Math.trunc(seed * 13 + 5)) % 20 >= 7;
+  if (!stock && !sameRecent && !(laughs >= 3 && /[ㅋㅎ]/.test(tail))) return text;
   const pool = VARIANTS.filter((v) => v !== tail && (!recentTails.includes(v) || v === '')).filter((v) => !(serious && /[ㅋㅎ😆🥰]/u.test(v)));
-  const pick = laughs >= 2 ? '' : pool[Math.abs(Math.trunc(seed)) % pool.length] ?? '';
+  const pick = laughs >= 3 ? '' : pool[Math.abs(Math.trunc(seed)) % pool.length] ?? '';
   if (!pick) return body;
   return /^[~!]/.test(pick) ? body + pick : body + ' ' + pick;
 }

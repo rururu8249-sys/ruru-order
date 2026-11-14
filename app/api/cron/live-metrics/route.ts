@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { recordLiveMetricsTick } from "@/lib/liveMetricsServer";
 import { announceRecentPaid } from "@/lib/liveOrderChatServer";
 import { getServiceClient } from "@/lib/youtube";
+import { drainOrphanPayments } from "@/lib/autoTestOrphanPayment";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,9 +27,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: { message: "인증 필요" } }, { status: 401 });
   }
   // Immediate DB chat notification is primary; this retry must not wait for YouTube metrics.
-  const [r, paidPosted] = await Promise.all([
+  const [r, paidPosted, testPaidPosted] = await Promise.all([
     recordLiveMetricsTick(),
     announceRecentPaid(getServiceClient()).catch(() => 0),
+    drainOrphanPayments(getServiceClient()).catch(() => 0), // 지운 테스트 주문의 예정 결제 알림
   ]);
-  return NextResponse.json({ ...r, paidPosted });
+  return NextResponse.json({ ...r, paidPosted, testPaidPosted });
 }
