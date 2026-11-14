@@ -15,15 +15,7 @@ export const AUTO_TEST_PHONE = "0200000077";
 export const AUTO_TEST_NAME = "자동테스트";
 /** 테스트 채팅의 표식(채팅 글 avatar_url 자리) — 화면은 닉네임 첫 글자 동그라미로 그림 */
 export const AUTO_TEST_AVATAR = "autotest";
-/** 테스트 글·주문에 「TEST」 표시를 보는 사람(채팅 관리자 말고 따로) — 사장님 지정 부계정 관리자 김현아(문성) */
-export const AUTO_TEST_VIEWER_PHONES = ["01083388860", "01073561623"]; // 김현아(문성) 주문 번호 · 카카오 등록 휴대폰
-/** [2026-11-14 23:31] 같은 분의 카카오 계정 번호 — 카카오에 등록된 휴대폰(010-7356-…)이 주문 번호와 달라 번호로만 보면 못 알아봄 */
-export const AUTO_TEST_VIEWER_KAKAO_IDS = ["4980919533"];
-/** 서버가 서명한 채팅 본인 확인(카카오 계정 번호·카카오 휴대폰)으로 부관리자인지 */
-export function isAutoTestViewerIdentity(identity: { sub?: string; phone?: string } | null | undefined): boolean {
-  if (!identity) return false;
-  return AUTO_TEST_VIEWER_PHONES.includes(String(identity.phone ?? "")) || AUTO_TEST_VIEWER_KAKAO_IDS.includes(String(identity.sub ?? ""));
-}
+// [2026-11-15] 테스트 표시를 보는 사람은 코드에 적지 않고 설정 › 방송 화면 권한(live_member_roles)에서 정한다.
 export const AUTO_TEST_MIN_GAP_MS = 5 * 60_000;
 export const AUTO_TEST_MAX_GAP_MS = 10 * 60_000;
 

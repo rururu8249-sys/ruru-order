@@ -17,8 +17,10 @@ export function verifyChatAccount() {
   const popup = window.open(url, "ruru-chat-verification", "width=480,height=720");
   if (!popup) window.location.assign(url);
 }
-type PrivateState = { testMessages: Record<string,{nickname:string;body:string}>; avatars: Record<string,string>; verified: boolean; canReviewDeleted: boolean; ownIds: number[]; hiddenIds: number[]; deletedMessages: LiveChatMessage[]; commandMessages: LiveChatMessage[] };
-const EMPTY: PrivateState = { testMessages: {}, avatars: {}, verified: false, canReviewDeleted: false, ownIds: [], hiddenIds: [], deletedMessages: [], commandMessages: [] };
+export type ChatPerms = { owner: boolean; host: boolean; moderate: boolean; test: boolean; persona: boolean };
+const NO_PERMS: ChatPerms = { owner: false, host: false, moderate: false, test: false, persona: false };
+type PrivateState = { perms: ChatPerms; testMessages: Record<string,{nickname:string;body:string}>; avatars: Record<string,string>; verified: boolean; canReviewDeleted: boolean; ownIds: number[]; hiddenIds: number[]; deletedMessages: LiveChatMessage[]; commandMessages: LiveChatMessage[] };
+const EMPTY: PrivateState = { perms: NO_PERMS, testMessages: {}, avatars: {}, verified: false, canReviewDeleted: false, ownIds: [], hiddenIds: [], deletedMessages: [], commandMessages: [] };
 function currentChatAccount() { try { return localStorage.getItem("ruru_kakao_id") || ""; } catch { return ""; } }
 
 export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveChatMessage[]) {
@@ -69,7 +71,10 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
       const commandMessages = j.verified ? (j.commandMessages || []).map((raw: unknown) => {
         const m = parseChatMessage(raw); return m && m.broadcastId === bc ? { ...m, privateCommand: true } : null;
       }).filter(Boolean) as LiveChatMessage[] : [];
-      setState({ testMessages: j.canReviewDeleted ? (j.testMessages || {}) : {}, avatars: j.canReviewDeleted ? (j.avatars || {}) : {}, verified: j.verified === true, canReviewDeleted: j.canReviewDeleted === true, ownIds: j.ownIds || [], hiddenIds: j.hiddenIds || [], deletedMessages, commandMessages });
+      const pr = j.perms && typeof j.perms === "object" ? j.perms : null;
+      const perms: ChatPerms = pr ? { owner: pr.owner === true, host: pr.host === true, moderate: pr.moderate === true, test: pr.test === true, persona: pr.persona === true } : NO_PERMS;
+      // [2026-11-15] 테스트 글 원문은 서버가 「테스트 표시 보기」 권한일 때만 보냄 — 채팅 정리 권한과 따로
+      setState({ perms, testMessages: j.canReviewDeleted || perms.test ? (j.testMessages || {}) : {}, avatars: j.canReviewDeleted ? (j.avatars || {}) : {}, verified: j.verified === true, canReviewDeleted: j.canReviewDeleted === true, ownIds: j.ownIds || [], hiddenIds: j.hiddenIds || [], deletedMessages, commandMessages });
     }).catch(() => { /* 네트워크 실패 — 직전 화면 유지(사진이 진짜↔기본으로 깜박이지 않게) */ });
     return () => { ++serial.current; controller.abort(); };
   }, [bc, enabled, revision]);
@@ -97,7 +102,7 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
     if (state.canReviewDeleted) for (const m of state.deletedMessages) if (m.broadcastId === bc) map.set(m.id, m);
     for (const m of state.commandMessages) if (m.broadcastId === bc) map.set(m.id, m);
     if (receipts.bc === bc && receipts.account === currentChatAccount()) for (const m of receipts.messages) map.set(m.id, m);
-    return [...map.values()].map(m=>state.canReviewDeleted && !m.hidden && !m.deletedByAuthor && state.testMessages[m.id] ? {...m,body:state.testMessages[m.id].body,...(m.badge==='bot'?{}:{nickname:state.testMessages[m.id].nickname})} : m).map(m=>state.canReviewDeleted && /^https:\/\//.test(state.avatars[m.id] || "") ? {...m,avatar:state.avatars[m.id]} : m).sort((a, b) => a.id - b.id).slice(-200);
+    return [...map.values()].map(m=>!m.hidden && !m.deletedByAuthor && state.testMessages[m.id] ? {...m,body:state.testMessages[m.id].body,...(m.badge==='bot'?{}:{nickname:state.testMessages[m.id].nickname})} : m).map(m=>state.canReviewDeleted && /^https:\/\//.test(state.avatars[m.id] || "") ? {...m,avatar:state.avatars[m.id]} : m).sort((a, b) => a.id - b.id).slice(-200);
   }, [messages, state, revision, bc, receipts]);
   const deleteOwn = async (messageId: number) => {
     if (pending.current) return { ok: false, message: "삭제 중이에요." };

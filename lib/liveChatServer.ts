@@ -1,10 +1,12 @@
 // [2026-11-10] 사이트 채팅 — 서버 공용(지우기·금지·관리 권한 확인). service_role 클라이언트로만 부른다.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { penaltyUntil, type LiveChatPenalty } from "@/lib/liveChat";
-import { LIVE_WATCH_KEY, chatBadgeOf, isChatOwnerPhone, parseLiveWatchSetting, serializeLiveWatchSetting, type LiveChatBadge } from "@/lib/liveWatch";
+import { LIVE_WATCH_KEY, chatBadgeOf, isChatOwnerPhone, parseLiveWatchSetting, type LiveChatBadge } from "@/lib/liveWatch";
 import { buildBlockReason } from "@/lib/customerBlockReason";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import { AUTO_TEST_PHONE } from "@/lib/autoTestOrder";
+import { badgeFromRole, flagsFromPerms, memberRoleOf } from "@/lib/liveMemberRoles";
+import { toggleModeratePerm } from "@/lib/liveMemberRolesServer";
 
 export const LIVE_CHAT_PENALTIES: LiveChatPenalty[] = ["hide", "mute30s", "mute5m", "ban"];
 const LABEL: Record<LiveChatPenalty, string> = {
@@ -33,12 +35,16 @@ export async function chatRoleOfKakao(sb: SupabaseClient, kakaoId: string): Prom
     readWatchSetting(sb),
     sb.from("operator_test_accounts").select("customer_phone, is_active").eq("is_active", true),
   ]);
-  if (!phone) return { phone: "", badge: null, isMod: false, isOwner: false, isManager: false };
+  // [2026-11-15] 방송 화면 권한 표(카카오 계정 기준) — 예전 전화번호 목록과 합침, 표시는 표가 먼저
+  const member = await memberRoleOf(sb, kakaoId);
+  const tableBadge = member ? badgeFromRole(member.perms, member.badge) : null;
+  const tableFlags = member ? flagsFromPerms(member.perms) : null;
+  if (!phone) return { phone: "", badge: tableBadge, isMod: !!tableFlags?.isMod, isOwner: !!tableFlags?.isOwner, isManager: !!tableFlags?.isManager };
   const isOwner = isChatOwnerPhone(setting, phone);
   // [2026-11-13] 자동 테스트 회원 번호는 시험 계정 표에 있어도 채팅에선 평범한 손님(R 표시·관리 권한 없음)
   const isOp = phone !== AUTO_TEST_PHONE && (opsRes.data ?? []).some((o) => String((o as { customer_phone?: string }).customer_phone ?? "").replace(/[^0-9]/g, "") === phone);
-  const badge = chatBadgeOf(setting, phone) ?? (isOp ? "mod" : null);
-  return { phone, badge, isMod: isOwner || isOp || setting.mods.includes(phone), isOwner, isManager: isOwner || isOp };
+  const badge = tableBadge ?? chatBadgeOf(setting, phone) ?? (isOp ? "mod" : null);
+  return { phone, badge, isMod: !!tableFlags?.isMod || isOwner || isOp || setting.mods.includes(phone), isOwner: !!tableFlags?.isOwner || isOwner, isManager: !!tableFlags?.isManager || isOwner || isOp };
 }
 
 /** 이 카카오 계정이 채팅 관리자인지 — 총관리자·관리자 시험 계정 표(켜진 것)·설정 mods 번호 */
@@ -68,11 +74,14 @@ export async function setChatManager(sb: SupabaseClient, messageId: number, gran
   const nick = String((msg as { nickname?: string }).nickname ?? "");
   const phone = await phoneOfKakao(sb, String((msg as { kakao_id: string }).kakao_id));
   if (!phone) return { ok: false, message: "이 손님의 회원 번호를 못 찾았어요.", status: 404 };
+  const kakaoId = String((msg as { kakao_id: string }).kakao_id);
   const setting = await readWatchSetting(sb);
-  if (isChatOwnerPhone(setting, phone)) return { ok: false, message: "총관리자는 바꿀 수 없어요.", status: 400 };
-  const mods = grant ? Array.from(new Set([...setting.mods, phone])) : setting.mods.filter((x) => x !== phone);
-  const { error } = await sb.from("settings").update({ value: serializeLiveWatchSetting({ ...setting, mods }) }).eq("key", LIVE_WATCH_KEY);
-  if (error) return { ok: false, message: "저장 못 했어요.", status: 500 };
+  const member = await memberRoleOf(sb, kakaoId);
+  if (isChatOwnerPhone(setting, phone) || member?.perms.includes("owner")) return { ok: false, message: "총관리자는 바꿀 수 없어요.", status: 400 };
+  // [2026-11-15] 권한 표(카카오 계정)에 채팅 정리 권한을 넣고 뺌 → 예전 목록(mods)도 같이 맞춰짐
+  let r: { ok: boolean; message: string };
+  try { r = await toggleModeratePerm(sb, kakaoId, grant, nick, "chat"); } catch { r = { ok: false, message: "저장 못 했어요." }; }
+  if (!r.ok) return { ok: false, message: r.message, status: 500 };
   return { ok: true, message: grant ? `${nick}님을 채팅 관리자로 지정했어요. 다음 글부터 R 표시가 붙어요.` : `${nick}님을 채팅 관리자에서 해제했어요.` };
 }
 

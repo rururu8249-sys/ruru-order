@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminAuthConfig } from "@/lib/admin-auth";
 import { LIVE_WATCH_KEY, isChatOwnerPhone, parseLiveWatchSetting } from "@/lib/liveWatch";
+import { NO_MEMBER_FLAGS, flagsFromPerms, memberRoleOf, mergeFlags, type MemberFlags } from "@/lib/liveMemberRoles";
 
 export const CHAT_SESSION_COOKIE = "ruru_chat_identity";
 export const CHAT_STATE_COOKIE = "ruru_chat_oauth_state";
@@ -40,8 +41,12 @@ export function sameChatOrigin(request: NextRequest) {
   return request.headers.get("origin") === request.nextUrl.origin;
 }
 /** Provider-verified phone only. Never use editable customer profile phone for private originals. */
-export async function verifiedChatRole(sb: SupabaseClient, identity: ChatIdentity | null) {
-  if (!identity?.phone) return { isOwner: false, isMod: false, isManager: false };
+export async function verifiedChatRole(sb: SupabaseClient, identity: ChatIdentity | null): Promise<MemberFlags> {
+  if (!identity) return { ...NO_MEMBER_FLAGS };
+  // [2026-11-15] 방송 화면 권한 표(카카오 계정 기준) — 예전 전화번호 목록과 합침
+  const member = await memberRoleOf(sb, identity.sub);
+  const fromTable = member ? flagsFromPerms(member.perms) : { ...NO_MEMBER_FLAGS };
+  if (!identity.phone) return fromTable;
   const [st, ops] = await Promise.all([
     sb.from("settings").select("value").eq("key", LIVE_WATCH_KEY).maybeSingle(),
     sb.from("operator_test_accounts").select("customer_phone").eq("is_active", true),
@@ -51,5 +56,6 @@ export async function verifiedChatRole(sb: SupabaseClient, identity: ChatIdentit
   const isOwner = isChatOwnerPhone(setting, identity.phone);
   const isOp = (ops.data ?? []).some(o => String(o.customer_phone).replace(/\D/g, "") === identity.phone);
   // [2026-11-13] 채팅 관리자(mods·R) = 글 삭제·금지·차단·지운 글 원문만. 그 밖의 관리는 총관리자·관리자 시험 계정(isManager)만
-  return { isOwner, isMod: isOwner || setting.mods.includes(identity.phone) || isOp, isManager: isOwner || isOp };
+  const isManager = isOwner || isOp;
+  return mergeFlags(fromTable, { isOwner, isMod: isOwner || setting.mods.includes(identity.phone) || isOp, isManager, seeTest: isManager, persona: isOwner });
 }

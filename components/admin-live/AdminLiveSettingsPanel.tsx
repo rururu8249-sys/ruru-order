@@ -9,6 +9,7 @@ import {useSettingsDraft,type SettingsDraftState} from "./useSettingsDraft";
 import YoutubeNotifyCard from "./YoutubeNotifyCard";
 import TelegramNotifyCard from "./TelegramNotifyCard";
 import KakaoNotifyCard from "./KakaoNotifyCard";
+import MemberRolesCard from "./MemberRolesCard";
 import LiveAlertTemplateCard from "./LiveAlertTemplateCard";
 import SubscribeFreeShipSettingsCard from "./SubscribeFreeShipSettingsCard";
 import { supabase } from "@/lib/supabase";
@@ -799,6 +800,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
 
           {/* ── 방송 화면 (저장 없음: 프리즘 소스 주소·크기 안내) ── */}
           {activeTab === "screen" && <BroadcastScreenSettingsTab onOpenEvent={onOpenEvent} />}
+          {activeTab === "roles" && <MemberRolesCard />}
 
           {/* ── 알림음 (이 브라우저에만 저장: localStorage) ── */}
           {activeTab === "sound" && (

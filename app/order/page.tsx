@@ -8467,11 +8467,12 @@ export default function OrderPage() {
                 },
                 notice: liveChatNotice,
                 pinned: liveChatPinned && privateChat.canReviewDeleted && privateChat.avatars[liveChatPinned.id] ? {...liveChatPinned,avatar:privateChat.avatars[liveChatPinned.id]} : liveChatPinned,
-                canGrant: !viewAsCustomer && isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)),
-                canPin: !viewAsCustomer && ["crown", "crown_pink"].includes(String(chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? "")),
+                canGrant: !viewAsCustomer && (privateChat.perms.owner || isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone))),
+                canPin: !viewAsCustomer && (privateChat.perms.owner || ["crown", "crown_pink"].includes(String(chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? ""))),
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
-                canModerate: !viewAsCustomer && (operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null),
-                canManage: !viewAsCustomer && (operatorTestAccount !== null || isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone))),
+                // [2026-11-15] 방송 화면 권한(설정 › 방송 화면 권한, 카카오 계정 기준)도 함께 — 서버가 다시 확인
+                canModerate: !viewAsCustomer && (privateChat.perms.moderate || operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null),
+                canManage: !viewAsCustomer && (privateChat.perms.host || operatorTestAccount !== null || isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone))),
                 emojis: liveChatEmojis,
                 canEmoji: liveChatCanEmoji,
                 onSend: async (body, target, manual) => {
