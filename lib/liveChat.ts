@@ -198,9 +198,12 @@ export function chatHueGap(a: number, b: number): number {
 }
 const NEAR_GAP = 50; // 바로 위 다른 사람과 이 각도보다 가까우면 «비슷한 색»
 const NEAR_GAP2 = 30; // 두 줄 위 다른 사람
+// [2026-11-15 08:31 사장님] 「프로필·닉네임 색은 본인이 쓰던 색 그대로, 앞뒤로 겹쳐 헷갈릴 때만 바꿈」
+//   ① 사람마다 정해진 자기 색(chatBaseColorIndex)을 먼저 씀(목록 첫 글 색을 따라가지 않음)
+//   ② 한 번 정해진 글 색은 기억(CHAT_COLOR_MEMO) — 위 글이 화면에서 빠지거나 새 글이 와도 이미 보인 글 색이 안 바뀜
+const CHAT_COLOR_MEMO = new Map<number, number>();
 export function chatColors(list: { id: number; nickname: string }[]): Map<number, string> {
   const out = new Map<number, string>();
-  const sticky = new Map<string, number>();
   let prevNick = "";
   let prevIdx = -1;
   let prev2Idx = -1;
@@ -208,17 +211,23 @@ export function chatColors(list: { id: number; nickname: string }[]): Map<number
   const ok = (i: number) => (prevIdx < 0 || chatHueGap(i, prevIdx) >= NEAR_GAP) && (prev2Idx < 0 || chatHueGap(i, prev2Idx) >= NEAR_GAP2);
   for (const m of list) {
     let idx: number;
+    const memo = CHAT_COLOR_MEMO.get(m.id);
     if (m.nickname === prevNick && prevIdx >= 0) idx = prevIdx; // 같은 사람이 이어 쓰면 같은 색
     else {
-      const base = chatBaseColorIndex(m.nickname);
-      const want = sticky.get(m.nickname) ?? base;
-      idx = -1;
-      for (const cand of [want, base]) if (ok(cand)) { idx = cand; break; }
-      if (idx < 0) for (let k = 1; k < CHAT_COLORS.length; k++) { const c = (base + k) % CHAT_COLORS.length; if (ok(c)) { idx = c; break; } }
-      if (idx < 0) { idx = base; for (let c = 0; c < CHAT_COLORS.length; c++) if (score(c) > score(idx)) idx = c; }
+      if (memo !== undefined) idx = memo;
+      else {
+        const base = chatBaseColorIndex(m.nickname);
+        idx = -1;
+        if (ok(base)) idx = base;
+        if (idx < 0) for (let k = 1; k < CHAT_COLORS.length; k++) { const c = (base + k) % CHAT_COLORS.length; if (ok(c)) { idx = c; break; } }
+        if (idx < 0) { idx = base; for (let c = 0; c < CHAT_COLORS.length; c++) if (score(c) > score(idx)) idx = c; }
+      }
       prev2Idx = prevIdx;
     }
-    if (!sticky.has(m.nickname)) sticky.set(m.nickname, idx);
+    if (memo === undefined && m.id < CHAT_TEMP_ID_BASE) {
+      CHAT_COLOR_MEMO.set(m.id, idx);
+      if (CHAT_COLOR_MEMO.size > 3000) CHAT_COLOR_MEMO.delete(CHAT_COLOR_MEMO.keys().next().value as number);
+    }
     out.set(m.id, CHAT_COLORS[idx]);
     prevNick = m.nickname;
     prevIdx = idx;
