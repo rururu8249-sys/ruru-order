@@ -75,7 +75,9 @@ export async function POST(request:NextRequest){
    if(body.action==='delete'){
      const state=await readAutomationState(db);
      if(state.orders||state.chat||state.viewers||state.manualAction)return fail('먼저 자동 실행을 중지해 주세요.',409);
-     const result=await deleteAutoTestOrders(db,null);
+     const groupIds=Array.isArray((body as any).groupIds)?((body as any).groupIds as unknown[]).map(String).filter(Boolean).slice(0,2000):null;
+     if(groupIds&&groupIds.length===0)return fail('지울 주문서를 골라 주세요.');
+     const result=await deleteAutoTestOrders(db,groupIds);
      return NextResponse.json({ok:true,...result,state:await readAutomationState(db)});
    }
    if(['screen-plan','screen-verify','chat-after','toggle-public','toggle','toggle-chat'].includes(body.action))return fail('화면이 변경됐어요. 새로고침해 주세요.',410);

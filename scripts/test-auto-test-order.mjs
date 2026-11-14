@@ -188,7 +188,7 @@ const del = await S.deleteAutoTestOrders(db, null);
 assert.equal(del.groups, 2);
 assert.ok(!tables.orders.some((o) => o.id === 902), "화면 방식 테스트 주문도 지움");
 const hiddenIds = tables.live_chat_messages.filter((m) => m.hidden_at).map((m) => m.id).sort();
-assert.deepEqual(hiddenIds, [7001, 7002, 7003, 7004, 7005], "그 주문서 테스트 글만 숨김(손님 글·다른 테스트 글 그대로)");
+assert.deepEqual(hiddenIds, [], "주문서 삭제해도 채팅 글·알림은 그대로(2026-11-15)");
 assert.ok(tables.live_chat_messages.every((m) => !m.hidden_at || m.hidden_by === "autotest"));
 assert.equal(A.isTestOrderChatLine({ avatar_url: T, body: "🛍️ 가나다라마바사아자차카님 장바구니 담음 · X", bot_ref: "c:1" }, [], ["가나다라마바사아자차카타"]), false);
 assert.equal(A.isTestOrderChatLine({ avatar_url: T, body: "🛍️ 가*다라마바사아자님 장바구니 담음 · X", bot_ref: "c:1" }, [], ["가나다라마바사아자차카타"]), true);
