@@ -787,9 +787,21 @@ export default function ProductWidgetClient() {
   //   (카드가 다시 그려지며 알림 스티커가 처음부터 다시 뜨거나, 5초 순환의 흐려짐에 같이 사라지던 것)
   const toastActive = Boolean(currentToast) || toastQueue.length > 0;
   const heldRef = useRef<AnyProduct | null>(null);
-  if (!toastActive) heldRef.current = null;
-  else if (!heldRef.current && liveCurrent) heldRef.current = liveCurrent;
-  const current = toastActive && heldRef.current && !pinned ? heldRef.current : liveCurrent;
+  const releaseIdxRef = useRef<number | null>(null);
+  // [2026-11-15 08:37 사장님 «알림 보여주는 게 우선»] 알림이 끝나도 바로 다음 상품으로 넘기지 않음 —
+  //   남은 순환 몇 초 동안 다음 상품이 잠깐 떴다 바로 흐려지던 것. 알림 끝난 뒤 «다음 순환 차례»가 올 때까지 같은 상품 그대로.
+  const sameProduct = (a: AnyProduct | null, b: AnyProduct | null) =>
+    String(a?.id ?? a?.product_id ?? "") === String(b?.id ?? b?.product_id ?? "") && String(a?.__detail_name ?? "") === String(b?.__detail_name ?? "");
+  if (toastActive) {
+    if (!heldRef.current && liveCurrent) heldRef.current = liveCurrent;
+    releaseIdxRef.current = null;
+  } else if (heldRef.current) {
+    if (!rotationAdvances || sameProduct(heldRef.current, liveCurrent)) { heldRef.current = null; releaseIdxRef.current = null; }
+    else if (releaseIdxRef.current === null) releaseIdxRef.current = rotIndex;
+    else if (rotIndex !== releaseIdxRef.current) { heldRef.current = null; releaseIdxRef.current = null; }
+  }
+  const holding = Boolean(heldRef.current) && !pinned;
+  const current = holding ? heldRef.current : liveCurrent;
   const img = imageOf(current);
 
   // [2026-07-12 사장님 지침] 간헐적 이미지 미표시 해결 — 불안정 회선(중국 현장 등)에서 저장소 이미지
@@ -865,12 +877,12 @@ export default function ProductWidgetClient() {
               color: "#fff",
               // [2026-11-15 사장님 «카드가 좌우로 까딱까딱»] 순환 때 좌우로 8px 밀리던 움직임 삭제 — 제자리에서 흐려졌다 나타남만.
               //   알림이 떠 있는 동안은 흐려짐도 없음(상품 고정). 알림 끝난 뒤엔 순환 시계에 맞춰 흐려짐 시작점을 맞춤.
-              animation: toastActive
+              animation: toastActive || holding
                 ? "none"
                 : rotationAdvances
                   ? "ruruWidgetCycle 5s linear both"
                   : "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
-              animationDelay: !toastActive && rotationAdvances
+              animationDelay: !toastActive && !holding && rotationAdvances
                 ? `-${Math.max(0, Date.now() - (rotationConfig.startedAt ?? 0)) % WIDGET_ROTATION_INTERVAL_MS}ms`
                 : undefined,
             }}
