@@ -1264,7 +1264,7 @@ export default function LiveWatchView(props: Props) {
           {behindLive ? <button type="button" onClick={backToLive} style={{ flex: "1 1 0", minWidth: 0, minHeight: 44, alignSelf: "stretch", wordBreak: "keep-all", padding: "8px 10px", lineHeight: 1.35, borderRadius: 10, border: "1px solid #999999", background: "#333333", color: "#FFFFFF", font: "inherit", fontWeight: 600, cursor: "pointer" }}><span aria-hidden="true">● </span>실시간 방송으로 돌아가기</button> : null}
         </div>
       ) : null}
-      <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s", zIndex: 4 }}>
+      <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: paused ? "flex-start" : "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s", zIndex: 4 }}>
         {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0 }}>
           {/* [07:05 사장님] LIVE + 시청자 수(유튜브 동시 시청자) — 오늘만셀러처럼 한 알약 */}
@@ -1280,7 +1280,16 @@ export default function LiveWatchView(props: Props) {
               </span>
             ) : null}
           </span>
-          <span style={{ maxWidth: "100%", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>{title || "라이브 방송"}</span>
+          {/* [2026-11-15 사장님 03:25] 쉬는 동안엔 제목 대신 진한 안내 상자(위쪽 채널 배너 자리 — 사이트 손님은 이미 채널로 들어옴). 라이브로 착각 안 하게 첫 줄 고정 문구 */}
+          {paused && !(rpsActive && !focus) ? (
+            <div role="status" data-live-paused-box style={{ width: "min(300px, calc(60vw - 16px))", padding: "10px 12px", borderRadius: "12px", background: "rgba(17,17,17,0.92)", border: "1px solid rgba(255,255,255,0.18)", lineHeight: 1.45, opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: "#FFD54F", wordBreak: "keep-all" }}>지금은 라이브 방송이 아니에요</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 700, color: "#FFFFFF", whiteSpace: "pre-line", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{pausedText}</div>
+              <div style={{ marginTop: "4px", fontSize: "13px", fontWeight: 400, color: "#CCCCCC" }}>상품은 지금도 담을 수 있어요</div>
+            </div>
+          ) : (
+            <span style={{ maxWidth: "100%", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>{title || "라이브 방송"}</span>
+          )}
           {/* [2026-11-12] 처음/오랜만에 오신 선물 — 받을 손님에게만 보임(서버 설정 꺼지면 안 보임) */}
           {/* 소개영상 안내 띠가 뜰 땐 겹치지 않게 숨김(초 세기·상태는 유지) */}
           <span style={{ display: showIntroBanner ? "none" : "contents" }}><LiveWelcomeChip /></span>
@@ -1320,14 +1329,7 @@ export default function LiveWatchView(props: Props) {
         </button>
       ) : null}
 
-      {/* 잠시 쉬는 중 — 주문은 그대로 */}
-      {paused && !(rpsActive && !focus) ? (
-        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", top: "40%", textAlign: "center", pointerEvents: "none", opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
-          <span style={{ display: "inline-block", padding: "12px 18px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "15px", fontWeight: 600, lineHeight: 1.5 }}>
-            {pausedText}<br /><span style={{ fontSize: "13px", fontWeight: 400, color: "#E5E5E5" }}>상품은 지금도 담을 수 있어요</span>
-          </span>
-        </div>
-      ) : null}
+      {/* 잠시 쉬는 중 안내는 위쪽 제목 자리 상자로 옮김(2026-11-15) */}
 
       </div>
 

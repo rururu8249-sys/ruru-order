@@ -10,7 +10,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
-import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX } from "@/lib/livePausedText";
+import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX, normalizeLivePausedText } from "@/lib/livePausedText";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, youtubeVideoIdFromUrl, type LiveWatchSetting } from "@/lib/liveWatch";
 import BroadcastVideoHistoryPicker from "./BroadcastVideoHistoryPicker";
 import { LIVE_CHAT_KEY, LIVE_CHAT_DEFAULT, parseLiveChatSetting, serializeLiveChatSetting, type LiveChatSetting } from "@/lib/liveChat";
@@ -75,7 +75,7 @@ export default function LiveHeader({
     let alive = true;
     supabase.from("settings").select("value").eq("key", LIVE_PAUSED_TEXT_KEY).maybeSingle().then(({ data }) => {
       if (!alive) return;
-      const v = String(data?.value ?? "").trim();
+      const v = normalizeLivePausedText(data?.value);
       setPausedText(v);
       setPausedTextSaved(v);
     });
@@ -242,7 +242,7 @@ export default function LiveHeader({
     if (pausedSaving) return;
     setPausedSaving(true);
     try {
-      const value = pausedText.trim().slice(0, LIVE_PAUSED_TEXT_MAX);
+      const value = normalizeLivePausedText(pausedText);
       const { error } = await supabase.from("settings").upsert([{ key: LIVE_PAUSED_TEXT_KEY, value }], { onConflict: "key" });
       if (error) throw error;
       setPausedText(value);
@@ -792,11 +792,10 @@ export default function LiveHeader({
       <section className={sectionCls}>
         <h3 className={titleCls}>기타</h3>
         <div className="mt-3 space-y-3">
-          <FormRow label="잠시 쉬는 중 문구" hint={pausedText.trim() !== pausedTextSaved ? "저장 안 됨" : "「잠시 멈춤」 때 손님 화면에 나와요 · 비우면 기본 문구"}>
-            <input value={pausedText} maxLength={LIVE_PAUSED_TEXT_MAX} onChange={(event) => setPausedText(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePausedText(); } }}
-              placeholder={LIVE_PAUSED_TEXT_DEFAULT} className={fieldCls} />
-            {pausedText.trim() !== pausedTextSaved ? <button type="button" disabled={pausedSaving} onClick={() => void savePausedText()} className={primaryCls}>{pausedSaving ? "저장 중…" : "저장"}</button> : null}
+          <FormRow label="잠시 쉬는 중 문구" hint={normalizeLivePausedText(pausedText) !== pausedTextSaved ? "저장 안 됨" : "엔터로 줄바꿈 · 3줄 80자까지 · 비우면 기본 문구"}>
+            <textarea value={pausedText} maxLength={LIVE_PAUSED_TEXT_MAX + 4} rows={3} onChange={(event) => setPausedText(event.target.value)}
+              placeholder={LIVE_PAUSED_TEXT_DEFAULT} className={`${fieldCls} h-auto py-2 leading-normal`} />
+            {normalizeLivePausedText(pausedText) !== pausedTextSaved ? <button type="button" disabled={pausedSaving} onClick={() => void savePausedText()} className={primaryCls}>{pausedSaving ? "저장 중…" : "저장"}</button> : null}
           </FormRow>
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={!activeBroadcast || copyingCurrent} onClick={() => void copyCurrentProductLine()} className={secondaryCls}

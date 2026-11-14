@@ -7626,7 +7626,7 @@ export default function OrderPage() {
                     <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#FF3B30" }} />
                   </span>
                 ) : <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "#E8340A", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" }} />}
-                <span style={{ fontSize: "14px", fontWeight: 900 }}>{isBroadcastPaused ? livePausedText : "라이브 방송 중!"}</span>
+                <span style={{ fontSize: "14px", fontWeight: 900, whiteSpace: "pre-line" }}>{isBroadcastPaused ? livePausedText : "라이브 방송 중!"}</span>
                 <span style={uiV2 ? { marginLeft: "auto", fontSize: "13px", fontWeight: 400, opacity: 0.8 } : { marginLeft: "auto", fontSize: "11.5px", fontWeight: 700, opacity: 0.75 }}>
                   {String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
                 </span>
