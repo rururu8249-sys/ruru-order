@@ -1257,7 +1257,7 @@ export default function LiveWatchView(props: Props) {
             RURU: 유튜브 로고와 같은 크기·자리, 얇은 글씨 반투명 워터마크(yt-cover-ruru-v3, 06:18). 06:28 로고 실측(폰 77×20·오른쪽 38·아래 23)과 같은 크기·자리, 진하게 앞에 + 그 자리만 부드러운 흐림. */}
         <img aria-hidden="true" src="/yt-cover-dog-v2.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 18 : 14, bottom: isDesktop ? -26 : -22, width: isDesktop ? 124 : 106, height: "auto", pointerEvents: "none" }} />
         {/* 06:51 폰 캡처 실측: 로고(재생 상자+YouTube) 폭 약 85·높이 약 19px — RURU 글자도 같은 폭·높이·자리(전엔 15px 오른쪽으로 쏠리고 더 컸음), 그 자리만 흐림 판 */}
-        <div aria-hidden="true" style={{ position: "absolute", right: "calc(min(57px, 12cqw) + 10px)", bottom: 23, width: 93, height: 27, borderRadius: 8, background: "rgba(0,0,0,0.35)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", WebkitMaskImage: "radial-gradient(ellipse at center, #000 60%, transparent 100%)", maskImage: "radial-gradient(ellipse at center, #000 60%, transparent 100%)", pointerEvents: "none" }} />
+        <div aria-hidden="true" style={{ position: "absolute", right: "calc(min(57px, 12cqw) - 8px)", bottom: 19, width: 124, height: 34, borderRadius: 12, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", WebkitMaskImage: "radial-gradient(ellipse at center, #000 72%, transparent 100%)", maskImage: "radial-gradient(ellipse at center, #000 72%, transparent 100%)", pointerEvents: "none" }} />
         <img aria-hidden="true" src="/yt-cover-ruru-v3.png" alt="" draggable={false} style={{ position: "absolute", right: "calc(min(57px, 12cqw) + 14px)", bottom: 20, width: 89, height: 27, pointerEvents: "none" }} />
       </div>
 
