@@ -144,7 +144,11 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    paid:payments.filter(p=>p.actor_id===a.id).map(p=>String(p.kind)),
    own:messages.filter(m=>String(m.automation_actor_id||'')===String(a.id)).map(m=>clean(m.body)).slice(0,8)}];
  });
- if(!roster.length)return;
+ // [2026-11-14 21:07 사장님 「글이 안 올라와」] DB(live_automation_eligibility)는 오늘 담았거나 주문한 가상 손님만 AI 글을 허락함.
+ // 그 밖의 손님을 말하게 고르면 전부 AI_NOT_ELIGIBLE 로 막혀 조용해졌음 → 처음부터 말할 수 있는 손님만 후보로.
+ const speakable=roster.filter(r=>r.cart.length>0||r.ordered.length>0);
+ if(!speakable.length)return;
+ roster.splice(0,roster.length,...speakable);
  const recent=messages.filter(m=>m.badge!=='bot').map(m=>clean(m.body));
  const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));
  const notices=messages.filter(m=>m.badge==='bot'&&/^(c|o|p):/.test(String(m.bot_ref||''))).map(m=>clean(m.body));
