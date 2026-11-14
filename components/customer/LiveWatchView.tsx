@@ -375,7 +375,8 @@ function IconEyeSmall({ size = 14, color = "#FFFFFF" }: { size?: number; color?:
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
 }
 
-const YT_EDGE_CROP = 54; // 유튜브 공유·로고·제목은 어떤 크기든 가장자리 48~52px 안 (2026-11-15 실측 300·360·600·1300폭) → 최소로만 자름
+// [2026-11-15 06:09 사장님 「원본영상 절대 건들지 말 것」] 자르기·키우기 없음 — 영상은 원본 그대로. 유튜브 공유·로고는 워터마크 그림이 덮음.
+const YT_EDGE_CROP = 0;
 
 export default function LiveWatchView(props: Props) {
   // Live view splits by available width, including unfolded foldables and landscape phones.
@@ -901,7 +902,7 @@ export default function LiveWatchView(props: Props) {
       const h = el.clientHeight;
       if (w <= 0 || h <= 0) return;
       const s = w / (h * 9 / 16);
-      setVideoScale(s > 1.005 ? Math.min(1.12, s) : 1);
+      void s; setVideoScale(1); // 원본 그대로(키우지 않음)
       setIframeH(h - YT_EDGE_CROP * 2);
       // [2026-11-15] 9:16 영상이 실제로 그려지는 칸(검은 띠 뺀 자리) — PC 쉬는 중 안내 상자를 영상 속 채널 배너 위에 맞추려고
       const fw = Math.min(w, h * 9 / 16);
@@ -1238,9 +1239,7 @@ export default function LiveWatchView(props: Props) {
     >
       {/* PC 영상 영역 / 폰은 기존 화면 전체 배치 */}
       <div data-live-video="1" style={isDesktop ? { position: "absolute", left: 0, right: videoAreaRight, top: 0, bottom: 0, overflow: "hidden" } : { display: "contents" }}>
-      {/* [2026-11-15 사장님 04:51 「스티커 말고 화면과 하나로」] 덮개 대신 유튜브 공유·로고·제목이 그려지는 위아래 가장자리를 잘라냄.
-          영상(iframe)을 위아래로 YT_EDGE_CROP 만큼 더 크게 그리고, 원래 크기 칸(overflow hidden)으로 잘라 보여줌 → 유튜브가 가장자리에 띄우는 것이 칸 밖으로 나감.
-          PC 는 영상이 조금 커지고(위아래 약간 잘림), 폰은 키우는 배율이 그만큼 줄어듦. */}
+      {/* [2026-11-15 06:09] 영상은 원본 크기 그대로(자르기·키우기 없음). */}
       <div style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", overflow: "hidden", containerType: "size", background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
         <iframe
           ref={iframeRef}
@@ -1252,20 +1251,12 @@ export default function LiveWatchView(props: Props) {
           allowFullScreen
           style={{ position: "absolute", left: 0, top: -YT_EDGE_CROP, width: "100%", height: `calc(100% + ${YT_EDGE_CROP * 2}px)`, border: 0, background: "#000000" }}
         />
-        {/* 워터마크(사장님 04:57) — 왼쪽 강아지 그림·오른쪽 RURU 글씨 모두 상자 없이 반투명(05:06) 글씨만(상자 없음, 반투명). 영상 칸 안이라 같이 커지고, 폰은 버튼 줄 뒤로 숨는 만큼 위로. */}
-        {(() => {
-          const lift = isDesktop || videoScale === 1 || !iframeH ? 0 : Math.max(0, ((videoScale - 1) * iframeH) / 2 - (84 - (bottomBarHeight ?? 84))) / videoScale;
-          const bottom = Math.round(lift) + (isDesktop ? 14 : 10);
-          return (
-            <>
-              <div aria-hidden="true" style={{ position: "absolute", right: "clamp(12px, 2cqh, 26px)", bottom: bottom + 4, width: isDesktop ? "clamp(84px, min(12cqh, 17cqw), 132px)" : "clamp(66px, min(10.5cqh, 22cqw), 116px)", display: "flex", flexDirection: "column", alignItems: "center", pointerEvents: "none" }}>
-                {/* 강아지가 RURU 글씨 위로 빼꼼(사장님 05:37 「떠 있음·목 잘림」) — 목은 글씨 뒤로 숨어 어느 화면이든 같은 모양 */}
-                <img src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ width: "54%", height: "auto", marginBottom: "-9%", opacity: 0.85, WebkitMaskImage: "linear-gradient(to bottom, #000 72%, transparent 100%)", maskImage: "linear-gradient(to bottom, #000 72%, transparent 100%)", position: "relative", zIndex: 0 }} />
-                <img src="/yt-cover-logo.png" alt="" draggable={false} style={{ width: "100%", height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", position: "relative", zIndex: 1 }} />
-              </div>
-            </>
-          );
-        })()}
+        {/* 워터마크(사장님 06:08 「강아지 왼쪽 필수·오른쪽 글씨」) — 영상은 그대로, 그림만 위에.
+            유튜브 공유·나중에 보기(왼쪽 아래)·YouTube 로고(오른쪽 아래)는 iframe 크기와 상관없이 가장자리 고정 px(실측)라 그림도 고정 px.
+            강아지: 불투명, 아래 가장자리에서 빼꼼(가슴은 칸 밖) → 공유 버튼 완전히 덮음.
+            RURU: 글자 둘레 어두운 그림자를 그림에 넣어(yt-cover-ruru-v2) 글자 사이로 로고가 비치지 않게. */}
+        <img aria-hidden="true" src="/yt-cover-dog-v2.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 3 : 2, bottom: isDesktop ? -54 : -34, width: isDesktop ? 170 : 140, height: "auto", pointerEvents: "none" }} />
+        <img aria-hidden="true" src="/yt-cover-ruru-v2.png" alt="" draggable={false} style={{ position: "absolute", right: -1, bottom: isDesktop ? -9 : -6, width: isDesktop ? 208 : 164, height: "auto", pointerEvents: "none" }} />
       </div>
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
