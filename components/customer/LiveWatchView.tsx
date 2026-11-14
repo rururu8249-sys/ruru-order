@@ -1258,8 +1258,8 @@ export default function LiveWatchView(props: Props) {
         <img aria-hidden="true" src="/yt-cover-dog-v2.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 18 : 14, bottom: isDesktop ? -26 : -22, width: isDesktop ? 124 : 106, height: "auto", pointerEvents: "none" }} />
         {/* 06:51 폰 캡처 실측: 로고(재생 상자+YouTube) 폭 약 85·높이 약 19px — RURU 글자도 같은 폭·높이·자리(전엔 15px 오른쪽으로 쏠리고 더 컸음), 그 자리만 흐림 판 */}
         <div aria-hidden="true" style={{ position: "absolute", right: "calc(min(57px, 12cqw) - 14px)", bottom: 13, width: 105, height: 40, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", WebkitMaskImage: "radial-gradient(closest-side, #000 70%, transparent)", maskImage: "radial-gradient(closest-side, #000 70%, transparent)", pointerEvents: "none" }} />
-        {/* 07:15 사장님: 유튜브 로고와 같은 크기·자리에 우리 로고(분홍 R + RURU#3)를 늘 표시 — 유튜브 로고가 사라져도 유지 */}
-        <img aria-hidden="true" src="/yt-cover-ruru3-logo-v2.png" alt="" draggable={false} style={{ position: "absolute", right: "calc(min(57px, 12cqw) + 15px)", bottom: 25, width: 77, height: 20, pointerEvents: "none" }} />
+        {/* 07:15 사장님: 유튜브 로고와 같은 크기·자리에 우리 로고(R + RURU#2)를 늘 표시 — 유튜브 로고가 사라져도 유지 */}
+        <img aria-hidden="true" src="/yt-cover-ruru2-logo.png" alt="" draggable={false} style={{ position: "absolute", right: "calc(min(57px, 12cqw) + 32px)", bottom: 29, width: 77, height: 20, pointerEvents: "none" }} />
       </div>
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
