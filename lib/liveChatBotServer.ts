@@ -95,7 +95,8 @@ async function postedRecently(sb: SupabaseClient, bc: string, ref: string): Prom
 }
 
 async function postBot(sb: SupabaseClient, bc: string, ref: string, body: string) {
-  if (await postedRecently(sb, bc, ref)) return;
+  // [2026-11-14 21:55 사장님 「물어보면 계속 나오게」] 자주 묻는 말(f:)은 쉬는 시간 없이 물을 때마다 답함 — 상품 안내 등은 1분 쉬는 시간 그대로
+  if (!ref.startsWith("f:") && (await postedRecently(sb, bc, ref))) return;
   recentRefs.set(`${bc}|${ref}`, Date.now());
   if (recentRefs.size > 500) for (const [k, t] of recentRefs) if (Date.now() - t > LIVE_CHAT_BOT_COOLDOWN_MS) recentRefs.delete(k);
   await sb.from("live_chat_messages").insert({ broadcast_id: bc, kakao_id: LIVE_CHAT_BOT_KAKAO, customer_id: null, nickname: LIVE_CHAT_BOT_NICK, body, badge: "bot", bot_ref: ref });

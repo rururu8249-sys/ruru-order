@@ -26,3 +26,7 @@ for(const t of ['BB-59 160에 50인데 S면 맞을까요?','160에 50인데 S �
 for(const t of ['BB-59 160에 50인데 몇 입으면 될까요?','몽346 키 165 몸무게 58이면 몇 사이즈요?','버110 기장 몇이에요?','가격요','BB-58 안에 두꺼운 거 입으려면 168에 62인데 뭐가 맞을까요?'])if(vq(t))throw Error('ok '+t);
 if(!rep('160에 50인데 S 입으면 될까용',['BB-59 160에 50인데 S면 맞을까요?']))throw Error('size repeat');
 console.log('ok size ask');}
+{const {wrongPaymentTalk:w}=await import('../lib/liveAutomationDirector');
+if(!w('카결 링크 주세여~',false,true)||!w('결제 링크 언제 와요',false,false)||!w('입금했어요',true,false))throw Error('pay');
+if(w('카결 링크 주세여~',true,false)||w('입금 계좌 어디예요',false,true)||w('가격요',false,true))throw Error('pay ok');
+console.log('ok pay talk');}

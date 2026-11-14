@@ -77,6 +77,14 @@ export function namesSize(text:string):boolean{
   ||/엑라|엑스라지|라지|미듐|미디움|스몰|투엑|프리사이즈|(^|[^\d])[0-5]\s*(호|사이즈)?\s*(면|이면|으로|로|입|괜찮|맞|될|되)/.test(text)
   ||/(^|[^\d])(44|55|66|77|88)(반)?\s*(사이즈)?\s*(으로|로|입|면|이면)?\s*(맞|될|되|괜찮|입)/.test(text);
 }
+// [2026-11-14 21:57 사장님 「무통장 해놓고 카결 링크 달라고」] 결제 얘기는 그 손님 주문 결제 방법과 맞아야 함
+const CARD_TALK=/카결|카드\s*결제|결제\s*링크|카드\s*링크|링크/;
+const BANK_TALK=/입금|계좌|무통장|이체/;
+export function wrongPaymentTalk(text:string,card:boolean,bank:boolean):boolean{
+ if(CARD_TALK.test(text)&&!card)return true;
+ if(BANK_TALK.test(text)&&card&&!bank)return true;
+ return false;
+}
 export function vagueProductQuestion(text:string):boolean{
  if(!ASKING.test(text))return false;
  const sizeAsk=SIZE_REC.test(text)&&!/기장|총장|어깨|가슴|소매|단면/.test(text.replace(/어깨\s?(넓|좁)/g,''));
@@ -172,6 +180,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   return [{actor:a,session:s,first:!spoke.has(a.id),
    ordered:mine.map(o=>[o.product_name,o.color,o.size].filter(Boolean).join(' ')),
    cardOrder:mine.some(o=>/카드/.test(String(o.payment_method||''))),
+   bankOrder:mine.some(o=>!/카드/.test(String(o.payment_method||''))),
    cart:cartItems.map(i=>[i.productName,i.color,i.size].filter(Boolean).join(' ')),
    paid:payments.filter(p=>p.actor_id===a.id).map(p=>String(p.kind)),
    own:messages.filter(m=>String(m.automation_actor_id||'')===String(a.id)).map(m=>clean(m.body)).slice(0,8)}];
@@ -185,7 +194,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));
  const notices=messages.filter(m=>m.badge==='bot'&&/^(c|o|p):/.test(String(m.bot_ref||''))).map(m=>clean(m.body));
  const transcript=[...messages].reverse().map(m=>`#${m.id} ${hhmm(m.created_at)} ${clean(m.nickname)||'알림'}(${roleOf(m)}): ${clean(m.body).slice(0,140)}`).join('\n');
- const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?'(카드결제 주문 — 카톡으로 결제 링크 받음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
+ const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?'(카드결제 주문 — 카톡으로 결제 링크 받음)':''}${r.bankOrder&&!r.cardOrder?'(무통장 주문 — 계좌로 입금, 카드 결제 링크 없음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
  const cardText=card?`${card.name} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
  const prompt=[
   '너는 유튜브 라이브커머스 「루루동이」 사이트 채팅방에 있는 가상 손님들의 다음 한 마디를 정한다. 진짜 사람처럼 자연스러워야 한다.',
@@ -224,6 +233,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(!r.ordered.length&&/주문.{0,8}(했|냈|넣었|제출했|보냈|완료)/.test(t))return false;
   if(repeatsOwnLine(t,r.own)||advisesOthers(t)||mentionsSelf(t,r.actor.nickname))return false;
   if(vagueProductQuestion(t)||sizeBodyMismatch(t))return false;
+  if(wrongPaymentTalk(t,r.cardOrder,r.bankOrder))return false;
   if(!tgt&&roomAnnounceBlocked(t,recentAi))return false;
   if(offCardProductMention(t,[card?`${card.name} ${card.colors.join(' ')}`:'',...r.cart,...r.ordered].join(' '),notices))return false;
   if(/([가-힣]{2,}요)[\s\S]*\1/.test(t)||/다시\s*보기|구경\s*(하는|중|하고)/.test(t))return false;
@@ -237,6 +247,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  if(speaker&&text&&!acceptable(text,speaker,target))text='';
  void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent':text?'sent':'rejected'});
  if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor),speaker.own)||'';
+ if(speaker&&text&&wrongPaymentTalk(text,speaker.cardOrder,speaker.bankOrder))text='';
  // 사람 글은 한 번만 판단 — 침묵이어도 그 글 번호를 남겨 같은 글로 Gemini 를 다시 부르지 않음
  const sourceId=target?Number(target.id):newestHuman?Number(newestHuman.id):null;
  const who=speaker&&text?speaker:(sourceId?roster[0]:null);
