@@ -1,8 +1,9 @@
-/** [2026-11-14 19:28 사장님 «테스트 닉네임이 전부 이상해 — 회원 닉네임과 대조해 진짜 그럴듯한 500개, 이상한 건 삭제»]
+/** [2026-11-14 19:53 사장님 «1,000명으로 늘려, 한 사람이 무한대로 주문하는 게 더 이상해 — 하루에 겹치면 안 됨»] 1,000개, 한 이름은 하루(한국 날짜)에 한 사람만.
+ * [2026-11-14 19:28 사장님 «테스트 닉네임이 전부 이상해 — 회원 닉네임과 대조해 진짜 그럴듯한 500개, 이상한 건 삭제»]
  * 사이트 회원 닉네임 3,988개(2026-11-14 실측)의 모양을 따라 만든 500개: 사람 이름 3글자·○○맘/○○언니/○○네/○여사·짧은 귀여운 말·
  * 일상 말(아아한잔·집콕중)·영어 이름(한글/영문)·간식 이름. 사장님 첨부 엑셀(500개)에서 고른 것 포함.
  * 실제 회원 닉네임과 똑같은 것(96개)은 뺐다(실제 배정 때 DB 가 한 번 더 막음). 숫자·test 글자·흔한 채팅 말(감사합니다 등) 없음.
- * 낱말 두 개를 이어 만들던 이름(매실다락방·서리정류장 등)은 폐기 — 이름은 이 500개만, 다 쓰면 나갔던 가상 손님을 «다시 온 손님»으로 다시 쓴다(DB).
+ * 낱말 두 개를 이어 만들던 이름(매실다락방·서리정류장 등)은 폐기 — 이름은 이 1,000개만. 오늘 쓴 이름은 다음 날(한국 0시 뒤)에야 다시 후보가 된다(DB recycle).
  */
 export type NicknameCategory='korean'|'humor'|'celebrity'|'english'|'hangul_number'|'english_number'|'real_name';
 export type NicknameCandidate={nickname:string;category:NicknameCategory};
@@ -2006,6 +2007,2006 @@ export const NICKNAME_CANDIDATES:readonly NicknameCandidate[]=[
   {
     "nickname": "미역국",
     "category": "korean"
+  },
+  {
+    "nickname": "이지은",
+    "category": "real_name"
+  },
+  {
+    "nickname": "임정란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "노은지",
+    "category": "real_name"
+  },
+  {
+    "nickname": "진명자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "고덕순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박현정",
+    "category": "real_name"
+  },
+  {
+    "nickname": "최경숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "이혜영",
+    "category": "real_name"
+  },
+  {
+    "nickname": "문인숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "고혜원",
+    "category": "real_name"
+  },
+  {
+    "nickname": "추정미",
+    "category": "real_name"
+  },
+  {
+    "nickname": "권미옥",
+    "category": "real_name"
+  },
+  {
+    "nickname": "함정자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "함영미",
+    "category": "real_name"
+  },
+  {
+    "nickname": "변명자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김태숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "이미화",
+    "category": "real_name"
+  },
+  {
+    "nickname": "장미영",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김명숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "함순희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "정금순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박은숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "남혜경",
+    "category": "real_name"
+  },
+  {
+    "nickname": "오은미",
+    "category": "real_name"
+  },
+  {
+    "nickname": "고지수",
+    "category": "real_name"
+  },
+  {
+    "nickname": "이영희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "오보영",
+    "category": "real_name"
+  },
+  {
+    "nickname": "홍현정",
+    "category": "real_name"
+  },
+  {
+    "nickname": "황지현",
+    "category": "real_name"
+  },
+  {
+    "nickname": "장미옥",
+    "category": "real_name"
+  },
+  {
+    "nickname": "변은숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "유경숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "손은영",
+    "category": "real_name"
+  },
+  {
+    "nickname": "선유진",
+    "category": "real_name"
+  },
+  {
+    "nickname": "유미숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "고금희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박혜원",
+    "category": "real_name"
+  },
+  {
+    "nickname": "허지현",
+    "category": "real_name"
+  },
+  {
+    "nickname": "최영옥",
+    "category": "real_name"
+  },
+  {
+    "nickname": "마영미",
+    "category": "real_name"
+  },
+  {
+    "nickname": "권경숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "전서연",
+    "category": "real_name"
+  },
+  {
+    "nickname": "우옥자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "이은영",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김미라",
+    "category": "real_name"
+  },
+  {
+    "nickname": "설옥순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "유현정",
+    "category": "real_name"
+  },
+  {
+    "nickname": "손수진",
+    "category": "real_name"
+  },
+  {
+    "nickname": "조정순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "조수경",
+    "category": "real_name"
+  },
+  {
+    "nickname": "공경옥",
+    "category": "real_name"
+  },
+  {
+    "nickname": "표미화",
+    "category": "real_name"
+  },
+  {
+    "nickname": "신정옥",
+    "category": "real_name"
+  },
+  {
+    "nickname": "황보영",
+    "category": "real_name"
+  },
+  {
+    "nickname": "송옥자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "송정옥",
+    "category": "real_name"
+  },
+  {
+    "nickname": "유명희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김영란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김화숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "윤상희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "조지혜",
+    "category": "real_name"
+  },
+  {
+    "nickname": "곽금순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "정정화",
+    "category": "real_name"
+  },
+  {
+    "nickname": "정정란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박미선",
+    "category": "real_name"
+  },
+  {
+    "nickname": "송미라",
+    "category": "real_name"
+  },
+  {
+    "nickname": "공경아",
+    "category": "real_name"
+  },
+  {
+    "nickname": "임윤희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "심정희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "최혜원",
+    "category": "real_name"
+  },
+  {
+    "nickname": "손귀순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "구명숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "오미선",
+    "category": "real_name"
+  },
+  {
+    "nickname": "백경미",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박은희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "임정자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "공현숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "이춘자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "이화숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "백영란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "황지영",
+    "category": "real_name"
+  },
+  {
+    "nickname": "공미란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김금순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "정은지",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김미진",
+    "category": "real_name"
+  },
+  {
+    "nickname": "정인숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박소연",
+    "category": "real_name"
+  },
+  {
+    "nickname": "우숙자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "천명숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "장수빈",
+    "category": "real_name"
+  },
+  {
+    "nickname": "한은경",
+    "category": "real_name"
+  },
+  {
+    "nickname": "채경희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "한지혜",
+    "category": "real_name"
+  },
+  {
+    "nickname": "정정숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "한경화",
+    "category": "real_name"
+  },
+  {
+    "nickname": "지영란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "노은숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "원수민",
+    "category": "real_name"
+  },
+  {
+    "nickname": "노춘자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "민은미",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박서연",
+    "category": "real_name"
+  },
+  {
+    "nickname": "나은주",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김정미",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김경옥",
+    "category": "real_name"
+  },
+  {
+    "nickname": "이소연",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김미숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "구정아",
+    "category": "real_name"
+  },
+  {
+    "nickname": "곽정화",
+    "category": "real_name"
+  },
+  {
+    "nickname": "강정란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "김정숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "허은정",
+    "category": "real_name"
+  },
+  {
+    "nickname": "홍화숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "인명희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "최금순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "공수빈",
+    "category": "real_name"
+  },
+  {
+    "nickname": "함진희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박정옥",
+    "category": "real_name"
+  },
+  {
+    "nickname": "조미란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "안금순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "금은희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "조지수",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박미영",
+    "category": "real_name"
+  },
+  {
+    "nickname": "천덕순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "이경희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "주화숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "최민지",
+    "category": "real_name"
+  },
+  {
+    "nickname": "전혜린",
+    "category": "real_name"
+  },
+  {
+    "nickname": "정말순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "기길자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "서미진",
+    "category": "real_name"
+  },
+  {
+    "nickname": "곽민지",
+    "category": "real_name"
+  },
+  {
+    "nickname": "강미란",
+    "category": "real_name"
+  },
+  {
+    "nickname": "송영희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "장봉순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "정수희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "송경순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "주순자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "나춘자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "안명자",
+    "category": "real_name"
+  },
+  {
+    "nickname": "황명희",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박지수",
+    "category": "real_name"
+  },
+  {
+    "nickname": "민수빈",
+    "category": "real_name"
+  },
+  {
+    "nickname": "한현숙",
+    "category": "real_name"
+  },
+  {
+    "nickname": "박경화",
+    "category": "real_name"
+  },
+  {
+    "nickname": "손봉순",
+    "category": "real_name"
+  },
+  {
+    "nickname": "라온엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "아라맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "채은맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "다빈엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "도현이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "가은맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "지율엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "민준이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "지안이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "도현엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "연우맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "태윤엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "나은맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "다인맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "서우네",
+    "category": "korean"
+  },
+  {
+    "nickname": "하은맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "예나맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "하준엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "소윤엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "아라엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "채은엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "하은엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "이안엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "로아엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "라온이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "이준엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "은호네",
+    "category": "korean"
+  },
+  {
+    "nickname": "이안이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "이준맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "시아엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "다현맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "민준맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "해담엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "현우엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "솔이맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "지훈이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "민지네",
+    "category": "korean"
+  },
+  {
+    "nickname": "주원맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "겨울이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "서우엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "지안맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "아린이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "민준엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "하율이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "지원엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "승우엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "다현이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "솔이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "태윤이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "보담맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "아린엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "서현맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "시은맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "시우맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "현우네",
+    "category": "korean"
+  },
+  {
+    "nickname": "시아맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "우진엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "예린엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "예나엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "유찬엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "도현맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "지훈엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "로아맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "우진이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "서우맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "연우엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "우진맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "채은이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "하은이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "지유엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "소윤맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "봄이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "정우네",
+    "category": "korean"
+  },
+  {
+    "nickname": "겨울맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "유주엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "예린이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "리안이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "선우맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "리안맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "현우맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "하람엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "승우네",
+    "category": "korean"
+  },
+  {
+    "nickname": "보담이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "재윤이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "지원맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "하엘이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "봄이맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "누리엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "이준이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "해담이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "윤서엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "윤서네",
+    "category": "korean"
+  },
+  {
+    "nickname": "윤서맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "보담엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "지환맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "선우엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "지훈맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "하람맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "해담맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "재윤엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "은서맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "연우네",
+    "category": "korean"
+  },
+  {
+    "nickname": "다올맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "서연엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "지율이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "시아네",
+    "category": "korean"
+  },
+  {
+    "nickname": "다현엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "서진엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "정우엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "누리네",
+    "category": "korean"
+  },
+  {
+    "nickname": "서연이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "서현이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "은서엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "시우엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "다인이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "지환이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "다올엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "가은엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "누리맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "하준맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "하엘엄마",
+    "category": "korean"
+  },
+  {
+    "nickname": "아라네",
+    "category": "korean"
+  },
+  {
+    "nickname": "하준이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "지유네",
+    "category": "korean"
+  },
+  {
+    "nickname": "수인이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "민지맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "지원이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "하엘맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "은호맘",
+    "category": "korean"
+  },
+  {
+    "nickname": "수빈이네",
+    "category": "korean"
+  },
+  {
+    "nickname": "지혜이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "경화언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "영미언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "미경언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "순자이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "현정언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "신선생",
+    "category": "korean"
+  },
+  {
+    "nickname": "혜영언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "구여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "태숙언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "미옥이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "혜숙이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "보영이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "임선생",
+    "category": "korean"
+  },
+  {
+    "nickname": "숙자언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "김선생",
+    "category": "korean"
+  },
+  {
+    "nickname": "혜린언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "은경이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "정순이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "심여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "송선생",
+    "category": "korean"
+  },
+  {
+    "nickname": "경희언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "방여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "예진이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "옥자언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "채여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "지은언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "현주이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "강선생",
+    "category": "korean"
+  },
+  {
+    "nickname": "양여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "천여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "이선생",
+    "category": "korean"
+  },
+  {
+    "nickname": "미옥언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "현여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "류여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "윤선생",
+    "category": "korean"
+  },
+  {
+    "nickname": "미란언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "명자이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "경애이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "영옥이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "상희이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "정숙언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "민여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "정옥이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "은주이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "은미언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "미숙이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "원여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "전여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "변여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "선희이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "은희이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "은지언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "혜자이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "다은이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "옥순이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "순례이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "옥여사",
+    "category": "korean"
+  },
+  {
+    "nickname": "영희이모",
+    "category": "korean"
+  },
+  {
+    "nickname": "민지언니",
+    "category": "korean"
+  },
+  {
+    "nickname": "콩알이",
+    "category": "korean"
+  },
+  {
+    "nickname": "꼬맹이",
+    "category": "korean"
+  },
+  {
+    "nickname": "똥강아지",
+    "category": "korean"
+  },
+  {
+    "nickname": "귀요미",
+    "category": "korean"
+  },
+  {
+    "nickname": "몽실몽실",
+    "category": "korean"
+  },
+  {
+    "nickname": "말랑말랑",
+    "category": "korean"
+  },
+  {
+    "nickname": "몽쉘",
+    "category": "korean"
+  },
+  {
+    "nickname": "오예스",
+    "category": "korean"
+  },
+  {
+    "nickname": "초코파이",
+    "category": "korean"
+  },
+  {
+    "nickname": "빼빼로",
+    "category": "korean"
+  },
+  {
+    "nickname": "꼬깔콘",
+    "category": "korean"
+  },
+  {
+    "nickname": "새우깡",
+    "category": "korean"
+  },
+  {
+    "nickname": "감자칩",
+    "category": "korean"
+  },
+  {
+    "nickname": "쫀드기",
+    "category": "korean"
+  },
+  {
+    "nickname": "뽀빠이",
+    "category": "korean"
+  },
+  {
+    "nickname": "아폴로",
+    "category": "korean"
+  },
+  {
+    "nickname": "맛동산",
+    "category": "korean"
+  },
+  {
+    "nickname": "홈런볼",
+    "category": "korean"
+  },
+  {
+    "nickname": "쌀과자",
+    "category": "korean"
+  },
+  {
+    "nickname": "누룽지",
+    "category": "korean"
+  },
+  {
+    "nickname": "식혜",
+    "category": "korean"
+  },
+  {
+    "nickname": "수정과",
+    "category": "korean"
+  },
+  {
+    "nickname": "약과",
+    "category": "korean"
+  },
+  {
+    "nickname": "강정",
+    "category": "korean"
+  },
+  {
+    "nickname": "경단",
+    "category": "korean"
+  },
+  {
+    "nickname": "송편",
+    "category": "korean"
+  },
+  {
+    "nickname": "찰떡",
+    "category": "korean"
+  },
+  {
+    "nickname": "백설기",
+    "category": "korean"
+  },
+  {
+    "nickname": "꿀단지",
+    "category": "korean"
+  },
+  {
+    "nickname": "밤송이",
+    "category": "korean"
+  },
+  {
+    "nickname": "솔방울",
+    "category": "korean"
+  },
+  {
+    "nickname": "민들레",
+    "category": "korean"
+  },
+  {
+    "nickname": "진달래",
+    "category": "korean"
+  },
+  {
+    "nickname": "개나리",
+    "category": "korean"
+  },
+  {
+    "nickname": "해바라기",
+    "category": "korean"
+  },
+  {
+    "nickname": "안개꽃",
+    "category": "korean"
+  },
+  {
+    "nickname": "프리지아",
+    "category": "korean"
+  },
+  {
+    "nickname": "튤립",
+    "category": "korean"
+  },
+  {
+    "nickname": "라벤더",
+    "category": "korean"
+  },
+  {
+    "nickname": "동백꽃",
+    "category": "korean"
+  },
+  {
+    "nickname": "목련",
+    "category": "korean"
+  },
+  {
+    "nickname": "벚꽃",
+    "category": "korean"
+  },
+  {
+    "nickname": "매화",
+    "category": "korean"
+  },
+  {
+    "nickname": "국화",
+    "category": "korean"
+  },
+  {
+    "nickname": "꽃님이",
+    "category": "korean"
+  },
+  {
+    "nickname": "들꽃",
+    "category": "korean"
+  },
+  {
+    "nickname": "새싹이",
+    "category": "korean"
+  },
+  {
+    "nickname": "무당벌레",
+    "category": "korean"
+  },
+  {
+    "nickname": "다람쥐",
+    "category": "korean"
+  },
+  {
+    "nickname": "고슴도치",
+    "category": "korean"
+  },
+  {
+    "nickname": "판다",
+    "category": "korean"
+  },
+  {
+    "nickname": "코알라",
+    "category": "korean"
+  },
+  {
+    "nickname": "펭귄",
+    "category": "korean"
+  },
+  {
+    "nickname": "돌고래",
+    "category": "korean"
+  },
+  {
+    "nickname": "아기돼지",
+    "category": "korean"
+  },
+  {
+    "nickname": "병아리",
+    "category": "korean"
+  },
+  {
+    "nickname": "참새",
+    "category": "korean"
+  },
+  {
+    "nickname": "까치",
+    "category": "korean"
+  },
+  {
+    "nickname": "비둘기",
+    "category": "korean"
+  },
+  {
+    "nickname": "꾀꼬리",
+    "category": "korean"
+  },
+  {
+    "nickname": "부엉이",
+    "category": "korean"
+  },
+  {
+    "nickname": "망아지",
+    "category": "korean"
+  },
+  {
+    "nickname": "송아지",
+    "category": "korean"
+  },
+  {
+    "nickname": "사슴이",
+    "category": "korean"
+  },
+  {
+    "nickname": "장보는중",
+    "category": "humor"
+  },
+  {
+    "nickname": "퇴근길",
+    "category": "humor"
+  },
+  {
+    "nickname": "출근전",
+    "category": "humor"
+  },
+  {
+    "nickname": "점심시간",
+    "category": "humor"
+  },
+  {
+    "nickname": "저녁준비중",
+    "category": "humor"
+  },
+  {
+    "nickname": "설거지끝",
+    "category": "humor"
+  },
+  {
+    "nickname": "빨래하는중",
+    "category": "humor"
+  },
+  {
+    "nickname": "육아중",
+    "category": "humor"
+  },
+  {
+    "nickname": "독박육아",
+    "category": "humor"
+  },
+  {
+    "nickname": "워킹맘",
+    "category": "humor"
+  },
+  {
+    "nickname": "전업주부",
+    "category": "humor"
+  },
+  {
+    "nickname": "일하는엄마",
+    "category": "humor"
+  },
+  {
+    "nickname": "늦둥이맘",
+    "category": "humor"
+  },
+  {
+    "nickname": "손주보는중",
+    "category": "humor"
+  },
+  {
+    "nickname": "김장준비",
+    "category": "humor"
+  },
+  {
+    "nickname": "반찬가게",
+    "category": "humor"
+  },
+  {
+    "nickname": "시장구경",
+    "category": "humor"
+  },
+  {
+    "nickname": "동네마실",
+    "category": "humor"
+  },
+  {
+    "nickname": "마실가요",
+    "category": "humor"
+  },
+  {
+    "nickname": "수다쟁이",
+    "category": "humor"
+  },
+  {
+    "nickname": "잠꾸러기",
+    "category": "humor"
+  },
+  {
+    "nickname": "먹보",
+    "category": "humor"
+  },
+  {
+    "nickname": "대식가",
+    "category": "humor"
+  },
+  {
+    "nickname": "다이어트중",
+    "category": "humor"
+  },
+  {
+    "nickname": "내일부터다이어트",
+    "category": "humor"
+  },
+  {
+    "nickname": "오늘만먹자",
+    "category": "humor"
+  },
+  {
+    "nickname": "야식금지",
+    "category": "humor"
+  },
+  {
+    "nickname": "커피중독",
+    "category": "humor"
+  },
+  {
+    "nickname": "빵지순례",
+    "category": "humor"
+  },
+  {
+    "nickname": "떡순이",
+    "category": "humor"
+  },
+  {
+    "nickname": "국수좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "라면한그릇",
+    "category": "humor"
+  },
+  {
+    "nickname": "고기좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "회좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "꽃집아줌마",
+    "category": "humor"
+  },
+  {
+    "nickname": "옷장정리",
+    "category": "humor"
+  },
+  {
+    "nickname": "신발부자",
+    "category": "humor"
+  },
+  {
+    "nickname": "가방부자",
+    "category": "humor"
+  },
+  {
+    "nickname": "모자좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "원피스좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "니트좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "겨울준비",
+    "category": "humor"
+  },
+  {
+    "nickname": "봄옷구경",
+    "category": "humor"
+  },
+  {
+    "nickname": "Amy",
+    "category": "english"
+  },
+  {
+    "nickname": "Anna",
+    "category": "english"
+  },
+  {
+    "nickname": "Cindy",
+    "category": "english"
+  },
+  {
+    "nickname": "Diana",
+    "category": "english"
+  },
+  {
+    "nickname": "Ella",
+    "category": "english"
+  },
+  {
+    "nickname": "Hailey",
+    "category": "english"
+  },
+  {
+    "nickname": "Irene",
+    "category": "english"
+  },
+  {
+    "nickname": "Jane",
+    "category": "english"
+  },
+  {
+    "nickname": "Kelly",
+    "category": "english"
+  },
+  {
+    "nickname": "Lisa",
+    "category": "english"
+  },
+  {
+    "nickname": "Megan",
+    "category": "english"
+  },
+  {
+    "nickname": "Nora",
+    "category": "english"
+  },
+  {
+    "nickname": "Penny",
+    "category": "english"
+  },
+  {
+    "nickname": "Ruby",
+    "category": "english"
+  },
+  {
+    "nickname": "Tiffany",
+    "category": "english"
+  },
+  {
+    "nickname": "Vivian",
+    "category": "english"
+  },
+  {
+    "nickname": "Wendy",
+    "category": "english"
+  },
+  {
+    "nickname": "Yuri",
+    "category": "english"
+  },
+  {
+    "nickname": "Zoe",
+    "category": "english"
+  },
+  {
+    "nickname": "jinny",
+    "category": "english"
+  },
+  {
+    "nickname": "merry",
+    "category": "english"
+  },
+  {
+    "nickname": "rosie",
+    "category": "english"
+  },
+  {
+    "nickname": "molly",
+    "category": "english"
+  },
+  {
+    "nickname": "polly",
+    "category": "english"
+  },
+  {
+    "nickname": "dolly",
+    "category": "english"
+  },
+  {
+    "nickname": "lala",
+    "category": "english"
+  },
+  {
+    "nickname": "boa",
+    "category": "english"
+  },
+  {
+    "nickname": "sona",
+    "category": "english"
+  },
+  {
+    "nickname": "dana",
+    "category": "english"
+  },
+  {
+    "nickname": "hani",
+    "category": "english"
+  },
+  {
+    "nickname": "soso",
+    "category": "english"
+  },
+  {
+    "nickname": "베로니카",
+    "category": "english"
+  },
+  {
+    "nickname": "레베카",
+    "category": "english"
+  },
+  {
+    "nickname": "캐서린",
+    "category": "english"
+  },
+  {
+    "nickname": "엘리자베스",
+    "category": "english"
+  },
+  {
+    "nickname": "마가렛",
+    "category": "english"
+  },
+  {
+    "nickname": "패트리샤",
+    "category": "english"
+  },
+  {
+    "nickname": "젬마",
+    "category": "english"
+  },
+  {
+    "nickname": "아멜리아",
+    "category": "english"
+  },
+  {
+    "nickname": "이자벨",
+    "category": "english"
+  },
+  {
+    "nickname": "매기",
+    "category": "english"
+  },
+  {
+    "nickname": "몰리",
+    "category": "english"
+  },
+  {
+    "nickname": "페니",
+    "category": "english"
+  },
+  {
+    "nickname": "사라",
+    "category": "english"
+  },
+  {
+    "nickname": "티파니",
+    "category": "english"
+  },
+  {
+    "nickname": "웬디",
+    "category": "english"
+  },
+  {
+    "nickname": "조이스",
+    "category": "english"
+  },
+  {
+    "nickname": "쥬디",
+    "category": "english"
+  },
+  {
+    "nickname": "케이티",
+    "category": "english"
+  },
+  {
+    "nickname": "미셸",
+    "category": "english"
+  },
+  {
+    "nickname": "나탈리",
+    "category": "english"
+  },
+  {
+    "nickname": "폴린",
+    "category": "english"
+  },
+  {
+    "nickname": "레일라",
+    "category": "english"
+  },
+  {
+    "nickname": "세실리아",
+    "category": "english"
+  },
+  {
+    "nickname": "도로시",
+    "category": "english"
+  },
+  {
+    "nickname": "에밀리",
+    "category": "english"
+  },
+  {
+    "nickname": "피오나",
+    "category": "english"
+  },
+  {
+    "nickname": "지젤",
+    "category": "english"
   }
 ];
 export function nicknameCollisionKey(value:string):string {

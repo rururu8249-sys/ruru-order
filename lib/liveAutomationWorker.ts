@@ -16,9 +16,8 @@ async function rows<T>(query:PromiseLike<{data:unknown;error:{message:string}|nu
  const result=await query;if(result.error)throw Error(result.error.message);return (result.data||[]) as T[];
 }
 async function ensurePool(db:SupabaseClient) {
- // [2026-11-14 19:28 사장님 «테스트 닉네임 전부 이상해 — 회원 닉네임처럼 500개로 새로»] 이름은 NICKNAME_CANDIDATES 500개만.
- // 하루 가상 손님이 약 1,000명이라 한 번 쓰고 버리면 반나절에 바닥 → 나간 지 15분 지난 손님 이름은 후보로 되돌린다(DB recycle).
- // 같은 방송에 그 이름의 가상 손님이 남아 있으면 DB pool_assign 이 그 손님을 «다시 온 손님»으로 다시 들여보낸다.
+ // [2026-11-14 사장님 «회원 닉네임처럼 1,000개 · 하루에 겹치면 안 됨»] 이름은 NICKNAME_CANDIDATES 1,000개만.
+ // 오늘(한국 날짜) 쓴 이름은 다음 날이 돼야 후보로 되돌린다(DB recycle) — 같은 날 같은 이름이 다른 사람처럼 또 주문하는 일 없음.
  try { await automationRpc(db,'live_automation_pool_recycle',{}); } catch { /* 되돌리기 실패해도 후보 채우기는 계속 */ }
  const existing=await db.from('live_automation_nickname_pool').select('nickname_key',{head:true,count:'exact'}).eq('status','unused');
  if(existing.error)throw Error(existing.error.message);
