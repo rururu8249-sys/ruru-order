@@ -3,7 +3,7 @@ import {AUTOMATION_OWNER,dwellMinutes,orderTarget,type AutomationLine} from './l
 import type {AutomationContext} from './liveAutomationAuth';
 import {automationRpc,activeAutomationBroadcast,type Campaign,type Actor,type Session,type Action} from './liveAutomationServer';
 import {createPersona} from './liveAutomationPersona';
-import {NICKNAME_CANDIDATES,generatedNicknameCandidates} from './liveAutomationNicknames';
+import {NICKNAME_CANDIDATES} from './liveAutomationNicknames';
 import {loadAutomationChoices,readAutomationSettings,liveCardChoices} from './liveAutomationCatalog';
 import {automationPost,runOrderAction} from './liveAutomationTransport';
 import {pickOrderLines,pickCardFocusedLines,type AutoTestSettings,type AutoTestPick} from './autoTestOrder';
@@ -16,14 +16,15 @@ async function rows<T>(query:PromiseLike<{data:unknown;error:{message:string}|nu
  const result=await query;if(result.error)throw Error(result.error.message);return (result.data||[]) as T[];
 }
 async function ensurePool(db:SupabaseClient) {
+ // [2026-11-14 19:28 사장님 «테스트 닉네임 전부 이상해 — 회원 닉네임처럼 500개로 새로»] 이름은 NICKNAME_CANDIDATES 500개만.
+ // 하루 가상 손님이 약 1,000명이라 한 번 쓰고 버리면 반나절에 바닥 → 나간 지 15분 지난 손님 이름은 후보로 되돌린다(DB recycle).
+ // 같은 방송에 그 이름의 가상 손님이 남아 있으면 DB pool_assign 이 그 손님을 «다시 온 손님»으로 다시 들여보낸다.
+ try { await automationRpc(db,'live_automation_pool_recycle',{}); } catch { /* 되돌리기 실패해도 후보 채우기는 계속 */ }
  const existing=await db.from('live_automation_nickname_pool').select('nickname_key',{head:true,count:'exact'}).eq('status','unused');
  if(existing.error)throw Error(existing.error.message);
  if((existing.count||0)>=50)return;
- // [2026-11-13 사장님] 기존 닉네임 뒤에 숫자만 붙인 비슷한 닉네임(양말한짝수배 → 양말한짝수배53)은 만들지 않는다 — 후보 목록 그대로만.
- // [2026-11-13 22:00 사장님 «숫자 빼고 제대로»] 숫자가 들어간 후보(달빛27·Mia27 등)는 아예 넣지 않는다.
  const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]/.test(x.nickname));
- // 후보 200개는 한 번씩 쓰면 끝이라, 숫자 없는 새 이름(낱말 두 개 이어 붙임) 80개를 같이 넣는다 — 후보가 바닥나 시청자가 한꺼번에 사라지는 것 방지.
- await automationRpc(db,'live_automation_pool_refill',{p_candidates:[...candidates,...generatedNicknameCandidates(80)]});
+ for(let i=0;i<candidates.length;i+=250)await automationRpc(db,'live_automation_pool_refill',{p_candidates:candidates.slice(i,i+250)});
 }
 async function freshActor(db:SupabaseClient,c:LiveCampaign,target:number,minutes:number,watch:boolean):Promise<{actor:Actor;session:Session}> {
  await ensurePool(db);

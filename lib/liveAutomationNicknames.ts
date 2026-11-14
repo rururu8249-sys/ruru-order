@@ -1,950 +1,2011 @@
-/** Original candidates; checked against current customers on 2026-11-13.
- * This snapshot never replaces the atomic database collision check at assignment.
- * Trend inspiration: https://hsad.tistory.com/3798 and https://letter.wepick.kr/post/23942 and https://ksma.tistory.com (2026-11-14, 7자 이하·30~50대 여성 손님에 맞는 것만)
- * Names are fictional handles; fan handles never confer celebrity identity or privileges.
+/** [2026-11-14 19:28 사장님 «테스트 닉네임이 전부 이상해 — 회원 닉네임과 대조해 진짜 그럴듯한 500개, 이상한 건 삭제»]
+ * 사이트 회원 닉네임 3,988개(2026-11-14 실측)의 모양을 따라 만든 500개: 사람 이름 3글자·○○맘/○○언니/○○네/○여사·짧은 귀여운 말·
+ * 일상 말(아아한잔·집콕중)·영어 이름(한글/영문)·간식 이름. 사장님 첨부 엑셀(500개)에서 고른 것 포함.
+ * 실제 회원 닉네임과 똑같은 것(96개)은 뺐다(실제 배정 때 DB 가 한 번 더 막음). 숫자·test 글자·흔한 채팅 말(감사합니다 등) 없음.
+ * 낱말 두 개를 이어 만들던 이름(매실다락방·서리정류장 등)은 폐기 — 이름은 이 500개만, 다 쓰면 나갔던 가상 손님을 «다시 온 손님»으로 다시 쓴다(DB).
  */
 export type NicknameCategory='korean'|'humor'|'celebrity'|'english'|'hangul_number'|'english_number'|'real_name';
 export type NicknameCandidate={nickname:string;category:NicknameCategory};
 export const NICKNAME_CANDIDATES:readonly NicknameCandidate[]=[
   {
-    "category": "korean",
-    "nickname": "노을한잔"
+    "nickname": "김미경",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "달빛산책"
+    "nickname": "박미숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "봄날라떼"
+    "nickname": "이정숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "소담한하루"
+    "nickname": "최영희",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "구름정원"
+    "nickname": "정은숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "보리한줌"
+    "nickname": "김정희",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "자두빛하늘"
+    "nickname": "이영숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "고운물결"
+    "nickname": "조미정",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "느린오후"
+    "nickname": "오현숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "작은동백"
+    "nickname": "김현정",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "포근한밤"
+    "nickname": "박지영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "햇살마중"
+    "nickname": "최미영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "담백한오늘"
+    "nickname": "정미애",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "새벽풀잎"
+    "nickname": "이혜경",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "바람소풍"
+    "nickname": "한미숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "은빛여울"
+    "nickname": "윤경숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "온기한스푼"
+    "nickname": "신은영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "수풀사이"
+    "nickname": "김수진",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "여름찻집"
+    "nickname": "이지영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "가을서랍"
+    "nickname": "박은영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "겨울모퉁이"
+    "nickname": "최정아",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "봄빛편지"
+    "nickname": "정혜진",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "고요한숲"
+    "nickname": "이수연",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "파란수첩"
+    "nickname": "박수경",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "살구정원"
+    "nickname": "김선희",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "다정한별"
+    "nickname": "임미정",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "오솔길커피"
+    "nickname": "장미란",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "미소한아름"
+    "nickname": "김지은",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "둥근달빛"
+    "nickname": "이소영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "꽃잎우체통"
+    "nickname": "박현주",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "낮잠구름"
+    "nickname": "최유진",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "반달주머니"
+    "nickname": "정수영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "산들다락방"
+    "nickname": "김미정",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "느티나무길"
+    "nickname": "이경아",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "연두주전자"
+    "nickname": "송지현",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "오후의레몬"
+    "nickname": "유미란",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "귤빛마당"
+    "nickname": "박선영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "별빛찻잔"
+    "nickname": "최지현",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "라일락바람"
+    "nickname": "정민정",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "고운보자기"
+    "nickname": "김경미",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "햇살책방"
+    "nickname": "박소영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "소소한정원"
+    "nickname": "김나영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "밤하늘수다"
+    "nickname": "이수진",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "도란찻집"
+    "nickname": "박은정",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "푸른소쿠리"
+    "nickname": "최정윤",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "나무그늘집"
+    "nickname": "정선아",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "수줍은살구"
+    "nickname": "이민정",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "모란한송이"
+    "nickname": "박희정",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "복숭아편지"
+    "nickname": "권미영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "은방울산책"
+    "nickname": "양지은",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "여유로운별"
+    "nickname": "강순자",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "자작나무향"
+    "nickname": "고미라",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "하늘빛바느질"
+    "nickname": "구정란",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "도토리쉼터"
+    "nickname": "권혜숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "다람쥐식탁"
+    "nickname": "남정희",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "소금꽃향기"
+    "nickname": "노미선",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "물망초소풍"
+    "nickname": "도경자",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "동백빛오후"
+    "nickname": "류현숙",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "달맞이산책"
+    "nickname": "마선영",
+    "category": "real_name"
   },
   {
-    "category": "korean",
-    "nickname": "담쟁이찻집"
+    "nickname": "문정임",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "찹쌀떡출근중"
+    "nickname": "민혜란",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "과일모찌산책"
+    "nickname": "반은희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "두쫀쿠는내편"
+    "nickname": "방미옥",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "버터떡대기조"
+    "nickname": "백정숙",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "모찌가웃었다"
+    "nickname": "서명희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "도파민찻잔"
+    "nickname": "석은주",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "추구미는낮잠"
+    "nickname": "성미란",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "오늘도쫀득함"
+    "nickname": "손정애",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "과몰입한식빵"
+    "nickname": "송현미",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "감자도퇴근해"
+    "nickname": "신미자",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "귤까는회장님"
+    "nickname": "안경옥",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "오이는억울해"
+    "nickname": "양순희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "배추의휴가"
+    "nickname": "엄미경",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "출근한고구마"
+    "nickname": "여혜정",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "양말한짝수배"
+    "nickname": "오순덕",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "냉장고수호대"
+    "nickname": "우정미",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "이불밖잠복근무"
+    "nickname": "원미숙",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "만보걷고한입"
+    "nickname": "위경란",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "커피는내짝꿍"
+    "nickname": "유선자",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "떡볶이외교관"
+    "nickname": "윤희정",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "김밥꼬다리부장"
+    "nickname": "이춘희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "반찬통탐정"
+    "nickname": "인미영",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "양파는눈물뿐"
+    "nickname": "임경애",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "미역국잠수부"
+    "nickname": "장순옥",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "호떡의품격"
+    "nickname": "전미혜",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "퇴근은예술이다"
+    "nickname": "정옥순",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "리모컨어디갔지"
+    "nickname": "조경란",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "만두도고민중"
+    "nickname": "주미숙",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "식빵굽는구름"
+    "nickname": "지은희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "산책하는국자"
+    "nickname": "진숙자",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "밥솥의자존심"
+    "nickname": "차혜련",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "누룽지연구소"
+    "nickname": "채미정",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "고등어도휴무"
+    "nickname": "천경숙",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "귤껍질작가님"
+    "nickname": "최순애",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "과자봉지명상중"
+    "nickname": "추정희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "일단차부터한잔"
+    "nickname": "탁미경",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "찹쌀떡마음씨"
+    "nickname": "하정숙",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "직관보다간식"
+    "nickname": "한경애",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "구경하다차식음"
+    "nickname": "함은숙",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "말차도쉬는날"
+    "nickname": "허미란",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "바삭한결심"
+    "nickname": "현정옥",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "쫀득한월요일"
+    "nickname": "홍순미",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "양배추의반격"
+    "nickname": "황미경",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "수박씨발굴단"
+    "nickname": "김말순",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "콩나물면접관"
+    "nickname": "이복희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "밤톨대리출근"
+    "nickname": "박영란",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "햇반이랑친구"
+    "nickname": "최숙희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "붕어빵순찰대"
+    "nickname": "정금옥",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "졸음참는주전자"
+    "nickname": "김연희",
+    "category": "real_name"
   },
   {
-    "category": "humor",
-    "nickname": "마감은내일부터"
+    "nickname": "김서영",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "영웅이노래친구"
+    "nickname": "이하나",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "송가인응원중"
+    "nickname": "박지혜",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "장윤정노래한잔"
+    "nickname": "최수아",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "이찬원팬소풍"
+    "nickname": "정다솜",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "영탁노래산책"
+    "nickname": "강보라",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "정동원응원별"
+    "nickname": "조아라",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "진성노래마실"
+    "nickname": "윤소희",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "김연자팬찻집"
+    "nickname": "장혜원",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "이문세듣는오후"
+    "nickname": "임채원",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "성시경노래숲"
+    "nickname": "한지수",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "아이유팬다락방"
+    "nickname": "오다은",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "효리바라기"
+    "nickname": "서유리",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "보검이응원단"
+    "nickname": "신혜린",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "공유팬찻잔"
+    "nickname": "권나연",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "현빈팬마실"
+    "nickname": "황보은",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "손예진응원꽃"
+    "nickname": "안수민",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "김혜수팬산책"
+    "nickname": "송예린",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "전지현팬노을"
+    "nickname": "전소연",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "나훈아노래방석"
+    "nickname": "홍지아",
+    "category": "real_name"
   },
   {
-    "category": "celebrity",
-    "nickname": "조용필노래수첩"
+    "nickname": "민서맘",
+    "category": "korean"
   },
   {
-    "category": "english",
-    "nickname": "Momo"
+    "nickname": "하윤맘",
+    "category": "korean"
   },
   {
-    "category": "english",
-    "nickname": "Coco"
+    "nickname": "지우맘",
+    "category": "korean"
   },
   {
-    "category": "english",
-    "nickname": "Lily"
+    "nickname": "서준맘",
+    "category": "korean"
   },
   {
-    "category": "english",
-    "nickname": "Rose"
+    "nickname": "도윤맘",
+    "category": "korean"
   },
   {
-    "category": "english",
-    "nickname": "Nina"
+    "nickname": "예은맘",
+    "category": "korean"
   },
   {
-    "category": "english",
-    "nickname": "Dora"
+    "nickname": "수아맘",
+    "category": "korean"
   },
   {
-    "category": "english",
-    "nickname": "Joy"
+    "nickname": "채원이맘",
+    "category": "korean"
   },
   {
-    "category": "english",
-    "nickname": "Anne"
+    "nickname": "다둥이맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "달빛27"
+    "nickname": "딸둘맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "소담52"
+    "nickname": "아들둘맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "노을86"
+    "nickname": "지호맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "보리19"
+    "nickname": "현이맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "꽃길73"
+    "nickname": "은우엄마",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "은별24"
+    "nickname": "서아엄마",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "미소58"
+    "nickname": "다은엄마",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "여울31"
+    "nickname": "쌍둥이엄마",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "동백67"
+    "nickname": "토리맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "햇살42"
+    "nickname": "초코맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "라떼09"
+    "nickname": "콩이엄마",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "수풀64"
+    "nickname": "사랑이엄마",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "살구38"
+    "nickname": "루나엄마",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "연두15"
+    "nickname": "몽이누나",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "다정82"
+    "nickname": "구름이맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "하늘46"
+    "nickname": "윤아맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "별빛93"
+    "nickname": "지민맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "봄날26"
+    "nickname": "서윤맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "모란71"
+    "nickname": "하린맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "산들35"
+    "nickname": "준우맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "찻잔48"
+    "nickname": "시윤맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "나무62"
+    "nickname": "유나맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "도란17"
+    "nickname": "예준맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "반달83"
+    "nickname": "건우맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "담쟁이29"
+    "nickname": "소율맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "느티57"
+    "nickname": "태리맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "물결34"
+    "nickname": "단비맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "동글68"
+    "nickname": "보리맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "소풍12"
+    "nickname": "두부맘",
+    "category": "korean"
   },
   {
-    "category": "hangul_number",
-    "nickname": "바람95"
+    "nickname": "호두맘",
+    "category": "korean"
   },
   {
-    "category": "english_number",
-    "nickname": "Mia27"
+    "nickname": "별이맘",
+    "category": "korean"
   },
   {
-    "category": "english_number",
-    "nickname": "Luna17"
+    "nickname": "꼬미맘",
+    "category": "korean"
   },
   {
-    "category": "english_number",
-    "nickname": "Bella63"
+    "nickname": "해피맘",
+    "category": "korean"
   },
   {
-    "category": "english_number",
-    "nickname": "Hana28"
+    "nickname": "은찬맘",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "설은정"
+    "nickname": "리아맘",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "이정숙"
+    "nickname": "준이네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "남미경"
+    "nickname": "율이네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "최영희"
+    "nickname": "다온이네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "정선희"
+    "nickname": "하랑이네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "강미영"
+    "nickname": "민이네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "윤정희"
+    "nickname": "쭈쭈네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "장혜숙"
+    "nickname": "수아네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "임은숙"
+    "nickname": "지아네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "한경희"
+    "nickname": "예솔이네",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "오선영"
+    "nickname": "은솔맘",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "서미숙"
+    "nickname": "미자언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "신영숙"
+    "nickname": "영희언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "권정애"
+    "nickname": "순자언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "황혜진"
+    "nickname": "혜숙언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "안수정"
+    "nickname": "정숙이모",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "송은희"
+    "nickname": "수진언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "유미정"
+    "nickname": "소영언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "전선미"
+    "nickname": "은정언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "홍지숙"
+    "nickname": "지영언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "고명숙"
+    "nickname": "동네언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "문정희"
+    "nickname": "옆집언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "양은경"
+    "nickname": "미선언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "손경숙"
+    "nickname": "경아언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "배정미"
+    "nickname": "현주언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "백선화"
+    "nickname": "명희언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "조미선"
+    "nickname": "숙이언니",
+    "category": "korean"
   },
   {
-    "category": "real_name",
-    "nickname": "남수진"
+    "nickname": "쏭언니",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "숨만쉬어도살찜"
+    "nickname": "진주언니",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "프로귀찮러"
+    "nickname": "홍여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "칼퇴요정"
+    "nickname": "김여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "월급루팡"
+    "nickname": "박여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "텅장요정"
+    "nickname": "이여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "어쩔티비"
+    "nickname": "장여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "더피곤해"
+    "nickname": "최여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "나름전설이다"
+    "nickname": "오여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "오즈의맙소사"
+    "nickname": "한여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "곧휴가철이다"
+    "nickname": "강여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "가문의영광굴비"
+    "nickname": "송여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "소거기덮밥"
+    "nickname": "신여사",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "오드리햇반"
+    "nickname": "은이네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "올리비아핫바"
+    "nickname": "미영이네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "입다물면여신"
+    "nickname": "정희네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "궁민연금"
+    "nickname": "소희네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "천안호구과자"
+    "nickname": "영희네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "추적60인분"
+    "nickname": "혜진이네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "그대라는사치"
+    "nickname": "지연이네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "이뻔한세상"
+    "nickname": "민정이네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "반만고양이"
+    "nickname": "영미네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "귀신이고칼로리"
+    "nickname": "수경이네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "빚과송금"
+    "nickname": "경숙이네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "띠끌모아파산"
+    "nickname": "순이네",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "월급없는미녀"
+    "nickname": "쏭쏭이",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "카드값줘체리"
+    "nickname": "쭈쭈",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "돈들어손내놔"
+    "nickname": "찌니찌니",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "발광머리앤"
+    "nickname": "순둥이",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "순대렐라"
+    "nickname": "뽀짝이",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "전국노예자랑"
+    "nickname": "콩순이",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "흔들인우동"
+    "nickname": "몽글이",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "햄부기주세요"
+    "nickname": "꼬물이",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "손절미맛집"
+    "nickname": "찹쌀떡",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "아뇨뚱인데요"
+    "nickname": "밤톨이",
+    "category": "korean"
   },
   {
-    "category": "humor",
-    "nickname": "밤양갱먹고싶다"
+    "nickname": "땅콩이",
+    "category": "korean"
+  },
+  {
+    "nickname": "왕밤빵",
+    "category": "korean"
+  },
+  {
+    "nickname": "방긋이",
+    "category": "korean"
+  },
+  {
+    "nickname": "햇살이",
+    "category": "korean"
+  },
+  {
+    "nickname": "초롱이",
+    "category": "korean"
+  },
+  {
+    "nickname": "토순이",
+    "category": "korean"
+  },
+  {
+    "nickname": "뽀송이",
+    "category": "korean"
+  },
+  {
+    "nickname": "봉봉이",
+    "category": "korean"
+  },
+  {
+    "nickname": "까꿍이",
+    "category": "korean"
+  },
+  {
+    "nickname": "뿌꾸",
+    "category": "korean"
+  },
+  {
+    "nickname": "미미짱",
+    "category": "korean"
+  },
+  {
+    "nickname": "나나짱",
+    "category": "korean"
+  },
+  {
+    "nickname": "쪼꼬미",
+    "category": "korean"
+  },
+  {
+    "nickname": "별콩이",
+    "category": "korean"
+  },
+  {
+    "nickname": "달콩이",
+    "category": "korean"
+  },
+  {
+    "nickname": "알콩이",
+    "category": "korean"
+  },
+  {
+    "nickname": "삐약이",
+    "category": "korean"
+  },
+  {
+    "nickname": "꼬마곰",
+    "category": "korean"
+  },
+  {
+    "nickname": "웃음꽃",
+    "category": "korean"
+  },
+  {
+    "nickname": "맑음이",
+    "category": "korean"
+  },
+  {
+    "nickname": "콩콩이",
+    "category": "korean"
+  },
+  {
+    "nickname": "뚜비뚜비",
+    "category": "korean"
+  },
+  {
+    "nickname": "쏘블리",
+    "category": "korean"
+  },
+  {
+    "nickname": "밍블리",
+    "category": "korean"
+  },
+  {
+    "nickname": "수블리",
+    "category": "korean"
+  },
+  {
+    "nickname": "쩡블리",
+    "category": "korean"
+  },
+  {
+    "nickname": "꽁꽁이",
+    "category": "korean"
+  },
+  {
+    "nickname": "콩떡",
+    "category": "korean"
+  },
+  {
+    "nickname": "쑥떡",
+    "category": "korean"
+  },
+  {
+    "nickname": "꿀떡이",
+    "category": "korean"
+  },
+  {
+    "nickname": "찐빵",
+    "category": "korean"
+  },
+  {
+    "nickname": "호빵이",
+    "category": "korean"
+  },
+  {
+    "nickname": "만두",
+    "category": "korean"
+  },
+  {
+    "nickname": "군만두",
+    "category": "korean"
+  },
+  {
+    "nickname": "꼬마김밥",
+    "category": "korean"
+  },
+  {
+    "nickname": "깨순이",
+    "category": "korean"
+  },
+  {
+    "nickname": "단호박",
+    "category": "korean"
+  },
+  {
+    "nickname": "옥수수",
+    "category": "korean"
+  },
+  {
+    "nickname": "땅콩버터",
+    "category": "korean"
+  },
+  {
+    "nickname": "순두부",
+    "category": "korean"
+  },
+  {
+    "nickname": "몽몽",
+    "category": "korean"
+  },
+  {
+    "nickname": "뭉치",
+    "category": "korean"
+  },
+  {
+    "nickname": "뭉게",
+    "category": "korean"
+  },
+  {
+    "nickname": "별이",
+    "category": "korean"
+  },
+  {
+    "nickname": "해님",
+    "category": "korean"
+  },
+  {
+    "nickname": "봄이",
+    "category": "korean"
+  },
+  {
+    "nickname": "여름이",
+    "category": "korean"
+  },
+  {
+    "nickname": "가을이",
+    "category": "korean"
+  },
+  {
+    "nickname": "겨울이",
+    "category": "korean"
+  },
+  {
+    "nickname": "단비",
+    "category": "korean"
+  },
+  {
+    "nickname": "이슬이",
+    "category": "korean"
+  },
+  {
+    "nickname": "아롱이",
+    "category": "korean"
+  },
+  {
+    "nickname": "다롱이",
+    "category": "korean"
+  },
+  {
+    "nickname": "꼬미",
+    "category": "korean"
+  },
+  {
+    "nickname": "쪼미",
+    "category": "korean"
+  },
+  {
+    "nickname": "꼬꼬",
+    "category": "korean"
+  },
+  {
+    "nickname": "삐삐",
+    "category": "korean"
+  },
+  {
+    "nickname": "뽀뽀",
+    "category": "korean"
+  },
+  {
+    "nickname": "뽀미",
+    "category": "korean"
+  },
+  {
+    "nickname": "미루",
+    "category": "korean"
+  },
+  {
+    "nickname": "나루",
+    "category": "korean"
+  },
+  {
+    "nickname": "가람",
+    "category": "korean"
+  },
+  {
+    "nickname": "새롬",
+    "category": "korean"
+  },
+  {
+    "nickname": "다솜",
+    "category": "korean"
+  },
+  {
+    "nickname": "은솔",
+    "category": "korean"
+  },
+  {
+    "nickname": "예솔",
+    "category": "korean"
+  },
+  {
+    "nickname": "해솔",
+    "category": "korean"
+  },
+  {
+    "nickname": "초롱",
+    "category": "korean"
+  },
+  {
+    "nickname": "방울이",
+    "category": "korean"
+  },
+  {
+    "nickname": "구슬이",
+    "category": "korean"
+  },
+  {
+    "nickname": "단추",
+    "category": "korean"
+  },
+  {
+    "nickname": "리본이",
+    "category": "korean"
+  },
+  {
+    "nickname": "깨비",
+    "category": "korean"
+  },
+  {
+    "nickname": "꼬마요정",
+    "category": "korean"
+  },
+  {
+    "nickname": "꽃공주",
+    "category": "korean"
+  },
+  {
+    "nickname": "딸기",
+    "category": "korean"
+  },
+  {
+    "nickname": "자두",
+    "category": "korean"
+  },
+  {
+    "nickname": "복숭아",
+    "category": "korean"
+  },
+  {
+    "nickname": "홍시",
+    "category": "korean"
+  },
+  {
+    "nickname": "곶감",
+    "category": "korean"
+  },
+  {
+    "nickname": "한라봉",
+    "category": "korean"
+  },
+  {
+    "nickname": "귤이",
+    "category": "korean"
+  },
+  {
+    "nickname": "유자",
+    "category": "korean"
+  },
+  {
+    "nickname": "메론",
+    "category": "korean"
+  },
+  {
+    "nickname": "수박",
+    "category": "korean"
+  },
+  {
+    "nickname": "참외",
+    "category": "korean"
+  },
+  {
+    "nickname": "머루",
+    "category": "korean"
+  },
+  {
+    "nickname": "다래",
+    "category": "korean"
+  },
+  {
+    "nickname": "오디",
+    "category": "korean"
+  },
+  {
+    "nickname": "산딸기",
+    "category": "korean"
+  },
+  {
+    "nickname": "쑤니",
+    "category": "korean"
+  },
+  {
+    "nickname": "꾸니",
+    "category": "korean"
+  },
+  {
+    "nickname": "뚜니",
+    "category": "korean"
+  },
+  {
+    "nickname": "순이",
+    "category": "korean"
+  },
+  {
+    "nickname": "미야",
+    "category": "korean"
+  },
+  {
+    "nickname": "똘순이",
+    "category": "korean"
+  },
+  {
+    "nickname": "꼼지",
+    "category": "korean"
+  },
+  {
+    "nickname": "아띠",
+    "category": "korean"
+  },
+  {
+    "nickname": "아기곰",
+    "category": "korean"
+  },
+  {
+    "nickname": "곰순이",
+    "category": "korean"
+  },
+  {
+    "nickname": "토끼",
+    "category": "korean"
+  },
+  {
+    "nickname": "바니",
+    "category": "korean"
+  },
+  {
+    "nickname": "냥이",
+    "category": "korean"
+  },
+  {
+    "nickname": "야옹이",
+    "category": "korean"
+  },
+  {
+    "nickname": "멍이",
+    "category": "korean"
+  },
+  {
+    "nickname": "댕이",
+    "category": "korean"
+  },
+  {
+    "nickname": "마카롱",
+    "category": "korean"
+  },
+  {
+    "nickname": "푸딩",
+    "category": "korean"
+  },
+  {
+    "nickname": "솜사탕",
+    "category": "korean"
+  },
+  {
+    "nickname": "츄러스",
+    "category": "korean"
+  },
+  {
+    "nickname": "와플",
+    "category": "korean"
+  },
+  {
+    "nickname": "붕어빵",
+    "category": "korean"
+  },
+  {
+    "nickname": "호떡",
+    "category": "korean"
+  },
+  {
+    "nickname": "계란빵",
+    "category": "korean"
+  },
+  {
+    "nickname": "언제나봄",
+    "category": "humor"
+  },
+  {
+    "nickname": "행복한하루",
+    "category": "humor"
+  },
+  {
+    "nickname": "꽃길만걷자",
+    "category": "humor"
+  },
+  {
+    "nickname": "웃으며살자",
+    "category": "humor"
+  },
+  {
+    "nickname": "나답게",
+    "category": "humor"
+  },
+  {
+    "nickname": "하루하루",
+    "category": "humor"
+  },
+  {
+    "nickname": "천천히",
+    "category": "humor"
+  },
+  {
+    "nickname": "느리게살기",
+    "category": "humor"
+  },
+  {
+    "nickname": "쉬엄쉬엄",
+    "category": "humor"
+  },
+  {
+    "nickname": "여유롭게",
+    "category": "humor"
+  },
+  {
+    "nickname": "두근두근",
+    "category": "humor"
+  },
+  {
+    "nickname": "설레임",
+    "category": "humor"
+  },
+  {
+    "nickname": "봄날의햇살",
+    "category": "humor"
+  },
+  {
+    "nickname": "가을하늘",
+    "category": "humor"
+  },
+  {
+    "nickname": "겨울바다",
+    "category": "humor"
+  },
+  {
+    "nickname": "바다좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "꽃좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "커피좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "빵좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "떡좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "산이좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "걷는게좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "옷이좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "쇼핑좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "지름신",
+    "category": "humor"
+  },
+  {
+    "nickname": "오늘도화이팅",
+    "category": "humor"
+  },
+  {
+    "nickname": "예쁘게살자",
+    "category": "humor"
+  },
+  {
+    "nickname": "멋지게살자",
+    "category": "humor"
+  },
+  {
+    "nickname": "착하게살자",
+    "category": "humor"
+  },
+  {
+    "nickname": "아아한잔",
+    "category": "humor"
+  },
+  {
+    "nickname": "얼죽아",
+    "category": "humor"
+  },
+  {
+    "nickname": "따아파",
+    "category": "humor"
+  },
+  {
+    "nickname": "커피한잔",
+    "category": "humor"
+  },
+  {
+    "nickname": "라떼좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "빵순이",
+    "category": "humor"
+  },
+  {
+    "nickname": "집콕중",
+    "category": "humor"
+  },
+  {
+    "nickname": "낮잠최고",
+    "category": "humor"
+  },
+  {
+    "nickname": "산책중",
+    "category": "humor"
+  },
+  {
+    "nickname": "동네한바퀴",
+    "category": "humor"
+  },
+  {
+    "nickname": "꽃구경",
+    "category": "humor"
+  },
+  {
+    "nickname": "오운완",
+    "category": "humor"
+  },
+  {
+    "nickname": "홈트중",
+    "category": "humor"
+  },
+  {
+    "nickname": "등산좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "캠핑좋아",
+    "category": "humor"
+  },
+  {
+    "nickname": "여행가고파",
+    "category": "humor"
+  },
+  {
+    "nickname": "제주살이",
+    "category": "humor"
+  },
+  {
+    "nickname": "바다보러가자",
+    "category": "humor"
+  },
+  {
+    "nickname": "맛집탐방",
+    "category": "humor"
+  },
+  {
+    "nickname": "혼밥중",
+    "category": "humor"
+  },
+  {
+    "nickname": "소확행",
+    "category": "humor"
+  },
+  {
+    "nickname": "엄마는멋쟁이",
+    "category": "humor"
+  },
+  {
+    "nickname": "우리집공주",
+    "category": "humor"
+  },
+  {
+    "nickname": "우리딸최고",
+    "category": "humor"
+  },
+  {
+    "nickname": "아들바보",
+    "category": "humor"
+  },
+  {
+    "nickname": "딸바보",
+    "category": "humor"
+  },
+  {
+    "nickname": "손주바보",
+    "category": "humor"
+  },
+  {
+    "nickname": "강아지엄마",
+    "category": "humor"
+  },
+  {
+    "nickname": "고양이엄마",
+    "category": "humor"
+  },
+  {
+    "nickname": "냥집사",
+    "category": "humor"
+  },
+  {
+    "nickname": "멍집사",
+    "category": "humor"
+  },
+  {
+    "nickname": "식물집사",
+    "category": "humor"
+  },
+  {
+    "nickname": "화분부자",
+    "category": "humor"
+  },
+  {
+    "nickname": "텃밭농부",
+    "category": "humor"
+  },
+  {
+    "nickname": "주말농부",
+    "category": "humor"
+  },
+  {
+    "nickname": "시골아낙",
+    "category": "humor"
+  },
+  {
+    "nickname": "서울언니",
+    "category": "humor"
+  },
+  {
+    "nickname": "부산언니",
+    "category": "humor"
+  },
+  {
+    "nickname": "광주언니",
+    "category": "humor"
+  },
+  {
+    "nickname": "제주댁",
+    "category": "humor"
+  },
+  {
+    "nickname": "강원도감자",
+    "category": "humor"
+  },
+  {
+    "nickname": "레이첼",
+    "category": "english"
+  },
+  {
+    "nickname": "올리비아",
+    "category": "english"
+  },
+  {
+    "nickname": "소피아",
+    "category": "english"
+  },
+  {
+    "nickname": "엠마",
+    "category": "english"
+  },
+  {
+    "nickname": "클레어",
+    "category": "english"
+  },
+  {
+    "nickname": "스텔라",
+    "category": "english"
+  },
+  {
+    "nickname": "루시",
+    "category": "english"
+  },
+  {
+    "nickname": "로즈",
+    "category": "english"
+  },
+  {
+    "nickname": "릴리",
+    "category": "english"
+  },
+  {
+    "nickname": "헬렌",
+    "category": "english"
+  },
+  {
+    "nickname": "러브",
+    "category": "english"
+  },
+  {
+    "nickname": "엔젤",
+    "category": "english"
+  },
+  {
+    "nickname": "비비",
+    "category": "english"
+  },
+  {
+    "nickname": "쥬쥬",
+    "category": "english"
+  },
+  {
+    "nickname": "애니",
+    "category": "english"
+  },
+  {
+    "nickname": "줄리",
+    "category": "english"
+  },
+  {
+    "nickname": "제인",
+    "category": "english"
+  },
+  {
+    "nickname": "미아",
+    "category": "english"
+  },
+  {
+    "nickname": "에이미",
+    "category": "english"
+  },
+  {
+    "nickname": "수지",
+    "category": "english"
+  },
+  {
+    "nickname": "캐시",
+    "category": "english"
+  },
+  {
+    "nickname": "낸시",
+    "category": "english"
+  },
+  {
+    "nickname": "메리",
+    "category": "english"
+  },
+  {
+    "nickname": "샐리",
+    "category": "english"
+  },
+  {
+    "nickname": "티나",
+    "category": "english"
+  },
+  {
+    "nickname": "니나",
+    "category": "english"
+  },
+  {
+    "nickname": "레나",
+    "category": "english"
+  },
+  {
+    "nickname": "엘사",
+    "category": "english"
+  },
+  {
+    "nickname": "안나",
+    "category": "english"
+  },
+  {
+    "nickname": "베키",
+    "category": "english"
+  },
+  {
+    "nickname": "마리",
+    "category": "english"
+  },
+  {
+    "nickname": "수잔",
+    "category": "english"
+  },
+  {
+    "nickname": "다이애나",
+    "category": "english"
+  },
+  {
+    "nickname": "비비안",
+    "category": "english"
+  },
+  {
+    "nickname": "엘리스",
+    "category": "english"
+  },
+  {
+    "nickname": "nana",
+    "category": "english"
+  },
+  {
+    "nickname": "momo",
+    "category": "english"
+  },
+  {
+    "nickname": "coco",
+    "category": "english"
+  },
+  {
+    "nickname": "kiki",
+    "category": "english"
+  },
+  {
+    "nickname": "lucky",
+    "category": "english"
+  },
+  {
+    "nickname": "lovely",
+    "category": "english"
+  },
+  {
+    "nickname": "rosy",
+    "category": "english"
+  },
+  {
+    "nickname": "lily",
+    "category": "english"
+  },
+  {
+    "nickname": "daisy",
+    "category": "english"
+  },
+  {
+    "nickname": "grace",
+    "category": "english"
+  },
+  {
+    "nickname": "joy",
+    "category": "english"
+  },
+  {
+    "nickname": "honey",
+    "category": "english"
+  },
+  {
+    "nickname": "berry",
+    "category": "english"
+  },
+  {
+    "nickname": "cherry",
+    "category": "english"
+  },
+  {
+    "nickname": "bunny",
+    "category": "english"
+  },
+  {
+    "nickname": "Emma",
+    "category": "english"
+  },
+  {
+    "nickname": "Olivia",
+    "category": "english"
+  },
+  {
+    "nickname": "Chloe",
+    "category": "english"
+  },
+  {
+    "nickname": "Nina",
+    "category": "english"
+  },
+  {
+    "nickname": "Hana",
+    "category": "english"
+  },
+  {
+    "nickname": "Mina",
+    "category": "english"
+  },
+  {
+    "nickname": "Yuna",
+    "category": "english"
+  },
+  {
+    "nickname": "Sora",
+    "category": "english"
+  },
+  {
+    "nickname": "Eunji",
+    "category": "english"
+  },
+  {
+    "nickname": "Hyejin",
+    "category": "english"
+  },
+  {
+    "nickname": "Minji",
+    "category": "english"
+  },
+  {
+    "nickname": "Jiyeon",
+    "category": "english"
+  },
+  {
+    "nickname": "비비빅",
+    "category": "korean"
+  },
+  {
+    "nickname": "붕어싸만코",
+    "category": "korean"
+  },
+  {
+    "nickname": "쌍쌍바",
+    "category": "korean"
+  },
+  {
+    "nickname": "바밤바",
+    "category": "korean"
+  },
+  {
+    "nickname": "누가바",
+    "category": "korean"
+  },
+  {
+    "nickname": "월드콘",
+    "category": "korean"
+  },
+  {
+    "nickname": "청포도에이드",
+    "category": "korean"
+  },
+  {
+    "nickname": "콜드브루",
+    "category": "korean"
+  },
+  {
+    "nickname": "녹차라떼",
+    "category": "korean"
+  },
+  {
+    "nickname": "고구마라떼",
+    "category": "korean"
+  },
+  {
+    "nickname": "흑당밀크티",
+    "category": "korean"
+  },
+  {
+    "nickname": "딸기우유",
+    "category": "korean"
+  },
+  {
+    "nickname": "바나나우유",
+    "category": "korean"
+  },
+  {
+    "nickname": "유자차",
+    "category": "korean"
+  },
+  {
+    "nickname": "떡볶이",
+    "category": "korean"
+  },
+  {
+    "nickname": "순대",
+    "category": "korean"
+  },
+  {
+    "nickname": "김밥",
+    "category": "korean"
+  },
+  {
+    "nickname": "냉면",
+    "category": "korean"
+  },
+  {
+    "nickname": "잔치국수",
+    "category": "korean"
+  },
+  {
+    "nickname": "미역국",
+    "category": "korean"
   }
 ];
 export function nicknameCollisionKey(value:string):string {
@@ -953,20 +2014,4 @@ export function nicknameCollisionKey(value:string):string {
 export function availableNicknameCandidates(memberNames:readonly string[],reserved:ReadonlySet<string>):NicknameCandidate[] {
   const denied=new Set([...memberNames.map(nicknameCollisionKey),...reserved]);
   return NICKNAME_CANDIDATES.filter(x=>!denied.has(nicknameCollisionKey(x.nickname))).map(x=>({...x}));
-}
-
-// [2026-11-13 21:54 사장님 «53 같은 규칙적인 숫자 닉네임 금지»] 닉네임은 한 번 쓰면 다시 못 써서(시청자 한 명 들어올 때마다 1개) 후보 200개로는 금방 바닥난다.
-//   숫자를 붙이는 대신 낱말 두 개를 이어 새 이름을 만든다(노을한잔·달빛산책과 같은 모양, 숫자 없음). 한 묶음 안에서는 앞말·뒷말이 서로 안 겹친다.
-const NICK_HEAD=['노을','달빛','봄날','구름','보리','햇살','새벽','바람','은빛','여름','가을','겨울','봄빛','살구','꽃잎','반달','연두','귤빛','별빛','모란','자두','이슬','솔잎','단풍','유자','매실','앵두','호두','밤톨','도토리','민들레','수국','목련','동백','라일락','백합','튤립','솔방울','조약돌','모래','파도','물결','바다','호수','강변','언덕','들판','숲속','오솔길','골목','다락','창가','마루','초록','연분홍','보라','쪽빛','감빛','우유','아침','오후','저녁','한낮','주말','휴일','소풍','콧노래','휘파람','무지개','소나기','첫눈','봄비','햇님','달님','별님','꽃비','안개','서리','샘물','시냇물','옹달샘','대나무','버들','느티','은행잎','감나무','포도','복숭아','체리','레몬'];
-const NICK_TAIL=['한잔','산책','라떼','정원','한줌','마중','풀잎','여울','찻집','서랍','편지','수첩','커피','한아름','우체통','주머니','다락방','주전자','마당','찻잔','보자기','책방','수다','소쿠리','그늘','한송이','쉼터','향기','바느질','일기','노트','엽서','담요','베개','의자','창문','계단','우산','장화','모자','목도리','단추','리본','구슬','풍선','연필','물감','악보','멜로디','자장가','이야기','속삭임','발자국','나침반','지도','여행','기차','정류장','꽃집','빵집','방앗간','텃밭','화분','씨앗','새싹','꽃씨','나비','참새','고양이','강아지','다람쥐','토끼','별사탕','솜사탕','젤리','쿠키','식빵','호빵','경단','꿀떡','카페','식탁','오두막','나들이','한스푼','바구니','손수건','앞치마','털실','뜨개질'];
-export function generatedNicknameCandidates(count:number,random:()=>number=Math.random):NicknameCandidate[] {
-  const shuffle=<T,>(list:readonly T[]):T[]=>{const a=[...list];for(let i=a.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
-  const heads=shuffle(NICK_HEAD),tails=shuffle(NICK_TAIL),fixed=new Set(NICKNAME_CANDIDATES.map(x=>nicknameCollisionKey(x.nickname)));
-  const out:NicknameCandidate[]=[];
-  for(let i=0;i<Math.min(heads.length,tails.length)&&out.length<count;i++){
-    const nickname=heads[i]+tails[i];
-    if(fixed.has(nicknameCollisionKey(nickname)))continue;
-    out.push({nickname,category:'korean'});
-  }
-  return out;
 }
