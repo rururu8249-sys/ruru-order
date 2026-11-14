@@ -6,6 +6,6 @@ assert.equal(A.avatarInitial('[테스트]송이'),'송');
 assert.equal(A.avatarInitial('  🌸봄이'),'봄');
 assert.equal(A.avatarInitial('momo'),'M');
 assert.equal(A.avatarInitial(''),'?');
-const c=A.avatarColors('루루','#74C0FC');assert.equal(c.bg,'#74C0FC');assert.match(c.fg,/^rgb\(37, 61, 81\)$/);
+const c=A.avatarColors('루루','#74C0FC');assert.equal(c.bg,'#74C0FC');assert.match(c.fg,/^rgb\(28, 46, 60\)$/);
 assert.equal(A.avatarColors('[테스트]송이').bg,A.avatarColors('송이').bg,'테스트 표시 붙어도 같은 색');
 console.log('PASS chat avatar initial: 첫 글자 하나·[테스트]/이모지 건너뜀·본인 색 배경+진한 글씨');

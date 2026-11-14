@@ -12,7 +12,7 @@ export function avatarInitial(nick:string):string{
 export function avatarColors(nick:string,color?:string):{bg:string;fg:string}{
   const base=/^#[0-9a-f]{6}$/i.test(color||'')?color!:CHAT_COLORS[chatBaseColorIndex(String(nick||'').replace(/^\s*\[[^\]]*\]\s*/,''))];
   const n=parseInt(base.slice(1),16);
-  const dark=(c:number)=>Math.round(c*0.32);
+  const dark=(c:number)=>Math.round(c*0.24);
   const fg=`rgb(${dark((n>>16)&255)}, ${dark((n>>8)&255)}, ${dark(n&255)})`;
   return {bg:base,fg};
 }
