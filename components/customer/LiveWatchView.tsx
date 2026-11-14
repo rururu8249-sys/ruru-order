@@ -1258,7 +1258,7 @@ export default function LiveWatchView(props: Props) {
           const bottom = Math.round(lift) + (isDesktop ? 14 : 10);
           return (
             <>
-              <img aria-hidden="true" src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ position: "absolute", left: "clamp(8px, 1.6cqh, 20px)", bottom: bottom - 4, width: isDesktop ? "clamp(76px, min(11.5cqh, 16cqw), 124px)" : "clamp(56px, min(10cqh, 20cqw), 112px)", height: "auto", opacity: 0.92, WebkitMaskImage: "linear-gradient(to bottom, #000 62%, transparent 96%)", maskImage: "linear-gradient(to bottom, #000 62%, transparent 96%)", pointerEvents: "none" }} />
+              <img aria-hidden="true" src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ position: "absolute", left: "clamp(8px, 1.6cqh, 20px)", bottom: Math.round(lift), width: isDesktop ? "clamp(76px, min(11.5cqh, 16cqw), 124px)" : "clamp(56px, min(10cqh, 20cqw), 112px)", height: "auto", opacity: 0.92, WebkitMaskImage: "linear-gradient(to bottom, #000 78%, transparent 100%)", maskImage: "linear-gradient(to bottom, #000 78%, transparent 100%)", pointerEvents: "none" }} />
               <img aria-hidden="true" src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "absolute", right: "clamp(12px, 2cqh, 26px)", bottom: bottom + 4, width: isDesktop ? "clamp(84px, min(12cqh, 17cqw), 132px)" : "clamp(66px, min(10.5cqh, 22cqw), 116px)", height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
             </>
           );
