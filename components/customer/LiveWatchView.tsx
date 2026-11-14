@@ -1250,20 +1250,16 @@ export default function LiveWatchView(props: Props) {
       {/* [2026-11-15 사장님 화면 테스트] 유튜브 공유(왼쪽 아래)·YouTube 표시(오른쪽 아래)를 늘 가림.
           영상(iframe)과 같은 크기·같은 배율 칸 안에 두어 폰·PC(손님·관리자 칸 너비가 달라도) 유튜브가 버튼을 그리는 모서리에 맞음.
           폰은 영상을 키워(videoScale) 맨 아래가 아래 버튼 줄 뒤로 숨으므로, 그만큼 위로 올려 잘리지 않게(coverLift).
-          왼쪽 = 유튜브 버튼 모양과 같은 반투명 알약(강아지 동그라미 + 루루동이), 오른쪽 = 흰 RURU 글씨(배경 없음, 뒤만 살짝 흐림). 채팅·상품 카드보다는 뒤. */}
+          왼쪽 = 강아지 얼굴 큰 동그라미(사장님 04:40 — 알약·글자 없이 얼굴만, PC 104·폰 66px), 오른쪽 = 흰 RURU 글씨(배경 없음, 뒤만 살짝 흐림). 채팅·상품 카드보다는 뒤. */}
       {(() => {
         // 키운 영상이 아래로 넘친 만큼 − (영상 칸 아래 84px 중 버튼 줄이 덮지 않는 틈) = 버튼 줄 뒤로 숨은 높이(화면 px) → 영상 배율로 나눔
         const coverLift = isDesktop || videoScale === 1 || !iframeH ? 0 : Math.max(0, ((videoScale - 1) * iframeH) / 2 - (84 - (bottomBarHeight ?? 84))) / videoScale;
         const bottom = Math.max(4, Math.round(coverLift));
         return (
           <div aria-hidden="true" data-yt-cover style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
-            <div style={{ position: "absolute", left: 22, bottom, height: 56, padding: "0 16px 0 6px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 8, borderRadius: 28, background: "rgba(20,20,20,0.74)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.14)" }}>
-              <img src="/yt-cover-dog-face.jpg" alt="" draggable={false} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", objectPosition: "50% 45%", display: "block", boxShadow: "0 0 0 1.5px rgba(255,255,255,0.7)" }} />
-              <span style={{ color: "#FFFFFF", fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em", whiteSpace: "nowrap", textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}>루루동이</span>
-            </div>
-            <div style={{ position: "absolute", right: 30, bottom: bottom - 10, width: 136, height: 58, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ position: "absolute", inset: 0, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%)", maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%)" }} />
-              <img src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "relative", width: 96, height: "auto", opacity: 0.92, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 6px rgba(0,0,0,0.25))" }} />
+            <img src="/yt-cover-dog-face.jpg" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 34 : 20, bottom: isDesktop ? 8 : bottom, width: isDesktop ? 104 : 66, height: isDesktop ? 104 : 66, borderRadius: "50%", objectFit: "cover", display: "block", boxShadow: "0 0 0 2px rgba(255,255,255,0.85), 0 2px 10px rgba(0,0,0,0.35)" }} />
+            <div style={{ position: "absolute", right: isDesktop ? 22 : 24, bottom: isDesktop ? 6 : bottom, width: isDesktop ? 150 : 124, height: isDesktop ? 84 : 62, borderRadius: isDesktop ? 42 : 31, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(10,10,10,0.5)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", boxShadow: "0 0 0 2px rgba(255,255,255,0.85), 0 2px 10px rgba(0,0,0,0.35)" }}>
+              <img src="/yt-cover-logo.png" alt="" draggable={false} style={{ width: isDesktop ? 104 : 86, height: "auto", display: "block" }} />
             </div>
           </div>
         );
