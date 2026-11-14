@@ -13,6 +13,7 @@ import {automationPost} from './liveAutomationTransport';
 import {streamModeOf} from './autoTestOrderServer';
 import {unsupportedProductCode,unsuitableSpeech} from './liveAutomationSpeech';
 import {falseExperience} from './liveAutomationDialogue';
+import {mentionsNickname} from './liveAutomationConversation';
 import {readDialogueCard} from './liveAutomationDialogueServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
@@ -158,14 +159,14 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  // [2026-11-14] 학습 노트 — 3시간마다(새 채팅 40개 이상) 자동 정리, 실패해도 대화는 계속
  let learning=(await readLearning(db).catch(()=>null))?.notes||null;
  if(learning&&learningDue(learning,Date.now(),9999)){await refreshLearning(db,c.broadcast_id).catch(()=>null);learning=(await readLearning(db).catch(()=>null))?.notes||learning;}
- const now=Date.now(),k=kstDate(now),today=k.toISOString().slice(0,10)+'T00:00:00+09:00';
+ const now=Date.now(),k=kstDate(now);
  const sessions=await rows<Session>(db.from('live_automation_sessions').select('*').eq('campaign_id',c.id).is('stopped_at',null).gt('leave_at',new Date(now+30000).toISOString()));
  if(!sessions.length)return;
  const ids=sessions.map(s=>s.actor_id);
  const [actors,holds,orders,actions,messages,bc,payments,spokeRows,paceRow]=await Promise.all([
   rows<Actor>(db.from('live_automation_actors').select('*').in('id',ids).is('retired_at',null)),
   rows<Row>(db.from('live_automation_cart_holds').select('session_id,items').in('session_id',sessions.map(s=>s.id)).gt('expires_at',new Date(now).toISOString())),
-  rows<Row>(db.from('orders').select('automation_actor_id,product_name,color,size,payment_method').in('automation_actor_id',ids).eq('broadcast_id',c.broadcast_id).neq('is_deleted',true).gte('created_at',today)),
+  rows<Row>(db.from('orders').select('automation_actor_id,product_name,color,size,payment_method').in('automation_actor_id',ids).eq('broadcast_id',c.broadcast_id).neq('is_deleted',true)),
   rows<Action>(db.from('live_automation_actions').select('*').eq('campaign_id',c.id).gte('created_at',new Date(now-3600000).toISOString()).limit(500)),
   rows<Row>(db.from('live_chat_messages').select('id,nickname,body,created_at,badge,bot_ref,automation_actor_id').eq('broadcast_id',c.broadcast_id).is('hidden_at',null).order('id',{ascending:false}).limit(40)),
   db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle(),
@@ -208,7 +209,9 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  });
  // [2026-11-14 21:07 사장님 「글이 안 올라와」] DB(live_automation_eligibility)는 오늘 담았거나 주문한 가상 손님만 AI 글을 허락함.
  // 그 밖의 손님을 말하게 고르면 전부 AI_NOT_ELIGIBLE 로 막혀 조용해졌음 → 처음부터 말할 수 있는 손님만 후보로.
- const speakable=roster.filter(r=>r.cart.length>0||r.ordered.length>0);
+ // [2026-11-15 03:47 사장님 「민여사 불렀는데 대답 안 함」] 자정이 지나도 이 방송에서 주문한 손님은 계속, 사람이 이름을 부른 손님은 장바구니·주문 없어도 답할 수 있게.
+ const called=newestHuman?roster.filter(r=>mentionsNickname(String(newestHuman.body||''),r.actor.nickname)):[];
+ const speakable=roster.filter(r=>r.cart.length>0||r.ordered.length>0||called.includes(r));
  if(!speakable.length)return;
  roster.splice(0,roster.length,...speakable);
  const recent=messages.filter(m=>m.badge!=='bot').map(m=>clean(m.body));
