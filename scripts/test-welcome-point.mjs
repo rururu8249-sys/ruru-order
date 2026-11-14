@@ -55,8 +55,8 @@ assert.equal(W.kstDayStartIso(Date.parse("2026-11-11T16:00:00Z")), "2026-11-11T1
 // 설명 문구
 const h = W.welcomeHelpLines("first", 2000, 30);
 assert.equal(h.title, "처음 오신 분께 드리는 시청 선물");
-assert.deepEqual(h.lines, ["방송을 30초 보시면 2,000P를 드려요", "다른 앱이나 탭으로 나가면 시간이 처음부터 다시 시작돼요", "받은 포인트는 주문할 때 바로 쓸 수 있어요", "한 분께 한 번만 드려요"]);
-assert.deepEqual(W.welcomeHelpLines("back", 1000, 0).lines, ["1,000P를 드려요", "받은 포인트는 주문할 때 바로 쓸 수 있어요", "오랜만에 오실 때마다 다시 드려요"]);
+assert.deepEqual(h.lines, ["방송을 30초 보시면 2,000P를 드려요", "다른 앱이나 탭으로 나가면 시간이 처음부터 다시 시작돼요", "받은 포인트는 주문할 때 바로 쓸 수 있어요", "유효기간: 지급일로부터 30일 이내 사용", "한 분께 한 번만 드려요"]);
+assert.deepEqual(W.welcomeHelpLines("back", 1000, 0).lines, ["1,000P를 드려요", "받은 포인트는 주문할 때 바로 쓸 수 있어요", "유효기간: 지급일로부터 30일 이내 사용", "오랜만에 오실 때마다 다시 드려요"]);
 assert.equal(W.welcomeHelpLines("back", 1000, 30).title, "오랜만에 오신 분께 드리는 시청 선물");
 
 // ── 가짜 DB ──

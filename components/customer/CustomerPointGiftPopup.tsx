@@ -6,7 +6,7 @@
 // 주문금액/입금/정산/배송/포인트 잔액/포인트 차감/포인트 사용 로직 없음.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { POINT_GIFT_REFRESH_EVENT } from "@/lib/welcomePoint";
+import { POINT_GIFT_REFRESH_EVENT, WELCOME_EXPIRY_TEXT } from "@/lib/welcomePoint";
 
 type PointGift = {
   id: string;
@@ -152,6 +152,7 @@ export default function CustomerPointGiftPopup() {
         >
           <div style={{ fontSize: 15, lineHeight: "20px", fontWeight: 700, color: "#111111" }}>{gift.reason || "포인트 선물"}</div>
           <div style={{ marginTop: 6, fontSize: 40, lineHeight: "46px", fontWeight: 800, color: "#D30005", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>{amountText}</div>
+          {/오신\s*선물|시청\s*선물/.test(gift.reason || "") ? <div style={{ marginTop: 6, fontSize: 13, lineHeight: "18px", fontWeight: 600, color: "#707072" }}>{WELCOME_EXPIRY_TEXT}</div> : null}
           {gift.hint ? <div style={{ marginTop: 8, fontSize: 14, lineHeight: "20px", fontWeight: 700, color: "#111111", wordBreak: "keep-all" }}>{gift.hint}</div> : null}
           <div style={{ margin: "12px 0 0", paddingTop: 10, borderTop: "1px dashed #D9D9DE", fontSize: 13, lineHeight: "16px", fontWeight: 700, letterSpacing: "2px", color: "#8E8E93" }}>RURUDONGI</div>
         </div>
