@@ -1258,8 +1258,11 @@ export default function LiveWatchView(props: Props) {
           const bottom = Math.round(lift) + (isDesktop ? 14 : 10);
           return (
             <>
-              <img aria-hidden="true" src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ position: "absolute", left: "clamp(8px, 1.6cqh, 20px)", bottom: Math.round(lift), width: isDesktop ? "clamp(76px, min(11.5cqh, 16cqw), 124px)" : "clamp(56px, min(10cqh, 20cqw), 112px)", height: "auto", opacity: 0.92, WebkitMaskImage: "linear-gradient(to bottom, #000 78%, transparent 100%)", maskImage: "linear-gradient(to bottom, #000 78%, transparent 100%)", pointerEvents: "none" }} />
-              <img aria-hidden="true" src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "absolute", right: "clamp(12px, 2cqh, 26px)", bottom: bottom + 4, width: isDesktop ? "clamp(84px, min(12cqh, 17cqw), 132px)" : "clamp(66px, min(10.5cqh, 22cqw), 116px)", height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
+              <div aria-hidden="true" style={{ position: "absolute", right: "clamp(12px, 2cqh, 26px)", bottom: bottom + 4, width: isDesktop ? "clamp(84px, min(12cqh, 17cqw), 132px)" : "clamp(66px, min(10.5cqh, 22cqw), 116px)", display: "flex", flexDirection: "column", alignItems: "center", pointerEvents: "none" }}>
+                {/* 강아지가 RURU 글씨 위로 빼꼼(사장님 05:37 「떠 있음·목 잘림」) — 목은 글씨 뒤로 숨어 어느 화면이든 같은 모양 */}
+                <img src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ width: "54%", height: "auto", marginBottom: "-9%", opacity: 0.85, WebkitMaskImage: "linear-gradient(to bottom, #000 72%, transparent 100%)", maskImage: "linear-gradient(to bottom, #000 72%, transparent 100%)", position: "relative", zIndex: 0 }} />
+                <img src="/yt-cover-logo.png" alt="" draggable={false} style={{ width: "100%", height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", position: "relative", zIndex: 1 }} />
+              </div>
             </>
           );
         })()}
