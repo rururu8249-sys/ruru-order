@@ -181,14 +181,44 @@ export function chatBaseColorIndex(nick: string): number {
   for (const ch of String(nick || "")) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
   return h % CHAT_COLORS.length;
 }
+// [2026-11-14 20:45 사장님 «아래위 상황 파악 후 색상 안 겹치게»] 번호만 다르면 통과하던 것 → 색 «느낌»(색상환 각도)으로 비교.
+//   분홍·빨강, 노랑·주황처럼 비슷한 색도 위아래(바로 위 다른 사람 + 그 위 다른 사람)와 안 붙게 고름.
+//   같은 사람이 이어 쓰면 같은 색, 목록 안에서 이미 쓴 색이 괜찮으면 그 색을 그대로(사람마다 색이 자꾸 바뀌지 않게).
+const CHAT_HUES = CHAT_COLORS.map((hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (!d) return 0;
+  const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+});
+export function chatHueGap(a: number, b: number): number {
+  const d = Math.abs(CHAT_HUES[a] - CHAT_HUES[b]) % 360;
+  return Math.min(d, 360 - d);
+}
+const NEAR_GAP = 50; // 바로 위 다른 사람과 이 각도보다 가까우면 «비슷한 색»
+const NEAR_GAP2 = 30; // 두 줄 위 다른 사람
 export function chatColors(list: { id: number; nickname: string }[]): Map<number, string> {
   const out = new Map<number, string>();
+  const sticky = new Map<string, number>();
   let prevNick = "";
   let prevIdx = -1;
+  let prev2Idx = -1;
+  const score = (i: number) => Math.min(prevIdx < 0 ? 999 : chatHueGap(i, prevIdx), prev2Idx < 0 ? 999 : chatHueGap(i, prev2Idx) + (NEAR_GAP - NEAR_GAP2));
+  const ok = (i: number) => (prevIdx < 0 || chatHueGap(i, prevIdx) >= NEAR_GAP) && (prev2Idx < 0 || chatHueGap(i, prev2Idx) >= NEAR_GAP2);
   for (const m of list) {
-    let idx = chatBaseColorIndex(m.nickname);
+    let idx: number;
     if (m.nickname === prevNick && prevIdx >= 0) idx = prevIdx; // 같은 사람이 이어 쓰면 같은 색
-    else if (idx === prevIdx) idx = (idx + 1) % CHAT_COLORS.length; // 다른 사람인데 겹치면 다음 색
+    else {
+      const base = chatBaseColorIndex(m.nickname);
+      const want = sticky.get(m.nickname) ?? base;
+      idx = -1;
+      for (const cand of [want, base]) if (ok(cand)) { idx = cand; break; }
+      if (idx < 0) for (let k = 1; k < CHAT_COLORS.length; k++) { const c = (base + k) % CHAT_COLORS.length; if (ok(c)) { idx = c; break; } }
+      if (idx < 0) { idx = base; for (let c = 0; c < CHAT_COLORS.length; c++) if (score(c) > score(idx)) idx = c; }
+      prev2Idx = prevIdx;
+    }
+    if (!sticky.has(m.nickname)) sticky.set(m.nickname, idx);
     out.set(m.id, CHAT_COLORS[idx]);
     prevNick = m.nickname;
     prevIdx = idx;

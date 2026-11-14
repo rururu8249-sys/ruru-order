@@ -10,7 +10,7 @@ import {notificationPresentation} from "@/lib/chatPresentation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
-import { mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
+import { chatColors, mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
 import type { ChatEmoji } from "@/lib/liveChatEmoji";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 
@@ -159,10 +159,10 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
       >
         {loadError ? <div className="p-3 text-[13px] text-danger-tx">{loadError}</div> : null}
         {!loadError && list.length === 0 ? <div className="p-6 text-center text-[13px] text-ink-mute">아직 글이 없어요. 아래 칸에 쓰면 손님 화면에 바로 올라가요.</div> : null}
-        {list.map((m) => { const palette=notificationPresentation(m); return (
+        {(() => { const avatarColorMap = chatColors(list); return list.map((m) => { const palette=notificationPresentation(m); return (
           <div key={m.id} onClick={() => { if (m.badge !== "bot") setMenuId((v) => (v === m.id ? null : m.id)); }}
             className={`relative flex items-start gap-2 rounded-lg px-1.5 py-1 ${m.badge === "bot" ? "" : "cursor-pointer"} ${menuId === m.id ? "bg-surface-2" : ""}`}>
-            <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} frame={palette?.frame} style={{marginTop:2}} />
+            <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} frame={palette?.frame} color={palette ? undefined : avatarColorMap.get(m.id)} style={{marginTop:2}} />
             <div className="min-w-0 flex-1 text-[14px] leading-5 text-ink">
               <span className="mr-1 font-bold text-ink-soft" style={palette?{color:palette.light}:undefined}>{m.nickname}</span>
               {m.badge ? <span style={palette?{background:palette.badge,color:palette.ink}:undefined} className={`mr-1 inline-flex h-[18px] items-center rounded px-1 align-[1px] text-[11px] font-bold ${BADGE_CLS[m.badge] || ""}`}>{BADGE_LABEL[m.badge]}</span> : null}
@@ -183,7 +183,7 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
               </div>
             )}
           </div>
-        ); })}
+        ); }); })()}
       </div>
       {emojiOpen && emojis.length > 0 ? (
         <div className="grid max-h-40 grid-cols-6 gap-1 overflow-y-auto border-t border-line p-2">

@@ -11,7 +11,7 @@ import { useChatAutoScroll } from "@/lib/useChatAutoScroll";
 import { useLiveChatPrivate } from "@/lib/useLiveChatPrivate";
 import { supabase } from "@/lib/supabase";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
-import { mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
+import { chatColors, mergeChat, parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
 import { youtubeVideoIdFromUrl } from "@/lib/liveWatch";
 import type { ChatEmoji } from "@/lib/liveChatEmoji";
 import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
@@ -42,6 +42,7 @@ export default function ChatViewClient() {
   const visibleList = useMemo(()=>list.filter(includeChatViewMessage),[list]);
   const privateChat = useLiveChatPrivate(bc?.id || "", Boolean(bc), visibleList);
   const displayMessages = useMemo(()=>privateChat.displayMessages.filter(includeChatViewMessage),[privateChat.displayMessages]);
+  const avatarColorMap = useMemo(()=>chatColors(displayMessages),[displayMessages]); // [2026-11-14] 위아래 비슷한 색 안 붙게(방송 화면과 같은 규칙)
   const [emojis, setEmojis] = useState<ChatEmoji[]>([]);
   const [sizeIdx, setSizeIdx] = useState(SIZES.indexOf(20));
   const [ytSizeIdx, setYtSizeIdx] = useState(YT_SCALES.indexOf(1.5));
@@ -317,7 +318,7 @@ export default function ChatViewClient() {
             const b = palette ? {label:"AI",bg:palette.badge,fg:palette.ink} : m.badge ? BADGE[m.badge] : null;
             return (
               <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "var(--chat-row-gap, 10px)", padding: "var(--chat-row-padding, 7px 8px)" }}>
-                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size="1.6em" frame={palette?.frame} />
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size="1.6em" frame={palette?.frame} color={palette ? undefined : avatarColorMap.get(m.id)} />
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
