@@ -29,10 +29,39 @@ const clean=(s:unknown)=>String(s??'').replace(/\uE000[^\uE001]*\uE001/g,'(이�
 const roleOf=(m:Row)=>m.badge==='bot'?'사이트알림':m.automation_actor_id?'가상손님':m.badge==='crown'||m.badge==='crown_pink'?'사장님':m.badge==='mod'?'채팅관리자':'손님';
 const seedOf=(a:Actor)=>Number((a as unknown as {profile?:{seed?:unknown}}).profile?.seed)||0;
 /** Gemini 답이 없거나 걸러졌을 때만 쓰는 짧은 답 */
-function shortReply(q:string,recent:string[],seed:number):string|null{
+function shortReply(q:string,recent:string[],seed:number,own:string[]=[]):string|null{
  const sets:Array<[RegExp,string[]]>=[[/카톡|링크|결제/,['네 카톡 볼게요~','넵 링크 확인할게요!','카톡 확인해볼게요 😊']],[/감사|고마|안녕|반가|좋은\s*(밤|하루|저녁|아침|꿈)|잘\s*자|수고|평안|편안|굿밤|쉬세요/,['감사해요~','네 감사합니다 😊','넵 감사해요!']]];
- for(const [re,list] of sets)if(re.test(q)){for(let i=0;i<list.length;i++){const r=list[(Math.abs(seed)+i)%list.length];if(!duplicateLine(r,recent.slice(0,15)))return r;}return null;}
+ for(const [re,list] of sets)if(re.test(q)){for(let i=0;i<list.length;i++){const r=list[(Math.abs(seed)+i)%list.length];if(!duplicateLine(r,recent.slice(0,15))&&!repeatsOwnLine(r,own))return r;}return null;}
  return null;
+}
+// [2026-11-14 10:22 사장님 「소개 안 하는 상품·없는 브라운·제니패딩 얘기」] 상품 얘기는 «지금 상품 카드»(+그 손님 장바구니·주문)만.
+//   사이트 알림(다른 손님 장바구니·주문)에 나온 상품 이름·색, 흔한 색 이름이 카드에 없으면 버림.
+const COLOR_WORDS=['블랙','화이트','베이지','브라운','카멜','그레이','네이비','아이보리','핑크','레드','초코','차콜','크림','카키','민트','실버','골드','퍼플','블루','그린','옐로우','오렌지','와인','버건디','소라','하늘','연베이지','모카','라벤더','올리브','스카이','백색','검정','검은','흰색','회색','갈색','남색'];
+const NOTICE_STOP=new Set(['장바구니','담음','주문','감사합니다','카톡','카드결제','링크','확인해주세요','결제','완료','감사','외','종','사이즈','원','상품','해외배송','배송','평균','소요되며']);
+export function offCardProductMention(text:string,allowed:string,notices:string[]):string|null{
+ const a=allowed.replace(/\s+/g,'');
+ for(const c of COLOR_WORDS)if(text.includes(c)&&!a.includes(c))return c;
+ for(const n of notices){
+  for(const w of n.replace(/[A-Za-z]{1,4}-?\d+/g,' ').split(/[\s·()（）,/\[\]!~]+/)){
+   const t=w.replace(/[^가-힣]/g,'');
+   if(t.length<2||/\*/.test(w)||NOTICE_STOP.has(t)||/님$/.test(t)||a.includes(t))continue;
+   if(text.includes(t))return t;
+  }
+ }
+ return null;
+}
+// [2026-11-14 10:22 사장님 「반달지도 한 말을 또 함」] 같은 가상 손님이 같은 얘기(카톡·결제 등)를 또 하면 버림
+const TOPICS=[/카톡|링크|결제|입금/,/사이즈|라지|미듐|스몰|\d{2,3}\s*(cm|키로|kg)/i,/배송|언제\s*와/];
+// [2026-11-14 10:24 사장님 「누가 물어본 것도 없는데 55면 M 하면 된다」] 가상 손님은 남에게 사이즈·상품을 추천·안내하지 않음
+//   (방송 목소리를 듣는 것도 아니고 정답을 모름). 자기 키·몸무게를 말하고 «묻는» 것만.
+export function advisesOthers(text:string):boolean{
+ if(/[?？]|까요|나요|될까|맞을까|어때요|어떤가요/.test(text))return false;
+ return /(하시면|하면|입으시면|사시면|고르시면|가시면)\s*(될|돼|되|맞|괜찮|좋|딱)/.test(text)||/추천(해요|드려요|드림|합니다)|정사이즈|한\s*치수\s*(크게|작게)|(작게|크게)\s*나왔/.test(text);
+}
+export function repeatsOwnLine(text:string,own:string[]):boolean{
+ if(!own.length)return false;
+ if(duplicateLine(text,own))return true;
+ return TOPICS.some(re=>re.test(text)&&own.some(o=>re.test(o)));
 }
 // [2026-11-14 09:03] AI 채팅 양 — 관리자 「채팅 양」(settings live_automation_chat_pace). 간격은 AI 글 사이 시간
 const CHAT_PACE_KEY='live_automation_chat_pace';
@@ -95,18 +124,23 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    ordered:mine.map(o=>[o.product_name,o.color,o.size].filter(Boolean).join(' ')),
    cardOrder:mine.some(o=>/카드/.test(String(o.payment_method||''))),
    cart:cartItems.map(i=>[i.productName,i.color,i.size].filter(Boolean).join(' ')),
-   paid:payments.filter(p=>p.actor_id===a.id).map(p=>String(p.kind))}];
+   paid:payments.filter(p=>p.actor_id===a.id).map(p=>String(p.kind)),
+   own:messages.filter(m=>String(m.automation_actor_id||'')===String(a.id)).map(m=>clean(m.body)).slice(0,8)}];
  });
  if(!roster.length)return;
  const recent=messages.filter(m=>m.badge!=='bot').map(m=>clean(m.body));
+ const notices=messages.filter(m=>m.badge==='bot'&&/^(c|o|p):/.test(String(m.bot_ref||''))).map(m=>clean(m.body));
  const transcript=[...messages].reverse().map(m=>`#${m.id} ${hhmm(m.created_at)} ${clean(m.nickname)||'알림'}(${roleOf(m)}): ${clean(m.body).slice(0,140)}`).join('\n');
- const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?'(카드결제 주문 — 카톡으로 결제 링크 받음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}`).join('\n');
+ const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?'(카드결제 주문 — 카톡으로 결제 링크 받음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
  const cardText=card?`${card.name} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
  const prompt=[
   '너는 유튜브 라이브커머스 「루루동이」 사이트 채팅방에 있는 가상 손님들의 다음 한 마디를 정한다. 진짜 사람처럼 자연스러워야 한다.',
   '[할 일] 아래 대화 전체를 시간순으로 읽고, 가상 손님 목록 중 지금 말하는 게 자연스러운 한 명과 그 한 마디를 고른다. '+(newestHuman?'자연스러운 말이 정말 없을 때만 speaker를 빈 문자열로 둔다(침묵).':'지금은 말할 차례다(얼마나 자주 말할지는 이미 정해져 있다). speaker를 비우지 말고 반드시 한 명이 짧게 한마디(인사·가격·사이즈 질문·짧은 반응·대화 이어 가기) 한다.'),
   '[답하기] 사장님·손님이 가상 손님을 부르거나 말을 걸었으면 그 가상 손님이 답한다. 줄임말·별명·닉네임 일부·오타로 불러도 문맥으로 판단한다(예: 여름한아름 → 한아름님, 포도다람쥐 → 포도님). 사이트알림(주문 감사·카드결제 링크·결제 확인)과 이어지는 말이면 그 흐름대로 답한다(카드결제 링크 안내 뒤 카톡 확인 부탁 → 카톡 확인하겠다는 답). 답할 때 replyTo에 그 글 번호를 넣는다.',
   '[말투] 실제 방송 채팅처럼 보통 2~25자 한 문장. 띄어쓰기·맞춤법은 느슨해도 된다. 사람마다 어미를 다르게(~요/~용/~여/~유/~당/~죠?), ㅋㅋ ㅎㅎ ~ 이모지는 가끔 하나. 브랜드는 줄여 부르기도 한다(몽·몽클·버버·막스). 흔한 유형: 가격 질문, 사이즈 고민(66이면 라지 될까요?), 번호로 묻기, 짧은 감탄(이쁘다/요고 귀엽네요), 결제·배송 질문, 다른 손님 질문에 짧게 거들기, 인사. 예시를 그대로 쓰지 말고 매번 새로 쓴다. 바로 앞 글들의 첫 단어·어미·문장 모양을 따라 하지 않는다(누가 하이 했으면 하이 금지). 한 글 안에서 같은 말을 두 번 쓰지 않는다. 고객센터·광고·설명 말투 금지.',
+  '[상품] 상품 얘기는 «지금 상품 카드» 상품만 한다(카드가 없으면 상품 얘기 대신 인사·짧은 반응). 사이트알림에 나온 다른 손님의 장바구니·주문 상품 이름·색은 말하지 않는다(지금 소개 중인 상품이 아님). 카드에 없는 색 이름 금지.',
+  '[질문은 내 것만] 가상 손님은 방송 목소리를 듣지 못하고 정답을 모른다. 다른 손님 질문(사이즈 추천 등)에 답하거나 «~면 M 하시면 돼요» 같은 추천·안내를 절대 하지 않는다. 사이즈 얘기는 자기 키·몸무게를 말하고 카드 상품 사이즈를 묻는 것만(예: 160에 55인데 이거 M 될까요?). 아무도 안 물었는데 혼자 결론 내지 않는다.',
+  '[반복 금지] 각 가상 손님의 «이미 한 말»과 같은 뜻을 또 하지 않는다(카톡 확인하겠다고 이미 했으면 다시 카톡 얘기 금지 — 다른 짧은 반응이나 침묵).',
   '[사실] 상품 얘기는 지금 상품 카드 정보만 근거로 한다(없는 색·사이즈·소재·가격을 지어내지 않는다). 해 본 적 없는 구매·사용·배송받은 경험, 친구 소개 같은 이야기를 지어내지 않는다. 주문했다는 말은 주문이 있는 손님만, 결제 완료 말은 결제확인 받은 손님만. 영상·소리를 보거나 들은 척하지 않는다. 자기가 지금 뭘 보는 중인지 설명하지 않는다. 테스트·AI·가상·시스템 같은 말 금지.',
   `[상황] 지금 ${mode==='live'?'생방송 중':'방송이 끝난 뒤 다시보기/쉬는 중이다. 상품은 지금도 담고 주문할 수 있다. 상황에 맞게(방송 끝나도 보면서 바로 담을 수 있어 편하다는 뜻 등, 매번 다른 말로). 지금 입어 달라·보여 달라 같은 실시간 요청 금지'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
   `[지금 상품 카드] ${cardText}`,
@@ -133,6 +167,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(unsupportedProductCode(t,[...r.ordered,...r.cart,...(card?[card.name]:[])].map(productName=>({productName}))))return false;
   if(!tgt&&(unsuitableSpeech(t,mode,'chat')||duplicateLine(t,recent.slice(0,15))))return false;
   if(!r.ordered.length&&/주문.{0,8}(했|냈|넣었|제출했|보냈|완료)/.test(t))return false;
+  if(repeatsOwnLine(t,r.own)||advisesOthers(t))return false;
+  if(offCardProductMention(t,[card?`${card.name} ${card.colors.join(' ')}`:'',...r.cart,...r.ordered].join(' '),notices))return false;
   if(/([가-힣]{2,}요)[\s\S]*\1/.test(t)||/다시\s*보기|구경\s*(하는|중|하고)/.test(t))return false;
   if(weekend&&WORK.test(t))return false;
   if(learning?.bad.length&&duplicateLine(t,learning.bad))return false;
@@ -143,7 +179,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const rawText=text;
  if(speaker&&text&&!acceptable(text,speaker,target))text='';
  void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent':text?'sent':'rejected'});
- if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor))||'';
+ if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor),speaker.own)||'';
  // 사람 글은 한 번만 판단 — 침묵이어도 그 글 번호를 남겨 같은 글로 Gemini 를 다시 부르지 않음
  const sourceId=target?Number(target.id):newestHuman?Number(newestHuman.id):null;
  const who=speaker&&text?speaker:(sourceId?roster[0]:null);
