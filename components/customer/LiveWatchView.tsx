@@ -1266,7 +1266,7 @@ export default function LiveWatchView(props: Props) {
       ) : null}
       <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: paused ? "flex-start" : "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s", zIndex: 4 }}>
         {/* [07:32 사장님 「숫자 넣으니 제목이 사라짐」] 첫 줄 LIVE·숫자, 둘째 줄 제목(제목이 늘 보이게) */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", minWidth: 0, width: paused && !(rpsActive && !focus) ? "min(300px, 58%)" : undefined }}>
           {/* [07:05 사장님] LIVE + 시청자 수(유튜브 동시 시청자) — 오늘만셀러처럼 한 알약 */}
           <span style={{ display: "inline-flex", alignItems: "stretch", height: "28px", borderRadius: "9999px", overflow: "hidden", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 10px", background: paused ? "#707072" : "#D30005" }}>
@@ -1282,10 +1282,10 @@ export default function LiveWatchView(props: Props) {
           </span>
           {/* [2026-11-15 사장님 03:25] 쉬는 동안엔 제목 대신 진한 안내 상자(위쪽 채널 배너 자리 — 사이트 손님은 이미 채널로 들어옴). 라이브로 착각 안 하게 첫 줄 고정 문구 */}
           {paused && !(rpsActive && !focus) ? (
-            <div role="status" data-live-paused-box style={{ width: "min(300px, calc(60vw - 16px))", padding: "8px 12px", borderRadius: "12px", background: "rgba(17,17,17,0.92)", border: "1px solid rgba(255,255,255,0.18)", lineHeight: 1.35, textAlign: "center", opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
+            <div role="status" data-live-paused-box style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: "12px", background: "rgba(17,17,17,0.92)", border: "1px solid rgba(255,255,255,0.18)", lineHeight: 1.35, textAlign: "center", opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
               <div style={{ fontSize: "13px", fontWeight: 700, color: "#FFD54F", wordBreak: "keep-all" }}>지금은 라이브 방송이 아니에요</div>
               <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 700, color: "#FFFFFF", whiteSpace: "pre-line", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{pausedText}</div>
-              <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 400, color: "#CCCCCC" }}>상품은 지금도 담을 수 있어요</div>
+              <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 400, color: "#CCCCCC" }}>상품은 지금도 구매할 수 있어요</div>
             </div>
           ) : (
             <span style={{ maxWidth: "100%", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>{title || "라이브 방송"}</span>
@@ -1298,7 +1298,7 @@ export default function LiveWatchView(props: Props) {
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0, pointerEvents: "auto", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
             {/* 채팅 숨기기 — [2026-11-12] 왼쪽 위 시청자 수(눈)와 헷갈려 눈 그림 → 말풍선 그림 */}
             <button type="button" onClick={() => { const next = !focus; setFocus(next); setChatHint(next ? "채팅을 숨겼어요. 말풍선을 다시 누르면 보여요." : "채팅을 다시 보여 드려요."); }} aria-label={focus ? "채팅 보이기" : "채팅 숨기기"} aria-pressed={focus} style={TOP_ICON_BTN}>
-              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12a7.5 7.5 0 01-11 6.6L4 20l1.4-4.2A7.5 7.5 0 1120 12z" /><g fill="#FFFFFF" stroke="none"><circle cx="9" cy="12" r="1.2" /><circle cx="12.5" cy="12" r="1.2" /><circle cx="16" cy="12" r="1.2" /></g>{focus ? <path d="M4 4l16 16" /> : null}</svg>
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h14a2 2 0 012 2v9a2 2 0 01-2 2h-8l-5 4v-4H5a2 2 0 01-2-2V6a2 2 0 012-2z" /><path d="M7.5 9h9M7.5 12.5h6" />{focus ? <path d="M3 3l18 18" /> : null}</svg>
             </button>
             <button type="button" onClick={reloadPlayer} aria-label="방송 새로고침" style={TOP_ICON_BTN}>
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0014.3 4.9L20 16" /><path d="M20 20v-4h-4" /></svg>
@@ -1313,7 +1313,7 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {!soundPromptDone && !guideOpen && !(rpsActive && !focus) ? (
-        <div style={{ position: "absolute", left: "16px", right: "16px", top: showIntroBanner ? "max(calc(232px + env(safe-area-inset-top)), 25%)" : "max(100px, 25%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
+        <div style={{ position: "absolute", left: "16px", right: "16px", top: showIntroBanner ? "max(calc(232px + env(safe-area-inset-top)), 25%)" : "50%", transform: showIntroBanner ? undefined : "translateY(-50%)", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
           <button type="button" aria-label="방송 소리 켜기" onClick={turnSoundOn}
             style={{ minWidth: "192px", minHeight: "60px", padding: "12px 24px", border: "1px solid rgba(255,255,255,0.7)", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", boxShadow: "0 4px 24px rgba(0,0,0,0.45)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "10px", fontSize: "20px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", pointerEvents: "auto" }}>
             <IconSoundOn color="#111111" />소리 켜기
