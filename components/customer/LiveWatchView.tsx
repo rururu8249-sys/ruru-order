@@ -1282,10 +1282,10 @@ export default function LiveWatchView(props: Props) {
           </span>
           {/* [2026-11-15 사장님 03:25] 쉬는 동안엔 제목 대신 진한 안내 상자(위쪽 채널 배너 자리 — 사이트 손님은 이미 채널로 들어옴). 라이브로 착각 안 하게 첫 줄 고정 문구 */}
           {paused && !(rpsActive && !focus) ? (
-            <div role="status" data-live-paused-box style={{ width: "min(300px, calc(60vw - 16px))", padding: "10px 12px", borderRadius: "12px", background: "rgba(17,17,17,0.92)", border: "1px solid rgba(255,255,255,0.18)", lineHeight: 1.45, opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
-              <div style={{ fontSize: "14px", fontWeight: 700, color: "#FFD54F", wordBreak: "keep-all" }}>지금은 라이브 방송이 아니에요</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 700, color: "#FFFFFF", whiteSpace: "pre-line", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{pausedText}</div>
-              <div style={{ marginTop: "4px", fontSize: "13px", fontWeight: 400, color: "#CCCCCC" }}>상품은 지금도 담을 수 있어요</div>
+            <div role="status" data-live-paused-box style={{ width: "min(300px, calc(60vw - 16px))", padding: "8px 12px", borderRadius: "12px", background: "rgba(17,17,17,0.92)", border: "1px solid rgba(255,255,255,0.18)", lineHeight: 1.35, textAlign: "center", opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#FFD54F", wordBreak: "keep-all" }}>지금은 라이브 방송이 아니에요</div>
+              <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 700, color: "#FFFFFF", whiteSpace: "pre-line", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{pausedText}</div>
+              <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 400, color: "#CCCCCC" }}>상품은 지금도 담을 수 있어요</div>
             </div>
           ) : (
             <span style={{ maxWidth: "100%", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>{title || "라이브 방송"}</span>
