@@ -6,6 +6,7 @@ import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { getServiceClient } from "@/lib/youtube";
 import { invalidateMemberRoles, readMemberRoles } from "@/lib/liveMemberRoles";
 import { removeMemberRole, saveMemberRole } from "@/lib/liveMemberRolesServer";
+import { koreanPhoneVariants } from "@/lib/order/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,8 @@ async function list(sb: ReturnType<typeof getServiceClient>) {
   const opPhones = ((ops ?? []) as Array<{ customer_phone?: string }>).map((o) => digits(o.customer_phone)).filter((p) => p.length >= 9);
   const opPeople: Array<ReturnType<typeof person> & { key: string }> = [];
   if (opPhones.length) {
-    const { data } = await sb.from("customers").select(COLS).in("customer_phone", opPhones);
+    const vs = Array.from(new Set(opPhones.flatMap((p) => [p, ...koreanPhoneVariants(p)])));
+    const { data } = await sb.from("customers").select(COLS).in("customer_phone", vs);
     const byPhone = new Map(((data ?? []) as Cust[]).map((c) => [digits(c.customer_phone), c]));
     for (const p of opPhones) {
       const c = byPhone.get(p);
