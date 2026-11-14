@@ -137,6 +137,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-14 **[근본 수정 — 손님 쓰기 「permission denied for function」 재발 막기(사장님 23:38 「근본적으로」)]** 손님이 쓸 수 있는 표(broadcasts·orders·products)의 트리거 3개(live_automation_broadcast_end·live_automation_order_guard·product_brand_guard_parent_note)를 만든 사람 권한(security definer·search_path 고정, 본문 무변경)으로 — 안에서 부르는 잠긴 함수 때문에 손님 쓰기가 막힐 일 없음(supabase/sql/hotfix/trigger_definer_20261114.sql, 클로드 SQL Editor 실행·prosecdef true 확인). 점검 SQL supabase/sql/check/anon_permission_scan_20261114.sql — 색인·손님이 쓸 수 있는 표 트리거 59개 중 문제 0. 돈·주문 판정 무변경. 배포 완료
 - 2026-11-14 **[긴급 — 손님 주문서 제출 「permission denied for function live_automation_name_key」(사장님 23:37 김현정 캡처)]** 원인: customers 색인 customers_automation_name_key 가 이 함수를 쓰는데 11/13 자동 실행 마이그레이션이 live_automation_* 함수 실행 권한을 anon·authenticated 에서 뺐음 → 손님 화면의 회원 정보 저장이 막혀 제출 실패. 클로드가 SQL Editor 에서 grant execute(public·anon·authenticated) 실행, has_function_privilege 확인 true(supabase/sql/hotfix/grant_name_key_20261114.sql). 순수 글자 정리 함수라 안전, 코드 무변경·돈 무접촉. 손님 다시 제출 확인 필요
 - 2026-11-14 **[부관리자 김현아 — 닉네임 골라 보내기·[테스트] 표시 안 뜨던 원인(사장님 23:31)]** 실측: 그분 카카오에 등록된 휴대폰(010-7356-…)이 주문 번호 01083388860 과 달라, 서버가 «카카오 본인 확인 휴대폰»으로만 보던 판정에서 빠졌음. lib/autoTestOrder isAutoTestViewerIdentity = 번호 또는 카카오 계정 번호(4980919533, 서버 서명 값) — 닉네임 고르기(liveAutomationManualChat)·[테스트] 표시(live-chat/private)·보는 사람 목록 테스트 표시(watchers) 공통. 돈·주문 무접촉. manual auth/route/client 테스트·tsc 0·build(BANKDA 2). 배포 완료 — 실화면 확인 필요
 - 2026-11-14 **[PC 채팅 엔터 뒤 입력칸 커서 유지 + [테스트] 표시는 부관리자 김현아만 추가(사장님 23:10·23:11)]** LiveWatchView sendChat: PC 에서 보낸 뒤 입력칸에 다시 커서(보내는 동안 readOnly 라 빠지던 것). live-chat/private: [테스트] 표시 = 총관리자·관리자 시험 계정 + AUTO_TEST_VIEWER_PHONES(01083388860)만, 다른 채팅 관리자(R)는 안 보임. DB: live_watch_v1.mods 에 01083388860 추가(채팅 관리). 돈·주문 무접촉. tsc 0·build(BANKDA 2). 배포 완료 — 실화면 확인 필요
@@ -715,6 +716,7 @@ grep -r "TODO\|FIXME\|console.log" components/ app/
 git status
 
 ## 기술 함정
+- **live_automation_% 등 함수 권한을 손님(anon/authenticated)에게서 빼는 revoke 를 넣었으면, 반드시 supabase/sql/check/anon_permission_scan_20261114.sql 을 돌려 total_checked 한 줄만 나오는지 확인. 손님 쓰기 경로의 색인·트리거가 그 함수를 쓰면 주문서 제출이 막힘(2026-11-14 live_automation_name_key 사고).**
 - **Supabase SQL Editor 에서는 `create temp table … on commit drop` 이 바로 사라진다(42P01). SQL 파일에 temp table 쓰지 말 것. begin/rollback 시험 실행도 그 화면에선 안 먹으니(실데이터 바뀜) 시뮬레이션은 SQL Editor 에서 돌리지 말 것.** (㉟ 2026-10-18)
 - 맥 sed s///1은 줄마다 첫 매칭이라 여러 줄 다 바뀜 → 여러 줄 치환은 python 스크립트 사용
 - 긴 체인(sed+build+commit+push 한 줄)은 중간에 멎음 → 단계 분리
