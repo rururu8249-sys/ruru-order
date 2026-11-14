@@ -4,7 +4,7 @@ import { getServiceClient } from "@/lib/youtube";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { chatIdentityFromRequest, verifiedChatRole } from "@/lib/liveChatSession";
 import { readLiveWatcherList } from "@/lib/liveAudienceServer";
-import { AUTO_TEST_VIEWER_PHONES } from "@/lib/autoTestOrder";
+import { isAutoTestViewerIdentity } from "@/lib/autoTestOrder";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const reply = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
@@ -15,7 +15,7 @@ async function authorized(request: NextRequest): Promise<{ owner: boolean; test:
   if (!identity) return null;
   const role = await verifiedChatRole(getServiceClient(), identity);
   // 테스트 표시는 총관리자·부계정 관리자만(채팅 관리자 R 에겐 안 보임)
-  const test = role.isOwner || AUTO_TEST_VIEWER_PHONES.includes(String(identity.phone ?? ""));
+  const test = role.isOwner || isAutoTestViewerIdentity(identity);
   return role.isManager || test ? { owner: role.isOwner, test } : null;
 }
 export async function GET(request: NextRequest) {

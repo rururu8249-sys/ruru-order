@@ -2,6 +2,7 @@ import type {NextRequest} from 'next/server';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {verifyAdminSessionFromRequest} from '@/lib/admin-auth';
 import {chatIdentityFromRequest,verifiedChatRole} from '@/lib/liveChatSession';
+import {isAutoTestViewerIdentity} from '@/lib/autoTestOrder';
 export const MANUAL_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type ManualChatSelection={token:string;clientId:string;requestId:string;nickname?:string};
 export type ManualActor={used?:boolean;id:string;nickname:string;activity:{used?:boolean;present:boolean;cart:boolean;orders:number};inUse:boolean;mine:boolean;expiresAt:string|null};
@@ -13,7 +14,7 @@ export async function manualChatOperator(request:NextRequest,db:SupabaseClient):
   const role=await verifiedChatRole(db,identity);
   // Only provider-signed phone/identity and current owner configuration grant access.
   // Generic moderators and editable request/profile phone numbers do not.
-  return role.isOwner || identity.phone==='01083388860' ? 'kakao:'+identity.sub : null;
+  return role.isOwner || isAutoTestViewerIdentity(identity) ? 'kakao:'+identity.sub : null;
 }
 export function validManualSelection(value:unknown):value is ManualChatSelection {
   if(!value || typeof value!=='object') return false;

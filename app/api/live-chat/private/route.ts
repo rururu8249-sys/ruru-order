@@ -5,7 +5,7 @@ import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { getServiceClient } from "@/lib/youtube";
 import { CHAT_TEMP_ID_BASE, parseChatMessage } from "@/lib/liveChat";
 import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
-import { AUTO_TEST_VIEWER_PHONES } from "@/lib/autoTestOrder";
+import { isAutoTestViewerIdentity } from "@/lib/autoTestOrder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const sb = getServiceClient();
     const role = admin ? { isMod: true, isManager: true } : await verifiedChatRole(sb, identity);
     // [2026-11-14 23:11 사장님] [테스트] 표시는 총관리자·관리자 시험 계정 + 부관리자(김현아 문성)만 — 다른 채팅 관리자(R)는 안 보임
-    const seeTest = role.isManager || AUTO_TEST_VIEWER_PHONES.includes(String(identity?.phone ?? ""));
+    const seeTest = role.isManager || isAutoTestViewerIdentity(identity);
     const [own, deleted, hidden, commands, photos, testRows] = await Promise.all([
       identity ? sb.from("live_chat_messages").select("id").eq("broadcast_id", bc).eq("kakao_id", identity.sub).is("hidden_at", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
       role.isMod ? sb.from("live_chat_messages").select(columns).eq("broadcast_id", bc).eq("hidden_by", "author").not("hidden_at", "is", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),

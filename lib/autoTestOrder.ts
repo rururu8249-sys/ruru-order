@@ -17,6 +17,13 @@ export const AUTO_TEST_NAME = "자동테스트";
 export const AUTO_TEST_AVATAR = "autotest";
 /** 테스트 글·주문에 「TEST」 표시를 보는 사람(채팅 관리자 말고 따로) — 사장님 지정 부계정 관리자 김현아(문성) */
 export const AUTO_TEST_VIEWER_PHONES = ["01083388860"];
+/** [2026-11-14 23:31] 같은 분의 카카오 계정 번호 — 카카오에 등록된 휴대폰(010-7356-…)이 주문 번호와 달라 번호로만 보면 못 알아봄 */
+export const AUTO_TEST_VIEWER_KAKAO_IDS = ["4980919533"];
+/** 서버가 서명한 채팅 본인 확인(카카오 계정 번호·카카오 휴대폰)으로 부관리자인지 */
+export function isAutoTestViewerIdentity(identity: { sub?: string; phone?: string } | null | undefined): boolean {
+  if (!identity) return false;
+  return AUTO_TEST_VIEWER_PHONES.includes(String(identity.phone ?? "")) || AUTO_TEST_VIEWER_KAKAO_IDS.includes(String(identity.sub ?? ""));
+}
 export const AUTO_TEST_MIN_GAP_MS = 5 * 60_000;
 export const AUTO_TEST_MAX_GAP_MS = 10 * 60_000;
 
