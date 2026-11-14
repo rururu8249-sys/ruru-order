@@ -926,8 +926,6 @@ export default function LiveWatchView(props: Props) {
   const [behindLive, setBehindLive] = useState(false);
   // [08:35 사장님 「녹화 영상인데 왜 실시간으로 돌아가기가 떠」] 녹화 영상은 길이(duration) 전체가 끝이라 늘 «30초 넘게 뒤»로 잡혔음.
   //   이제 «진짜 라이브»일 때만: 유튜브가 알려 주는 isLive, 또는 영상 길이가 시간 따라 계속 늘어날 때(라이브는 길이가 자람).
-  // [2026-11-15 사장님 화면 테스트] 유튜브가 멈춤·첫 화면·막대 때 왼쪽 아래 공유 / 오른쪽 아래 YouTube 표시를 띄움 → 그때만 RURU 그림으로 덮음
-  const [ytPlaying, setYtPlaying] = useState(false);
   const playerInfo = useRef<{ t: number; d: number; state: number; live: boolean; d0: number; d0at: number; seekableEnd: number | null; atLiveHead: boolean | null }>({ t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0, seekableEnd: null, atLiveHead: null });
   const lastTick = useRef<{ t: number; at: number; state: number }>({ t: 0, at: 0, state: -1 });
   useEffect(() => {
@@ -956,7 +954,7 @@ export default function LiveWatchView(props: Props) {
       }
       const vd = info.videoData as { isLive?: unknown } | undefined;
       if (typeof vd?.isLive === "boolean") cur.live = vd.isLive;
-      if (typeof info.playerState === "number") { cur.state = info.playerState; pausedRef.current = info.playerState === 2; setYtPlaying(info.playerState === 1 || info.playerState === 3); }
+      if (typeof info.playerState === "number") { cur.state = info.playerState; pausedRef.current = info.playerState === 2; }
       // 실제 라이브 응답에서 duration(5767초)과 이동 가능한 끝(2170초)이 달랐다.
       // progressState는 현재 DVR 범위와 실제 실시간 도착 여부. 부분 응답에서도 마지막 값을 유지한다.
       const progress = info.progressState as { seekableEnd?: unknown; isAtLiveHead?: unknown } | undefined;
@@ -986,7 +984,6 @@ export default function LiveWatchView(props: Props) {
   };
   const reloadPlayer = () => {
     playerInfo.current = { t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0, seekableEnd: null, atLiveHead: null };
-    setYtPlaying(false);
     lastTick.current = { t: 0, at: 0, state: -1 };
     setBehindLive(false);
     setMuted(true);
@@ -1248,14 +1245,19 @@ export default function LiveWatchView(props: Props) {
         style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}
       />
 
-      {/* [2026-11-15 사장님 화면 테스트] 유튜브 공유(왼쪽 아래)·YouTube 표시(오른쪽 아래) 덮개 — 영상과 같은 크기·같은 배율 칸 안에 두어 폰·PC 모두 그 자리에 맞음, 어둡게 할 땐 영상과 같이 어두워짐 */}
-      <div aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s, opacity 0.25s", opacity: seekMode || !ytPlaying ? 1 : 0 }}>
-        <div style={{ position: "absolute", left: 22, bottom: -2, width: 118, height: 60, borderRadius: 30, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.35)" }}>
-          <img src="/yt-cover-share.jpg" alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0.94 }} />
-        </div>
-        <div style={{ position: "absolute", right: 44, bottom: 4, width: 108, height: 44, borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.35)" }}>
-          <img src="/yt-cover-logo.jpg" alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0.94 }} />
-        </div>
+      {/* [2026-11-15 사장님 화면 테스트] 유튜브 공유(왼쪽 아래)·YouTube 표시(오른쪽 아래)를 늘 가림.
+          영상(iframe)과 같은 크기·같은 배율 칸 안에 두어 폰·PC(손님·관리자 칸 너비가 달라도) 유튜브가 버튼을 그리는 그 모서리에 맞음.
+          스티커처럼 안 보이게: 그 자리 영상을 흐리고 살짝 어둡게(가장자리는 서서히 사라짐) + 그 위에 흰 RURU 글씨(배경 없음). 채팅·상품 카드보다는 뒤. */}
+      <div aria-hidden="true" data-yt-cover style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
+        {[
+          { key: "share", src: "/yt-cover-share.png", box: { left: 4, bottom: -14, width: 156, height: 86 }, logoW: 92 },
+          { key: "logo", src: "/yt-cover-logo.png", box: { right: 24, bottom: -12, width: 150, height: 76 }, logoW: 96 },
+        ].map((c) => (
+          <div key={c.key} style={{ position: "absolute", ...c.box, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ position: "absolute", inset: 0, backdropFilter: "blur(14px) brightness(0.72) saturate(1.1)", WebkitBackdropFilter: "blur(14px) brightness(0.72) saturate(1.1)", background: "rgba(0,0,0,0.12)", WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%)", maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%)" }} />
+            <img src={c.src} alt="" draggable={false} style={{ position: "relative", width: c.logoW, height: "auto", opacity: 0.9, transform: "translateY(-9px)", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.45))" }} />
+          </div>
+        ))}
       </div>
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
       {/* 돌려보기 중 — 영상 전체를 반투명 검정으로 어둡게(유튜브 막대는 빨강·흰색이라 그대로 보임) */}
