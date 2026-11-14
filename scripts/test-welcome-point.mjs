@@ -154,6 +154,7 @@ function world({ cfg, on = true, rpcFail = false, ledger = [] }) {
     customer_point_ledger: ledger.slice(),
   };
   const calls = [];
+  const clock = { v: NOW };
   const db = fakeDb(tables);
   db.storage = { from: () => ({ download: async () => ({ data: { text: async () => JSON.stringify(cfg) }, error: null }) }) };
   db.rpc = async (name, a) => {
@@ -161,10 +162,10 @@ function world({ cfg, on = true, rpcFail = false, ledger = [] }) {
     if (rpcFail) return { data: null, error: { message: "boom" } };
     const dup = tables.customer_point_ledger.find((r) => r.source_key === a.p_source_key);
     if (dup) return { data: { ok: true, duplicate: true }, error: null };
-    tables.customer_point_ledger.push({ id: 100 + calls.length, customer_phone: a.p_phone, amount: a.p_amount, reason: a.p_reason, customer_visible: a.p_customer_visible, source_key: a.p_source_key, created_at: new Date(NOW).toISOString() });
+    tables.customer_point_ledger.push({ id: 100 + calls.length, customer_phone: a.p_phone, amount: a.p_amount, reason: a.p_reason, customer_visible: a.p_customer_visible, source_key: a.p_source_key, created_at: new Date(clock.v).toISOString() });
     return { data: { ok: true }, error: null };
   };
-  return { db, calls, tables };
+  return { db, calls, tables, clock };
 }
 const NOW = Date.parse("2026-11-12T03:00:00Z");
 const ON = { first: { on: true, amount: 2000 }, back: { on: true, amount: 1000, days: 60 }, watchSec: 30, dailyCap: 50 };
@@ -308,7 +309,7 @@ console.log("welcome-point OK");
   assert.deepEqual(W.parseWelcomeSourceKey("welcome_first:c1#2"), { kind: "first", customerId: "c1", tier: 1 });
   assert.deepEqual(W.parseWelcomeSourceKey("welcome_back:c2:G7#3"), { kind: "back", customerId: "c2", tier: 2 });
   assert.deepEqual(W.welcomeHelpLines("first", [{ sec: 30, amount: 1000 }, { sec: 60, amount: 1000 }]).lines.slice(0, 4),
-    ["방송을 30초 보시면 1,000P를 드려요", "1분까지 보시면 1,000P를 더 드려요", "끝까지 보시면 모두 2,000P예요", "다른 앱이나 탭으로 나가면 시간이 처음부터 다시 시작돼요"]);
+    ["방송을 30초 보시면 1,000P를 드려요", "1분까지 보시면 1,000P를 더 드려요", "끝까지 보시면 모두 2,000P예요", "다른 앱이나 탭으로 나가면 시간이 다시 시작돼요 (받은 선물 다음부터 남은 시간만)"]);
   const T2 = [{ sec: 30, amount: 500 }, { sec: 60, amount: 500 }];
   assert.equal(W.welcomeCouponHint(T2, 0), "1분까지 보시면 500P 더 드려요");
   assert.equal(W.welcomeCouponHint(T2, 1), "모두 1,000P 받으셨어요");
@@ -317,7 +318,7 @@ console.log("welcome-point OK");
   const TIERS = { ...ON, first: { on: true, tiers: [{ sec: 30, amount: 1000 }, { sec: 60, amount: 1000 }] }, back: { on: true, days: 60, tiers: [{ sec: 30, amount: 1000 }, { sec: 60, amount: 500 }] } };
   const START = NOW;
   const ticketOf = async (w, k, p, start = START) => { const ev = await S.evaluateWelcome(w.db, k, p, start); return { ev, t: S.signWelcomeTicket(ev.customer?.id || "-", k, start, SECRET) }; };
-  const go = (w, k, p, at, t, secret = SECRET) => S.claimWelcome(w.db, k, p, at, { ticket: t, secret });
+  const go = (w, k, p, at, t, secret = SECRET) => { w.clock.v = at; return S.claimWelcome(w.db, k, p, at, { ticket: t, secret }); };
 
   // 처음 손님: 30초 → 1구간, 45초 → 아직, 60초 → 2구간(#2), 그 뒤 더 없음
   fresh(); { const w = world({ cfg: TIERS });
@@ -359,9 +360,20 @@ console.log("welcome-point OK");
   fresh(); { const w = world({ cfg: { ...TIERS, dailyCap: 1 }, ledger: [{ id: 1, customer_phone: "01050005000", source_key: "welcome_first:n1", created_at: "2026-11-12T01:00:00Z" }] });
     const { ev, t: tk } = await ticketOf(w, "500", "01050005000");
     assert.equal(ev.tierIndex, 1);
-    assert.equal((await go(w, "500", "01050005000", START + 30_000, tk)).message, "아직 시간이 안 됐어요"); // 2구간은 60초
-    const r = await go(w, "500", "01050005000", START + 60_000, tk);
+    assert.equal((await go(w, "500", "01050005000", START + 20_000, tk)).message, "아직 시간이 안 됐어요"); // 남은 30초 전
+    const r = await go(w, "500", "01050005000", START + 30_000, tk); // [남은 30초만] 다시 와서 30초면 2구간
     assert.equal(r.ok, true); assert.equal(r.tier, 1); assert.equal(w.calls[0].a.p_source_key, "welcome_first:n1#2");
+  }
+  // 같은 화면에서 1구간 받은 뒤 나갔다 옴 → 새 표로 30초만, 옛 표로 1구간 직후 바로 받기는 막힘
+  fresh(); { const w = world({ cfg: TIERS });
+    const { t: tk } = await ticketOf(w, "500", "01050005000");
+    assert.equal((await go(w, "500", "01050005000", START + 30_000, tk)).tier, 0);
+    assert.equal((await go(w, "500", "01050005000", START + 31_000, tk)).message, "아직 시간이 안 됐어요"); // 옛 표 바로 또 → 막힘
+    const back = await ticketOf(w, "500", "01050005000", START + 100_000); // 다른 앱 갔다 옴
+    assert.equal(back.ev.tierIndex, 1);
+    assert.equal((await go(w, "500", "01050005000", START + 110_000, back.t)).message, "아직 시간이 안 됐어요");
+    assert.equal((await go(w, "500", "01050005000", START + 130_000, back.t)).tier, 1); // 30초만
+    assert.equal(w.calls.length, 2);
   }
 
   // 오랜만 손님 2구간 금액 500 / 금액 0 구간은 건너뜀

@@ -135,6 +135,19 @@ export async function grantedTierKeys(sb: SupabaseClient, keys: string[]): Promi
   return new Set(((data ?? []) as { source_key?: unknown }[]).map((r) => String(r.source_key ?? "")));
 }
 
+/** 앞 구간들을 받은 가장 늦은 시각(ms). 없으면 null */
+export async function lastTierGrantMs(sb: SupabaseClient, keys: string[]): Promise<number | null> {
+  if (!keys.length) return null;
+  const { data, error } = await sb.from("customer_point_ledger").select("source_key,created_at").in("source_key", keys).limit(keys.length * 2);
+  if (error) throw new Error(error.message);
+  let at: number | null = null;
+  for (const r of (data ?? []) as { created_at?: unknown }[]) {
+    const t = Date.parse(String(r.created_at ?? ""));
+    if (Number.isFinite(t) && (at == null || t > at)) at = t;
+  }
+  return at;
+}
+
 /** 오늘(한국 시간) 선물 받은 «사람» 수 — 첫 구간 지급만 셈(#2·#3 추가 구간은 같은 사람) */
 export async function grantedTodayCount(sb: SupabaseClient, dayStartIso: string): Promise<number> {
   const { count, error } = await sb.from("customer_point_ledger")
@@ -235,7 +248,13 @@ export async function claimWelcome(
   const tier = decision.tiers[tierIndex];
   const startMs = verifyWelcomeTicket(opts.ticket, customer.id, String(kakaoId || "").replace(/[^0-9A-Za-z_-]/g, ""), nowMs, opts.secret);
   if (startMs == null) return { ok: false, status: 409, message: "다시 열어 주세요" };
-  if (nowMs - startMs < tier.sec * 1000 - TICKET_SLACK_MS) return { ok: false, status: 409, message: "아직 시간이 안 됐어요" };
+  // [2026-11-14 사장님 「남은 30초만」] 앞 구간을 받았으면 «남은 초»(이 구간 초 − 앞 구간 초)만 보면 됨.
+  //   기준 시각 = 보기 시작 표와 앞 구간 받은 시각 중 늦은 쪽 → 같은 표로 앞 구간 받자마자 바로 또 받는 것은 막힘.
+  const prevSec = tierIndex > 0 ? decision.tiers[tierIndex - 1].sec : 0;
+  const needMs = Math.max(0, tier.sec - prevSec) * 1000;
+  const prevAt = tierIndex > 0 ? await lastTierGrantMs(sb, decision.tiers.slice(0, tierIndex).map((_, i) => welcomeTierKey(decision.sourceKey, i))) : null;
+  const fromMs = Math.max(startMs, prevAt ?? startMs);
+  if (nowMs - fromMs < needMs - TICKET_SLACK_MS) return { ok: false, status: 409, message: "아직 시간이 안 됐어요" };
   if (tierIndex === 0 && (await grantedTodayCount(sb, kstDayStartIso(nowMs))) >= cfg.dailyCap) return { ok: false, status: 409, message: "오늘 선물이 모두 나갔어요" };
   const { data, error } = await sb.rpc("admin_change_customer_points", {
     p_phone: customer.phone, p_action: "grant", p_amount: tier.amount,

@@ -32,8 +32,10 @@ export function LiveWelcomeChip() {
         if (!j?.ok || !j.offer) { setOffer(null); return; }
         const o = j.offer as Offer;
         setOffer(o);
-        setIdx(Math.max(0, Math.floor(Number(o.tierIndex) || 0)));
-        setElapsed(0);
+        const i = Math.max(0, Math.floor(Number(o.tierIndex) || 0));
+        setIdx(i);
+        // [2026-11-14 사장님 「남은 30초만」] 앞 구간을 이미 받았으면 그 구간 초부터 셈 → 남은 초만 보면 됨(서버도 같은 규칙)
+        setElapsed(i > 0 && o.tiers && o.tiers[i - 1] ? Math.max(0, Math.floor(Number(o.tiers[i - 1].sec) || 0)) : 0);
       })
       .catch(() => {});
   }, []);
@@ -90,11 +92,12 @@ export function LiveWelcomeChip() {
         if (j?.ok) window.dispatchEvent(new CustomEvent(POINT_GIFT_REFRESH_EVENT, {detail: {hint: welcomeCouponHint(tiers, idx)}}));
         const next = j?.ok && typeof j.next === 'number' && tiers[j.next] ? j.next : null;
         if (next != null) setIdx(next); // 같은 표로 다음 구간 이어서 셈(시간은 처음부터 누적)
+        else if (j && j.ok === false) load(); // 시간이 조금 모자랐으면 서버에 다시 물어 남은 구간부터(없으면 저절로 숨김)
         else { setOffer(null); setHelpOpen(false); }
       })
       .catch(() => { setOffer(null); setHelpOpen(false); })
       .finally(() => { claiming.current = false; });
-  }, [offer, target, left, tiers, idx]);
+  }, [offer, target, left, tiers, idx, load]);
 
   if (!offer || !target) return null;
   const total = tiers.reduce((n, t) => n + t.amount, 0);

@@ -162,7 +162,7 @@ export function welcomeHelpLines(kind: WelcomeKind, amountOrTiers: number | Welc
   } else {
     lines.push(t0.sec > 0 ? `방송을 ${welcomeSecText(t0.sec)} 보시면 ${pointText(t0.amount)}를 드려요` : `${pointText(t0.amount)}를 드려요`);
   }
-  if (t0.sec > 0) lines.push("다른 앱이나 탭으로 나가면 시간이 처음부터 다시 시작돼요");
+  if (t0.sec > 0) lines.push(tiers.length > 1 ? "다른 앱이나 탭으로 나가면 시간이 다시 시작돼요 (받은 선물 다음부터 남은 시간만)" : "다른 앱이나 탭으로 나가면 시간이 처음부터 다시 시작돼요");
   lines.push("받은 포인트는 주문할 때 바로 쓸 수 있어요");
   lines.push(kind === "first" ? "한 분께 한 번만 드려요" : "오랜만에 오실 때마다 다시 드려요");
   return { title: kind === "first" ? "처음 오신 분께 드리는 시청 선물" : "오랜만에 오신 분께 드리는 시청 선물", lines };
