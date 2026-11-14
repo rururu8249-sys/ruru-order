@@ -891,6 +891,7 @@ export default function LiveWatchView(props: Props) {
   // [09:08 사장님 「좌우 여백」] 화면이 9:16 보다 넓으면(카톡 브라우저 등) 세로 영상 좌우에 검은 띠 → 영상을 그만큼 키워 꽉 채움(위아래 조금 잘림, 최대 1.12배).
   // 돌려보기 중엔 원래 크기(유튜브 막대가 잘리지 않게).
   const [videoScale, setVideoScale] = useState(1);
+  const [iframeH, setIframeH] = useState(0);
   const [videoFrame, setVideoFrame] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   useEffect(() => {
     const el = iframeRef.current;
@@ -901,6 +902,7 @@ export default function LiveWatchView(props: Props) {
       if (w <= 0 || h <= 0) return;
       const s = w / (h * 9 / 16);
       setVideoScale(s > 1.005 ? Math.min(1.12, s) : 1);
+      setIframeH(h - YT_EDGE_CROP * 2);
       // [2026-11-15] 9:16 영상이 실제로 그려지는 칸(검은 띠 뺀 자리) — PC 쉬는 중 안내 상자를 영상 속 채널 배너 위에 맞추려고
       const fw = Math.min(w, h * 9 / 16);
       const fh = fw * 16 / 9;
@@ -1250,6 +1252,19 @@ export default function LiveWatchView(props: Props) {
           allowFullScreen
           style={{ position: "absolute", left: 0, top: -YT_EDGE_CROP, width: "100%", height: `calc(100% + ${YT_EDGE_CROP * 2}px)`, border: 0, background: "#000000" }}
         />
+        {/* 워터마크(사장님 04:57) — 왼쪽 강아지 프로필, 오른쪽 RURU 글씨만(상자 없음, 반투명). 영상 칸 안이라 같이 커지고, 폰은 버튼 줄 뒤로 숨는 만큼 위로. */}
+        {(() => {
+          const lift = isDesktop || videoScale === 1 || !iframeH ? 0 : Math.max(0, ((videoScale - 1) * iframeH) / 2 - (84 - (bottomBarHeight ?? 84))) / videoScale;
+          const bottom = Math.round(lift) + (isDesktop ? 14 : 10);
+          return (
+            <>
+              <div aria-hidden="true" style={{ position: "absolute", left: isDesktop ? 20 : 14, bottom, width: isDesktop ? 72 : 52, height: isDesktop ? 72 : 52, borderRadius: "50%", padding: 2, boxSizing: "border-box", background: "rgba(255,255,255,0.85)", boxShadow: "0 3px 10px rgba(0,0,0,0.3)", pointerEvents: "none" }}>
+                <img src="/yt-cover-dog-face.jpg" alt="" draggable={false} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", objectPosition: "50% 42%", display: "block" }} />
+              </div>
+              <img aria-hidden="true" src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "absolute", right: isDesktop ? 22 : 16, bottom: bottom + 4, width: isDesktop ? 96 : 76, height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
+            </>
+          );
+        })()}
       </div>
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
