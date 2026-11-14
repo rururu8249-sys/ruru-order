@@ -7,17 +7,21 @@
 import {BRAND_SPEECH_ALIASES} from './liveAutomationSpeech';
 const CODE_RE = /\b(MIU|MX|BB|MC|PD|CL|LOE|BC|CH|GC|DR)\s*-?\s*(\d{1,4})\b/gi;
 
-/** 상품번호를 손님이 부르는 말로 — 사장님이 정한 별칭(BRAND_SPEECH_ALIASES) 전체를 돌려 쓰되 한글을 더 자주,
- *  가끔(약 6번에 1번)은 영어 코드 그대로(PD-222·pd222) — 영어로 쓰는 손님도 있음 */
+// [2026-11-15 08:05 사장님] AI 손님이 «쓰는» 상품번호 이름 — 이 안에서만 랜덤(알아듣는 이름표 BRAND_SPEECH_ALIASES 와 따로)
+export const SPOKEN_CODE_NAMES: Record<string, readonly string[]> = {
+  PD: ['프라', '프라다', '푸라닭', '프', '프라땡', 'pd'],
+  MX: ['막스', '막땡', '막지마라', 'mx'],
+  MC: ['몽', '몽클', '몽ㅋ', 'mc'],
+  BB: ['버', '버버', '버땡', 'bb'],
+};
+/** 상품번호를 손님이 부르는 말로 — 위 표 안에서 랜덤, 표에 없는 브랜드는 예전 별칭표의 한글 이름 */
 export function shortProductCodes(text: string, seed = 0): string {
   let i = 0;
   return text.replace(CODE_RE, (whole, code: string, num: string) => {
     const k = Math.abs(Math.trunc(seed)) + 7 * i++;
-    if (k % 6 === 5) return k % 12 === 5 ? whole : code.toLowerCase() + num;
-    const aliases = BRAND_SPEECH_ALIASES[code.toUpperCase()] || [code];
-    const korean = aliases.filter((x) => /[가-힣]/.test(x));
-    const choices = korean.length ? korean : aliases;
-    return choices[k % choices.length] + num;
+    const C = code.toUpperCase();
+    const list = SPOKEN_CODE_NAMES[C] || (BRAND_SPEECH_ALIASES[C] || []).filter((x) => /[가-힣]/.test(x));
+    return list.length ? list[k % list.length] + num : whole;
   });
 }
 

@@ -1,8 +1,8 @@
 /** Spoken aliases affect persona chat only; saved catalog/order names stay exact. */
 export const BRAND_SPEECH_ALIASES: Record<string, readonly string[]> = {
   // [2026-11-15 07:58 사장님] 프·프라땡·막지마라·몽 추가(영어 코드도 가끔 그대로)
-  MIU:['미우','미워','미우미우','miu'], MX:['막스','막땡','막스마라','막지마라','막','mx'], BB:['버버','버','버버리','bb'],
-  MC:['몽클','몽클레어','몽','mc'], PD:['프라','프라다','푸라닭','프','프라땡','pd'], CL:['셀린','쎌린','셀','cl'],
+  MIU:['미우','미워','미우미우','miu'], MX:['막스','막땡','막스마라','막지마라','막','mx'], BB:['버버','버','버버리','버땡','bb'],
+  MC:['몽클','몽클레어','몽','몽ㅋ','mc'], PD:['프라','프라다','푸라닭','프','프라땡','pd'], CL:['셀린','쎌린','셀','cl'],
   LOE:['로에','로에베','loe'], BC:['브루','브루넬로','쿠치','bc'], CH:['샤넬','ch'], GC:['구찌','gc'], DR:['디올','dr'],
 };
 export function spokenProductName(name: string, seed=0): string {
