@@ -34,6 +34,18 @@ function shortReply(q:string,recent:string[],seed:number):string|null{
  for(const [re,list] of sets)if(re.test(q)){for(let i=0;i<list.length;i++){const r=list[(Math.abs(seed)+i)%list.length];if(!duplicateLine(r,recent.slice(0,15)))return r;}return null;}
  return null;
 }
+// [2026-11-14 09:03] AI 채팅 양 — 관리자 「채팅 양」(settings live_automation_chat_pace). 간격은 AI 글 사이 시간
+const CHAT_PACE_KEY='live_automation_chat_pace';
+export const CHAT_PACE={low:{gapMin:120000,gapMax:240000,chance:.6},normal:{gapMin:45000,gapMax:90000,chance:.75},high:{gapMin:20000,gapMax:40000,chance:.95}} as const;
+export const chatPaceOf=(v:unknown):keyof typeof CHAT_PACE=>{const t=String(v??'').replace(/"/g,'').trim();return t==='low'||t==='high'?t:'normal';};
+// 최근 판단 30개(침묵·걸러짐·보냄)를 남겨 «왜 조용한지» 확인할 수 있게 — settings 한 줄, 실패해도 무시
+async function noteDecision(db:SupabaseClient,entry:Record<string,unknown>){
+ try{
+  const cur=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle();
+  let list:unknown[]=[];try{const v=JSON.parse(String((cur.data as {value?:unknown}|null)?.value??'[]'));if(Array.isArray(v))list=v;}catch{list=[];}
+  await db.from('settings').upsert([{key:'live_automation_director_log',value:JSON.stringify([entry,...list].slice(0,30))}],{onConflict:'key'});
+ }catch{/* 기록 실패는 무시 */}
+}
 export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch=fetch){
  if(!c.chat_enabled)return;
  // [2026-11-14] 학습 노트 — 3시간마다(새 채팅 40개 이상) 자동 정리, 실패해도 대화는 계속
@@ -43,7 +55,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const sessions=await rows<Session>(db.from('live_automation_sessions').select('*').eq('campaign_id',c.id).is('stopped_at',null).gt('leave_at',new Date(now+30000).toISOString()));
  if(!sessions.length)return;
  const ids=sessions.map(s=>s.actor_id);
- const [actors,holds,orders,actions,messages,bc,payments,spokeRows]=await Promise.all([
+ const [actors,holds,orders,actions,messages,bc,payments,spokeRows,paceRow]=await Promise.all([
   rows<Actor>(db.from('live_automation_actors').select('*').in('id',ids).is('retired_at',null)),
   rows<Row>(db.from('live_automation_cart_holds').select('session_id,items').in('session_id',sessions.map(s=>s.id)).gt('expires_at',new Date(now).toISOString())),
   rows<Row>(db.from('orders').select('automation_actor_id,product_name,color,size,payment_method').in('automation_actor_id',ids).eq('broadcast_id',c.broadcast_id).neq('is_deleted',true).gte('created_at',today)),
@@ -52,6 +64,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle(),
   rows<Row>(db.from('live_automation_payment_events').select('actor_id,kind').eq('campaign_id',c.id).eq('status','sent').limit(500)),
   rows<Row>(db.from('live_chat_messages').select('automation_actor_id').eq('broadcast_id',c.broadcast_id).in('automation_actor_id',ids).limit(2000)),
+  db.from('settings').select('value').eq('key',CHAT_PACE_KEY).maybeSingle().then(r=>(r.data as {value?:unknown}|null)?.value,()=>null),
  ]);
  if(bc.error||!bc.data||!actors.length)return;
  // 언제 판단할지: 사람이 새 글을 쓰면(아직 판단 안 한 글) 10초 뒤 바로, 아니면 AI 글 사이 20~45초 + 확률(밤엔 아주 드물게)
@@ -61,9 +74,10 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const lastAction=Math.max(0,...actions.filter(a=>a.kind!=='order').map(a=>Date.parse(String((a as Action&{created_at?:unknown}).created_at))||0));
  if(newestHuman){if(now-lastAction<10000)return;}
  else{
-  if(now-lastAi<20000+Math.floor(Math.random()*25000)||now-lastAction<20000)return;
-  // [2026-11-14 07:58 사장님 「AI 채팅 적당히 — 테스트가 안 돼」] 낮(밤 아님)엔 차례 확률 0.35→0.6, 밤은 그대로 드물게
-  if(Math.random()>(isNightKst(now)?.08:.6))return;
+  // [2026-11-14 09:03 사장님 「채팅량도 적게·보통·많게」] 관리자 「채팅 양」 설정으로 AI 글 사이 간격·차례 확률을 정함(밤은 그대로 드물게)
+  const pace=CHAT_PACE[chatPaceOf(paceRow)];
+  if(now-lastAi<pace.gapMin+Math.floor(Math.random()*(pace.gapMax-pace.gapMin))||now-lastAction<20000)return;
+  if(Math.random()>(isNightKst(now)?.08:pace.chance))return;
  }
  const spoke=new Set(spokeRows.map(r=>String(r.automation_actor_id)));
  const mode=await streamModeOf(db,bc.data);
@@ -87,11 +101,11 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const cardText=card?`${card.name} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
  const prompt=[
   '너는 유튜브 라이브커머스 「루루동이」 사이트 채팅방에 있는 가상 손님들의 다음 한 마디를 정한다. 진짜 사람처럼 자연스러워야 한다.',
-  '[할 일] 아래 대화 전체를 시간순으로 읽고, 가상 손님 목록 중 지금 말하는 게 자연스러운 한 명과 그 한 마디를 고른다. 자연스러운 말이 정말 없을 때만 speaker를 빈 문자열로 둔다(침묵). 생방송 중에는 손님 한 명이 짧게 한마디(인사·가격·사이즈 질문·짧은 반응) 하는 쪽이 자연스럽다. 다시보기·쉬는 중에는 침묵이 더 자연스럽다.',
+  '[할 일] 아래 대화 전체를 시간순으로 읽고, 가상 손님 목록 중 지금 말하는 게 자연스러운 한 명과 그 한 마디를 고른다. '+(newestHuman?'자연스러운 말이 정말 없을 때만 speaker를 빈 문자열로 둔다(침묵).':'지금은 말할 차례다(얼마나 자주 말할지는 이미 정해져 있다). speaker를 비우지 말고 반드시 한 명이 짧게 한마디(인사·가격·사이즈 질문·짧은 반응·대화 이어 가기) 한다.'),
   '[답하기] 사장님·손님이 가상 손님을 부르거나 말을 걸었으면 그 가상 손님이 답한다. 줄임말·별명·닉네임 일부·오타로 불러도 문맥으로 판단한다(예: 여름한아름 → 한아름님, 포도다람쥐 → 포도님). 사이트알림(주문 감사·카드결제 링크·결제 확인)과 이어지는 말이면 그 흐름대로 답한다(카드결제 링크 안내 뒤 카톡 확인 부탁 → 카톡 확인하겠다는 답). 답할 때 replyTo에 그 글 번호를 넣는다.',
   '[말투] 실제 방송 채팅처럼 보통 2~25자 한 문장. 띄어쓰기·맞춤법은 느슨해도 된다. 사람마다 어미를 다르게(~요/~용/~여/~유/~당/~죠?), ㅋㅋ ㅎㅎ ~ 이모지는 가끔 하나. 브랜드는 줄여 부르기도 한다(몽·몽클·버버·막스). 흔한 유형: 가격 질문, 사이즈 고민(66이면 라지 될까요?), 번호로 묻기, 짧은 감탄(이쁘다/요고 귀엽네요), 결제·배송 질문, 다른 손님 질문에 짧게 거들기, 인사. 예시를 그대로 쓰지 말고 매번 새로 쓴다. 바로 앞 글들의 첫 단어·어미·문장 모양을 따라 하지 않는다(누가 하이 했으면 하이 금지). 한 글 안에서 같은 말을 두 번 쓰지 않는다. 고객센터·광고·설명 말투 금지.',
   '[사실] 상품 얘기는 지금 상품 카드 정보만 근거로 한다(없는 색·사이즈·소재·가격을 지어내지 않는다). 해 본 적 없는 구매·사용·배송받은 경험, 친구 소개 같은 이야기를 지어내지 않는다. 주문했다는 말은 주문이 있는 손님만, 결제 완료 말은 결제확인 받은 손님만. 영상·소리를 보거나 들은 척하지 않는다. 자기가 지금 뭘 보는 중인지 설명하지 않는다. 테스트·AI·가상·시스템 같은 말 금지.',
-  `[상황] 지금 ${mode==='live'?'생방송 중':'방송이 끝난 뒤 다시보기/쉬는 중이다. 상품은 지금도 담고 주문할 수 있다. 말은 드물게, 상황에 맞게(방송 끝나도 보면서 바로 담을 수 있어 편하다는 뜻 등, 매번 다른 말로). 지금 입어 달라·보여 달라 같은 실시간 요청 금지'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
+  `[상황] 지금 ${mode==='live'?'생방송 중':'방송이 끝난 뒤 다시보기/쉬는 중이다. 상품은 지금도 담고 주문할 수 있다. 상황에 맞게(방송 끝나도 보면서 바로 담을 수 있어 편하다는 뜻 등, 매번 다른 말로). 지금 입어 달라·보여 달라 같은 실시간 요청 금지'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
   `[지금 상품 카드] ${cardText}`,
   `[가상 손님 목록 — 이 중에서만 고른다]\n${rosterText}`,
   `[대화 — 오래된 것부터]\n${transcript}`,
@@ -121,7 +135,9 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   return true;
  };
  let text=typeof pick.text==='string'?clean(pick.text):'';
+ const rawText=text;
  if(speaker&&text&&!acceptable(text,speaker,target))text='';
+ void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent':text?'sent':'rejected'});
  if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor))||'';
  // 사람 글은 한 번만 판단 — 침묵이어도 그 글 번호를 남겨 같은 글로 Gemini 를 다시 부르지 않음
  const sourceId=target?Number(target.id):newestHuman?Number(newestHuman.id):null;

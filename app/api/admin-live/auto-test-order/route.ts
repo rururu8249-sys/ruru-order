@@ -13,13 +13,15 @@ export const maxDuration=60;
 const fail=(message:string,status=400)=>NextResponse.json({ok:false,message},{status});
 // [2026-11-13 23:06] 테스트 주문 양 적게/보통/많게 — settings 한 줄(돈·주문 무접촉)
 const PACE_KEY='live_automation_order_pace';
+// [2026-11-14 09:03 사장님 「채팅량도 적게·보통·많게」] AI 채팅 양 — settings 한 줄(lib/liveAutomationDirector 가 읽음)
+const CHAT_PACE_KEY='live_automation_chat_pace';
 const paceOf=(v:unknown)=>{const s=String(v??'').replace(/"/g,'').trim();return s==='low'||s==='high'?s:'normal';};
 export async function GET(request:NextRequest){
  if(!await verifyAdminSessionFromRequest(request))return fail('관리자 로그인이 필요해요.',401);
  try{
    const db=getServiceClient();
-   const [state,rows,gemini,paceRow,learning]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle(),readLearning(db)]);
-   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value),learning:learning.notes},{headers:{'Cache-Control':'no-store'}});
+   const [state,rows,gemini,paceRow,learning,chatPaceRow]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle(),readLearning(db),db.from('settings').select('value').eq('key',CHAT_PACE_KEY).maybeSingle()]);
+   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value),chatPace:paceOf((chatPaceRow.data as {value?:unknown}|null)?.value),learning:learning.notes},{headers:{'Cache-Control':'no-store'}});
  }catch{return fail('실행 상태를 확인하지 못했어요.',503)}
 }
 export async function POST(request:NextRequest){
@@ -44,6 +46,12 @@ export async function POST(request:NextRequest){
        if(!c.next_order_at||Date.parse(c.next_order_at)-Date.now()>120000)await db.rpc('live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});
      }
      return NextResponse.json({ok:true,pace:body.pace,state:await readAutomationState(db)});
+   }
+   if(body.action==='chat-pace'){
+     if(!['low','normal','high'].includes(body.pace))return fail('채팅 양을 확인해 주세요.');
+     const saved=await db.from('settings').upsert([{key:CHAT_PACE_KEY,value:body.pace}],{onConflict:'key'});
+     if(saved.error)throw Error('PACE_SAVE');
+     return NextResponse.json({ok:true,chatPace:body.pace});
    }
    // [2026-11-14] AI 학습 노트 — 한 줄 지우기 / 지금 정리
    if(body.action==='learning-remove'){
