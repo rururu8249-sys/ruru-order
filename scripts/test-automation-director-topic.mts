@@ -70,9 +70,12 @@ console.log('ok pay talk');}
 // [2026-11-15 07:40] 상품번호 줄임말·웃음 끝맺음 바꾸기
 {
  const {shortProductCodes,varyLaughTail}=await import('../lib/liveAutomationVoice');
- if(shortProductCodes('PD-222 이거 38사이즈면 맞을까요?',0)!=='프222 이거 38사이즈면 맞을까요?')throw new Error('PD 줄임');
- if(!/^(버|버버)58 /.test(shortProductCodes('BB-58 XL',1)))throw new Error('BB 줄임');
- if(/[A-Z]{2}-?\d/.test(shortProductCodes('MC-319 아이보리 MX117',2)))throw new Error('영어 코드 남음');
+ const forms=new Set<string>();for(let i=0;i<60;i++)forms.add(shortProductCodes('PD-222',i));
+ for(const f of ['프222','프라222','프라땡222','PD-222','pd222'])if(!forms.has(f))throw new Error('PD 별칭 빠짐 '+f+' '+[...forms]);
+ const mx=new Set<string>();for(let i=0;i<60;i++)mx.add(shortProductCodes('MX-117',i));
+ for(const f of ['막스117','막지마라117','막땡117'])if(!mx.has(f))throw new Error('MX 별칭 빠짐 '+f);
+ const kor=[...Array(60)].map((_,i)=>shortProductCodes('BB-58',i)).filter(x=>/[가-힣]/.test(x)).length;if(kor<45)throw new Error('한글이 더 자주여야 함 '+kor);
+ console.log('  PD 형태',[...forms].join(' '));
  const recent=['링크 확인했어요 ㅎㅎ','네~','좋아요','아하'];
  const outs=new Set<string>();
  for(let i=0;i<12;i++){const o=varyLaughTail('입금했어용 ㅎㅎ',recent,i);if(o.endsWith('ㅎㅎ')&&!o.endsWith('ㅎㅎㅎ'))throw new Error('같은 ㅎㅎ 반복 '+o);outs.add(o);}

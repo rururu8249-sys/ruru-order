@@ -4,19 +4,20 @@
 //   ② ㅋㅋ·ㅎㅎ 끝맺음이 매번 같으면 바꿈: 개수 다르게(ㅋ·ㅋㅋㅋㅋ·ㅎ·ㅎㅎㅎ), 이모지, 아예 없음 — 최근 AI 글에 쓴 끝맺음은 안 씀
 //   표시 글자만, 돈·주문 무접촉.
 
-const SHORT: Record<string, [string, string]> = {
-  PD: ['프', '프라'], BB: ['버', '버버'], MC: ['몽', '몽클'], MX: ['막스', '막'], MIU: ['미우', '미우'],
-  CL: ['셀', '셀린'], LOE: ['로에', '로에'], BC: ['브루', '브루'], CH: ['샤넬', '샤'], GC: ['구찌', '구'], DR: ['디올', '디올'],
-};
+import {BRAND_SPEECH_ALIASES} from './liveAutomationSpeech';
 const CODE_RE = /\b(MIU|MX|BB|MC|PD|CL|LOE|BC|CH|GC|DR)\s*-?\s*(\d{1,4})\b/gi;
 
-/** 상품번호를 손님이 부르는 줄임말로 — 대부분 한 글자(프222), 가끔 두 글자(프라222) */
+/** 상품번호를 손님이 부르는 말로 — 사장님이 정한 별칭(BRAND_SPEECH_ALIASES) 전체를 돌려 쓰되 한글을 더 자주,
+ *  가끔(약 6번에 1번)은 영어 코드 그대로(PD-222·pd222) — 영어로 쓰는 손님도 있음 */
 export function shortProductCodes(text: string, seed = 0): string {
   let i = 0;
-  return text.replace(CODE_RE, (_m, code: string, num: string) => {
-    const pair = SHORT[code.toUpperCase()];
-    const pick = (Math.abs(Math.trunc(seed)) + i++) % 4 === 3 ? pair[1] : pair[0];
-    return pick + num;
+  return text.replace(CODE_RE, (whole, code: string, num: string) => {
+    const k = Math.abs(Math.trunc(seed)) + 7 * i++;
+    if (k % 6 === 5) return k % 12 === 5 ? whole : code.toLowerCase() + num;
+    const aliases = BRAND_SPEECH_ALIASES[code.toUpperCase()] || [code];
+    const korean = aliases.filter((x) => /[가-힣]/.test(x));
+    const choices = korean.length ? korean : aliases;
+    return choices[k % choices.length] + num;
   });
 }
 
