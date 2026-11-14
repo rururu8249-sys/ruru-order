@@ -1252,15 +1252,13 @@ export default function LiveWatchView(props: Props) {
           allowFullScreen
           style={{ position: "absolute", left: 0, top: -YT_EDGE_CROP, width: "100%", height: `calc(100% + ${YT_EDGE_CROP * 2}px)`, border: 0, background: "#000000" }}
         />
-        {/* 워터마크(사장님 04:57) — 왼쪽 강아지 프로필, 오른쪽 RURU 글씨만(상자 없음, 반투명). 영상 칸 안이라 같이 커지고, 폰은 버튼 줄 뒤로 숨는 만큼 위로. */}
+        {/* 워터마크(사장님 04:57) — 왼쪽 강아지 그림·오른쪽 RURU 글씨 모두 상자 없이 반투명(05:06) 글씨만(상자 없음, 반투명). 영상 칸 안이라 같이 커지고, 폰은 버튼 줄 뒤로 숨는 만큼 위로. */}
         {(() => {
           const lift = isDesktop || videoScale === 1 || !iframeH ? 0 : Math.max(0, ((videoScale - 1) * iframeH) / 2 - (84 - (bottomBarHeight ?? 84))) / videoScale;
           const bottom = Math.round(lift) + (isDesktop ? 14 : 10);
           return (
             <>
-              <div aria-hidden="true" style={{ position: "absolute", left: isDesktop ? 20 : 14, bottom, width: isDesktop ? 72 : 52, height: isDesktop ? 72 : 52, borderRadius: "50%", padding: 2, boxSizing: "border-box", background: "rgba(255,255,255,0.85)", boxShadow: "0 3px 10px rgba(0,0,0,0.3)", pointerEvents: "none" }}>
-                <img src="/yt-cover-dog-face.jpg" alt="" draggable={false} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", objectPosition: "50% 42%", display: "block" }} />
-              </div>
+              <img aria-hidden="true" src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 16 : 10, bottom: bottom - 4, width: isDesktop ? 92 : 64, height: "auto", opacity: 0.7, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
               <img aria-hidden="true" src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "absolute", right: isDesktop ? 22 : 16, bottom: bottom + 4, width: isDesktop ? 96 : 76, height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
             </>
           );
