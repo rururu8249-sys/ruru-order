@@ -1259,7 +1259,7 @@ export default function LiveWatchView(props: Props) {
         {/* 06:51 폰 캡처 실측: 로고(재생 상자+YouTube) 폭 약 85·높이 약 19px — RURU 글자도 같은 폭·높이·자리(전엔 15px 오른쪽으로 쏠리고 더 컸음), 그 자리만 흐림 판 */}
         <div aria-hidden="true" style={{ position: "absolute", right: "calc(min(57px, 12cqw) - 20px)", bottom: 11, width: 150, height: 44, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", WebkitMaskImage: "radial-gradient(closest-side, #000 70%, transparent)", maskImage: "radial-gradient(closest-side, #000 70%, transparent)", pointerEvents: "none" }} />
         {/* 07:15 사장님: 유튜브 로고와 같은 크기·자리에 우리 로고(R + RURU#2)를 늘 표시 — 유튜브 로고가 사라져도 유지 */}
-        <img aria-hidden="true" src="/yt-cover-ruru2-logo-v2.png" alt="" draggable={false} style={{ position: "absolute", right: "calc(min(57px, 12cqw) + 20px)", bottom: 27, width: 77, height: 20, pointerEvents: "none" }} />
+        <img aria-hidden="true" src="/yt-cover-ruru2-logo-v2.png" alt="" draggable={false} style={{ position: "absolute", right: isDesktop ? "calc(min(57px, 12cqw) + 32px)" : "calc(min(57px, 12cqw) + 16px)", bottom: isDesktop ? 29 : 25, width: 77, height: 20, pointerEvents: "none" }} />
       </div>
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
