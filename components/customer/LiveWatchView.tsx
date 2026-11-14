@@ -1257,8 +1257,9 @@ export default function LiveWatchView(props: Props) {
             RURU: 유튜브 로고와 같은 크기·자리, 얇은 글씨 반투명 워터마크(yt-cover-ruru-v3, 06:18). 06:28 로고 실측(폰 77×20·오른쪽 38·아래 23)과 같은 크기·자리, 진하게 앞에 + 그 자리만 부드러운 흐림. */}
         <img aria-hidden="true" src="/yt-cover-dog-v2.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 18 : 14, bottom: isDesktop ? -26 : -22, width: isDesktop ? 124 : 106, height: "auto", pointerEvents: "none" }} />
         {/* 06:51 폰 캡처 실측: 로고(재생 상자+YouTube) 폭 약 85·높이 약 19px — RURU 글자도 같은 폭·높이·자리(전엔 15px 오른쪽으로 쏠리고 더 컸음), 그 자리만 흐림 판 */}
-        <div aria-hidden="true" style={{ position: "absolute", right: "calc(min(57px, 12cqw) - 30px)", bottom: 12, width: 150, height: 44, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", WebkitMaskImage: "radial-gradient(closest-side, #000 60%, transparent)", maskImage: "radial-gradient(closest-side, #000 60%, transparent)", pointerEvents: "none" }} />
-        <img aria-hidden="true" src="/yt-cover-ruru-v3.png" alt="" draggable={false} style={{ position: "absolute", right: "calc(min(57px, 12cqw) + 14px)", bottom: 20, width: 89, height: 27, pointerEvents: "none" }} />
+        <div aria-hidden="true" style={{ position: "absolute", right: "calc(min(57px, 12cqw) - 20px)", bottom: 16, width: 80, height: 34, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", WebkitMaskImage: "radial-gradient(closest-side, #000 60%, transparent)", maskImage: "radial-gradient(closest-side, #000 60%, transparent)", pointerEvents: "none" }} />
+        {/* 07:13 사장님: 유튜브 빨간 재생 아이콘은 그대로 두고, 그 뒤 YouTube 글자 자리에 RURU#2 */}
+        <img aria-hidden="true" src="/yt-cover-ruru2.png" alt="" draggable={false} style={{ position: "absolute", right: "calc(min(57px, 12cqw) - 8px)", bottom: 26, width: 65, height: 14, pointerEvents: "none" }} />
       </div>
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
