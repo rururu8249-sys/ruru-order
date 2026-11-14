@@ -1257,9 +1257,13 @@ export default function LiveWatchView(props: Props) {
         const bottom = Math.max(4, Math.round(coverLift));
         return (
           <div aria-hidden="true" data-yt-cover style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
-            <img src="/yt-cover-dog-face.jpg" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 34 : 20, bottom: isDesktop ? 8 : bottom, width: isDesktop ? 104 : 66, height: isDesktop ? 104 : 66, borderRadius: "50%", objectFit: "cover", display: "block", boxShadow: "0 0 0 2px rgba(255,255,255,0.85), 0 2px 10px rgba(0,0,0,0.35)" }} />
-            <div style={{ position: "absolute", right: isDesktop ? 22 : 24, bottom: isDesktop ? 6 : bottom, width: isDesktop ? 150 : 124, height: isDesktop ? 84 : 62, borderRadius: isDesktop ? 42 : 31, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(10,10,10,0.5)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", boxShadow: "0 0 0 2px rgba(255,255,255,0.85), 0 2px 10px rgba(0,0,0,0.35)" }}>
-              <img src="/yt-cover-logo.png" alt="" draggable={false} style={{ width: isDesktop ? 104 : 86, height: "auto", display: "block" }} />
+            {/* 왼쪽 — 강아지 얼굴 프로필(흰 테두리 + 얇은 유리 고리 + 부드러운 그림자) */}
+            <div style={{ position: "absolute", left: isDesktop ? 32 : 18, bottom: isDesktop ? 6 : bottom, width: isDesktop ? 108 : 70, height: isDesktop ? 108 : 70, borderRadius: "50%", padding: isDesktop ? 4 : 3, boxSizing: "border-box", background: "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(255,255,255,0.55))", boxShadow: "0 6px 18px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.12)" }}>
+              <img src="/yt-cover-dog-face.jpg" alt="" draggable={false} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", objectPosition: "50% 42%", display: "block" }} />
+            </div>
+            {/* 오른쪽 — RURU 유리 알약(진한 흐림이라 뒤 유튜브 로고가 비치지 않음) */}
+            <div style={{ position: "absolute", right: isDesktop ? 20 : 22, bottom: isDesktop ? 10 : bottom, width: isDesktop ? 140 : 124, height: isDesktop ? 64 : 60, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(160deg, rgba(40,40,40,0.62), rgba(8,8,8,0.72))", backdropFilter: "blur(26px) saturate(140%)", WebkitBackdropFilter: "blur(26px) saturate(140%)", border: "1px solid rgba(255,255,255,0.45)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 18px rgba(0,0,0,0.35)" }}>
+              <img src="/yt-cover-logo.png" alt="" draggable={false} style={{ width: isDesktop ? 98 : 86, height: "auto", display: "block", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }} />
             </div>
           </div>
         );
