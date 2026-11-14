@@ -22,7 +22,7 @@ if(rab('블랙 4사이즈 이뿌당..',['카톡 확인했어용','주문완료�
 console.log('ok room announce');
 // [2026-11-14 21:38] 사이즈는 키·몸무게 + 추천 받기, 사이즈 콕 집기·같은 질문 반복 금지
 {const {vagueProductQuestion:vq}=await import('../lib/liveAutomationDirector');
-for(const t of ['BB-59 160에 50인데 S면 맞을까요?','160에 50인데 S 입으면 될까용','베이지 엑라 커요?','165에 55인데 엑라 많이 커여?','버110 몇 입으면 될까요?','몽346 어깨 좁은 편인데 2 괜찮나요?'])if(!vq(t))throw Error('vague '+t);
-for(const t of ['BB-59 160에 50인데 몇 입으면 될까요?','몽346 키 165 몸무게 58이면 몇 사이즈요?','버110 기장 몇이에요?','가격요'])if(vq(t))throw Error('ok '+t);
+for(const t of ['BB-59 160에 50인데 S면 맞을까요?','160에 50인데 S 입으면 될까용','베이지 엑라 커요?','165에 55인데 엑라 많이 커여?','버110 몇 입으면 될까요?','몽346 어깨 좁은 편인데 2 괜찮나요?','BB-58 이거 XL 크려나요 168에 62인뎅','안에 두꺼운거 입으면 맞으려나유'])if(!vq(t))throw Error('vague '+t);
+for(const t of ['BB-59 160에 50인데 몇 입으면 될까요?','몽346 키 165 몸무게 58이면 몇 사이즈요?','버110 기장 몇이에요?','가격요','BB-58 안에 두꺼운 거 입으려면 168에 62인데 뭐가 맞을까요?'])if(vq(t))throw Error('ok '+t);
 if(!rep('160에 50인데 S 입으면 될까용',['BB-59 160에 50인데 S면 맞을까요?']))throw Error('size repeat');
 console.log('ok size ask');}

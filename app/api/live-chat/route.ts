@@ -189,6 +189,8 @@ export async function POST(request: NextRequest) {
     if(automation){
       const {data,error}=await sb.rpc('live_automation_chat',{p_action:automation.capability.action,p_lease:automation.capability.lease,p_revision:automation.capability.revision,p_body:finalBody});
       if(error)return fail('채팅 실행 조건이 변경되어 전송하지 않았어요.',409);
+      // [2026-11-14 21:41 사장님 「배송 연관검색어 설정했는데 손님이 쓰면 안 나와」] 자동 테스트 손님 글도 실제 손님처럼 루루동이 자동 안내(자주 묻는 말·상품)
+      {const botText=chatBodyWithoutEmoji(finalBody);if(botText)after(()=>runLiveChatBot(sb,bc,botText));}
       return NextResponse.json({ok:true,message:parseChatMessage(publicChatRow(data))},{headers:{'Cache-Control':'no-store'}});
     }
     const { data: ins, error } = await sb
