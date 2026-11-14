@@ -7,7 +7,7 @@ export function AutomationNicknamePicker({state,dark=false,disabled=false,onPick
  const orderRequest=useRef(0);
  useEffect(()=>{if(!state.open){orderRequest.current++;setDetail(null);setOrders([])}},[state.open]);
  const showOrders=async(id:string)=>{if(detail===id){setDetail(null);++orderRequest.current;return;}const request=++orderRequest.current;setDetail(id);setOrders([]);setOrderError('');setOrderLoading(true);try{const list=await state.readOrders(id);if(request===orderRequest.current)setOrders(list)}catch{if(request===orderRequest.current)setOrderError('주문 기록을 불러오지 못했어요. 다시 눌러 주세요.')}finally{if(request===orderRequest.current)setOrderLoading(false)}};
- const [query,setQuery]=useState('');const trigger=useRef<HTMLButtonElement>(null);
+ const [query,setQuery]=useState('');const [refreshing,setRefreshing]=useState(false);const trigger=useRef<HTMLButtonElement>(null);
  if(!state.available)return null;
  const foreground=dark?'#FFFFFF':'#111111',background=dark?'#1C1C1E':'#FFFFFF',muted=dark?'#CCCCCC':'#707072';
  const button:CSSProperties={minHeight:44,border:'none',borderRadius:12,padding:'8px 12px',fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',color:foreground,background:dark?'#39393B':'#F5F5F5'};
@@ -29,8 +29,10 @@ export function AutomationNicknamePicker({state,dark=false,disabled=false,onPick
    {state.message?<div role="status" style={{fontSize:12,lineHeight:1.4,color:muted,padding:'4px 2px'}}>{state.message}</div>:null}
    {state.open?<div role="dialog" aria-label="보내는 닉네임 선택" aria-modal="false" style={{position:'absolute',left:0,right:0,bottom:'calc(100% + 8px)',zIndex:5,background,color:foreground,border:dark?'1px solid #707072':'1px solid #CACACB',borderRadius:16,boxShadow:'0 4px 20px rgba(0,0,0,0.2)',padding:12,maxHeight:'min(42dvh, 340px)',display:'flex',flexDirection:'column',boxSizing:'border-box'}}>
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-       <strong style={{fontSize:15}}>보내는 닉네임</strong><button type="button" onClick={close} style={button} aria-label="닉네임 선택 닫기">닫기</button>
+       <strong style={{fontSize:15}}>보내는 닉네임</strong>
+       <span style={{display:'flex',gap:6}}><button type="button" disabled={refreshing} onClick={async()=>{setRefreshing(true);try{await state.refresh()}finally{setRefreshing(false)}}} style={button} aria-label="닉네임 목록 새로고침">{refreshing?'불러오는 중…':'새로고침'}</button><button type="button" onClick={close} style={button} aria-label="닉네임 선택 닫기">닫기</button></span>
      </div>
+     <div role="status" style={{fontSize:12,color:state.listError||state.message?(dark?'#FF8A80':'#D30005'):muted,padding:'4px 2px'}}>{state.listError||state.message||(state.listedAt?new Date(state.listedAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',second:'2-digit'})+' 기준 · 3초마다 저절로 바뀌어요':'')}</div>
      {state.actors.length>8?<input aria-label="닉네임 검색" placeholder="닉네임 검색" value={query} onChange={e=>setQuery(e.target.value)} style={{boxSizing:'border-box',width:'100%',minHeight:44,margin:'8px 0',border:'1px solid #CACACB',borderRadius:12,padding:'8px 12px',fontSize:16,background,color:foreground}}/>:null}
      {!query&&state.recent.length?<div aria-label="최근 선택 3개" style={{display:'flex',gap:8,overflowX:'auto',flexShrink:0,padding:'6px 0'}}>
        {state.recent.map(id=>state.actors.find(a=>a.id===id)).filter(a=>!!a).map(a=><button type="button" key={a.id} disabled={disabled||state.busy||(a.inUse&&!a.mine)} style={{...button,flexShrink:0}} onMouseDown={e=>e.preventDefault()} onClick={()=>void choose(a.id)}>{a.nickname}</button>)}

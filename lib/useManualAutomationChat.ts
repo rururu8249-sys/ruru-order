@@ -25,7 +25,17 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
    if(!response.ok||!data.ok) throw Error(data.message||'사용 상태를 확인하지 못했어요.');
    return data;
  },[]);
- const refresh=useCallback(async()=>{
+ // [2026-11-15 07:47 사장님 「목록 새로고침이 안 됨」] 목록 읽기가 3초보다 오래 걸리면 3초마다 새 요청이 앞 요청 결과를 버려
+ //   목록이 영영 안 바뀌었음 → 읽는 중이면 새로 안 보내고 그 결과를 기다림.
+ const inFlight=useRef<Promise<boolean>|null>(null);
+ const [listedAt,setListedAt]=useState(0),[listError,setListError]=useState('');
+ const refresh=useCallback(async():Promise<boolean>=>{
+   if(inFlight.current)return inFlight.current;
+   const run=refreshOnce();inFlight.current=run;
+   try{return await run}finally{if(inFlight.current===run)inFlight.current=null}
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[allow,broadcastId,enabled]);
+ const refreshOnce=async()=>{
    if(!enabled||!broadcastId||document.hidden||!mounted.current)return false;
    const stamp=++serial.current,epoch=generation.current;
    try {
@@ -34,7 +44,7 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
      if(!mounted.current||epoch!==generation.current||stamp!==serial.current)return false;
      if(response.status===403){access.current=false;current.current=null;retry.current=null;setSelected(null);setAvailable(false);allow(false);setActors([]);return false}
      if(!response.ok||!data.ok)throw Error(data.message||'연결을 확인해 주세요.');
-     access.current=true;lastVerified.current=Date.now();setAvailable(true);setActors(data.actors||[]);
+     access.current=true;lastVerified.current=Date.now();setAvailable(true);setActors(data.actors||[]);setListedAt(Date.now());setListError('');
      if(current.current) {
        const found=(data.actors as ManualActor[]).find(a=>a.id===current.current?.actor.id);
        const valid=!!found?.mine&&Date.parse(current.current.lease.expires_at)>Date.now();
@@ -43,10 +53,10 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
      } else allow(true);
      return true;
    } catch {
-     if(mounted.current&&epoch===generation.current&&stamp===serial.current){lastVerified.current=0;allow(false);setMessage('연결 확인 중이에요. 확인 후 보낼 수 있어요.');}
+     if(mounted.current&&epoch===generation.current&&stamp===serial.current){lastVerified.current=0;allow(false);setMessage('연결 확인 중이에요. 확인 후 보낼 수 있어요.');setListError('목록을 불러오지 못했어요. 새로고침을 눌러 주세요.');}
      return false;
    }
- },[allow,broadcastId,enabled]);
+ };
  const choose=useCallback(async(id:string)=>{
    if(locked.current)return;
    const actor=actors.find(x=>x.id===id);
@@ -125,6 +135,6 @@ export function useManualAutomationChat(broadcastId:string,enabled:boolean) {
    const channel=supabase.channel('live-automation:'+broadcastId).on('broadcast',{event:'changed'},()=>{if(access.current)void refresh()}).subscribe();
    return ()=>{void supabase.removeChannel(channel)};
  },[available,broadcastId,enabled,refresh]);
- return {available,actors,selected,ready,busy,message,open,setOpen,recent,clearRecent,readOrders,choose,reset,send,refresh};
+ return {available,actors,selected,ready,busy,message,open,setOpen,recent,clearRecent,readOrders,choose,reset,send,refresh,listedAt,listError};
 }
 export type ManualAutomationChat=ReturnType<typeof useManualAutomationChat>;
