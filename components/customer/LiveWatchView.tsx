@@ -1241,7 +1241,7 @@ export default function LiveWatchView(props: Props) {
       {/* [2026-11-15 사장님 04:51 「스티커 말고 화면과 하나로」] 덮개 대신 유튜브 공유·로고·제목이 그려지는 위아래 가장자리를 잘라냄.
           영상(iframe)을 위아래로 YT_EDGE_CROP 만큼 더 크게 그리고, 원래 크기 칸(overflow hidden)으로 잘라 보여줌 → 유튜브가 가장자리에 띄우는 것이 칸 밖으로 나감.
           PC 는 영상이 조금 커지고(위아래 약간 잘림), 폰은 키우는 배율이 그만큼 줄어듦. */}
-      <div style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", overflow: "hidden", background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", overflow: "hidden", containerType: "size", background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
         <iframe
           ref={iframeRef}
           key={`${videoId}-${reloadKey}`}
@@ -1258,8 +1258,8 @@ export default function LiveWatchView(props: Props) {
           const bottom = Math.round(lift) + (isDesktop ? 14 : 10);
           return (
             <>
-              <img aria-hidden="true" src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 16 : 10, bottom: bottom - 4, width: isDesktop ? 92 : 64, height: "auto", opacity: 0.7, WebkitMaskImage: "linear-gradient(to bottom, #000 50%, transparent 92%)", maskImage: "linear-gradient(to bottom, #000 50%, transparent 92%)", pointerEvents: "none" }} />
-              <img aria-hidden="true" src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "absolute", right: isDesktop ? 22 : 16, bottom: bottom + 4, width: isDesktop ? 96 : 76, height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
+              <img aria-hidden="true" src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ position: "absolute", left: "clamp(8px, 1.6cqh, 20px)", bottom: bottom - 4, width: isDesktop ? "clamp(76px, min(11.5cqh, 16cqw), 124px)" : "clamp(56px, min(10cqh, 20cqw), 112px)", height: "auto", opacity: 0.7, WebkitMaskImage: "linear-gradient(to bottom, #000 50%, transparent 92%)", maskImage: "linear-gradient(to bottom, #000 50%, transparent 92%)", pointerEvents: "none" }} />
+              <img aria-hidden="true" src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "absolute", right: "clamp(12px, 2cqh, 26px)", bottom: bottom + 4, width: isDesktop ? "clamp(84px, min(12cqh, 17cqw), 132px)" : "clamp(66px, min(10.5cqh, 22cqw), 116px)", height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
             </>
           );
         })()}
