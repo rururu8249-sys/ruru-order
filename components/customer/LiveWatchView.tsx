@@ -1250,7 +1250,7 @@ export default function LiveWatchView(props: Props) {
           스티커처럼 안 보이게: 그 자리 영상을 흐리고 살짝 어둡게(가장자리는 서서히 사라짐) + 그 위에 흰 RURU 글씨(배경 없음). 채팅·상품 카드보다는 뒤. */}
       <div aria-hidden="true" data-yt-cover style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
         {[
-          { key: "share", src: "/yt-cover-share.png", box: { left: 4, bottom: -14, width: 156, height: 86 }, logoW: 92 },
+          { key: "share", src: "/yt-cover-dog.png", box: { left: 4, bottom: -14, width: 156, height: 86 }, logoW: 70 },
           { key: "logo", src: "/yt-cover-logo.png", box: { right: 24, bottom: -12, width: 150, height: 76 }, logoW: 96 },
         ].map((c) => (
           <div key={c.key} style={{ position: "absolute", ...c.box, display: "flex", alignItems: "center", justifyContent: "center" }}>
