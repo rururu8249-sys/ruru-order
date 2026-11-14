@@ -215,6 +215,16 @@ export function pickOrderLines(choices: AutoTestChoice[], rand = Math.random): A
   return chosen;
 }
 
+/** [2026-11-14 11:07 사장님] 라이브 중엔 지금 소개하는 상품 카드 위주로 주문 — 카드 상품 1줄(보통 1개),
+ *  가끔(20%) 지금 도는 상품 하나를 더 담는다. 카드에 안 나온 상품은 안 고른다. */
+export function pickCardFocusedLines(card: AutoTestChoice[], rotation: AutoTestChoice[], rand = Math.random): AutoTestPick[] {
+  if (!card.length) return [];
+  const first: AutoTestPick = { ...pick(card, rand), qty: rand() < 0.8 ? 1 : 2 };
+  const others = rotation.filter((c) => !(c.productId === first.productId && c.productName === first.productName));
+  if (!others.length || rand() >= 0.2) return [first];
+  return [first, { ...pick(others, rand), qty: 1 }];
+}
+
 export type AutoTestSettings = { shipping: ShippingFeeSettings; customerCardRate: number; actualCardRate: number; cardMinAmount: number };
 
 export type BuildInput = {

@@ -2,6 +2,9 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import {readDialogueCard} from './liveAutomationDialogueServer';
 import {AUTO_TEST_ORDERED_SINCE,productChoices,type AutoTestChoice,type AutoTestSettings} from './autoTestOrder';
 import {buildCartHoldSnapshotItem} from './cartHoldDetail';
+import {readAutomationFeatured} from './liveAutomationFeatured';
+import {computeWidgetFeatured} from './widgetFeaturedServer';
+import {streamModeOf} from './autoTestOrderServer';
 export async function readAutomationSettings(db:SupabaseClient):Promise<AutoTestSettings> {
   const defaults:Record<string,number>={default_shipping_fee:4000,remote_area_shipping_fee:6000,vendor_shipping_fee:4000,vendor_remote_area_shipping_fee:7000,overseas_shipping_fee:0,overseas_remote_area_shipping_fee:0,customer_card_extra_rate:10,actual_card_fee_rate:7,card_payment_min_amount:100000};
   const {data,error}=await db.from('settings').select('key,value').in('key',Object.keys(defaults));
@@ -48,4 +51,18 @@ export async function loadAutomationChoices(db:SupabaseClient,broadcastId:string
   }
   return choices.filter(choice=>ordered.has(JSON.stringify([choice.productId,choice.productName.trim()]))
     ||Boolean(card&&choice.productId===card.productId&&choice.productName===card.name));
+}
+
+/** 라이브(실시간 송출) 중이고 상품 카드가 떠 있으면 {카드 상품 고르기, 지금 도는 상품 고르기}. 아니면 null(예전처럼 아무 상품). */
+export async function liveCardChoices(db:SupabaseClient,broadcastId:string,choices:AutoTestChoice[]):Promise<{card:AutoTestChoice[];rotation:AutoTestChoice[]}|null>{
+  try{
+    const bc=await db.from('broadcasts').select('id,status,paused_at,started_at').eq('id',broadcastId).maybeSingle();
+    if(bc.error||!bc.data||await streamModeOf(db,bc.data)!=='live')return null;
+    const now=await readAutomationFeatured(broadcastId);if(!now)return null;
+    const hit=(c:AutoTestChoice,t:{productId:string;detailName:string})=>c.productId===String(t.productId)&&(!t.detailName||c.productName===t.detailName);
+    const card=choices.filter(c=>hit(c,now));if(!card.length)return null;
+    const state=await computeWidgetFeatured(broadcastId);
+    const rotation=choices.filter(c=>state.targets.some(t=>hit(c,{productId:String(t.productId),detailName:String(t.detailName||'')})));
+    return {card,rotation};
+  }catch{return null}
 }

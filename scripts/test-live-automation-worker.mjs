@@ -17,7 +17,7 @@ assert.ok(calls.every(x=>x.url.endsWith('/api/presence')&&x.body.path.endsWith('
 assert.ok(!rpcCalls.some(n=>/gemini|submit|cart/.test(n)),'viewers-only never orders or calls AI');
 assert.ok(rpcCalls.includes('live_automation_tick_release'));
 let chats=0;
-const isolated=createUiLoader({'./liveAutomationCatalog':{readAutomationSettings:async()=>({}),loadAutomationChoices:async()=>[{}]},'./liveAutomationConversation':{runConversations:async()=>{chats++}}})('lib/liveAutomationWorker.ts');
+const isolated=createUiLoader({'./liveAutomationCatalog':{readAutomationSettings:async()=>({}),loadAutomationChoices:async()=>[{}],liveCardChoices:async()=>null},'./liveAutomationConversation':{runConversations:async()=>{chats++}}})('lib/liveAutomationWorker.ts');
 c.orders_enabled=true;c.chat_enabled=true;c.tempo_plan={id,at:new Date().toISOString(),offsets:[0]};
 const rpc=db.rpc;db.rpc=async(name,args)=>name==='live_automation_order_admission'?{error:{message:'ORDER_HOURLY_LIMIT'}}:rpc(name,args);
 await isolated.runAutomationTick(db,'https://shop.test','actions',transport);
@@ -30,7 +30,7 @@ try{
  dueActions=Array.from({length:3},(_,i)=>({id:String(i),plan:{stage:i===1?'submit':'cart'},status:'pending'}));
  db.rpc=async(name,args)=>name==='live_automation_claim'?{data:dueActions.find(a=>a.id===args.p_action)}:rpc(name,args);
  const bounded=createUiLoader({
-  './liveAutomationCatalog':{readAutomationSettings:async()=>({}),loadAutomationChoices:async()=>[{}]},
+  './liveAutomationCatalog':{readAutomationSettings:async()=>({}),loadAutomationChoices:async()=>[{}],liveCardChoices:async()=>null},
   './liveAutomationTransport':{runOrderAction:async()=>{orderRuns++;clock+=21000;return {ok:true}}},
   './liveAutomationConversation':{runConversations:async()=>{chats++}},
  })('lib/liveAutomationWorker.ts');

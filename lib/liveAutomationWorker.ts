@@ -4,9 +4,9 @@ import type {AutomationContext} from './liveAutomationAuth';
 import {automationRpc,activeAutomationBroadcast,type Campaign,type Actor,type Session,type Action} from './liveAutomationServer';
 import {createPersona} from './liveAutomationPersona';
 import {NICKNAME_CANDIDATES,generatedNicknameCandidates} from './liveAutomationNicknames';
-import {loadAutomationChoices,readAutomationSettings} from './liveAutomationCatalog';
+import {loadAutomationChoices,readAutomationSettings,liveCardChoices} from './liveAutomationCatalog';
 import {automationPost,runOrderAction} from './liveAutomationTransport';
-import {pickOrderLines,type AutoTestSettings,type AutoTestPick} from './autoTestOrder';
+import {pickOrderLines,pickCardFocusedLines,type AutoTestSettings,type AutoTestPick} from './autoTestOrder';
 import {runConversations} from './liveAutomationConversation';
 import {interleaveOrderStages,planOrderJourney,isNightKst} from './liveAutomationTempo';
 type Wave={id:string;mode:string;at:string;offsets:number[];planned?:boolean};
@@ -89,11 +89,12 @@ async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettin
  if(!choices.length){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:true});return;}
  // Expired schedules are replanned; resuming a worker never catches up a backlog.
  if(Date.parse(wave.at)<Date.now()-180000){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});return;}
+ const focus=await liveCardChoices(db,c.broadcast_id,choices); // 라이브 중엔 상품 카드 위주
  for(const offset of wave.offsets.slice(0,Math.min(8,12-pending.length))) {
    await automationRpc(db,'live_automation_order_admission',{p_campaign:c.id,p_action:null});
    let picks:AutoTestPick[]=[];
    for(let attempt=0;attempt<5;attempt++){
-     const proposed=pickOrderLines(choices);
+     const proposed=focus?pickCardFocusedLines(focus.card,focus.rotation):pickOrderLines(choices);
      try{await automationRpc(db,'live_automation_check_items',{p_broadcast:c.broadcast_id,p_items:planLines(proposed)});picks=proposed;break;}catch{}
    }
    if(!picks.length)continue;
@@ -158,7 +159,8 @@ export async function runAutomationNow(db:SupabaseClient,origin:string,transport
  if(!action) {
    const choices=await loadAutomationChoices(db,c.broadcast_id,settings);
    if(!choices.length)throw Error('지금 주문 가능한 상품이 없어요.');
-   const picks=pickOrderLines(choices);
+   const focus=await liveCardChoices(db,c.broadcast_id,choices);
+   const picks=focus?pickCardFocusedLines(focus.card,focus.rotation):pickOrderLines(choices);
    await automationRpc(db,'live_automation_check_items',{p_broadcast:c.broadcast_id,p_items:planLines(picks)});
    const actor=await orderActor(db,c,new Set());
    action=await automationRpc<Action>(db,'live_automation_action',{p_session:actor.session.id,p_kind:'order',p_due:nowIso(),
