@@ -685,6 +685,8 @@ export default function LiveWatchView(props: Props) {
       void loadProductIntroCatalog(props.broadcastId, videoId).catch(() => {});
     }
     setSending(false);
+    // [2026-11-14 23:10 사장님] PC 에서 엔터로 보내면 입력칸이 잠깐 잠겨(readOnly) 커서가 빠졌음 → 보낸 뒤 입력칸에 커서를 다시 둠
+    if (isDesktop && !batch) requestAnimationFrame(() => requestAnimationFrame(() => inputRef.current?.focus()));
     if (r.ok && r.message) setChatHint(r.message);
     if (batch) {
       if (r.ok) { setDraft(""); setComposeOpen(false); }

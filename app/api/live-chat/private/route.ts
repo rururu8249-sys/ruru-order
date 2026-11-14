@@ -5,6 +5,7 @@ import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { getServiceClient } from "@/lib/youtube";
 import { CHAT_TEMP_ID_BASE, parseChatMessage } from "@/lib/liveChat";
 import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
+import { AUTO_TEST_VIEWER_PHONES } from "@/lib/autoTestOrder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,16 +23,18 @@ export async function GET(request: NextRequest) {
     if (!identity && !admin) return fail("내 글 삭제와 삭제글 확인은 카카오 본인 확인 후 사용할 수 있어요.", 401);
     const sb = getServiceClient();
     const role = admin ? { isMod: true, isManager: true } : await verifiedChatRole(sb, identity);
+    // [2026-11-14 23:11 사장님] [테스트] 표시는 총관리자·관리자 시험 계정 + 부관리자(김현아 문성)만 — 다른 채팅 관리자(R)는 안 보임
+    const seeTest = role.isManager || AUTO_TEST_VIEWER_PHONES.includes(String(identity?.phone ?? ""));
     const [own, deleted, hidden, commands, photos, testRows] = await Promise.all([
       identity ? sb.from("live_chat_messages").select("id").eq("broadcast_id", bc).eq("kakao_id", identity.sub).is("hidden_at", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
       role.isMod ? sb.from("live_chat_messages").select(columns).eq("broadcast_id", bc).eq("hidden_by", "author").not("hidden_at", "is", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
       sb.from("live_chat_messages").select("id").eq("broadcast_id", bc).not("hidden_at", "is", null).order("id", { ascending: false }).limit(200),
       identity ? sb.from("live_chat_messages").select(columns).eq("broadcast_id", bc).eq("kakao_id", identity.sub).eq("hidden_by", "command").not("hidden_at", "is", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
       role.isManager ? sb.from("live_chat_messages").select("id, avatar_url").eq("broadcast_id",bc).is("automation_actor_id",null).or("badge.is.null,badge.neq.bot").order("id",{ascending:false}).limit(200) : Promise.resolve({data:[],error:null}),
-      role.isManager ? sb.from("live_chat_messages").select("id,nickname,body,badge,bot_ref,automation_actor_id,avatar_url").eq("broadcast_id",bc).is("hidden_at",null).or("automation_actor_id.not.is.null,avatar_url.eq.autotest").order("id",{ascending:false}).limit(200) : Promise.resolve({data:[],error:null}),
+      seeTest ? sb.from("live_chat_messages").select("id,nickname,body,badge,bot_ref,automation_actor_id,avatar_url").eq("broadcast_id",bc).is("hidden_at",null).or("automation_actor_id.not.is.null,avatar_url.eq.autotest").order("id",{ascending:false}).limit(200) : Promise.resolve({data:[],error:null}),
     ]);
     if (photos.error || testRows.error) return fail("프로필을 불러오지 못했어요.",503);
-    const testMessages=role.isManager?Object.fromEntries((testRows.data||[]).filter(r=>Boolean(r.automation_actor_id)||r.avatar_url==="autotest").map(r=>{const m=adminTestChatRow(r);return [r.id,{nickname:m.nickname,body:m.body}];})):{};
+    const testMessages=seeTest?Object.fromEntries((testRows.data||[]).filter(r=>Boolean(r.automation_actor_id)||r.avatar_url==="autotest").map(r=>{const m=adminTestChatRow(r);return [r.id,{nickname:m.nickname,body:m.body}];})):{};
     const avatars=role.isManager?Object.fromEntries((photos.data||[]).filter(r=>/^https:\/\//.test(String(r.avatar_url||""))).map(r=>[r.id,r.avatar_url])):{};
     if (own.error || deleted.error || hidden.error || commands.error) return fail("채팅 권한 정보를 불러오지 못했어요.", 503);
     // Only this authenticated response may contain original deleted bodies.
