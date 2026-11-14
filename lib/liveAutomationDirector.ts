@@ -74,6 +74,9 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const lastAction=Math.max(0,...actions.filter(a=>a.kind!=='order').map(a=>Date.parse(String((a as Action&{created_at?:unknown}).created_at))||0));
  if(newestHuman){if(now-lastAction<10000)return;}
  else{
+  // DB 가 정한 방 쉬는 시간(auto_chat_after) 안이면 Gemini 를 부르지 않음(불러도 글이 막힘)
+  const restUntil=Date.parse(String((c as Row).auto_chat_after||''));
+  if(restUntil&&restUntil>now)return;
   // [2026-11-14 09:03 사장님 「채팅량도 적게·보통·많게」] 관리자 「채팅 양」 설정으로 AI 글 사이 간격·차례 확률을 정함(밤은 그대로 드물게)
   const pace=CHAT_PACE[chatPaceOf(paceRow)];
   if(now-lastAi<pace.gapMin+Math.floor(Math.random()*(pace.gapMax-pace.gapMin))||now-lastAction<20000)return;
@@ -119,7 +122,9 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  try{const p=JSON.parse(ans.text||'{}');if(p&&typeof p==='object')pick=p as Row;}catch{/* 침묵 */}
  const speaker=roster.find(r=>r.actor.nickname===String(pick.speaker||'').trim())||null;
  const replyId=Number(pick.replyTo)||0;
- const target=replyId?messages.find(m=>Number(m.id)===replyId&&!m.automation_actor_id&&m.badge!=='bot')||null:null;
+ const target0=replyId?messages.find(m=>Number(m.id)===replyId&&!m.automation_actor_id&&m.badge!=='bot')||null:null;
+ // 사람 새 글이 있는데 글 번호를 안 줬으면 그 글에 대한 반응으로 봄(사람 글 뒤엔 «답»만 들어갈 수 있음)
+ const target=target0||(newestHuman&&speaker?newestHuman:null);
  const acceptable=(t:string,r:(typeof roster)[number],tgt:Row|null)=>{
   if(t.length<1||t.length>70)return false;
   if(!safeConversationLine(t,r.paid.length>0)||/가상|봇|자동|테스트/.test(t))return false;
@@ -144,7 +149,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const who=speaker&&text?speaker:(sourceId?roster[0]:null);
  if(!who)return;
  const kind=speaker&&text&&target?'reply':'chat';
- try{await automationRpc(db,'live_automation_ai_admission',{p_actor:who.actor.id,p_kind:kind})}catch{return}
+ try{await automationRpc(db,'live_automation_ai_admission',{p_actor:who.actor.id,p_kind:kind})}catch(e){void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:'막힘 '+String((e as Error)?.message||e).slice(0,40),result:'blocked'});return}
  const action=await automationRpc<Action>(db,'live_automation_action',{p_session:who.session.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,mode},p_manual:false,p_source:sourceId,p_revision:c.revision});
  const claimed=await automationRpc<Action|null>(db,'live_automation_claim',{p_action:action.id,p_revision:c.revision});
  if(!claimed)return;
