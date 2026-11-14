@@ -890,6 +890,7 @@ export default function LiveWatchView(props: Props) {
   // 돌려보기 중엔 원래 크기(유튜브 막대가 잘리지 않게).
   const [videoScale, setVideoScale] = useState(1);
   const [videoFrame, setVideoFrame] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [iframeH, setIframeH] = useState(0);
   useEffect(() => {
     const el = iframeRef.current;
     if (!el) return;
@@ -899,6 +900,7 @@ export default function LiveWatchView(props: Props) {
       if (w <= 0 || h <= 0) return;
       const s = w / (h * 9 / 16);
       setVideoScale(s > 1.005 ? Math.min(1.12, s) : 1);
+      setIframeH(h);
       // [2026-11-15] 9:16 영상이 실제로 그려지는 칸(검은 띠 뺀 자리) — PC 쉬는 중 안내 상자를 영상 속 채널 배너 위에 맞추려고
       const fw = Math.min(w, h * 9 / 16);
       const fh = fw * 16 / 9;
@@ -1246,19 +1248,26 @@ export default function LiveWatchView(props: Props) {
       />
 
       {/* [2026-11-15 사장님 화면 테스트] 유튜브 공유(왼쪽 아래)·YouTube 표시(오른쪽 아래)를 늘 가림.
-          영상(iframe)과 같은 크기·같은 배율 칸 안에 두어 폰·PC(손님·관리자 칸 너비가 달라도) 유튜브가 버튼을 그리는 그 모서리에 맞음.
-          스티커처럼 안 보이게: 그 자리 영상을 흐리고 살짝 어둡게(가장자리는 서서히 사라짐) + 그 위에 흰 RURU 글씨(배경 없음). 채팅·상품 카드보다는 뒤. */}
-      <div aria-hidden="true" data-yt-cover style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
-        {[
-          { key: "share", src: "/yt-cover-dog.png", box: { left: 4, bottom: -14, width: 156, height: 86 }, logoW: 70 },
-          { key: "logo", src: "/yt-cover-logo.png", box: { right: 24, bottom: -12, width: 150, height: 76 }, logoW: 96 },
-        ].map((c) => (
-          <div key={c.key} style={{ position: "absolute", ...c.box, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ position: "absolute", inset: 0, backdropFilter: "blur(14px) brightness(0.72) saturate(1.1)", WebkitBackdropFilter: "blur(14px) brightness(0.72) saturate(1.1)", background: "rgba(0,0,0,0.12)", WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%)", maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%)" }} />
-            <img src={c.src} alt="" draggable={false} style={{ position: "relative", width: c.logoW, height: "auto", opacity: 0.9, transform: "translateY(-9px)", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.45))" }} />
+          영상(iframe)과 같은 크기·같은 배율 칸 안에 두어 폰·PC(손님·관리자 칸 너비가 달라도) 유튜브가 버튼을 그리는 모서리에 맞음.
+          폰은 영상을 키워(videoScale) 맨 아래가 아래 버튼 줄 뒤로 숨으므로, 그만큼 위로 올려 잘리지 않게(coverLift).
+          왼쪽 = 유튜브 버튼 모양과 같은 반투명 알약(강아지 동그라미 + 루루동이), 오른쪽 = 흰 RURU 글씨(배경 없음, 뒤만 살짝 흐림). 채팅·상품 카드보다는 뒤. */}
+      {(() => {
+        // 키운 영상이 아래로 넘친 만큼 − (영상 칸 아래 84px 중 버튼 줄이 덮지 않는 틈) = 버튼 줄 뒤로 숨은 높이(화면 px) → 영상 배율로 나눔
+        const coverLift = isDesktop || videoScale === 1 || !iframeH ? 0 : Math.max(0, ((videoScale - 1) * iframeH) / 2 - (84 - (bottomBarHeight ?? 84))) / videoScale;
+        const bottom = Math.max(4, Math.round(coverLift));
+        return (
+          <div aria-hidden="true" data-yt-cover style={{ position: "absolute", left: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
+            <div style={{ position: "absolute", left: 22, bottom, height: 56, padding: "0 16px 0 6px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 8, borderRadius: 28, background: "rgba(20,20,20,0.74)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.14)" }}>
+              <img src="/yt-cover-dog-face.jpg" alt="" draggable={false} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", objectPosition: "50% 45%", display: "block", boxShadow: "0 0 0 1.5px rgba(255,255,255,0.7)" }} />
+              <span style={{ color: "#FFFFFF", fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em", whiteSpace: "nowrap", textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}>루루동이</span>
+            </div>
+            <div style={{ position: "absolute", right: 30, bottom: bottom - 10, width: 136, height: 58, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ position: "absolute", inset: 0, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%)", maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%)" }} />
+              <img src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "relative", width: 96, height: "auto", opacity: 0.92, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 6px rgba(0,0,0,0.25))" }} />
+            </div>
           </div>
-        ))}
-      </div>
+        );
+      })()}
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
       {/* 돌려보기 중 — 영상 전체를 반투명 검정으로 어둡게(유튜브 막대는 빨강·흰색이라 그대로 보임) */}
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
