@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
     // [2026-11-10] 루루동이AI — 응답을 보낸 «뒤»에 상품 안내·자주 묻는 말(손님 글 쓰기를 늦추지 않음, 실패해도 무관)
     //   이모티콘은 빼고 글자만 봄(이모티콘만 보낸 글이면 안내 안 함)
     const botText = chatBodyWithoutEmoji(finalBody);
-    if (botText) after(() => runLiveChatBot(sb, bc, botText));
+    if (botText) after(() => runLiveChatBot(sb, bc, botText, { staff: !!role.badge || !!role.isManager }));
     return NextResponse.json({ ok: true, message: parseChatMessage(publicChatRow(ins)) });
   } catch (error) {
     if(error instanceof AutomationError)return fail('채팅 실행 권한을 확인하지 못했어요.',error.status);

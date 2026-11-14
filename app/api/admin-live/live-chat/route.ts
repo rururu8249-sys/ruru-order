@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);
       // 관리자 PC 글에도 루루동이 자동 안내(손님 글과 같은 규칙 · 이모티콘 빼고 글자만)
       const botText = body.replace(/:[^:\s]{1,10}:/g, " ").replace(/\s+/g, " ").trim();
-      if (botText) after(() => runLiveChatBot(sb, bc, botText));
+      if (botText) after(() => runLiveChatBot(sb, bc, botText, { staff: true }));
       return NextResponse.json({ ok: true, message: adminMessage(ins) });
     }
 

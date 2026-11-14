@@ -103,7 +103,17 @@ async function postBot(sb: SupabaseClient, bc: string, ref: string, body: string
 }
 
 /** 손님 글 하나를 보고 루루동이AI 안내(상품·자주 묻는 말). 실패해도 조용히. */
-export async function runLiveChatBot(sb: SupabaseClient, bc: string, body: string): Promise<void> {
+// [2026-11-14 22:20 사장님 「자주 쓰는 말 복사해서 보냈는데 자동 응답이 또 받아쳐서 이중」]
+//   관리자·채팅 관리자 글엔 자주 묻는 말 답을 안 붙이고, 글 자체가 그 답과 같은 내용이어도 안 붙임.
+export function faqEchoesAnswer(body: string, answer: string): boolean {
+  const n = (v: string) => v.replace(/[\s\p{P}\p{S}]/gu, "").toLowerCase();
+  const b = n(body), a = n(answer);
+  if (!a || !b) return false;
+  const head = a.slice(0, Math.min(16, a.length));
+  if (b.includes(head)) return true;
+  return b.length >= 12 && a.includes(b.slice(0, 16));
+}
+export async function runLiveChatBot(sb: SupabaseClient, bc: string, body: string, opts: { staff?: boolean } = {}): Promise<void> {
   try {
     const { data } = await sb.from("settings").select("value").eq("key", LIVE_CHAT_BOT_KEY).maybeSingle();
     const setting = parseLiveChatBotSetting((data as { value?: unknown } | null)?.value);
@@ -115,7 +125,7 @@ export async function runLiveChatBot(sb: SupabaseClient, bc: string, body: strin
       else for (const sp of pickProductsForShortChat(body, cands)) await postBot(sb, bc, botRefOfProduct(sp), sp.text);
     }
     const faq = pickFaq(body, setting.faqs);
-    if (faq) await postBot(sb, bc, botRefOfFaq(faq.faq), faq.faq.answer);
+    if (faq && !opts.staff && !faqEchoesAnswer(body, faq.faq.answer)) await postBot(sb, bc, botRefOfFaq(faq.faq), faq.faq.answer);
   } catch {
     /* 봇 실패는 손님 글과 무관 */
   }

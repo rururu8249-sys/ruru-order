@@ -38,3 +38,11 @@ console.log('ok pay talk');}
  for (const t of ["지금 입으신 거 품번이 뭐예요?","언니가 입은 패딩 몇 번이에요?","PD-530 와인 따뜻해요?","와 이쁘다"]) { if (vq(t)) throw new Error("정상 질문 막힘: " + t); }
  console.log("✓ 대상 없는 «요고·이거» 질문 버림");
 }
+
+// 2026-11-14 22:18 «블랙 XL도 핏 예쁘겠당» — 사이즈 집은 감탄·상품번호 없는 핏 얘기 버림
+{
+ const { vagueProductQuestion: vq } = await import("../lib/liveAutomationDirector");
+ for (const t of ["블랙 XL도 핏 예쁘겠당","엑라도 이쁘겠다","핏 진짜 좋네요","M 사이즈 딱이겠어요"]) { if (!vq(t)) throw new Error("통과하면 안 됨: " + t); }
+ for (const t of ["와 블랙 예쁘다","PD-530 와인 핏 예쁘네요","ㅋㅋㅋ 귀여워","가격요"]) { if (vq(t)) throw new Error("막히면 안 됨: " + t); }
+ console.log("✓ 사이즈 집은 감탄·번호 없는 핏 얘기 버림");
+}
