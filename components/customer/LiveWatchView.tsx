@@ -1258,7 +1258,7 @@ export default function LiveWatchView(props: Props) {
           const bottom = Math.round(lift) + (isDesktop ? 14 : 10);
           return (
             <>
-              <img aria-hidden="true" src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 16 : 10, bottom: bottom - 4, width: isDesktop ? 92 : 64, height: "auto", opacity: 0.7, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
+              <img aria-hidden="true" src="/yt-cover-dog-mark.png" alt="" draggable={false} style={{ position: "absolute", left: isDesktop ? 16 : 10, bottom: bottom - 4, width: isDesktop ? 92 : 64, height: "auto", opacity: 0.7, WebkitMaskImage: "linear-gradient(to bottom, #000 50%, transparent 92%)", maskImage: "linear-gradient(to bottom, #000 50%, transparent 92%)", pointerEvents: "none" }} />
               <img aria-hidden="true" src="/yt-cover-logo.png" alt="" draggable={false} style={{ position: "absolute", right: isDesktop ? 22 : 16, bottom: bottom + 4, width: isDesktop ? 96 : 76, height: "auto", opacity: 0.55, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", pointerEvents: "none" }} />
             </>
           );
