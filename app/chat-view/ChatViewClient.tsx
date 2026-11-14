@@ -1,6 +1,6 @@
 "use client";
 import {ChatProfileAvatar} from "@/components/chat/ChatProfileAvatar";
-import {notificationPresentation} from "@/lib/chatPresentation";
+import {notificationPresentation,staffAvatarFrame} from "@/lib/chatPresentation";
 // 유튜브 기본 탭 · 사이트 새 글 두 개 미리보기 · 확인하면 알림 해제.
 // 탭을 숨겨도 유튜브 iframe을 유지해 재연결 없이 전환한다.
 //   지금 켜진 방송을 저절로 찾음(1분마다 다시 확인 — 새 방송이 켜지면 그 방송으로).
@@ -318,7 +318,7 @@ export default function ChatViewClient() {
             const b = palette ? {label:"AI",bg:palette.badge,fg:palette.ink} : m.badge ? BADGE[m.badge] : null;
             return (
               <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "var(--chat-row-gap, 10px)", padding: "var(--chat-row-padding, 7px 8px)" }}>
-                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size="1.6em" frame={palette?.frame} color={palette ? undefined : avatarColorMap.get(m.id)} />
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size="1.6em" frame={palette?.frame || staffAvatarFrame(m.badge)} color={palette ? undefined : avatarColorMap.get(m.id)} />
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}

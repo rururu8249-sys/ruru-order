@@ -29,3 +29,7 @@ export function publicChatRow(row:Record<string,unknown>){
  const id=Number(row.public_avatar_id);
  return {...safe,avatar_url:Number.isInteger(id)&&id>=0&&id<5000?(row.public_avatar_version===2?'public2:':'public:')+id+(row.public_avatar_key?':'+String(row.public_avatar_key):''):''};
 }
+/** [2026-11-15 사장님] 관리자(왕관)·채팅 관리자(R) 프로필 동그라미 = 알림 계정처럼 진한 테두리(표시만). */
+export function staffAvatarFrame(badge:unknown):string|undefined{
+ return badge==='crown'?'#F5C242':badge==='crown_pink'?'#FF7EB0':badge==='mod'?'#E8587A':undefined;
+}

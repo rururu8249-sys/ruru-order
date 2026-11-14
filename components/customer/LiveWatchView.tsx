@@ -1,6 +1,6 @@
 "use client";
 import {ChatProfileAvatar} from "@/components/chat/ChatProfileAvatar";
-import {notificationPresentation} from "@/lib/chatPresentation";
+import {notificationPresentation,staffAvatarFrame} from "@/lib/chatPresentation";
 // [2026-11-09] 「방송 보며 주문」 ②단계 화면 — 주문서 위에 덮는 방송 화면(손님용).
 //   참고: 오늘만셀러(onmlive)·모루라이브 — 세로 영상 꽉 차게, 아래에 «지금 소개 중» 상품 카드,
 //   맨 아래 줄 [상품 목록][주문서 확인], 「OO님 주문했어요」 알림.
@@ -1508,7 +1508,7 @@ export default function LiveWatchView(props: Props) {
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
-                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} frame={palette?.frame} color={palette ? undefined : color} />
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} frame={palette?.frame || staffAvatarFrame(m.badge)} color={palette ? undefined : color} />
                 <span style={{ minWidth: 0, flex: 1, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: 12, color: "#ccc", marginBottom: 3 }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: 12, color: "#a8c7fa", marginBottom: 3 }}>나만 보이는 명령어</span> : null}
@@ -1557,7 +1557,7 @@ export default function LiveWatchView(props: Props) {
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openChatMenu(chat.pinned!, e.clientX, e.clientY, chat.canPin && Number.isInteger(chat.pinned!.id)); }}
             style={{ ...(isDesktop ? { order: 2, flexShrink: 0, maxHeight: "30%", overflowY: "auto" } : {}), pointerEvents: "auto", display: "flex", alignItems: isDesktop && pinOpen ? "flex-start" : "center", gap: "8px", width: "100%", boxSizing: "border-box", minHeight: "44px", padding: "8px 12px", borderRadius: "22px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
           >
-            <ChatProfileAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} />
+            <ChatProfileAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} frame={staffAvatarFrame(chat.pinned.badge)} />
             <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "9999px", background: "rgba(255,255,255,0.16)", fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis" }}>
               {chat.pinned.nickname}<ChatBadge badge={chat.pinned.badge} />
             </span>
