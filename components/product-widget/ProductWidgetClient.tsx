@@ -7,6 +7,7 @@
 // - 배경 투명(크로마키). 읽기 전용 — 돈/주문 로직 건드리지 않음.
 
 import { useWidgetRotationIndex } from "@/lib/useWidgetRotationIndex";
+import { WIDGET_ROTATION_INTERVAL_MS } from "@/lib/widgetRotationClock";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
@@ -241,7 +242,6 @@ function ToastSticker({ toast, standalone, durMs = TOAST_SHOW_MS }: { toast: Toa
       style={{
         position: "relative",
         width: standalone ? "100%" : "86%",
-        transform: "rotate(-5deg)",
         // [2026-11-07] 흔들기 빼고 톡 붙은 뒤 가만히 — 사라질 때만 0.5초 부드럽게
         animation: `ruruStickerIn 0.55s cubic-bezier(0.18,0.89,0.32,1.2) both, ruruStickerOut ${durMs <= 2500 ? 0.3 : 0.5}s ease-in ${(durMs - (durMs <= 2500 ? 300 : 500)) / 1000}s forwards`,
       }}
@@ -781,7 +781,15 @@ export default function ProductWidgetClient() {
     return () => window.clearTimeout(t);
   }, [confettiKey, confettiOn]);
 
-  const current = pinned || (rotation.length > 0 ? rotation[rotIndex % rotation.length] : null);
+  const liveCurrent = pinned || (rotation.length > 0 ? rotation[rotIndex % rotation.length] : null);
+  // [2026-11-15 08:34 사장님 «알림 뜰 때 상품사진이 바뀌면서 깜박이고 금방 사라짐 — 알림이 우선»]
+  //   알림(대기 중인 것 포함)이 떠 있는 동안은 처음 보이던 상품을 그대로 붙잡아 둠. 알림이 다 끝나면 그때 지금 차례 상품으로.
+  //   (카드가 다시 그려지며 알림 스티커가 처음부터 다시 뜨거나, 5초 순환의 흐려짐에 같이 사라지던 것)
+  const toastActive = Boolean(currentToast) || toastQueue.length > 0;
+  const heldRef = useRef<AnyProduct | null>(null);
+  if (!toastActive) heldRef.current = null;
+  else if (!heldRef.current && liveCurrent) heldRef.current = liveCurrent;
+  const current = toastActive && heldRef.current && !pinned ? heldRef.current : liveCurrent;
   const img = imageOf(current);
 
   // [2026-07-12 사장님 지침] 간헐적 이미지 미표시 해결 — 불안정 회선(중국 현장 등)에서 저장소 이미지
@@ -855,9 +863,16 @@ export default function ProductWidgetClient() {
               //   → 카드 배경 없앰. 반투명은 사진칸·띠에 «한 겹(50%)»만.
               background: "transparent",
               color: "#fff",
-              animation: rotationAdvances
-                ? "ruruWidgetCycle 5s linear both"
-                : "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
+              // [2026-11-15 사장님 «카드가 좌우로 까딱까딱»] 순환 때 좌우로 8px 밀리던 움직임 삭제 — 제자리에서 흐려졌다 나타남만.
+              //   알림이 떠 있는 동안은 흐려짐도 없음(상품 고정). 알림 끝난 뒤엔 순환 시계에 맞춰 흐려짐 시작점을 맞춤.
+              animation: toastActive
+                ? "none"
+                : rotationAdvances
+                  ? "ruruWidgetCycle 5s linear both"
+                  : "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
+              animationDelay: !toastActive && rotationAdvances
+                ? `-${Math.max(0, Date.now() - (rotationConfig.startedAt ?? 0)) % WIDGET_ROTATION_INTERVAL_MS}ms`
+                : undefined,
             }}
           >
             {/* [2026-11-06 사장님 «평상시에도 테두리가 반짝이며 돌게» → 13:27 참고 영상처럼] 테두리에 빛 한 줄기(분홍→노랑)가 계속 돈다(주문·결제 땐 그 위에 초록/파랑 번쩍) */}
@@ -1082,12 +1097,12 @@ export default function ProductWidgetClient() {
       </div>
 
       <style>{`
-        @keyframes ruruWidgetIn { from { opacity: 0; transform: translate3d(8px, 0, 0) scale(0.992); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+        @keyframes ruruWidgetIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ruruWidgetCycle {
-          0% { opacity: 0; transform: translate3d(8px, 0, 0) scale(0.992); }
-          7% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-          93% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-          100% { opacity: 0; transform: translate3d(-8px, 0, 0) scale(0.992); }
+          0% { opacity: 0; }
+          7% { opacity: 1; }
+          93% { opacity: 1; }
+          100% { opacity: 0; }
         }
         @keyframes ruruToastPop {
           0% { opacity: 0; transform: scale(0.8) translateY(8px); }
@@ -1100,9 +1115,9 @@ export default function ProductWidgetClient() {
           100% { transform: translate(var(--tx), calc(var(--ty) + 40px)) rotate(var(--r)) scale(1); opacity: 0; }
         }
         @keyframes ruruStickerIn {
-          0% { opacity: 0; transform: rotate(-12deg) scale(0.6); }
-          60% { opacity: 1; transform: rotate(1deg) scale(1.06); }
-          100% { opacity: 1; transform: rotate(-3deg) scale(1); }
+          0% { opacity: 0; transform: scale(0.6); }
+          60% { opacity: 1; transform: scale(1.06); }
+          100% { opacity: 1; transform: scale(1); }
         }
         @keyframes ruruStickerBurst {
           0% { opacity: 0.9; transform: scale(0.4); }
@@ -1126,7 +1141,7 @@ export default function ProductWidgetClient() {
         @keyframes ruruTrail { 0% { opacity: 0; transform: translateY(0) scale(1); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(28px) scale(0.4); } }
         @keyframes ruruFlash { 0% { opacity: 0; transform: scale(0.2); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.4); } }
         @keyframes ruruSpark { 0% { opacity: 0; transform: translate(0, 0) scale(0.4); } 6% { opacity: 1; } 65% { opacity: 1; transform: translate(var(--sx), var(--sy)) scale(1); } 100% { opacity: 0; transform: translate(var(--sx), calc(var(--sy) + 40px)) scale(0.5); } }
-        @keyframes ruruStickerOut { to { opacity: 0; transform: rotate(-3deg) scale(0.96); } }
+        @keyframes ruruStickerOut { to { opacity: 0; transform: scale(0.96); } }
         @keyframes ruruLiveDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         @media (prefers-reduced-motion: reduce) {
           [data-ruru-widget-card], [data-ruru-widget-sticker], [data-ruru-widget-burst], [data-ruru-widget-flash], [data-ruru-widget-live-dot], [data-ruru-widget-price], [data-ruru-widget-rainbow] { animation: none !important; }
