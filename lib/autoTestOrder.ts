@@ -16,7 +16,7 @@ export const AUTO_TEST_NAME = "자동테스트";
 /** 테스트 채팅의 표식(채팅 글 avatar_url 자리) — 화면은 닉네임 첫 글자 동그라미로 그림 */
 export const AUTO_TEST_AVATAR = "autotest";
 /** 테스트 글·주문에 「TEST」 표시를 보는 사람(채팅 관리자 말고 따로) — 사장님 지정 부계정 관리자 김현아(문성) */
-export const AUTO_TEST_VIEWER_PHONES = ["01083388860"];
+export const AUTO_TEST_VIEWER_PHONES = ["01083388860", "01073561623"]; // 김현아(문성) 주문 번호 · 카카오 등록 휴대폰
 /** [2026-11-14 23:31] 같은 분의 카카오 계정 번호 — 카카오에 등록된 휴대폰(010-7356-…)이 주문 번호와 달라 번호로만 보면 못 알아봄 */
 export const AUTO_TEST_VIEWER_KAKAO_IDS = ["4980919533"];
 /** 서버가 서명한 채팅 본인 확인(카카오 계정 번호·카카오 휴대폰)으로 부관리자인지 */

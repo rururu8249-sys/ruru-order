@@ -1,7 +1,7 @@
 import type {NextRequest} from 'next/server';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {verifyAdminSessionFromRequest} from '@/lib/admin-auth';
-import {chatIdentityFromRequest,verifiedChatRole} from '@/lib/liveChatSession';
+import {chatIdentityFromRequest,verifiedChatRole,verifyChatIdentity,CHAT_SESSION_COOKIE} from '@/lib/liveChatSession';
 import {isAutoTestViewerIdentity} from '@/lib/autoTestOrder';
 export const MANUAL_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type ManualChatSelection={token:string;clientId:string;requestId:string;nickname?:string};
@@ -10,7 +10,14 @@ export async function manualChatOperator(request:NextRequest,db:SupabaseClient):
   const admin=await verifyAdminSessionFromRequest(request);
   if(admin) return 'admin:'+admin.sub;
   const identity=chatIdentityFromRequest(request);
-  if(!identity) return null;
+  if(!identity) {
+    // [2026-11-14 23:50 사장님 「이 사람만 강제로」] 부관리자 김현아(문성)만: 화면 쪽 계정 표시가 어긋나도
+    // 서버가 서명한 카카오 로그인 쿠키만으로 확인되면 허용. 다른 계정은 예전 그대로.
+    try {
+      const cookieOnly=verifyChatIdentity(request.cookies?.get?.(CHAT_SESSION_COOKIE)?.value);
+      return cookieOnly&&isAutoTestViewerIdentity(cookieOnly) ? 'kakao:'+cookieOnly.sub : null;
+    } catch { return null; }
+  }
   const role=await verifiedChatRole(db,identity);
   // Only provider-signed phone/identity and current owner configuration grant access.
   // Generic moderators and editable request/profile phone numbers do not.
