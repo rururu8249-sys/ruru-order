@@ -15,7 +15,7 @@ const GROUPS: { key: string; label: string }[] = [
   { key: "owner", label: "총관리자" },
   { key: "sub", label: "부관리자" },
   { key: "chat", label: "채팅 관리자" },
-  { key: "chatPhrases", label: "채팅 관리자 + 자주 쓰는 말" },
+  { key: "chatPhrases", label: "채팅 + 자주 쓰는 말" },
   { key: "custom", label: "직접 고른 권한" },
 ];
 

@@ -21,10 +21,10 @@ export const MEMBER_PERM_INFO: Record<MemberPerm, { label: string; desc: string 
 };
 
 export const MEMBER_PRESETS: { key: string; label: string; desc: string; perms: MemberPerm[] }[] = [
-  { key: "owner", label: "총관리자", desc: "모든 기능", perms: ["owner", "host", "moderate", "test", "persona", "memory", "phrases"] },
+  { key: "owner", label: "총관리자", desc: "모든 기능", perms: ["owner", "host", "moderate", "test", "persona", "memory"] },
   { key: "sub", label: "부관리자", desc: "채팅 정리 · 테스트 보기 · 닉네임 골라 보내기", perms: ["moderate", "test", "persona"] },
   { key: "chat", label: "채팅 관리자", desc: "채팅 정리만 (R 표시)", perms: ["moderate"] },
-  { key: "chatPhrases", label: "채팅 관리자 + 자주 쓰는 말", desc: "채팅 정리 · 내 자주 쓰는 말(유튜브 복사·사이트 보내기)", perms: ["moderate", "phrases"] },
+  { key: "chatPhrases", label: "채팅 + 자주 쓰는 말", desc: "채팅 정리 · 내 자주 쓰는 말(유튜브 복사·사이트 보내기)", perms: ["moderate", "phrases"] },
 ];
 
 export function cleanPerms(raw: unknown): MemberPerm[] {
