@@ -20,8 +20,8 @@ export async function GET(request:NextRequest){
  if(!await verifyAdminSessionFromRequest(request))return fail('관리자 로그인이 필요해요.',401);
  try{
    const db=getServiceClient();
-   const [state,rows,gemini,paceRow,learning,chatPaceRow]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle(),readLearning(db),db.from('settings').select('value').eq('key',CHAT_PACE_KEY).maybeSingle()]);
-   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value),chatPace:paceOf((chatPaceRow.data as {value?:unknown}|null)?.value),learning:learning.notes},{headers:{'Cache-Control':'no-store'}});
+   const [state,rows,gemini,paceRow,learning,chatPaceRow,memoryRow]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle(),readLearning(db),db.from('settings').select('value').eq('key',CHAT_PACE_KEY).maybeSingle(),db.from('settings').select('value').eq('key','live_automation_memory_public').maybeSingle()]);
+   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value),chatPace:paceOf((chatPaceRow.data as {value?:unknown}|null)?.value),learning:learning.notes,memoryPublic:String((memoryRow.data as {value?:unknown}|null)?.value??'').includes('on')},{headers:{'Cache-Control':'no-store'}});
  }catch{return fail('실행 상태를 확인하지 못했어요.',503)}
 }
 export async function POST(request:NextRequest){
@@ -46,6 +46,11 @@ export async function POST(request:NextRequest){
        if(!c.next_order_at||Date.parse(c.next_order_at)-Date.now()>120000)await db.rpc('live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});
      }
      return NextResponse.json({ok:true,pace:body.pace,state:await readAutomationState(db)});
+   }
+   if(body.action==='memory-public'){
+     const saved=await db.from('settings').upsert([{key:'live_automation_memory_public',value:body.on===true?'on':'off'}],{onConflict:'key'});
+     if(saved.error)throw Error('MEMORY_SAVE');
+     return NextResponse.json({ok:true,memoryPublic:body.on===true});
    }
    if(body.action==='chat-pace'){
      if(!['low','normal','high'].includes(body.pace))return fail('채팅 양을 확인해 주세요.');

@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
     const role = admin ? { isOwner: true, isMod: true, isManager: true, seeTest: true, persona: true } : await verifiedChatRole(sb, identity);
     // [2026-11-15] [테스트] 표시 = 방송 화면 권한 「테스트 표시 보기」(총관리자·방송 진행·관리자 시험 계정 포함)
     const seeTest = role.seeTest;
+    // [2026-11-15 15:13 사장님 「연습은 실전처럼 — 일반 계정 손님 화면에도」] 관리자 «구매 얘기 모든 손님 화면에 보이기» 스위치
+    const memoryPublic = await sb.from("settings").select("value").eq("key","live_automation_memory_public").maybeSingle().then(r=>String((r.data as {value?:unknown}|null)?.value??"").includes("on"),()=>false);
     const [own, deleted, hidden, commands, photos, testRows] = await Promise.all([
       identity ? sb.from("live_chat_messages").select("id").eq("broadcast_id", bc).eq("kakao_id", identity.sub).is("hidden_at", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
       role.isMod ? sb.from("live_chat_messages").select(columns).eq("broadcast_id", bc).eq("hidden_by", "author").not("hidden_at", "is", null).order("id", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
       return message ? { ...message, deletedByAuthor: true } : null;
     }).filter(Boolean);
     const commandMessages = (commands.data ?? []).map(row => parseChatMessage(role.isMod ? { ...row, hidden_at: null, pinned_at: null } : publicChatRow({ ...row, hidden_at: null, pinned_at: null }))).filter(Boolean);
-    return json({ ok: true, verified: Boolean(identity), canReviewDeleted: role.isMod, perms: admin ? null : { owner: role.isOwner, host: role.isManager, moderate: role.isMod, test: role.seeTest, persona: role.persona }, avatars, testMessages, ownIds: (own.data ?? []).map(r => r.id), hiddenIds: (hidden.data ?? []).map(r => r.id), deletedMessages, commandMessages });
+    return json({ ok: true, verified: Boolean(identity), canReviewDeleted: role.isMod, perms: admin ? null : { owner: role.isOwner, host: role.isManager, moderate: role.isMod, test: role.seeTest, persona: role.persona, memory: Boolean(role.memory) }, memoryPublic, avatars, testMessages, ownIds: (own.data ?? []).map(r => r.id), hiddenIds: (hidden.data ?? []).map(r => r.id), deletedMessages, commandMessages });
   } catch { return fail("채팅 권한을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.", 503); }
 }
 

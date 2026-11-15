@@ -7,11 +7,12 @@ const R = load("lib/liveMemberRoles.ts");
 
 // 프리셋 → 판정
 const f = (p) => R.flagsFromPerms(R.cleanPerms(p));
-assert.deepEqual(f(["owner"]), { isOwner: true, isManager: true, isMod: true, seeTest: true, persona: true });
-assert.deepEqual(f(["moderate", "test", "persona"]), { isOwner: false, isManager: false, isMod: true, seeTest: true, persona: true }, "부관리자");
-assert.deepEqual(f(["moderate"]), { isOwner: false, isManager: false, isMod: true, seeTest: false, persona: false }, "채팅 관리자 = 테스트 표시 안 봄");
-assert.deepEqual(f(["host"]), { isOwner: false, isManager: true, isMod: true, seeTest: true, persona: false }, "방송 진행 = 예전 isManager");
-assert.deepEqual(f(["test"]), { isOwner: false, isManager: false, isMod: false, seeTest: true, persona: false });
+assert.deepEqual(f(["owner"]), { isOwner: true, isManager: true, isMod: true, seeTest: true, persona: true, memory: true });
+assert.deepEqual(f(["moderate", "test", "persona"]), { isOwner: false, isManager: false, isMod: true, seeTest: true, persona: true, memory: false }, "부관리자");
+assert.deepEqual(f(["moderate"]), { isOwner: false, isManager: false, isMod: true, seeTest: false, persona: false, memory: false }, "채팅 관리자 = 테스트 표시 안 봄");
+assert.deepEqual(f(["host"]), { isOwner: false, isManager: true, isMod: true, seeTest: true, persona: false, memory: false }, "방송 진행 = 예전 isManager");
+assert.deepEqual(f(["test"]), { isOwner: false, isManager: false, isMod: false, seeTest: true, persona: false, memory: false });
+assert.deepEqual(f(["memory"]), { isOwner: false, isManager: false, isMod: false, seeTest: false, persona: false, memory: true }, "구매 얘기 시험 보기만 — [테스트] 표시 없음");
 assert.deepEqual(R.cleanPerms(["owner", "hack", "owner", 3]), ["owner"], "모르는 값·중복 버림");
 assert.equal(R.presetOf(["moderate"]), "chat");
 assert.equal(R.presetOf(["persona", "test", "moderate"]), "sub");

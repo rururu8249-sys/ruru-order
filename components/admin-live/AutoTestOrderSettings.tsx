@@ -18,6 +18,7 @@ export default function AutoTestOrderSettings(){
  const [busy,setBusy]=useState(false),[runningOnce,setRunningOnce]=useState(false);
  const [pace,setPace]=useState<'low'|'normal'|'high'>('normal');
  const [chatPace,setChatPace]=useState<'low'|'normal'|'high'>('normal');
+ const [memoryPublic,setMemoryPublic]=useState(false);
  const reads=useRef(0),writing=useRef(false);
  const load=useCallback(async()=>{
    if(writing.current)return;
@@ -26,7 +27,7 @@ export default function AutoTestOrderSettings(){
      const r=await fetch('/api/admin-live/auto-test-order',{cache:'no-store'}),j=await r.json();
      if(stamp!==reads.current)return;
      if(!r.ok||!j.ok)throw Error(j.message||'실행 상태를 확인하지 못했어요.');
-     setState(j.state);setPace(j.pace==='low'||j.pace==='high'?j.pace:'normal');setChatPace(j.chatPace==='low'||j.chatPace==='high'?j.chatPace:'normal');setUsage(Array.isArray(j.gemini)?j.gemini:[]);setOrders(Number(j.testOrders)||0);setError('');
+     setState(j.state);setPace(j.pace==='low'||j.pace==='high'?j.pace:'normal');setChatPace(j.chatPace==='low'||j.chatPace==='high'?j.chatPace:'normal');setMemoryPublic(j.memoryPublic===true);setUsage(Array.isArray(j.gemini)?j.gemini:[]);setOrders(Number(j.testOrders)||0);setError('');
    }catch(e){if(stamp===reads.current)setError(e instanceof Error?e.message:'연결을 확인해 주세요.');}
  },[]);
  const active=Boolean(state?.orders||state?.chat||state?.viewers||state?.manualAction||runningOnce);
@@ -60,6 +61,11 @@ export default function AutoTestOrderSettings(){
    try{await post({action:'chat-pace',pace:next});showAdminToast(next==='low'?'AI 채팅을 적게 해요.':next==='high'?'AI 채팅을 많이 해요.':'AI 채팅 양을 보통으로 했어요.','success')}
    catch(e){setChatPace(prev);setError(e instanceof Error?e.message:'다시 시도해 주세요.')}
  };
+ const toggleMemory=async()=>{
+   if(writing.current)return;const next=!memoryPublic;setMemoryPublic(next);setError('');
+   try{await post({action:'memory-public',on:next});showAdminToast(next?'구매 얘기가 모든 손님 화면에 보여요.':'구매 얘기는 테스트 권한 화면에만 보여요.','success')}
+   catch(e){setMemoryPublic(!next);setError(e instanceof Error?e.message:'다시 시도해 주세요.')}
+ };
  const changePace=async(next:'low'|'normal'|'high')=>{
    if(next===pace||writing.current)return;const prev=pace;setPace(next);setError('');
    try{await post({action:'pace',pace:next});showAdminToast(next==='low'?'주문을 적게 넣어요.':next==='high'?'주문을 많이 넣어요.':'주문 양을 보통으로 했어요.','success')}
@@ -91,6 +97,7 @@ export default function AutoTestOrderSettings(){
    </div>
    <button type="button" className={`${button} w-full bg-ink text-white`} disabled={busy||(!error&&(!state||(!active&&(!state.ready||!state.broadcastId))))} onClick={()=>{if(error&&!active)void load();else void control('all',!active)}}>{busy?'변경 중…':active?'중지':error?'다시 확인':'시작'}</button>
    <div className="mt-2" role="group" aria-label="주문 양"><div className="mb-1 text-[13px] font-bold text-ink">주문 양</div><div className="flex gap-2">{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={pace===k} disabled={!state?.ready} onClick={()=>void changePace(k)} className={`${button} min-w-0 flex-1 whitespace-nowrap ${pace===k?'bg-ink text-white':'border border-line text-ink'}`}>{l}</button>)}</div></div>
+   <div className="mt-2 flex items-center justify-between gap-2"><div className="min-w-0"><div className="text-[13px] font-bold text-ink">구매 얘기 모든 손님 화면에</div><div className="text-[12px] text-ink-mute">켜면 «지난번 ○○ 샀었는데 좋았어요»가 일반 손님에게도 보여요 — 실전 연습용, 손님 오기 전에 끄세요</div></div><button type="button" role="switch" aria-checked={memoryPublic} disabled={!state?.ready} onClick={()=>void toggleMemory()} className={`${button} shrink-0 ${memoryPublic?'bg-ink text-white':'border border-line text-ink'}`}>{memoryPublic?'켬':'끔'}</button></div>
    <div className="mt-2" role="group" aria-label="채팅 양"><div className="mb-1 text-[13px] font-bold text-ink">채팅 양</div><div className="flex gap-2">{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={chatPace===k} disabled={!state?.ready} onClick={()=>void changeChatPace(k)} className={`${button} min-w-0 flex-1 whitespace-nowrap ${chatPace===k?'bg-ink text-white':'border border-line text-ink'}`}>{l}</button>)}</div></div>
    <div className="mt-1 flex items-center justify-between gap-2">
      <a href="/order" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-[13px] font-semibold text-ink">방송화면 열기 ↗</a>
