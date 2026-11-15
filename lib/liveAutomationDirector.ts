@@ -21,7 +21,7 @@ import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
-import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
+import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,fillVisitLine,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
 import {announceOrderThanks} from './liveOrderChatServer';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
@@ -362,7 +362,7 @@ async function greetFlow(x:CodeCtx):Promise<boolean>{
   const pool=greetingPool({nextShow:x.live?null:x.nextShow,live:x.live,sinceStartMs:sinceStart,kstHour:k.getUTCHours(),visitRecently:acted('greetVisit',360000),siteRecently:acted('greetSite',480000),weekend:k.getUTCDay()===0||k.getUTCDay()===6});
   const recent=recentBodies(x);
   let g=null as (typeof pool)[number]|null;
-  for(let i=0;i<pool.length;i++){const c=pool[(seed+i*7)%pool.length];if(!duplicateLine(c.text,recent)){g=c;break;}}
+  for(let i=0;i<pool.length;i++){const c0=pool[(seed+i*7)%pool.length];const c={...c0,text:fillVisitLine(c0.text,seed+i)};if(!duplicateLine(c.text,recent)){g=c;break;}}
   if(!g)continue;
   const text=personaVoice(g.text,seedOf(actor),seed);
   if(await postCodeLine(x,actor,'chat',text,{greet:true,...(g.kind==='visit'?{greetVisit:true}:{}),...(g.kind==='site'?{greetSite:true}:{})},null,'들어온 인사'))return true;

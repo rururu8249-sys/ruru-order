@@ -1,5 +1,5 @@
 // [2026-11-15 14:15~14:30 사장님 「모든 글들 테스트 해야함」] 코드가 정한 가상 손님 말 전부 검사
-import {FAREWELL_LINES,VISIT_LINES,ORDER_FIRST_LINES,ORDER_AFTER_LINES,GREETINGS,farewellPlan,orderNoticePlan,orderAfterDelay,koreanSizeBand,parseHeightWeight,isSizeQuestion,sizeAnswerText,personaVoice,voiceOf,greetingPool,greetChance,isEndNotice,parseNextShow,nextShowLines,SIZE_ASK_LUNA_LINES,askLunaText,combineLines} from '../lib/liveAutomationLines';
+import {FAREWELL_LINES,VISIT_LINES,INSTA_VISIT_LINES,fillVisitLine,ORDER_FIRST_LINES,ORDER_AFTER_LINES,GREETINGS,farewellPlan,orderNoticePlan,orderAfterDelay,koreanSizeBand,parseHeightWeight,isSizeQuestion,sizeAnswerText,personaVoice,voiceOf,greetingPool,greetChance,isEndNotice,parseNextShow,nextShowLines,SIZE_ASK_LUNA_LINES,askLunaText,combineLines} from '../lib/liveAutomationLines';
 import {safeConversationLine} from '../lib/liveAutomationPersona';
 import {advisesOthers,orderedAskBlocked} from '../lib/liveAutomationDirector';
 import {falseExperience} from '../lib/liveAutomationDialogue';
@@ -23,7 +23,15 @@ function checkPool(name:string,pool:string[],min:number,maxLen=45){
   console.log(name,'ok',pool.length);
 }
 checkPool('방송 종료 인사',FAREWELL_LINES,100);
-checkPool('소개·인스타·밴드·유튜브',VISIT_LINES,40);
+checkPool('소개·밴드·유튜브',VISIT_LINES.filter(t=>t!=='{insta}'),30);
+checkPool('인스타로 온 말',INSTA_VISIT_LINES,120);
+{const insta=VISIT_LINES.filter(t=>t==='{insta}').length;if(insta<5||insta>8)fail('인스타 비중 '+insta);
+ const outs=new Set<string>();for(let i=0;i<500;i++){const t=fillVisitLine('{insta}',i);if(!INSTA_VISIT_LINES.includes(t))fail('인스타 채우기 '+t);outs.add(t);}
+ if(outs.size<100)fail('인스타 다양성 '+outs.size);
+ if(fillVisitLine('밴드 보고 들어왔어요',3)!=='밴드 보고 들어왔어요')fail('일반 말 바뀜');
+ for(const k of ['광고','릴스','피드','스토리','그냥','돋보기','인친'])if(!INSTA_VISIT_LINES.some(t=>t.includes(k)))fail('인스타 갈래 없음 '+k);
+ if(GREETINGS.some(g=>g.text.includes('{')&&g.text!=='{insta}'))fail('자리 표시 이상');
+ console.log('인스타 예',[...outs].slice(0,6));}
 if(VISIT_LINES.filter(t=>/유튜브/.test(t)).length<12)fail('유튜브 말 부족');
 if(GREETINGS.filter(g=>g.kind==='site').length<15)fail('사이트 칭찬 부족');
 checkPool('주문서 먼저',ORDER_FIRST_LINES,300);
@@ -33,7 +41,7 @@ for(const t of [...ORDER_FIRST_LINES,...ORDER_AFTER_LINES])if(/\s[.!~,]|[.!~,]{2
 if(!ORDER_FIRST_LINES.includes('주문서 넣었어요. 확인 부탁드려요')&&!ORDER_FIRST_LINES.some(t=>/주문서 넣었어요[.!~] 확인/.test(t)))fail('부호 섞인 모양 없음');
 for(let i=0;i<400;i++){const t=askLunaText(i);if(/\d/.test(t)||/언니이 |\{n\}/.test(t)||!/(루루언니|루언니|루사장님|루루사장님)/.test(t))fail('루루언니 답 '+t);}
 console.log('예시',ORDER_FIRST_LINES.slice(0,40).filter((_,i)=>i%7===0).join(' / '),'|',askLunaText(3),'|',askLunaText(8));
-checkPool('들어온 인사',GREETINGS.map(g=>g.text),95);
+checkPool('들어온 인사',GREETINGS.map(g=>g.text).filter(t=>t!=='{insta}'),90);
 
 // 종료 안내 감지 — 사장님 실제 문구
 if(!isEndNotice('✅ 라이브방송이 종료되었습니다. 현재는 사이트에서 다시보기 시청과 실시간 채팅이 가능하며, 원하는 상품도 바로 주문하실 수 있습니다🙂'))fail('종료 안내 감지');
