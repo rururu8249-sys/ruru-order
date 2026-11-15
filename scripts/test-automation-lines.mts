@@ -1,7 +1,9 @@
 // [2026-11-15 14:15~14:30 사장님 「모든 글들 테스트 해야함」] 코드가 정한 가상 손님 말 전부 검사
 import {FAREWELL_LINES,VISIT_LINES,ORDER_FIRST_LINES,ORDER_AFTER_LINES,GREETINGS,farewellPlan,orderNoticePlan,orderAfterDelay,koreanSizeBand,parseHeightWeight,isSizeQuestion,sizeAnswerText,personaVoice,voiceOf,greetingPool,greetChance,isEndNotice,parseNextShow,nextShowLines,SIZE_ASK_LUNA_LINES,askLunaText,combineLines} from '../lib/liveAutomationLines';
 import {safeConversationLine} from '../lib/liveAutomationPersona';
-import {advisesOthers} from '../lib/liveAutomationDirector';
+import {advisesOthers,orderedAskBlocked} from '../lib/liveAutomationDirector';
+import {falseExperience} from '../lib/liveAutomationDialogue';
+import {fixLaughCount,EMOJIS,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,topBrands,brandAskText,BRAND_ASK_TEMPLATES,SMALL_TALKS,smallTalkPool,smallTalkAnswer} from '../lib/liveAutomationLines';
 import {isCompletionReport} from '../lib/liveChatBot';
 
 const fail=(m:string)=>{throw new Error(m);};
@@ -119,4 +121,34 @@ const nl=nextShowLines(ns);checkPool('다음 방송 예정 말',nl,10);
 const rep=greetingPool({live:false,sinceStartMs:-1,kstHour:14,visitRecently:false,weekend:true,nextShow:ns});
 if(!rep.some(g=>g.kind==='next')||greetingPool({live:true,sinceStartMs:1,kstHour:14,visitRecently:false,weekend:true,nextShow:ns}).some(g=>g.kind==='next'))fail('예정 인사 상황');
 console.log('다음 방송 ok',nl.slice(0,3).join(' / '));
+// ㅋㅋ·ㅎㅎ 딱 두 개 금지(사장님 캡처 «좋네요~ㅎㅎ»)
+const TWO=/(^|[^ㅋㅎ])(ㅋㅋ|ㅎㅎ)(?![ㅋㅎ])/;
+for(let i=0;i<300;i++){for(const t of ['다시보기 보면서 주문할 수 있어서 좋네요~ㅎㅎ','이뻐요 ㅋㅋ','ㅎㅎ 안녕하세요','ㅋㅋ 너무 웃겨요 ㅎㅎ']){const v=fixLaughCount(t,i);if(TWO.test(v))fail('두 개 남음 '+v);}}
+const laughOuts=new Set<string>();for(let i=0;i<300;i++)laughOuts.add(fixLaughCount('좋네요~ㅎㅎ',i));
+if(![...laughOuts].some(v=>/[^ㅎ]ㅎ$/.test(v))||![...laughOuts].some(v=>/ㅎㅎㅎ$/.test(v))||![...laughOuts].some(v=>EMOJIS.some(e=>v.endsWith(e)))||![...laughOuts].some(v=>/요~$/.test(v)))fail('웃음 바꾸기 종류 '+[...laughOuts].join('|'));
+for(const t of ['ㅋㅋㅋ 좋아요','ㅎ 네'])if(fixLaughCount(t,1)!==t)fail('세 개·한 개는 그대로 '+t);
+for(let a=0;a<300;a++){const v=personaVoice('예쁘네요 ㅎㅎ',a,a);if(TWO.test(v))fail('말투 뒤 두 개 '+v);}
+const emo=new Set<string>();for(let a=0;a<400;a++){const v=personaVoice('오늘 예쁜 옷 많았네요',a,a);if(EMOJIS.some(e=>v.includes(e)))emo.add(v);}
+if(emo.size<15)fail('이모지 쓰는 사람 부족 '+emo.size);
+checkPool('이모지만',EMOJI_ONLY_LINES,15);checkPool('이모티콘 귀엽다',EMOJI_CUTE_LINES,40);
+console.log('웃음·이모지 ok',[...laughOuts].slice(0,8).join(' / '),'|',[...emo].slice(0,4).join(' / '));
+
+// 많이 팔린 브랜드 «또 언제 해요?» — 후기 지어내지 않음
+const brandNames=[...Array(20)].map(()=>'알로 부츠컷팬츠'),more=[...Array(15)].map(()=>'룰루레몬 얼라인 레깅스'),mc=[...Array(30)].map((_,i)=>'MC-3'+(i%10)+' 블랙');
+const tb=topBrands([...brandNames,...more,...mc,'나이키 운동화','나이키 운동화']);
+if(tb[0]!=='알로'||!tb.includes('룰루레몬')||!tb.includes('몽클레어')||tb.includes('나이키'))fail('브랜드 순위 '+tb);
+if(BRAND_ASK_TEMPLATES.length<200)fail('브랜드 말 수 '+BRAND_ASK_TEMPLATES.length);
+for(const b of ['알로','룰루레몬','몽클레어','샤넬'])for(let i=0;i<200;i++){const t=brandAskText(b,i);if(!t.includes(b)||t.includes('{b}')||falseExperience(t)||/샀|입어\s*보|좋았|후기/.test(t)||DB_BAD.test(t)||t.length>70)fail('브랜드 말 '+t);if(/샤넬는|룰루레몬는|알로은|몽클레어은/.test(t))fail('조사 '+t);}
+for(const t of BRAND_ASK_TEMPLATES)if(/[?!][~.,!]/.test(t))fail('부호 겹침 '+t);
+console.log('브랜드 ok',tb.join(','),'|',brandAskText('알로',3),'|',brandAskText('룰루레몬',9));
+
+// 손님끼리 한두 마디 — 모든 말 검사·상황
+for(const t of SMALL_TALKS)checkPool('손님끼리 '+t.id,[...t.q,...t.a,...(t.aCart||[]),...(t.aOrdered||[])],3);
+if(smallTalkPool({live:false,card:false}).some(t=>t.live||t.card))fail('손님끼리 상황');
+const cartTalk=SMALL_TALKS.find(t=>t.id==='cart')!;
+if(!/주문/.test(smallTalkAnswer(cartTalk,1,{cart:true,ordered:true}))||/주문|담았|담아/.test(smallTalkAnswer(cartTalk,1,{cart:false,ordered:false})))fail('손님 상태에 맞는 답');
+
+// 이미 주문한 손님이 주문 전 질문(사장님 캡처 «구독인증하면무배인가요?»)
+for(const t of ['구독인증하면무배인가요?','카드 결제 되나요?','주문 어떻게 해요?','배송비 얼마예요?','계좌 어디예요?'])if(!orderedAskBlocked(t))fail('주문 뒤 질문 못 거름 '+t);
+for(const t of ['주문서 낼 때 구독 인증했어요','블랙 이쁘네요','160에 50인데 몇 입으면 될까요?'])if(orderedAskBlocked(t))fail('거르면 안 됨 '+t);
 console.log('ALL OK');

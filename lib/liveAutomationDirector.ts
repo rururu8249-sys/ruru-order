@@ -21,7 +21,7 @@ import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
-import {askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
+import {EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
 import {announceOrderThanks} from './liveOrderChatServer';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
@@ -387,6 +387,91 @@ async function humanSizeAskFlow(x:CodeCtx,holds:Row[]):Promise<boolean>{
  const actor=cands[hashOf('ha:'+qid)%cands.length];
  return postCodeLine(x,actor,'reply',personaVoice(askLunaText(qid),seedOf(actor),qid),{askLunaFor:qid},qid,'사이즈는 루루언니한테');
 }
+
+// [2026-11-15 14:47 사장님] 최근 90일 많이 팔린 브랜드(알로·룰루레몬 가중) — 1시간 기억
+let brandCache:{at:number;list:string[]}|null=null;
+async function hotBrands(db:SupabaseClient,now:number):Promise<string[]>{
+ if(brandCache&&now-brandCache.at<3600000)return brandCache.list;
+ const r=await rows<Row>(db.from('orders').select('product_name').gte('created_at',new Date(now-90*86400000).toISOString()).neq('is_deleted',true).neq('is_test_order',true).is('automation_actor_id',null).limit(5000)).catch(()=>[] as Row[]);
+ brandCache={at:now,list:topBrands(r.map(x=>String(x.product_name||'')))};
+ return brandCache.list;
+}
+/** «알로 또 언제 해요?» — 지금 카드 상품 브랜드는 빼고, 방 전체 20분에 한 번, 한 사람 한 번 */
+async function brandAskFlow(x:CodeCtx,speakers:Actor[],cardName:string):Promise<boolean>{
+ if(x.actions.some(a=>planOf(a).brandAsk&&Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-1200000))return false;
+ const said=new Set(x.actions.filter(a=>planOf(a).brandAsk).map(a=>String(planOf(a).brandAsk)));
+ const brands=(await hotBrands(x.db,x.now)).filter(b=>!said.has(b)&&!BRAND_WORDS.some(([re,name])=>name===b&&re.test(cardName)));
+ if(!brands.length)return false;
+ const who=speakers.filter(a=>!x.actions.some(v=>planOf(v).brandAsk&&String(v.actor_id)===String(a.id)));
+ if(!who.length)return false;
+ const seed=Math.floor(x.now/60000);
+ const actor=who[seed%who.length],brand=brands[Math.min(brands.length-1,Math.floor((hashOf('b:'+seed)%100)/100*Math.min(brands.length,3)))];
+ return postCodeLine(x,actor,'chat',personaVoice(brandAskText(brand,seed),seedOf(actor),seed),{brandAsk:brand},null,'브랜드 또 언제');
+}
+/** 손님끼리 한두 마디 — 시작(묻기) */
+async function smallTalkStart(x:CodeCtx,speakers:Actor[],hasCard:boolean):Promise<boolean>{
+ if(x.actions.some(a=>planOf(a).smallTalk&&Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-1080000))return false;
+ const pool=smallTalkPool({live:x.live,card:hasCard});
+ if(!pool.length||speakers.length<2)return false;
+ const seed=Math.floor(x.now/60000);
+ const t=pool[hashOf('st:'+seed)%pool.length];
+ const askers=t.id==='how'?speakers.filter(a=>!x.orders.some(o=>String(o.automation_actor_id)===String(a.id))):speakers;
+ if(!askers.length)return false;
+ const actor=askers[hashOf('stq:'+seed)%askers.length];
+ const q=t.q[hashOf('stqq:'+seed)%t.q.length];
+ return postCodeLine(x,actor,'chat',personaVoice(q,seedOf(actor),seed),{smallTalk:t.id,role:'q'},null,'손님끼리 묻기');
+}
+/** 손님끼리 한두 마디 — 15~45초 뒤 다른 가상 손님이 짧게 답(그사이 다른 말이 오갔으면 안 함) */
+async function smallTalkAnswerFlow(x:CodeCtx,holds:Row[]):Promise<boolean>{
+ const qa=x.actions.find(a=>planOf(a).role==='q'&&planOf(a).smallTalk&&Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-120000);
+ if(!qa||x.actions.some(a=>planOf(a).answerOf===qa.id))return false;
+ const qText=String(planOf(qa).text||'');
+ const qm=x.messages.find(m=>String(m.automation_actor_id||'')===String(qa.actor_id)&&m.badge!=='bot'&&clean(m.body)===clean(qText));
+ if(!qm)return false;
+ if(x.messages.some(m=>Number(m.id)>Number(qm.id)&&m.badge!=='bot'))return false;
+ const qid=Number(qm.id);
+ if(x.now<Date.parse(String(qm.created_at))+15000+(hashOf('sw:'+qid)%30000))return false;
+ const t=SMALL_TALKS.find(v=>v.id===planOf(qa).smallTalk);if(!t)return false;
+ const holdSessions=new Set(holds.map(h=>String(h.session_id)));
+ const cands=x.actors.filter(a=>String(a.id)!==String(qa.actor_id)&&x.sessions.some(s=>s.actor_id===a.id));
+ if(!cands.length)return false;
+ const actor=cands[hashOf('swa:'+qid)%cands.length];
+ const ordered=x.orders.some(o=>String(o.automation_actor_id)===String(actor.id));
+ const cart=x.sessions.some(s=>s.actor_id===actor.id&&holdSessions.has(String(s.id)));
+ const text=personaVoice(smallTalkAnswer(t,qid,{cart,ordered}),seedOf(actor),qid);
+ return postCodeLine(x,actor,'chat',text,{smallTalk:t.id,role:'a',answerOf:qa.id},null,'손님끼리 답');
+}
+
+/** [2026-11-15 14:49 사장님] 할 말 없을 때 이모지만(👍·😍·💕💕…) — 방 전체 5분에 한 번 */
+async function emojiFiller(x:CodeCtx,speakers:Actor[]):Promise<boolean>{
+ if(x.actions.some(a=>planOf(a).emojiOnly&&Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-300000))return false;
+ if(!speakers.length)return false;
+ const seed=Math.floor(x.now/30000);
+ const actor=speakers[hashOf('eo:'+seed)%speakers.length];
+ const recent=recentBodies(x);
+ const text=pickLine(EMOJI_ONLY_LINES,hashOf('eol:'+seed),recent);
+ return text?postCodeLine(x,actor,'chat',text,{emojiOnly:true},null,'이모지만'):false;
+}
+/** 누가 사이트 이모티콘(그림)을 쓰면 가끔(35%) «이모티콘 귀엽다» — 그 글 하나에 한 번, 방 전체 10분에 한 번 */
+async function emojiCuteFlow(x:CodeCtx):Promise<boolean>{
+ const m=x.messages.find(v=>v.badge!=='bot'&&//.test(String(v.body||''))&&Date.parse(String(v.created_at))>x.now-150000);
+ if(!m)return false;
+ const mid=Number(m.id);
+ if(hashOf('cute:'+mid)%100>=35)return false;
+ if(x.now<Date.parse(String(m.created_at))+10000+(hashOf('cd:'+mid)%30000))return false;
+ if(x.actions.some(a=>planOf(a).emojiCute&&(Number(planOf(a).emojiCute)===mid||Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-600000)))return false;
+ const cands=x.actors.filter(a=>String(a.id)!==String(m.automation_actor_id||'')&&x.sessions.some(s=>s.actor_id===a.id));
+ if(!cands.length)return false;
+ const actor=cands[hashOf('ca:'+mid)%cands.length];
+ const text=personaVoice(EMOJI_CUTE_LINES[hashOf('ct:'+mid)%EMOJI_CUTE_LINES.length],seedOf(actor),mid);
+ return postCodeLine(x,actor,'chat',text,{emojiCute:mid},null,'이모티콘 귀엽다');
+}
+
+/** [2026-11-15 14:51] 주문서를 이미 낸 손님이 하면 이상한 «주문 전 질문» */
+export function orderedAskBlocked(t:string):boolean{
+ const asking=/[?？]|나요|까요|인가|되나|돼요\?|어떻게|어디|가요$/.test(t);
+ return asking&&/구독|무배|무료\s*배송|배송비|카드\s*(결제)?\s*(돼|되|가능)|결제\s*(방법|어떻게)|주문\s*(어떻게|방법)|계좌|입금\s*(어디|어떻게)|합배송/.test(t);
+}
 export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch=fetch){
  if(!c.chat_enabled)return;
  // [2026-11-14] 학습 노트 — 3시간마다(새 채팅 40개 이상) 자동 정리, 실패해도 대화는 계속
@@ -419,6 +504,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  if(await farewellFlow(codeCtx).catch(()=>false))return;
  if(await sizeAnswerFlow(codeCtx,holds).catch(()=>false))return;
  if(await humanSizeAskFlow(codeCtx,holds).catch(()=>false))return;
+ if(await smallTalkAnswerFlow(codeCtx,holds).catch(()=>false))return;
+ if(await emojiCuteFlow(codeCtx).catch(()=>false))return;
  if(await greetFlow(codeCtx).catch(()=>false))return;
  // 언제 판단할지: 사람이 새 글을 쓰면(아직 판단 안 한 글) 10초 뒤 바로, 아니면 AI 글 사이 20~45초 + 확률(밤엔 아주 드물게)
  const considered=Math.max(0,...actions.map(a=>Number((a as Action&{source_message_id?:unknown}).source_message_id)||0));
@@ -462,6 +549,14 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const speakable=roster.filter(r=>r.cart.length>0||r.ordered.length>0||called.includes(r));
  if(!speakable.length)return;
  roster.splice(0,roster.length,...speakable);
+ // [2026-11-15 14:47 사장님] 사람 글이 없을 때 가끔 Gemini 대신 «브랜드 또 언제 해요?»·손님끼리 한두 마디
+ if(!newestHuman){
+  const card0=await readDialogueCard(db,c.broadcast_id).catch(()=>null);
+  const roll=Math.random();
+  if(roll<.1&&await brandAskFlow(codeCtx,speakable.map(r=>r.actor),String(card0?.name||'')).catch(()=>false))return;
+  if(roll>=.1&&roll<.2&&await smallTalkStart(codeCtx,speakable.map(r=>r.actor),Boolean(card0)).catch(()=>false))return;
+  if(roll>=.2&&roll<.3&&await emojiFiller(codeCtx,speakable.map(r=>r.actor)).catch(()=>false))return;
+ }
  const recent=messages.filter(m=>m.badge!=='bot').map(m=>clean(m.body));
  const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));
  const notices=messages.filter(m=>m.badge==='bot'&&/^(c|o|p):/.test(String(m.bot_ref||''))).map(m=>clean(m.body));
@@ -483,12 +578,14 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   '[반복 금지] 각 가상 손님의 «이미 한 말»과 같은 뜻을 또 하지 않는다(카톡 확인하겠다고 이미 했으면 다시 카톡 얘기 금지 — 다른 짧은 반응이나 침묵). 진짜 손님은 «카톡 확인했어요»«주문완료했어요» 같은 보고를 거의 안 한다 — 다른 가상 손님이 최근에 한 보고는 아무도 또 하지 않고, «장바구니 담았어요»는 하지 않는다. 대신 카드 상품 질문(색·사이즈·보여 달라·두 개 중 뭐가 나은지)을 더 자주 한다.',
   '[안내 글엔 대답 안 함] 쇼핑도우미·루루동이의 자주 묻는 말 안내(카드결제·배송·계좌 안내 등)는 손님이 읽고 넘어가는 글이다 — «넵·알겠습니다» 같은 대답도 하지 않는다(카톡 카드결제 링크 안내만 예외).',
   '[사람처럼 — 티 나는 말 금지] 진짜 손님은 짧게 묻거나 짧게 반응한다. 시스템·쇼핑도우미·루루동이 안내 글은 손님이 그냥 읽고 넘어가는 글이다 — 거기에 «아니·맞아요·그쵸·오래 걸리네·…인 줄 알았더니»처럼 대꾸하거나 평가하지 않는다. 화면·상품에 이미 써 있는 정보(해외배송·가격·품번)를 «~인가요?»로 확인하지 않는다. 자기가 모르는 사실(배송 기간·재고·소재·품질)을 단정하지 않는다. 설명문·감상문처럼 길게 쓰지 않고, 한 번에 한 가지만 말한다.',
+  '[순서] 이미 주문서를 낸 손님(주문 있음)은 주문 전에 묻는 말(구독 무배·배송비·카드 돼요?·주문 방법·계좌)을 묻지 않는다 — 그런 질문은 아직 주문 안 한 손님만.',
+  '[루루동이] 매장·샵·오프라인 가게·별도 앱이 없다. 주문은 이 사이트에서 상품을 담고 주문서를 내는 것뿐이다. 없는 장소·경로를 지어내지 않는다.',
   '[사실] 상품 얘기는 지금 상품 카드 정보만 근거로 한다(없는 색·사이즈·소재·가격을 지어내지 않는다). 해 본 적 없는 구매·사용·배송받은 경험, 친구 소개 같은 이야기를 지어내지 않는다. 주문했다는 말은 주문이 있는 손님만, 결제 완료 말은 결제확인 받은 손님만. 영상·소리를 보거나 들은 척하지 않는다. 자기가 지금 뭘 보는 중인지 설명하지 않는다. 테스트·AI·가상·시스템 같은 말 금지.',
   `[상황] 지금 ${mode==='live'?'생방송 중':'지금은 방송 시간이 아니다(라이브 아님 — 다시보기/쉬는 중). 상품은 지금도 담고 주문할 수 있다. 가끔 «방송 중이 아닌데도 다시보기 보면서 주문할 수 있어 좋네요» 같은 뜻을 매번 다른 말로 해도 된다. 주말·요일 때문에 담을 수 있다는 말은 틀린 말이니 금지(주말에도 방송함). 지금 입어 달라·보여 달라 같은 실시간 요청 금지'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
   ...(nextShow?[`[다음 방송] 관리자 안내: «${clean(pausedRaw).slice(0,80)}» → ${nextShow.when} 방송 예정. 가끔 «${nextShow.when} 방송 때 올게요»처럼 말해도 된다. 날짜·시간을 바꾸거나 지어내지 말 것.`]:[]),
   `[지금 상품 카드] ${cardText}`,
   ...(rejectedLines.length?[`[방금 규칙에 걸려 버려진 말 — 이런 말·비슷한 말은 다시 고르지 말 것(다른 손님이나 다른 얘기, 또는 침묵)]\n${rejectedLines.join('\n')}`]:[]),
-  subscribeOn?'[구독 무배] 지금 «유튜브 구독 인증하면 배송비 무료» 행사 중 — 처음 온 손님이 가끔 «구독하면 무배?»«구독 인증 어디서 해요?»처럼 물어도 자연스럽다.':'[구독 무배] 지금 구독 무료배송 행사 없음 — 구독·무배·무료배송 얘기 금지.',
+  subscribeOn?'[구독 무배] 지금 «유튜브 구독 인증하면 배송비 무료» 행사 중 — 구독 인증은 이 사이트 주문서 화면에서 유튜브 구독 캡처를 올리는 것이다. 처음 온 손님이 가끔 «구독하면 무배?»«구독 인증 어디서 해요?»처럼 묻거나, 주문한 손님이 «주문서 낼 때 구독 인증했어요»라고 할 수 있다. 다른 곳(샵·매장·앱)에서 신청했다는 말 금지.':'[구독 무배] 지금 구독 무료배송 행사 없음 — 구독·무배·무료배송 얘기 금지.',
   '[배송 사실 — 손님도 이미 아는 것] 해배=해외배송이고 평균 2~3주 걸린다(쇼핑도우미 안내에도 있음). 국내 일반 상품은 2~3일. 상품이 해외배송인지는 상품에 이미 표시돼 있으니 «해외배송인가요?»«해배인가요?»«국내배송이에요?» 같이 묻지 않는다. 배송 기간·방식을 단정하거나 «오래 걸리네» 같은 평가, 쇼핑도우미·루루동이 안내에 반박·대꾸하는 말 절대 금지. 배송 얘기는 웬만하면 하지 않는다.'+(card?.overseas?' 지금 카드 상품은 해외배송 — 아주 가끔 «주문하면 언제쯤 받아요?» 정도 질문만 허용.':' 지금 카드 상품은 해외배송이 아니다 — 배송 얘기 금지.'),
   `[가상 손님 목록 — 이 중에서만 고른다]\n${rosterText}`,
   `[대화 — 오래된 것부터]\n${transcript}`,
@@ -524,6 +621,11 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   // 시청 상태 혼잣말은 금지 — 단 방송 시간이 아닐 때 «다시보기 보면서 주문/담기» 얘기는 사장님 요청(08:26)이라 허용
   if(/다시\s*보기|구경\s*(하는|중|하고)/.test(t)&&!(mode!=='live'&&/다시\s*보기/.test(t)&&/주문|담/.test(t)))return false;
   if(!subscribeOn&&/무배|무료\s*배송|구독.{0,6}(하면|인증|무료)/.test(t))return false;
+  // [2026-11-15 14:51 사장님 「이미 주문서 냈는데 구독 무배를 물어?」] 주문서를 이미 낸 손님은 주문 전에 물을 말(구독·무배·배송비·카드 돼요·주문 방법·계좌) 안 함
+  if(r.ordered.length&&orderedAskBlocked(t))return false;
+  // [2026-11-15 14:51 사장님 「샵 뭔소리야? 우리가 샵이 어딨어」] 매장·샵이 없음 — 지어낸 장소·신청 경로 말 버림, 구독 인증은 주문서에서 캡처 올리는 것
+  if(/샵|숍|매장|오프라인|스토어|가게에서|앱에서\s*신청|홈페이지에서\s*신청/.test(t))return false;
+  if(/구독/.test(t)&&/신청했|인증했|등록했|가입했/.test(t)&&!/주문서/.test(t))return false;
   if(shippingTalkBlocked(t,Boolean(card?.overseas)))return false;
   // [09:44 사장님 「배송 기간 질문은 아주 가끔, 남발 금지」] 다른 가상 손님이 최근(대화 40줄 안) 배송을 물었으면 버림
   if(/배송|받아요|받을|걸려|걸리/.test(t)&&messages.some(m=>m.automation_actor_id&&m.badge!=='bot'&&/배송|언제쯤\s*받|며칠\s*걸|얼마나\s*걸/.test(clean(m.body))))return false;

@@ -83,7 +83,7 @@ export function combineLines(heads:string[],cores:string[],tails:string[],max=45
   const out=new Set<string>();const seps=[' ','. ','! ','~ ',', '];
   heads.forEach((h,hi)=>cores.forEach((c,ci)=>tails.forEach((t,ti)=>{
     const sep=seps[(hi*7+ci*3+ti)%seps.length];
-    const line=[h,c].filter(Boolean).join(' ')+(t?sep+t:'');
+    const line=[h,c].filter(Boolean).join(' ')+(t?(/[?!]$/.test(c)?' ':sep)+t:'');
     const clean=line.replace(/\s+/g,' ').replace(/\s([.!~,])/g,'$1').trim();
     if(clean.length>=2&&clean.length<=max)out.add(clean);
   })));
@@ -163,11 +163,11 @@ export function sizeAnswerText(h: number, w: number, seed: number): string | nul
 }
 
 // ───────── ⑤ 말투 버릇(사람마다 일정하게) ─────────
-export type Voice = { spacing: 'tight' | 'loose' | 'neat'; mark: '~' | '!' | '..' | '^^' | '.' | '' | ':)'; ending: '요' | '여' | '용' | '당'; typo: number };
+export type Voice = { spacing: 'tight' | 'loose' | 'neat'; mark: '~' | '!' | '..' | '^^' | '.' | '' | ':)' | 'emoji'; ending: '요' | '여' | '용' | '당'; typo: number };
 export function voiceOf(actorSeed: number): Voice {
   const s = hashOf('voice:' + actorSeed);
   const spacing = (['tight', 'loose', 'neat', 'neat', 'neat'] as const)[s % 5];
-  const mark = (['~', '!', '..', '^^', '.', '', '~', '!', ':)'] as const)[(s >>> 3) % 9]; // [14:40 사장님] :) 웃는 표시 쓰는 사람도
+  const mark = (['~', '!', '..', '^^', '.', '', '~', '!', ':)', 'emoji', 'emoji'] as const)[(s >>> 3) % 11]; // [14:49 사장님] 이모지 쓰는 사람도 // [14:40 사장님] :) 웃는 표시 쓰는 사람도
   const ending = (['요', '여', '용', '요', '요', '당'] as const)[(s >>> 6) % 6];
   const typo = (s >>> 9) % 4 === 0 ? 0.4 : 0.05;
   return { spacing, mark, ending, typo };
@@ -198,27 +198,29 @@ export function personaVoice(text: string, actorSeed: number, msgSeed: number): 
   let body = m ? m[1] : s;
   const tail = m ? m[2].trim() : '';
   if (!body) return s;
-  if (/[ㅋㅎㅠㅜ]$|\p{Extended_Pictographic}$|:-?\)$/u.test(body)) return body + tail;
+  if (/[ㅋㅎㅠㅜ]$|\p{Extended_Pictographic}$|:-?\)$/u.test(body)) return fixLaughCount(body + tail, msgSeed);
   const question = /\?|？/.test(tail);
   // 어미 버릇 — «요»로 끝날 때만 가끔
   if (/요$/.test(body) && v.ending !== '요' && r() < 0.55) body = body.replace(/요$/, v.ending === '당' ? (/[다]요$/.test(body) ? '요' : '용') : v.ending);
   if (/니다$/.test(body) && v.ending === '당' && r() < 0.5) body = body.replace(/니다$/, '니당');
   // 끝 부호 버릇
-  if (question) return body + (v.mark === '~' && r() < 0.3 ? '?~' : v.mark === '!' && r() < 0.3 ? '?!' : r() < 0.15 ? '??' : '?');
+  if (question) return fixLaughCount(body, msgSeed) + (v.mark === '~' && r() < 0.3 ? '?~' : v.mark === '!' && r() < 0.3 ? '?!' : r() < 0.15 ? '??' : '?');
   const want = r() < 0.78 ? v.mark : tail;
-  if (want === ':)') return body + (r() < 0.25 ? ' :)' : r() < 0.4 ? ':-)' : ':)');
+  if (want === ':)') return fixLaughCount(body + (r() < 0.25 ? ' :)' : r() < 0.4 ? ':-)' : ':)'), msgSeed);
+  if (want === 'emoji') { const e = EMOJIS[Math.floor(r() * EMOJIS.length)]; return fixLaughCount(body + (r() < 0.5 ? ' ' : '') + e + (r() < 0.3 ? e : ''), msgSeed); }
   const mark = want === '~' ? (r() < 0.3 ? '~~' : '~') : want === '!' ? (r() < 0.3 ? '!!' : '!') : want === '..' ? (r() < 0.5 ? '...' : '..') : want;
-  return body + mark;
+  return fixLaughCount(body + mark, msgSeed);
 }
 
 // ───────── ⑥ 들어온 가상 손님 인사 (방송 시작 초~중반에 많이, 그 뒤·다시보기엔 드물게) ─────────
 // [2026-11-15 14:30 사장님] 다양하게, 쌩뚱맞은 말 금지. kind: plain=기본 인사 / visit=어떻게 왔는지(방 전체 6분에 한 번) /
 //   start=방송 막 시작(시작 15분 안·생방송만) / live=언니 칭찬(생방송만) / morning·evening=시간대
-export type Greeting={text:string;kind:'plain'|'visit'|'site'|'start'|'live'|'morning'|'evening'|'next'};
+export type Greeting={text:string;kind:'plain'|'emoji'|'visit'|'site'|'start'|'live'|'morning'|'evening'|'next'};
 export const GREETINGS:Greeting[]=[
   ...['안녕하세요','안녕하세요~','언니 안녕하세요','하이요','반가워요','안녕하세요 반가워요','언니 하이','안녕하세용','루루언니 안녕하세요','왔어요~',
       '들어왔어요','언니 저 왔어요','안녕하세요 오늘도 왔어요','오늘도 출석이요','출석했어요','안녕하세요 오늘 처음 왔어요','오늘 처음 와봤어요','처음 왔어요 반가워요','안녕하세요 구경하러 왔어요','언니 반가워요'
      ].map(text=>({text,kind:'plain' as const})),
+  ...['👋','👋👋','안녕하세요 👋','하이 👋','안녕하세요 😊','반가워요 🥰','왔어요 🙌','안녕하세용 💕'].map(text=>({text,kind:'plain' as const})),
   ...VISIT_LINES.map(text=>({text,kind:'visit' as const})),
   ...['방송 지금 시작한 거죠?','방금 시작했나요?','딱 맞춰 왔네요','시작하자마자 왔어요','알림 보고 바로 들어왔어요','오늘 방송 기다렸어요','오늘 뭐 나와요?','오늘도 기대돼요','시작했네요 반가워요','늦지 않게 왔어요'
      ].map(text=>({text,kind:'start' as const})),
@@ -282,3 +284,70 @@ export function nextShowLines(show:NextShow|null):string[]{
   if(!show)return [];
   return NEXT_SHOW_LINES.map(l=>l.replace('{w}',show.when));
 }
+
+// ───────── ⑧ 많이 팔린 브랜드 «또 언제 해요?» (최근 30~90일 주문 기준) ─────────
+// [2026-11-15 14:47 사장님] 알로·룰루레몬 등 많이 팔린 상품을 아는 손님처럼. 단 «샀었는데 너무 좋았다» 같은 구매·사용 후기는
+//   진짜 손님이 진짜 후기로 믿게 되는 지어낸 후기라 안 함 — «또 언제 해요?·기다려요» 같은 요청·기대만.
+export const BRAND_WORDS:[RegExp,string][]=[
+  [/알로|\balo\b/i,'알로'],[/룰루레몬|lululemon/i,'룰루레몬'],[/룰루(?!레몬|동이|언니|사장)/,'룰루'],[/나이키|nike/i,'나이키'],[/아디다스|adidas/i,'아디다스'],
+  [/뉴발란스|new\s*balance/i,'뉴발란스'],[/몽클레[어르]|moncler|\bMC-?\d/i,'몽클레어'],[/버버리|burberry|\bBB-?\d/i,'버버리'],[/막스마라|max\s*mara|\bMX-?\d/i,'막스마라'],
+  [/프라다|prada|\bPD-?\d/i,'프라다'],[/미우미우|miu/i,'미우미우'],[/디올|dior|\bDR-?\d/i,'디올'],[/로에베|loewe/i,'로에베'],[/셀린[느는]|celine|\bCL-?\d/i,'셀린느'],
+  [/샤넬|chanel/i,'샤넬'],[/다이슨|dyson/i,'다이슨'],[/꼼데|comme/i,'꼼데'],[/폴로|polo/i,'폴로'],[/어그|ugg/i,'어그'],[/노스페이스|north\s*face/i,'노스페이스'],
+];
+/** 주문 상품명 목록 → 많이 팔린 브랜드 순(알로·룰루레몬은 사장님 요청으로 가중) */
+export function topBrands(productNames:string[],limit=6):string[]{
+  const n=new Map<string,number>();
+  for(const p of productNames){const hit=BRAND_WORDS.find(([re])=>re.test(String(p||'')));if(hit)n.set(hit[1],(n.get(hit[1])||0)+1);}
+  if(n.has('룰루'))n.set('룰루레몬',(n.get('룰루레몬')||0)+(n.get('룰루')||0)),n.delete('룰루');
+  for(const b of ['알로','룰루레몬'])if(n.has(b))n.set(b,(n.get(b)||0)*2);
+  return [...n.entries()].filter(([,c])=>c>=3).sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([b])=>b);
+}
+const BRAND_HEADS=['','언니','루루언니','혹시','언니 혹시','저기'];
+const BRAND_CORES=['{b} 또 언제 해요?','{b} 방송 또 해주세요','{b} 다시 들어오면 알려주세요','{b} 기다리고 있어요','다음에 {b}도 해주세요','{b} 들어오면 꼭 살래요','{b} 언제 또 나와요?','{b} 또 보고 싶어요','{b} 재입고 언제예요?','{b} 방송 기다려요','{b}는 이제 안 해요?','{b} 또 해주시면 안 돼요?'];
+const BRAND_TAILS=['','기다릴게요','알림 켜놓을게요','제발요','꼭이요','부탁드려요'];
+export const BRAND_ASK_TEMPLATES:string[]=combineLines(BRAND_HEADS,BRAND_CORES,BRAND_TAILS,60);
+export function brandAskText(brand:string,seed:number):string{
+  const last=brand.charCodeAt(brand.length-1);
+  const batchim=last>=0xac00&&last<=0xd7a3&&(last-0xac00)%28!==0;
+  return BRAND_ASK_TEMPLATES[hashOf('brand:'+seed)%BRAND_ASK_TEMPLATES.length].split('{b}는').join(brand+(batchim?'은':'는')).split('{b}').join(brand);
+}
+
+// ───────── ⑨ 손님끼리 한두 마디 (사실을 지어내지 않는 평범한 말만) ─────────
+// [2026-11-15 14:47 사장님 「어색하면 만들지 마」] 상품 품질·사이즈·배송처럼 «정답»이 필요한 건 안 함.
+//   한 사람이 가볍게 묻고 15~45초 뒤 다른 가상 손님이 짧게 답함. 방 전체 18분에 한 번.
+export type SmallTalk={id:string;q:string[];a:string[];aCart?:string[];aOrdered?:string[];live?:boolean;card?:boolean};
+export const SMALL_TALKS:SmallTalk[]=[
+  {id:'cart',q:['다들 오늘 뭐 담으셨어요?','다들 뭐 고르셨어요?','오늘 뭐 담으셨어요?','다들 장바구니 뭐 있어요?'],
+   a:['저는 아직 고민 중이에요','아직 고르는 중이에요','저도 고민만 하고 있어요'],aCart:['저는 하나 담았어요','저는 벌써 담았어요','저 하나 담아놨어요'],aOrdered:['저는 벌써 주문했어요','저 주문 넣었어요','저는 하나 주문했어요']},
+  {id:'how',q:['처음인데 주문 어떻게 해요?','주문은 어떻게 하는 거예요?','여기 주문 어떻게 해요?'],
+   a:['상품 눌러서 담고 주문서 내시면 돼요','상품 선택 누르고 담은 다음에 주문서 내면 돼요','담고 나서 아래 주문서 누르시면 돼요','상품 담고 주문서 쓰시면 돼요']},
+  {id:'people',live:true,q:['오늘 사람 많네요','오늘 북적북적하네요','오늘 채팅 활발하네요'],
+   a:['그러게요 빨리 담아야겠어요','그쵸 다들 손 빠르시네요','그러게요 오늘 핫하네요']},
+  {id:'hesitate',card:true,q:['아 고민되네요','둘 다 예뻐서 고민이에요','뭘 골라야 할지 모르겠어요'],
+   a:['저도요 다 예뻐서','고민될 땐 일단 담아요','저도 고민 중이에요','저도 똑같아요']},
+  {id:'cheer',q:['다들 득템하세요~','오늘 다들 득템하세요','다들 좋은 거 건지세요'],
+   a:['감사해요 님도 득템하세요','님도요~','같이 득템해요']},
+];
+export function smallTalkPool(o:{live:boolean;card:boolean}):SmallTalk[]{return SMALL_TALKS.filter(t=>(!t.live||o.live)&&(!t.card||o.card));}
+export function smallTalkAnswer(t:SmallTalk,seed:number,state:{cart:boolean;ordered:boolean}):string{
+  const pool=state.ordered&&t.aOrdered?t.aOrdered:state.cart&&t.aCart?t.aCart:t.a;
+  return pool[hashOf('sta:'+seed)%pool.length];
+}
+
+// ───────── ⑩ ㅋㅋ·ㅎㅎ 딱 두 개 금지 · 이모지 ─────────
+// [2026-11-15 14:49 사장님 「ㅎㅎ 두 개 지겹다 — ㅎ 하나·ㅎㅎㅎ 세 개·ㅋ 하나, 이모티콘 쓰는 사람은 왜 안 나와」]
+//   모든 가상 손님 글에서 «딱 두 개» ㅋㅋ·ㅎㅎ 는 ㅎ/ㅋ 하나·세 개 이상·이모지·없음 중 하나로 바꿈.
+export const EMOJIS = ['😊','🥰','😆','😍','💕','👍','🙌','✨','🤗','😁','💖','👏','😘','🤭'];
+export function fixLaughCount(text: string, seed = 0): string {
+  let i = 0;
+  return String(text || '').replace(/(^|[^ㅋㅎ])(ㅋㅋ|ㅎㅎ)(?![ㅋㅎ])/g, (_m, pre: string, two: string) => {
+    const c = two[0];
+    const k = hashOf('laugh:' + seed + ':' + (i++)) % 9;
+    const rep = k < 3 ? c : k < 5 ? c + c + c : k < 6 ? c + c + c + c : k < 8 ? EMOJIS[hashOf('le:' + seed + i) % EMOJIS.length] : '';
+    return pre + rep;
+  }).replace(/\s+$/,'').replace(/\s{2,}/g,' ');
+}
+/** 할 말 없을 때 이모지만 — 방송 시작·중간에 가끔 */
+export const EMOJI_ONLY_LINES = ['👍','😍','💕💕','🙌','😊😊','👏👏','🥰','✨✨','😆','🤗','💖💖','🔥🔥','👍👍','😍😍','🥰🥰','👏','💕','🙌🙌','😁','❤️'];
+/** 사이트 이모티콘(그림)을 누가 쓰면 가끔 */
+export const EMOJI_CUTE_LINES = combineLines(['','와','오','헐'],['이모티콘 귀엽다','이모티콘 너무 귀여워요','이모티콘 뭐예요 귀엽네요','그 이모티콘 귀여워요','이모티콘 탐나요','이모티콘 넘 귀엽네'],['','ㅋ','ㅎㅎㅎ','😆','🥰']);
