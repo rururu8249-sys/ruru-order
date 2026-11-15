@@ -3,7 +3,7 @@ import {FAREWELL_LINES,VISIT_LINES,ORDER_FIRST_LINES,ORDER_AFTER_LINES,GREETINGS
 import {safeConversationLine} from '../lib/liveAutomationPersona';
 import {advisesOthers,orderedAskBlocked} from '../lib/liveAutomationDirector';
 import {falseExperience} from '../lib/liveAutomationDialogue';
-import {factTopic,FACT_ANSWERS,factAnswerText,agreeTopic,AGREE_ANSWERS,agreeAnswerText,fixLaughCount,EMOJIS,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,topBrands,brandAskText,BRAND_ASK_TEMPLATES,SMALL_TALKS,smallTalkPool,smallTalkAnswer} from '../lib/liveAutomationLines';
+import {soldItems,purchaseMemoryText,MEMORY_TEMPLATES,isTestOnlyLine,factTopic,FACT_ANSWERS,factAnswerText,agreeTopic,AGREE_ANSWERS,agreeAnswerText,fixLaughCount,EMOJIS,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,topBrands,brandAskText,BRAND_ASK_TEMPLATES,SMALL_TALKS,smallTalkPool,smallTalkAnswer} from '../lib/liveAutomationLines';
 import {isCompletionReport} from '../lib/liveChatBot';
 
 const fail=(m:string)=>{throw new Error(m);};
@@ -167,4 +167,11 @@ const ns2=new Set<string>();for(let i=0;i<60;i++){const t=agreeAnswerText('nextS
 if(ns2.size<20)fail('7시 맞장구 다양성 '+ns2.size);
 if(agreeAnswerText('nextShow','방송 기대돼요',1)!==null&&/\{t\}|\d시/.test(String(agreeAnswerText('nextShow','방송 기대돼요',1))))fail('시간 없는데 지어냄');
 console.log('답·맞장구 ok |',factAnswerText('subscribe',3),'|',agreeAnswerText('replay','',5),'|',[...ns2].slice(0,4).join(' / '));
+// 지난 구매 얘기(시험용) — 실제 판 상품명에서 브랜드+품목, 일반 손님 화면엔 숨김 판정
+const si=soldItems([...[...Array(5)].map(()=>'알로 부츠컷팬츠 블랙/M'),...[...Array(3)].map(()=>'룰루레몬 얼라인 레깅스 그레이'),...[...Array(4)].map(()=>'MC-320 블랙 패딩'),'나이키 운동화']);
+if(si[0].brand!=='알로'||si[0].item!=='부츠컷팬츠'||!si.some(v=>v.brand==='룰루레몬'&&v.item==='얼라인')||!si.some(v=>v.brand==='몽클레어')||si.some(v=>v.brand==='나이키'))fail('판 상품 읽기 '+JSON.stringify(si));
+if(MEMORY_TEMPLATES.length<200)fail('구매 얘기 수 '+MEMORY_TEMPLATES.length);
+for(let i=0;i<300;i++){const t=purchaseMemoryText(si[i%si.length],i);if(!isTestOnlyLine(t))fail('숨김 판정 못 함 '+t);if(DB_BAD.test(t)||t.length>100||t.includes('{x}'))fail('구매 얘기 '+t);const v=personaVoice(t,i,i);if(!isTestOnlyLine(v))fail('말투 바꾼 뒤 숨김 판정 못 함 '+v);}
+for(const t of ['블랙 이쁘네요','알로 또 언제 해요?','주문서 넣었어요 확인 부탁드려요'])if(isTestOnlyLine(t))fail('숨기면 안 됨 '+t);
+console.log('지난 구매 얘기 ok |',purchaseMemoryText(si[0],1),'|',purchaseMemoryText(si[1],7));
 console.log('ALL OK');

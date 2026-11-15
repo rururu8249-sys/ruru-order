@@ -21,7 +21,7 @@ import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
-import {agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
+import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
 import {announceOrderThanks} from './liveOrderChatServer';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
@@ -506,6 +506,27 @@ async function replyToAiFlow(x:CodeCtx):Promise<boolean>{
  const actor=cands[hashOf('ra:'+mid)%cands.length];
  return postCodeLine(x,actor,'chat',personaVoice(text,seedOf(actor),mid),{replyToAi:mid},null,fact?'가상 손님 질문에 답':'맞장구');
 }
+
+// [2026-11-15 15:02 사장님 「뭐 팔았는지 인식되는지 시험」] 30~90일 전 실제 판 상품(브랜드+품목) — 1시간 기억
+let soldCache:{at:number;list:SoldItem[]}|null=null;
+async function hotSoldItems(db:SupabaseClient,now:number):Promise<SoldItem[]>{
+ if(soldCache&&now-soldCache.at<3600000)return soldCache.list;
+ const r=await rows<Row>(db.from('orders').select('product_name').gte('created_at',new Date(now-90*86400000).toISOString()).lt('created_at',new Date(now-30*86400000).toISOString()).neq('is_deleted',true).neq('is_test_order',true).is('automation_actor_id',null).limit(5000)).catch(()=>[] as Row[]);
+ soldCache={at:now,list:soldItems(r.map(x=>String(x.product_name||'')))};
+ return soldCache.list;
+}
+/** 지난 구매 얘기 — 방 전체 12분에 한 번·한 사람 한 번. 일반 손님 화면엔 안 보임(isTestOnlyLine) */
+async function purchaseMemoryFlow(x:CodeCtx,speakers:Actor[]):Promise<boolean>{
+ if(x.actions.some(a=>planOf(a).memory&&Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-720000))return false;
+ const items=await hotSoldItems(x.db,x.now);
+ if(!items.length)return false;
+ const who=speakers.filter(a=>!x.actions.some(v=>planOf(v).memory&&String(v.actor_id)===String(a.id)));
+ if(!who.length)return false;
+ const seed=Math.floor(x.now/60000);
+ const actor=who[hashOf('pm:'+seed)%who.length];
+ const it=items[Math.floor(((hashOf('pmi:'+seed)%1000)/1000)**2*items.length)]; // 많이 팔린 것일수록 자주
+ return postCodeLine(x,actor,'chat',personaVoice(purchaseMemoryText(it,seed),seedOf(actor),seed),{memory:`${it.brand} ${it.item}`.trim()},null,'지난 구매 얘기(시험)');
+}
 export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch=fetch){
  if(!c.chat_enabled)return;
  // [2026-11-14] 학습 노트 — 3시간마다(새 채팅 40개 이상) 자동 정리, 실패해도 대화는 계속
@@ -591,6 +612,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(roll<.1&&await brandAskFlow(codeCtx,speakable.map(r=>r.actor),String(card0?.name||'')).catch(()=>false))return;
   if(roll>=.1&&roll<.2&&await smallTalkStart(codeCtx,speakable.map(r=>r.actor),Boolean(card0)).catch(()=>false))return;
   if(roll>=.2&&roll<.3&&await emojiFiller(codeCtx,speakable.map(r=>r.actor)).catch(()=>false))return;
+  if(roll>=.3&&roll<.4&&await purchaseMemoryFlow(codeCtx,speakable.map(r=>r.actor)).catch(()=>false))return;
  }
  const recent=messages.filter(m=>m.badge!=='bot').map(m=>clean(m.body));
  const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));

@@ -1,4 +1,5 @@
 "use client";
+import { isTestOnlyLine } from "@/lib/liveAutomationLines";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {refreshPublicAvatars} from "./liveChatPublicAvatars";
 import { parseChatMessage, type LiveChatMessage } from "@/lib/liveChat";
@@ -97,7 +98,9 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
   }, [bc, enabled, refresh]);
   const displayMessages = useMemo(() => {
     const hidden = new Set([...state.hiddenIds, ...knownHidden.current]);
-    const map = new Map(messages.filter(m => !hidden.has(m.id)).map(m => [m.id, m]));
+    // [2026-11-15 15:02] 가상 손님의 «지난 구매 얘기»(시험용·실제로 안 산 후기)는 테스트 표시 보기 권한이 있는 화면에만
+    const seeTest = state.canReviewDeleted || state.perms.test;
+    const map = new Map(messages.filter(m => !hidden.has(m.id) && (seeTest || !(m.avatar === "autotest" && isTestOnlyLine(m.body)))).map(m => [m.id, m]));
     // Keep deleted rows in chronological context, not as a new block at the bottom.
     if (state.canReviewDeleted) for (const m of state.deletedMessages) if (m.broadcastId === bc) map.set(m.id, m);
     for (const m of state.commandMessages) if (m.broadcastId === bc) map.set(m.id, m);

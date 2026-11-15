@@ -409,3 +409,35 @@ export function agreeAnswerText(topic:AgreeTopic,source:string,seed:number):stri
   if(line.includes('{t}')){const m=String(source).match(/(오전|오후|아침|점심|저녁|밤)?\s*(\d{1,2})\s*시/);if(!m)return null;line=line.split('{t}').join(`${m[2]}시`);}
   return line;
 }
+
+// ───────── ⑬ 지난 구매 얘기 (실제 판 상품 기준 — 시스템이 판매 기록을 읽는지 시험용) ─────────
+// [2026-11-15 15:02 사장님 「실전 방송 전 내가 혼자 보려고 하는 테스트 — 뭐 팔았는지 인식되는지·글이 올라오는지」]
+//   30~90일 전 실제 주문 상품명에서 브랜드+품목을 뽑아 «지난번 알로 부츠컷팬츠 샀었는데 너무 좋았어요».
+//   ⚠ 실제로 안 산 구매 후기라 «테스트 표시 보기» 권한이 있는 화면(관리자·부관리자·테스트 계정)에만 보이고
+//   일반 손님 화면에선 숨김(isTestOnlyLine — useLiveChatPrivate).
+const ITEM_STOP=/^(블랙|화이트|베이지|브라운|카멜|그레이|네이비|아이보리|핑크|레드|초코|차콜|크림|카키|민트|실버|골드|퍼플|블루|그린|옐로우|오렌지|와인|버건디|소라|하늘|모카|라벤더|올리브|검정|흰색|회색|남성용|여성용|공용|정품|신상|특가|샘플할인|해외배송|사이즈|프리|기본|무광|유광|세트|컬러)$/;
+export type SoldItem={brand:string;item:string;count:number};
+export function soldItems(productNames:string[],limit=12):SoldItem[]{
+  const n=new Map<string,SoldItem>();
+  for(const raw of productNames){
+    const p=String(raw||'');
+    const hit=BRAND_WORDS.find(([re])=>re.test(p));
+    if(!hit)continue;
+    const brand=hit[1]==='룰루'?'룰루레몬':hit[1];
+    const words=p.replace(hit[0],' ').replace(/[A-Za-z]{1,4}\s*-?\s*\d+/g,' ').replace(/\([^)]*\)/g,' ').split(/[\s/·,]+/).filter(w=>/^[가-힣]{2,8}$/.test(w)&&!ITEM_STOP.test(w)&&!BRAND_WORDS.some(([re])=>re.test(w)));
+    const item=words[0]||'';
+    const key=brand+'|'+item;
+    const cur=n.get(key)||{brand,item,count:0};cur.count++;n.set(key,cur);
+  }
+  return [...n.values()].map(v=>({...v,count:v.count*(v.brand==='알로'||v.brand==='룰루레몬'?2:1)})).filter(v=>v.count>=2).sort((a,b)=>b.count-a.count).slice(0,limit);
+}
+const MEMORY_HEADS=['','지난번에','저번에','전에','저번 방송에서','예전에'];
+const MEMORY_CORES=['{x} 샀었는데 너무 좋았어요','{x} 샀었는데 진짜 편해요','{x} 샀던 거 매일 입어요','{x} 샀는데 만족해요','{x} 사봤는데 최고예요','{x} 샀었는데 예뻐서 또 사고 싶어요','{x} 샀었는데 주변에서 다 물어봐요','{x} 사서 잘 입고 있어요'];
+const MEMORY_TAILS=['','또 언제 해요?','또 해주세요','강추예요','다음에 또 살래요','완전 득템이었어요'];
+export const MEMORY_TEMPLATES:string[]=combineLines(MEMORY_HEADS,MEMORY_CORES,MEMORY_TAILS,70);
+export function purchaseMemoryText(it:SoldItem,seed:number):string{
+  const x=it.item?`${it.brand} ${it.item}`:it.brand;
+  return MEMORY_TEMPLATES[hashOf('mem:'+seed)%MEMORY_TEMPLATES.length].split('{x}').join(x);
+}
+/** 일반 손님 화면에서 숨길 «시험용» 가상 손님 글(지어낸 구매 후기) */
+export const isTestOnlyLine=(body:string)=>/(샀었|샀던|샀는데|사봤는데|사서\s*잘)/.test(String(body||''));
