@@ -14,6 +14,7 @@ import {streamModeOf} from './autoTestOrderServer';
 import {unsupportedProductCode,unsuitableSpeech} from './liveAutomationSpeech';
 import {falseExperience} from './liveAutomationDialogue';
 import {mentionsNickname} from './liveAutomationConversation';
+import {readEmojiSetting} from './liveChatEmojiServer';
 import {readDialogueCard} from './liveAutomationDialogueServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
@@ -21,7 +22,7 @@ import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
-import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,fillVisitLine,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText,similarNick} from './liveAutomationLines';
+import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,emojiReactText,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,fillVisitLine,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText,similarNick} from './liveAutomationLines';
 import {announceOrderThanks} from './liveOrderChatServer';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
@@ -463,6 +464,12 @@ async function emojiFiller(x:CodeCtx,speakers:Actor[]):Promise<boolean>{
  return text?postCodeLine(x,actor,'chat',text,{emojiOnly:true},null,'이모지만'):false;
 }
 /** 누가 사이트 이모티콘(그림)을 쓰면 가끔(35%) «이모티콘 귀엽다» — 그 글 하나에 한 번, 방 전체 10분에 한 번 */
+let emojiNameCache:{at:number;list:string[]}|null=null;
+async function siteEmojiNames(db:SupabaseClient):Promise<string[]>{
+ if(emojiNameCache&&Date.now()-emojiNameCache.at<300000)return emojiNameCache.list;
+ const list=await readEmojiSetting(db).then(st=>st.items.filter(e=>e.on).map(e=>e.name),()=>[] as string[]);
+ emojiNameCache={at:Date.now(),list};return list;
+}
 async function emojiCuteFlow(x:CodeCtx):Promise<boolean>{
  const m=x.messages.find(v=>v.badge!=='bot'&&//.test(String(v.body||''))&&Date.parse(String(v.created_at))>x.now-150000);
  if(!m)return false;
@@ -473,7 +480,11 @@ async function emojiCuteFlow(x:CodeCtx):Promise<boolean>{
  const cands=x.actors.filter(a=>String(a.id)!==String(m.automation_actor_id||'')&&x.sessions.some(s=>s.actor_id===a.id));
  if(!cands.length)return false;
  const actor=cands[hashOf('ca:'+mid)%cands.length];
- const text=personaVoice(EMOJI_CUTE_LINES[hashOf('ct:'+mid)%EMOJI_CUTE_LINES.length],seedOf(actor),mid);
+ // [19:40 사장님] 같은 이모티콘 따라 쓰기·짧은 반응+등록 이모티콘 섞어서(맨날 같은 «이모티콘 귀엽네요» 안 함)
+ const srcNames=[...String(m.body||'').matchAll(/\uE000[^:\uE001]+:([^\uE001]+)\uE001/g)].map(v=>v[1]);
+ const siteNames=await siteEmojiNames(x.db);
+ const raw=emojiReactText(srcNames,siteNames,mid+seedOf(actor));
+ const text=/^(:[^:\s]+:|\s)+$/.test(raw)?raw:personaVoice(raw,seedOf(actor),mid);
  return postCodeLine(x,actor,'chat',text,{emojiCute:mid},null,'이모티콘 귀엽다');
 }
 

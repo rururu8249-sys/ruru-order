@@ -375,12 +375,31 @@ export function varyTailAgainst(text:string,prev:string[],seed:number):string{
   const alts=(q?['','','ㅎㅎ']:['','~','!','..','ㅎㅎ','^^']).filter(a=>a===''||(!used.has(a==='ㅎㅎ'?'ㅎ':a)&&a!==k));
   return core+(alts[hashOf('tail:'+seed)%alts.length]||'');
 }
+/** [19:40 사장님 「이모티콘 귀엽다 멘트 맨날 똑같음 — 이모티콘을 직접 쓰면서 말해」]
+ *  누가 사이트 이모티콘을 쓰면: 같은 이모티콘 따라 쓰기 / 짧은 반응 + 등록 이모티콘 / 가끔 귀엽다는 말(여러 갈래) — «:이름:» 은 서버가 그림으로 바꿈 */
+const REACT_WORDS=['ㅋ','헐','오','와','앗','심쿵','귀엽당','넘 귀여워','저도 써볼래요','따라쟁이 할래요','이거 뭐예요','귀여워서 쓰러짐','나도나도','찜','저도요','ㅋㅋ 귀엽','이모티콘 맛집','언니 이모티콘 센스','오늘 이모티콘 대박','이모티콘 실화'];
+const CUTE_SAY=['이모티콘 귀엽다','이모티콘 너무 귀여워요','그 이모티콘 뭐예요','이모티콘 탐나요','저 이모티콘 넘 웃겨요','이모티콘 표정 미쳤다','이모티콘 저랑 닮았어요','이모티콘 보고 빵 터짐','이모티콘 하나 더 보여주세요','이모티콘 쓰고 싶다','강아지 이모티콘 너무 귀여워','이모티콘 나만 귀엽나','이모티콘 진짜 잘 만들었다'];
+export function emojiReactText(srcNames:string[],siteNames:string[],seed:number):string{
+  const site=happyEmojiNames(siteNames);const src=srcNames.filter(n=>siteNames.includes(n));
+  const tok=(n:string)=>':'+n+':';const any=()=>site.length?tok(site[hashOf('er:'+seed)%site.length]):EMOJIS[hashOf('eu:'+seed)%EMOJIS.length];
+  const k=hashOf('ek:'+seed)%10;
+  if(k<4&&src.length){const n=src[hashOf('es:'+seed)%src.length];const r=hashOf('ec:'+seed)%4;return r===0?tok(n):r===1?tok(n)+tok(n):r===2?'저도 '+tok(n):tok(n)+' '+any();}
+  if(k<7){const w=REACT_WORDS[hashOf('ew:'+seed)%REACT_WORDS.length];return hashOf('eo:'+seed)%3===0?any()+' '+w:w+' '+any();}
+  const c=CUTE_SAY[hashOf('ey:'+seed)%CUTE_SAY.length];return hashOf('et:'+seed)%2?c+' '+any():c;
+}
+export function happyEmojiNames(names:string[]):string[]{
+  const all=[...new Set(names.filter(n=>/^[^:\s]{1,10}$/.test(n)))];
+  const happy=all.filter(n=>/하트|사랑|최고|신나|축하|굿|좋아|ㅋ|ㅎ|웃|행복|예쓰|우와|뀨|찡긋|쓰담|으흐|빼꼼|화이팅|힘|ok|감사|꾸벅|루루|동실장|느낌|냠냠|안녕$/i.test(n));
+  const calm=all.filter(n=>!/화남|덜덜|취침|삐짐|속상|미안|잘자|안녕히|뭐지|글쎄|멘붕|주륵|죄송|아악|제발|흐음|기도|맛점|아침|근육|주문|스트레|서터|짜증|슬퍼/.test(n));
+  return happy.length>=3?happy:calm.length?calm:all;
+}
 /** [19:38 사장님 「ㅋㅋ·ㅎㅎ 2개 말랬더니 3개로 통일이냐」] 모든 가상 손님 글의 웃음(ㅋ·ㅎ 몇 개든)을 글마다 다른 모양으로 —
  *  없음·1~5개·이모지·ㅋ↔ㅎ, 바로 앞 가상 손님 글 3개에 나온 웃음 모양은 안 씀 */
 export function varyLaughAgainst(text:string,prev:string[],seed:number):string{
   const used=new Set<string>();for(const p of prev.slice(0,3))for(const m of String(p||'').match(/[ㅋㅎ]+/g)||[])used.add(m);
   let i=0;
-  const out=String(text||'').replace(/[ㅋㅎ]+/g,run=>{
+  const out=String(text||'').replace(/(:[^:\s]{1,10}:|\uE000[^\uE001]*\uE001)|[ㅋㅎ]+/g,(run,token)=>{
+    if(token)return token; // 이모티콘 이름(:ㅋㅋㅋ: 등)은 안 건드림
     const k=hashOf('lg:'+seed+':'+(i++));
     const base=k%5===0?(run[0]==='ㅋ'?'ㅎ':'ㅋ'):run[0];
     const forms=['',base,base.repeat(2),base.repeat(3),base.repeat(4),base.repeat(2),base,'',base.repeat(5),EMOJIS[k%EMOJIS.length],base.repeat(3),''];
@@ -392,10 +411,7 @@ export function varyLaughAgainst(text:string,prev:string[],seed:number):string{
 /** 유니코드 이모지 일부 → 사장님이 등록한 사이트 이모티콘 «:이름:»(섞어 씀). 손님마다 즐겨 쓰는 3개, 한 글 최대 max개. */
 export function siteEmojiText(text:string,names:string[],actorSeed:number,msgSeed:number,max=3):string{
   const all=[...new Set(names.filter(n=>/^[^:\s]{1,10}$/.test(n)))];if(!all.length)return text;
-  // 웃으며 붙이는 자리라 밝은 이모티콘 위주(화남·속상해·잘자 같은 건 안 씀)
-  const happy=all.filter(n=>/하트|사랑|최고|신나|축하|굿|좋아|ㅋ|ㅎ|웃|행복|예쓰|우와|뀨|찡긋|쓰담|으흐|빼꼼|화이팅|힘|ok|감사|꾸벅|루루|동실장|느낌|냠냠|안녕$/i.test(n));
-  const calm=all.filter(n=>!/화남|덜덜|취침|삐짐|속상|미안|잘자|안녕히|뭐지|글쎄|멘붕|주륵|죄송|아악|제발|흐음|기도|맛점|아침|근육|주문|스트레|서터|짜증|슬퍼/.test(n));
-  const list=happy.length>=3?happy:calm.length?calm:all;
+  const list=happyEmojiNames(all); // 웃으며 붙이는 자리라 밝은 이모티콘 위주(화남·속상해·잘자 같은 건 안 씀)
   const fav=[...list].sort((a,b)=>hashOf(actorSeed+':'+a)-hashOf(actorSeed+':'+b)).slice(0,3);
   let n=0,i=0,prevEmoji='',prevName='';
   const out=String(text).replace(new RegExp(PICTO,'gu'),e=>{

@@ -220,3 +220,12 @@ console.log('ALL OK');
   if(varyLaughAgainst('ㅋㅋ',[],1).length===0)fail('웃음만 글 비면 안 됨');
   console.log('웃음 섞기 ok',JSON.stringify(forms));
 }
+{
+  const {emojiReactText,varyLaughAgainst:vl}=await import('../lib/liveAutomationLines');
+  const site=['하트','동실장','루루업','ㅋㅋㅋ','빼꼼','화남','잘자','감사합니다'];
+  const seen=new Set<string>();let copy=0;
+  for(let i=0;i<300;i++){const t=emojiReactText(['빼꼼'],site,i);seen.add(t);if(/:화남:|:잘자:/.test(t))fail('어두운 이모티콘 '+t);if(t.includes(':빼꼼:'))copy++;if(t.length>60)fail('길이 '+t);}
+  if(seen.size<80)fail('이모티콘 반응 종류 '+seen.size);if(copy<60)fail('따라 쓰기 '+copy);
+  if(vl('ㅋㅋ :ㅋㅋㅋ: 좋아요',[],3).indexOf(':ㅋㅋㅋ:')<0)fail('이모티콘 이름 깨짐');
+  console.log('이모티콘 반응 ok',seen.size,'가지 |',[...seen].slice(0,6).join(' / '));
+}
