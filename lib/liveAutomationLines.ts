@@ -378,7 +378,7 @@ export function varyTailAgainst(text:string,prev:string[],seed:number):string{
 /** [19:40 사장님 「이모티콘 귀엽다 멘트 맨날 똑같음 — 이모티콘을 직접 쓰면서 말해」]
  *  누가 사이트 이모티콘을 쓰면: 같은 이모티콘 따라 쓰기 / 짧은 반응 + 등록 이모티콘 / 가끔 귀엽다는 말(여러 갈래) — «:이름:» 은 서버가 그림으로 바꿈 */
 const REACT_WORDS=['ㅋ','헐','오','와','앗','심쿵','귀엽당','넘 귀여워','저도 써볼래요','따라쟁이 할래요','이거 뭐예요','귀여워서 쓰러짐','나도나도','찜','저도요','ㅋㅋ 귀엽','이모티콘 맛집','언니 이모티콘 센스','오늘 이모티콘 대박','이모티콘 실화'];
-const CUTE_SAY=['이모티콘 귀엽다','이모티콘 너무 귀여워요','그 이모티콘 뭐예요','이모티콘 탐나요','저 이모티콘 넘 웃겨요','이모티콘 표정 미쳤다','이모티콘 저랑 닮았어요','이모티콘 보고 빵 터짐','이모티콘 하나 더 보여주세요','이모티콘 쓰고 싶다','강아지 이모티콘 너무 귀여워','이모티콘 나만 귀엽나','이모티콘 진짜 잘 만들었다'];
+const CUTE_SAY=['이모티콘 귀엽다','이모티콘 너무 귀여워요','그 이모티콘 뭐예요','이모티콘 탐나요','저 이모티콘 넘 웃겨요','이모티콘 표정 미쳤다','이모티콘 저랑 닮았어요','이모티콘 보고 빵 터짐','이모티콘 하나 더 보여주세요','이모티콘 쓰고 싶다','이모티콘 나만 귀엽나','이모티콘 진짜 잘 만들었다'];
 export function emojiReactText(srcNames:string[],siteNames:string[],seed:number):string{
   const site=happyEmojiNames(siteNames);const src=srcNames.filter(n=>siteNames.includes(n));
   const tok=(n:string)=>':'+n+':';const any=()=>site.length?tok(site[hashOf('er:'+seed)%site.length]):EMOJIS[hashOf('eu:'+seed)%EMOJIS.length];
