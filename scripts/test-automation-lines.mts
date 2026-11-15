@@ -193,3 +193,19 @@ if([...memOut].some(t=>!t.includes('부츠컷팬츠')))fail('상품 없이 말�
 
 console.log('지난 구매 얘기 ok',memOut.size,'가지 |',[...memOut].slice(0,6).join(' / '));
 console.log('ALL OK');
+
+// [18:57 사장님] 등록 이모티콘·끝맺음 겹침·닉네임 꼴·브랜드 맥락
+{
+  const {siteEmojiText,varyTailAgainst,tailKind,similarNick,BRAND_ASK_TEMPLATES:BT}=await import('../lib/liveAutomationLines');
+  const names=['하트','동실장','루루업','ㅋㅋㅋ','감사합니다'];
+  for(let i=0;i<300;i++){const t=siteEmojiText('예뻐요 😊😊 👍 💕 ✨',names,i,i*7);if(/\p{Extended_Pictographic}/u.test(t))fail('유니코드 남음 '+t);if((t.match(/:[^:\s]+:/g)||[]).length>3)fail('이모티콘 4개↑ '+t);}
+  if(siteEmojiText('좋아요 😊',[],1,1)!=='좋아요 😊')fail('등록 없으면 그대로');
+  const favs=new Set<string>();for(let i=0;i<50;i++)for(const m of siteEmojiText('😊 👍',names,42,i).match(/:[^:\s]+:/g)||[])favs.add(m);if(favs.size>3)fail('한 손님 즐겨 쓰는 이모티콘 3개↑');
+  for(let i=0;i<300;i++){const t=varyTailAgainst('언니 꼼데 또 언제 해요?:)',['오늘 7시 방송 기다릴게요:)'],i);if(tailKind(t)===':)')fail('끝맺음 겹침 '+t);if(/\?[!~.]/.test(t))fail('부호 '+t);}
+  for(let i=0;i<300;i++){const t=varyTailAgainst('예뻐요 😊',['좋네요 abc:하트'],i);if(tailKind(t)==='emoji')fail('이모지 겹침 '+t);}
+  if(varyTailAgainst('예뻐요~',['좋아요!'],1)!=='예뻐요~')fail('안 겹치면 그대로');
+  if(varyTailAgainst('😊😊',['좋네요😊'],1)!=='😊😊')fail('이모지만 글 그대로');
+  if(!similarNick('[테스트]주원맘','[테스트]딸둘맘')||!similarNick('민여사','김여사')||similarNick('판다','여름'))fail('닉네임 꼴');
+  for(const t of BT)if(/기다리고 있|기다려요|기다릴게요/.test(t))fail('맥락 없는 기다림 '+t);
+  console.log('이모티콘·끝맺음·닉네임 ok',siteEmojiText('예뻐요 😊 👍',names,3,4),'|',varyTailAgainst('언니 꼼데 언제 해요?:)',['기다릴게요:)'],5));
+}

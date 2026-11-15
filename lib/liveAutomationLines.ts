@@ -316,8 +316,9 @@ export function topBrands(productNames:string[],limit=6):string[]{
   return [...n.entries()].filter(([,c])=>c>=3).sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([b])=>b);
 }
 const BRAND_HEADS=['','언니','루루언니','혹시','언니 혹시','저기'];
-const BRAND_CORES=['{b} 또 언제 해요?','{b} 방송 또 해주세요','{b} 다시 들어오면 알려주세요','{b} 기다리고 있어요','다음에 {b}도 해주세요','{b} 들어오면 꼭 살래요','{b} 언제 또 나와요?','{b} 또 보고 싶어요','{b} 재입고 언제예요?','{b} 방송 기다려요','{b}는 이제 안 해요?','{b} 또 해주시면 안 돼요?'];
-const BRAND_TAILS=['','기다릴게요','알림 켜놓을게요','제발요','꼭이요','부탁드려요'];
+// [18:57 사장님 「꼼데 뭐? 갑자기 뭘 기다려?」] 앞뒤 없이 «기다리고 있어요» 류 빼고, 묻거나 부탁하는 말만
+const BRAND_CORES=['{b} 또 언제 해요?','{b} 방송 또 해주세요','{b} 다시 들어오면 알려주세요','다음에 {b}도 해주세요','다음 방송 때 {b}도 해주세요','{b} 언제 또 나와요?','{b} 재입고 언제예요?','{b}는 이제 안 해요?','{b} 또 해주시면 안 돼요?','{b}도 다음에 가져와 주세요','{b} 다음 방송에 있어요?','{b} 또 들어와요?'];
+const BRAND_TAILS=['','알림 켜놓을게요','제발요','꼭이요','부탁드려요','궁금해서요'];
 export const BRAND_ASK_TEMPLATES:string[]=combineLines(BRAND_HEADS,BRAND_CORES,BRAND_TAILS,60);
 export function brandAskText(brand:string,seed:number):string{
   const last=brand.charCodeAt(brand.length-1);
@@ -350,6 +351,46 @@ export function smallTalkAnswer(t:SmallTalk,seed:number,state:{cart:boolean;orde
 // ───────── ⑩ ㅋㅋ·ㅎㅎ 딱 두 개 금지 · 이모지 ─────────
 // [2026-11-15 14:49 사장님 「ㅎㅎ 두 개 지겹다 — ㅎ 하나·ㅎㅎㅎ 세 개·ㅋ 하나, 이모티콘 쓰는 사람은 왜 안 나와」]
 //   모든 가상 손님 글에서 «딱 두 개» ㅋㅋ·ㅎㅎ 는 ㅎ/ㅋ 하나·세 개 이상·이모지·없음 중 하나로 바꿈.
+// [18:57 사장님] 이어진 두 가상 손님이 같은 끝맺음(:) 등)·같은 꼴 닉네임(○○맘·○○맘) 안 쓰게
+const NICK_SUFFIXES=['엄마','맘','언니','이모','여사','선생','쌤','네','님','공주','왕자','짱'];
+export function nickCore(n:string):string{return String(n||'').replace(/\[[^\]]*\]/g,'').replace(/[\s\d_.~!-]+/g,'').toLowerCase();}
+export function similarNick(a:string,b:string):boolean{
+  const x=nickCore(a),y=nickCore(b);if(!x||!y)return false;if(x===y)return true;
+  const sx=NICK_SUFFIXES.find(f=>x.endsWith(f)),sy=NICK_SUFFIXES.find(f=>y.endsWith(f));if(sx&&sx===sy)return true;
+  return x.length>=3&&y.length>=3&&(x.slice(-2)===y.slice(-2)||x.slice(0,2)===y.slice(0,2));
+}
+const PICTO='\\p{Extended_Pictographic}(?:\\uFE0F|\\u200D\\p{Extended_Pictographic})*';
+const TAIL_RE=new RegExp('(?:\\s*(?:\\uE000[^\\uE001]*\\uE001|:-?\\)|\\^\\^|~+|\\.{2,}|!+|ㅋ+|ㅎ+|'+PICTO+'))+$','u');
+export function tailKind(text:string):string{
+  const m=String(text||'').match(TAIL_RE);if(!m)return '';const t=m[0].trim();
+  if(/\uE000|\p{Extended_Pictographic}/u.test(t))return 'emoji';if(/:-?\)/.test(t))return ':)';if(t.includes('^^'))return '^^';
+  if(/ㅋ/.test(t))return 'ㅋ';if(/ㅎ/.test(t))return 'ㅎ';if(t.includes('~'))return '~';if(t.includes('..'))return '..';if(t.includes('!'))return '!';return '';
+}
+/** 바로 앞 가상 손님 글(최대 2개)과 끝맺음 종류가 같으면 다른 끝맺음으로. 이모지만 있는 글은 그대로. */
+export function varyTailAgainst(text:string,prev:string[],seed:number):string{
+  const k=tailKind(text);if(!k)return text;
+  const used=new Set(prev.slice(0,2).map(tailKind).filter(Boolean));if(!used.has(k))return text;
+  const core=text.replace(TAIL_RE,'').trimEnd();if(!core)return text;
+  const q=/[?!.~]$/.test(core);
+  const alts=(q?['','','ㅎㅎ']:['','~','!','..','ㅎㅎ','^^']).filter(a=>a===''||(!used.has(a==='ㅎㅎ'?'ㅎ':a)&&a!==k));
+  return core+(alts[hashOf('tail:'+seed)%alts.length]||'');
+}
+/** 유니코드 이모지 → 사장님이 등록한 사이트 이모티콘 «:이름:». 손님마다 즐겨 쓰는 3개, 한 글 최대 max개. */
+export function siteEmojiText(text:string,names:string[],actorSeed:number,msgSeed:number,max=3):string{
+  const all=[...new Set(names.filter(n=>/^[^:\s]{1,10}$/.test(n)))];if(!all.length)return text;
+  // 웃으며 붙이는 자리라 밝은 이모티콘 위주(화남·속상해·잘자 같은 건 안 씀)
+  const happy=all.filter(n=>/하트|사랑|최고|신나|축하|굿|좋아|ㅋ|ㅎ|웃|행복|예쓰|우와|뀨|찡긋|쓰담|으흐|빼꼼|화이팅|힘|ok|감사|꾸벅|루루|동실장|느낌|냠냠|안녕$/i.test(n));
+  const calm=all.filter(n=>!/화남|덜덜|취침|삐짐|속상|미안|잘자|안녕히|뭐지|글쎄|멘붕|주륵|죄송|아악|제발|흐음|기도|맛점|아침|근육|주문|스트레|서터|짜증|슬퍼/.test(n));
+  const list=happy.length>=3?happy:calm.length?calm:all;
+  const fav=[...list].sort((a,b)=>hashOf(actorSeed+':'+a)-hashOf(actorSeed+':'+b)).slice(0,3);
+  let n=0,i=0,prevEmoji='',prevName='';
+  const out=String(text).replace(new RegExp(PICTO,'gu'),e=>{
+    i++;if(n>=max)return '';
+    const name=e===prevEmoji&&prevName?prevName:fav[hashOf('se:'+msgSeed+':'+i)%fav.length];
+    prevEmoji=e;prevName=name;n++;return ':'+name+':';
+  });
+  return out.replace(/\s{2,}/g,' ').trim()||text;
+}
 export const EMOJIS = ['😊','🥰','😆','😍','💕','👍','🙌','✨','🤗','😁','💖','👏','😘','🤭'];
 export function fixLaughCount(text: string, seed = 0): string {
   let i = 0;

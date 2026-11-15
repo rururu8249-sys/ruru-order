@@ -1,3 +1,4 @@
+import { automationChatBody } from "@/lib/liveAutomationEmojiServer";
 import {publicChatRow} from '@/lib/chatPresentation';
 // app/api/live-chat/route.ts
 // [2026-11-10] 「방송 보며 주문」 ③단계 — 사이트 채팅(손님용).
@@ -170,7 +171,9 @@ export async function POST(request: NextRequest) {
     const masked = maskBannedWords(body, [...LIVE_CHAT_DEFAULT_WORDS, ...setting.words]);
     // [2026-11-10] 이모티콘 — «:이름:» 이 있고 쓸 수 있는 손님이면 그림 표식으로(아니면 글자 그대로)
     let finalBody = masked.text;
-    if (/:[^:\s]{1,10}:/.test(finalBody)) {
+    // [2026-11-15] 가상 손님 글 — 끝맺음 겹침 피하고 기본 이모지 대신 등록한 사이트 이모티콘
+    if (automation) finalBody = await automationChatBody(sb, bc, String(automation.actor.id), finalBody);
+    else if (/:[^:\s]{1,10}:/.test(finalBody)) {
       try {
         const emojiSetting = await readEmojiSetting(sb);
         if (emojiSetting.items.some((e) => e.on) && (await canUseChatEmoji(sb, kakaoId, emojiSetting))) {
