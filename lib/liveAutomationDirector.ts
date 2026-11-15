@@ -407,7 +407,11 @@ async function brandAskFlow(x:CodeCtx,speakers:Actor[],cardName:string):Promise<
  if(!who.length)return false;
  const seed=Math.floor(x.now/60000);
  const actor=who[seed%who.length],brand=brands[Math.min(brands.length-1,Math.floor((hashOf('b:'+seed)%100)/100*Math.min(brands.length,3)))];
- return postCodeLine(x,actor,'chat',personaVoice(brandAskText(brand,seed),seedOf(actor),seed),{brandAsk:brand},null,'브랜드 또 언제');
+ // [19:11 사장님 「등록했던 꼼데 상품명 있을 거 아니야, 구체적으로」] 실제 팔린 그 브랜드 품목(꼼데 가디건·알로 부츠컷팬츠…)을 넣어서
+ const items=(await hotSoldItems(x.db,x.now).catch(()=>[] as SoldItem[])).filter(it=>it.brand===brand&&it.item);
+ const it=items.length&&hashOf('bi:'+seed)%4!==0?items[hashOf('bit:'+seed)%Math.min(items.length,3)]:null;
+ const label=it?`${brand} ${it.item}`:brand;
+ return postCodeLine(x,actor,'chat',personaVoice(brandAskText(label,seed),seedOf(actor),seed),{brandAsk:brand},null,'브랜드 또 언제');
 }
 /** 손님끼리 한두 마디 — 시작(묻기) */
 async function smallTalkStart(x:CodeCtx,speakers:Actor[],hasCard:boolean):Promise<boolean>{

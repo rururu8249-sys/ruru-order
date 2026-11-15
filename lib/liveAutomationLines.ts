@@ -375,7 +375,7 @@ export function varyTailAgainst(text:string,prev:string[],seed:number):string{
   const alts=(q?['','','ㅎㅎ']:['','~','!','..','ㅎㅎ','^^']).filter(a=>a===''||(!used.has(a==='ㅎㅎ'?'ㅎ':a)&&a!==k));
   return core+(alts[hashOf('tail:'+seed)%alts.length]||'');
 }
-/** 유니코드 이모지 → 사장님이 등록한 사이트 이모티콘 «:이름:». 손님마다 즐겨 쓰는 3개, 한 글 최대 max개. */
+/** 유니코드 이모지 일부 → 사장님이 등록한 사이트 이모티콘 «:이름:»(섞어 씀). 손님마다 즐겨 쓰는 3개, 한 글 최대 max개. */
 export function siteEmojiText(text:string,names:string[],actorSeed:number,msgSeed:number,max=3):string{
   const all=[...new Set(names.filter(n=>/^[^:\s]{1,10}$/.test(n)))];if(!all.length)return text;
   // 웃으며 붙이는 자리라 밝은 이모티콘 위주(화남·속상해·잘자 같은 건 안 씀)
@@ -385,7 +385,11 @@ export function siteEmojiText(text:string,names:string[],actorSeed:number,msgSee
   const fav=[...list].sort((a,b)=>hashOf(actorSeed+':'+a)-hashOf(actorSeed+':'+b)).slice(0,3);
   let n=0,i=0,prevEmoji='',prevName='';
   const out=String(text).replace(new RegExp(PICTO,'gu'),e=>{
-    i++;if(n>=max)return '';
+    i++;
+    // [19:11 사장님 「기본 이모지도 써도 돼, 섞어 가면서」] 손님마다 등록 이모티콘 쓰는 비율(30~70%)이 다르고, 글마다 섞임
+    const useSite=e===prevEmoji?prevName!=='':(hashOf('mix:'+msgSeed+':'+i)%100)<30+hashOf('ratio:'+actorSeed)%41;
+    if(!useSite){prevEmoji=e;prevName='';return e;}
+    if(n>=max)return '';
     const name=e===prevEmoji&&prevName?prevName:fav[hashOf('se:'+msgSeed+':'+i)%fav.length];
     prevEmoji=e;prevName=name;n++;return ':'+name+':';
   });

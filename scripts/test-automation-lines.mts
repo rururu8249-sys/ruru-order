@@ -198,9 +198,10 @@ console.log('ALL OK');
 {
   const {siteEmojiText,varyTailAgainst,tailKind,similarNick,BRAND_ASK_TEMPLATES:BT}=await import('../lib/liveAutomationLines');
   const names=['하트','동실장','루루업','ㅋㅋㅋ','감사합니다'];
-  for(let i=0;i<300;i++){const t=siteEmojiText('예뻐요 😊😊 👍 💕 ✨',names,i,i*7);if(/\p{Extended_Pictographic}/u.test(t))fail('유니코드 남음 '+t);if((t.match(/:[^:\s]+:/g)||[]).length>3)fail('이모티콘 4개↑ '+t);}
+  let site=0,uni=0;for(let i=0;i<300;i++){const t=siteEmojiText('예뻐요 😊😊 👍 💕 ✨',names,i,i*7);if((t.match(/:[^:\s]+:/g)||[]).length>3)fail('이모티콘 4개↑ '+t);if(/:[^:\s]+:/.test(t))site++;if(/\p{Extended_Pictographic}/u.test(t))uni++;}
+  if(site<100||uni<100)fail('등록·기본 이모지 섞임 '+site+'/'+uni);
   if(siteEmojiText('좋아요 😊',[],1,1)!=='좋아요 😊')fail('등록 없으면 그대로');
-  const favs=new Set<string>();for(let i=0;i<50;i++)for(const m of siteEmojiText('😊 👍',names,42,i).match(/:[^:\s]+:/g)||[])favs.add(m);if(favs.size>3)fail('한 손님 즐겨 쓰는 이모티콘 3개↑');
+  const favs=new Set<string>();for(let i=0;i<200;i++)for(const m of siteEmojiText('😊 👍',names,42,i).match(/:[^:\s]+:/g)||[])favs.add(m);if(favs.size>3)fail('한 손님 즐겨 쓰는 이모티콘 3개↑');
   for(let i=0;i<300;i++){const t=varyTailAgainst('언니 꼼데 또 언제 해요?:)',['오늘 7시 방송 기다릴게요:)'],i);if(tailKind(t)===':)')fail('끝맺음 겹침 '+t);if(/\?[!~.]/.test(t))fail('부호 '+t);}
   for(let i=0;i<300;i++){const t=varyTailAgainst('예뻐요 😊',['좋네요 abc:하트'],i);if(tailKind(t)==='emoji')fail('이모지 겹침 '+t);}
   if(varyTailAgainst('예뻐요~',['좋아요!'],1)!=='예뻐요~')fail('안 겹치면 그대로');

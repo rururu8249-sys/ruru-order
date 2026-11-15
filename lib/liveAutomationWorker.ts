@@ -3,7 +3,7 @@ import {AUTOMATION_OWNER,dwellMinutes,orderTarget,type AutomationLine} from './l
 import type {AutomationContext} from './liveAutomationAuth';
 import {automationRpc,activeAutomationBroadcast,type Campaign,type Actor,type Session,type Action} from './liveAutomationServer';
 import {createPersona} from './liveAutomationPersona';
-import {NICKNAME_CANDIDATES} from './liveAutomationNicknames';
+import {NICKNAME_CANDIDATES,nicknameCollisionKey} from './liveAutomationNicknames';
 import {loadAutomationChoices,readAutomationSettings,liveCardChoices} from './liveAutomationCatalog';
 import {automationPost,runOrderAction} from './liveAutomationTransport';
 import {pickOrderLines,pickCardFocusedLines,type AutoTestSettings,type AutoTestPick} from './autoTestOrder';
@@ -16,14 +16,26 @@ const nowIso=()=>new Date().toISOString();
 async function rows<T>(query:PromiseLike<{data:unknown;error:{message:string}|null}>):Promise<T[]> {
  const result=await query;if(result.error)throw Error(result.error.message);return (result.data||[]) as T[];
 }
+async function dropStaleNames(db:SupabaseClient,keep:Set<string>) {
+ // [2026-11-15] 목록에서 뺀 옛 이름(3일 지나 되돌아온 것)은 후보에서 지움
+ try{
+   const stale:string[]=[];
+   for(let from=0;from<6000;from+=1000){const r=await db.from('live_automation_nickname_pool').select('nickname_key').eq('status','unused').range(from,from+999);if(r.error)break;const d=(r.data||[]) as {nickname_key:string}[];for(const x of d)if(!keep.has(x.nickname_key))stale.push(x.nickname_key);if(d.length<1000)break;}
+   for(let i=0;i<stale.length;i+=100)await db.from('live_automation_nickname_pool').delete().eq('status','unused').in('nickname_key',stale.slice(i,i+100));
+ }catch{/* 못 지워도 채우기는 계속 */}
+}
 async function ensurePool(db:SupabaseClient) {
- // [2026-11-14 사장님 «회원 닉네임처럼 1,000개 · 하루에 겹치면 안 됨»] 이름은 NICKNAME_CANDIDATES 1,000개만.
- // 오늘(한국 날짜) 쓴 이름은 다음 날이 돼야 후보로 되돌린다(DB recycle) — 같은 날 같은 이름이 다른 사람처럼 또 주문하는 일 없음.
- try { await automationRpc(db,'live_automation_pool_recycle',{}); } catch { /* 되돌리기 실패해도 후보 채우기는 계속 */ }
+ // [2026-11-15 사장님 «매 방송 같은 닉네임 안 됨»] 이름은 NICKNAME_CANDIDATES(실제 회원 닉네임 꼴 2,210개).
+ // 쓴 이름은 3일(한국 날짜) 뒤에 후보로 되돌린다(DB recycle, 모자라면 1일) — 연달아 며칠 같은 이름이 안 나옴.
+ const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]/.test(x.nickname));
+ const keep=new Set(candidates.map(x=>nicknameCollisionKey(x.nickname)));
+ let recycled=0;
+ try { recycled=Number(await automationRpc(db,'live_automation_pool_recycle',{}))||0; } catch { /* 되돌리기 실패해도 후보 채우기는 계속 */ }
+ if(recycled>0)await dropStaleNames(db,keep);
  const existing=await db.from('live_automation_nickname_pool').select('nickname_key',{head:true,count:'exact'}).eq('status','unused');
  if(existing.error)throw Error(existing.error.message);
  if((existing.count||0)>=50)return;
- const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]/.test(x.nickname));
+ await dropStaleNames(db,keep);
  for(let i=0;i<candidates.length;i+=250)await automationRpc(db,'live_automation_pool_refill',{p_candidates:candidates.slice(i,i+250)});
 }
 async function freshActor(db:SupabaseClient,c:LiveCampaign,target:number,minutes:number,watch:boolean):Promise<{actor:Actor;session:Session}> {

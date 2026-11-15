@@ -5,9 +5,9 @@ const cut=src.indexOf("console.log('PASS revised 2–30 ordinary range");
 if(cut<0)throw Error('기준 테스트 모양이 바뀜');
 const extra=String.raw`
 const hotfix=readFileSync('supabase/sql/hotfix/automation_member_style_nicknames_20261114.sql','utf8')+'\n'+readFileSync('supabase/sql/hotfix/automation_nicknames_1000_daily_20261114.sql','utf8');
-const listSrc=readFileSync('lib/liveAutomationNicknames.ts','utf8');
-const names=[...listSrc.matchAll(/"nickname": "([^"]+)"/g)].map(m=>m[1]);
-assert.equal(names.length,1000);
+const listSrc=readFileSync('supabase/sql/hotfix/automation_nicknames_1000_daily_20261114.sql','utf8');
+const names=[...new Set([...listSrc.matchAll(/"nickname":"([^"]+)"/g)].map(m=>m[1]))];
+assert.ok(names.length>=1000,'옛 목록 '+names.length);
 await db.exec("insert into customers values(9001,'k9001','"+names[0]+"')"); // 실제 회원과 같은 이름은 후보에서 빠져야 함
 const weird=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,'매실다락방',{seed:1},0,30,true]);
 const keep=await scalar('select live_automation_actor($1,$2,$3,$4,$5,$6)',[bc,names[5],{seed:2},0,30,true]);
@@ -49,6 +49,33 @@ assert.ok(empty,'다 쓰면 NICKNAME_POOL_EMPTY');
 await db.query("update live_automation_nickname_pool set status='unused' where status='retired'");
 await db.exec(hotfix); // 두 번 실행해도 안전
 assert.equal(await scalar('select retired_at is null from live_automation_actors where id=$1',[back]),true,'재실행해도 새 이름 손님은 그대로');
+// [2026-11-15] 3일 돌려쓰기·회원 닉네임 끝말만 다른 이름 제외·새 목록 2,210개
+const day3=readFileSync('supabase/sql/hotfix/automation_nicknames_3day_20261115.sql','utf8');
+await db.exec(day3);
+assert.equal(await scalar("select count(*)::int from live_automation_nickname_pool where status='unused'"),0,'옛 후보 지움');
+const newSrc=readFileSync('lib/liveAutomationNicknames.ts','utf8');
+const fresh=[...newSrc.matchAll(/\{"nickname": "([^"]+)", "category": "([a-z_]+)"\}/g)].map(m=>({nickname:m[1],category:m[2]}));
+assert.ok(fresh.length>=2000,'새 목록 '+fresh.length);
+const kid=fresh.find(x=>/엄마$/.test(x.nickname))||fresh.find(x=>/맘$/.test(x.nickname));
+const core=kid.nickname.replace(/(엄마|맘)$/,'');
+await db.exec("insert into customers values(9002,'k9002','"+core+"네')"); // 끝말만 다른 실제 회원
+for(let i=0;i<fresh.length;i+=250)await scalar('select live_automation_pool_refill($1)',[JSON.stringify(fresh.slice(i,i+250))]);
+const filled=await scalar("select count(*)::int from live_automation_nickname_pool where status='unused'");
+assert.ok(filled>=1900,'새 후보 '+filled);
+assert.equal(await scalar('select count(*)::int from live_automation_nickname_pool where nickname=$1',[kid.nickname]),0,'회원 닉네임과 끝말만 다른 이름 제외');
+assert.ok(await scalar("select count(*)::int from live_automation_nickname_pool where nickname ~ '^[A-Za-z]'")>=100,'영어 닉네임 들어감');
+const two=await scalar("select a.id from live_automation_actors a join live_automation_nickname_pool p on p.actor_id=a.id and p.status='assigned' where a.retired_at is null limit 1");
+await db.query("update live_automation_sessions set stopped_at=now()-interval '30 hours',leave_at=now()-interval '30 hours',watching=false where actor_id=$1",[two]);
+await db.query("update live_automation_nickname_pool set updated_at=now()-interval '30 hours' where actor_id=$1",[two]);
+assert.equal(await scalar("select count(*)::int from live_automation_nickname_pool where actor_id=$1 and status='assigned'",[two]),1);
+await scalar('select live_automation_pool_recycle()');
+assert.equal(await scalar("select status from live_automation_nickname_pool where actor_id=$1 or (status='unused' and nickname=(select nickname from live_automation_actors where id=$1)) limit 1",[two]),'assigned','어제 쓴 이름은 3일 안 지나 안 되돌림');
+await db.query("update live_automation_sessions set stopped_at=now()-interval '4 days',leave_at=now()-interval '4 days' where actor_id=$1",[two]);
+await db.query("update live_automation_nickname_pool set updated_at=now()-interval '4 days' where actor_id=$1",[two]);
+await scalar('select live_automation_pool_recycle()');
+assert.equal(await scalar("select count(*)::int from live_automation_nickname_pool where actor_id=$1",[two]),0,'4일 전 이름은 되돌림');
+await db.exec(day3); // 재실행 안전
+console.log('PASS 3일 돌려쓰기·회원 끝말 겹침 제외·새 후보 '+filled+'개');
 console.log('PASS member-style nicknames hotfix: 이상한 이름 내보냄·후보 '+unused+'개·회원 이름 제외·하루에 같은 이름 새 사람 안 만듦·재실행 안전');
 await db.close();
 `;

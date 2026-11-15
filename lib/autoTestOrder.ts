@@ -195,7 +195,7 @@ export function productChoices(row: Row, overseasFeeOn: boolean): AutoTestChoice
 
 export type AutoTestPick = AutoTestChoice & { qty: number };
 
-/** 상품(세부상품 포함) 1~3개를 서로 다르게 고르고 옵션·수량(1~3)도 랜덤 */
+/** 상품(세부상품 포함) — 보통 1개·수량 1, 가끔 2~3종 */
 export function pickOrderLines(choices: AutoTestChoice[], rand = Math.random): AutoTestPick[] {
   const byProduct = new Map<string, AutoTestChoice[]>();
   for (const c of choices) {
@@ -203,24 +203,27 @@ export function pickOrderLines(choices: AutoTestChoice[], rand = Math.random): A
     byProduct.set(k, [...(byProduct.get(k) ?? []), c]);
   }
   const keys = [...byProduct.keys()];
-  const want = Math.min(keys.length, 1 + Math.floor(rand() * 3));
+  // [2026-11-15 19:11 사장님] 보통은 상품 1개·수량 1개, 어쩌다 한 번씩 많이(약 85% 1줄 1개 · 10% 2개 · 5% 2~3종)
+  const r = rand();
+  const big = r >= 0.95;
+  const want = Math.min(keys.length, big ? 2 + Math.floor(rand() * 2) : r >= 0.9 ? 2 : 1);
   const chosen: AutoTestPick[] = [];
   const pool = [...keys];
   while (chosen.length < want && pool.length) {
     const k = pool.splice(Math.floor(rand() * pool.length), 1)[0];
     const c = pick(byProduct.get(k)!, rand);
-    chosen.push({ ...c, qty: 1 + Math.floor(rand() * 3) });
+    chosen.push({ ...c, qty: big && rand() < 0.4 ? 2 : r >= 0.85 && r < 0.9 ? 2 : 1 });
   }
   return chosen;
 }
 
-/** [2026-11-14 11:07 사장님] 라이브 중엔 지금 소개하는 상품 카드 위주로 주문 — 카드 상품 1줄(보통 1개),
- *  가끔(20%) 지금 도는 상품 하나를 더 담는다. 카드에 안 나온 상품은 안 고른다. */
+/** [2026-11-14 11:07 사장님] 라이브 중엔 지금 소개하는 상품 카드 위주로 주문 — 카드 상품 1줄(보통 1개, 7% 2개),
+ *  가끔(6%) 지금 도는 상품 하나를 더 담는다. 카드에 안 나온 상품은 안 고른다. */
 export function pickCardFocusedLines(card: AutoTestChoice[], rotation: AutoTestChoice[], rand = Math.random): AutoTestPick[] {
   if (!card.length) return [];
-  const first: AutoTestPick = { ...pick(card, rand), qty: rand() < 0.8 ? 1 : 2 };
+  const first: AutoTestPick = { ...pick(card, rand), qty: rand() < 0.93 ? 1 : 2 };
   const others = rotation.filter((c) => !(c.productId === first.productId && c.productName === first.productName));
-  if (!others.length || rand() >= 0.2) return [first];
+  if (!others.length || rand() >= 0.06) return [first];
   return [first, { ...pick(others, rand), qty: 1 }];
 }
 
