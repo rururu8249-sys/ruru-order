@@ -150,3 +150,10 @@ console.log('ok pay talk');}
  if(!src.includes('[사람처럼 — 티 나는 말 금지]'))throw new Error('사람처럼 규칙 없음');
  console.log('PASS 안내 글 대꾸·티 나는 말 규칙');
 }
+// [2026-11-15 21:14] 품절·재고 질문 버림
+{
+  const {stockQuestionBlocked}=await import('../lib/liveAutomationDirector');
+  for(const t of ['막스119 36호 품절인가용?','버58 L 재고 있나요?','블랙 남았나요'])if(!stockQuestionBlocked(t))throw Error('품절 질문 통과: '+t);
+  for(const t of ['버110 160에 50인데 몇 입으면 될까요?','버58 블랙 너무 예쁘다'])if(stockQuestionBlocked(t))throw Error('보통 말 막힘: '+t);
+  console.log('PASS 품절·재고 질문 버림');
+}
