@@ -343,8 +343,9 @@ export function fixLaughCount(text: string, seed = 0): string {
   let i = 0;
   return String(text || '').replace(/(^|[^ㅋㅎ])(ㅋㅋ|ㅎㅎ)(?![ㅋㅎ])/g, (_m, pre: string, two: string) => {
     const c = two[0];
-    const k = hashOf('laugh:' + seed + ':' + (i++)) % 9;
-    const rep = k < 3 ? c : k < 5 ? c + c + c : k < 6 ? c + c + c + c : k < 8 ? EMOJIS[hashOf('le:' + seed + i) % EMOJIS.length] : '';
+    // [15:01 사장님 「2개도 해도 되는데 랜덤으로 섞으라고」] 두 개 그대로 약 25%, 나머지는 하나·세 개·네 개·이모지·없음
+    const k = hashOf('laugh:' + seed + ':' + (i++)) % 12;
+    const rep = k < 3 ? two : k < 6 ? c : k < 8 ? c + c + c : k < 9 ? c + c + c + c : k < 11 ? EMOJIS[hashOf('le:' + seed + i) % EMOJIS.length] : '';
     return pre + rep;
   }).replace(/\s+$/,'').replace(/\s{2,}/g,' ');
 }

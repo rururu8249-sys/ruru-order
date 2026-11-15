@@ -123,11 +123,11 @@ if(!rep.some(g=>g.kind==='next')||greetingPool({live:true,sinceStartMs:1,kstHour
 console.log('다음 방송 ok',nl.slice(0,3).join(' / '));
 // ㅋㅋ·ㅎㅎ 딱 두 개 금지(사장님 캡처 «좋네요~ㅎㅎ»)
 const TWO=/(^|[^ㅋㅎ])(ㅋㅋ|ㅎㅎ)(?![ㅋㅎ])/;
-for(let i=0;i<300;i++){for(const t of ['다시보기 보면서 주문할 수 있어서 좋네요~ㅎㅎ','이뻐요 ㅋㅋ','ㅎㅎ 안녕하세요','ㅋㅋ 너무 웃겨요 ㅎㅎ']){const v=fixLaughCount(t,i);if(TWO.test(v))fail('두 개 남음 '+v);}}
+{let two=0,n=0;for(let i=0;i<300;i++){for(const t of ['다시보기 보면서 주문할 수 있어서 좋네요~ㅎㅎ','이뻐요 ㅋㅋ']){n++;if(TWO.test(fixLaughCount(t,i)))two++;}}if(two/n<0.15||two/n>0.35)fail('두 개 비율 '+two/n);console.log('ㅋㅋ·ㅎㅎ 두 개 비율',(two/n).toFixed(2));}
 const laughOuts=new Set<string>();for(let i=0;i<300;i++)laughOuts.add(fixLaughCount('좋네요~ㅎㅎ',i));
-if(![...laughOuts].some(v=>/[^ㅎ]ㅎ$/.test(v))||![...laughOuts].some(v=>/ㅎㅎㅎ$/.test(v))||![...laughOuts].some(v=>EMOJIS.some(e=>v.endsWith(e)))||![...laughOuts].some(v=>/요~$/.test(v)))fail('웃음 바꾸기 종류 '+[...laughOuts].join('|'));
+if(![...laughOuts].some(v=>/[^ㅎ]ㅎㅎ$/.test(v))||![...laughOuts].some(v=>/[^ㅎ]ㅎ$/.test(v))||![...laughOuts].some(v=>/ㅎㅎㅎ$/.test(v))||![...laughOuts].some(v=>EMOJIS.some(e=>v.endsWith(e)))||![...laughOuts].some(v=>/요~$/.test(v)))fail('웃음 바꾸기 종류 '+[...laughOuts].join('|'));
 for(const t of ['ㅋㅋㅋ 좋아요','ㅎ 네'])if(fixLaughCount(t,1)!==t)fail('세 개·한 개는 그대로 '+t);
-for(let a=0;a<300;a++){const v=personaVoice('예쁘네요 ㅎㅎ',a,a);if(TWO.test(v))fail('말투 뒤 두 개 '+v);}
+{let t2=0;for(let a=0;a<300;a++){if(TWO.test(personaVoice('예쁘네요 ㅎㅎ',a,a)))t2++;}if(t2<30||t2>110)fail('말투 뒤 두 개 비율 '+t2);}
 const emo=new Set<string>();for(let a=0;a<400;a++){const v=personaVoice('오늘 예쁜 옷 많았네요',a,a);if(EMOJIS.some(e=>v.includes(e)))emo.add(v);}
 if(emo.size<15)fail('이모지 쓰는 사람 부족 '+emo.size);
 checkPool('이모지만',EMOJI_ONLY_LINES,15);checkPool('이모티콘 귀엽다',EMOJI_CUTE_LINES,40);
