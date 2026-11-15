@@ -293,14 +293,15 @@ async function orderNoticeFlow(x:CodeCtx):Promise<boolean>{
   if(x.actions.some(a=>planOf(a).orderLineFor===g))continue; // 이미 말함
   const notice=x.messages.find(m=>String(m.bot_ref||'')==='o:'+g)||null;
   const seed=hashOf(g);
-  if(plan==='first'){
-   if(notice)continue; // 알림이 이미 나갔으면(늦어져 대신 올라감) 이 주문서는 말 안 함
+  if(!notice)continue; // 알림은 제출 때 바로 올라감(22:42 사장님) — 말은 그 뒤에
+  if(plan==='first'){ // «주문서 넣었어요» — 알림 바로 뒤(다음 차례)
+   const at0=Date.parse(String(notice.created_at));
+   if(x.now>at0+120000)continue;
+   if(x.messages.some(m=>String(m.automation_actor_id||'')===info.actorId&&m.badge!=='bot'&&Number(m.id)>Number(notice.id)))continue;
    const text=personaVoice(pickLine(ORDER_FIRST_LINES,seed,recentBodies(x)),seedOf(actor),seed);
-   if(!(await postCodeLine(x,actor,'chat',text,{orderLineFor:g},null,'주문서 먼저')))continue;
-   await announceOrderThanks(x.db,g,{force:true}).catch(()=>{});
-   return true;
+   if(await postCodeLine(x,actor,'chat',text,{orderLineFor:g},null,'주문서 넣었다'))return true;
+   continue;
   }
-  if(!notice)continue;
   const at=Date.parse(String(notice.created_at));
   if(x.now<at+orderAfterDelay(g)||x.now>at+240000)continue;
   if(x.messages.some(m=>String(m.automation_actor_id||'')===info.actorId&&m.badge!=='bot'&&Number(m.id)>Number(notice.id)))continue; // 그 뒤에 이미 말함
