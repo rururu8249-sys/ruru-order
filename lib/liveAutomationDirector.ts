@@ -44,7 +44,12 @@ function shortReply(q:string,recent:string[],seed:number,own:string[]=[],cardPai
   for(let i=0;i<acks.length;i++){const r=acks[(Math.abs(seed>>1)+i)%acks.length];if(!duplicateLine(r,recent.slice(0,15))&&!repeatsOwnLine(r,own))return r;}
   return null;
  }
- const sets:Array<[RegExp,string[]]>=[[/카톡|링크|결제/,['카결 완료했어요~','결제완료했습니다!','카드결제 했어요 😊']],[/감사|고마|안녕|반가|좋은\s*(밤|하루|저녁|아침|꿈)|잘\s*자|수고|평안|편안|굿밤|쉬세요/,['감사해요~','네 감사합니다 😊','넵 감사해요!']]];
+ const sets:Array<[RegExp,string[]]>=[[/카톡|링크|결제/,['카결 완료했어요~','결제완료했습니다!','카드결제 했어요 😊']],// [19:33 사장님 「안녕하세요에 네 감사합니다? 밑도 끝도 없이」] 인사엔 인사, 밤 인사엔 밤 인사, 수고엔 수고 — «감사합니다»는 감사 말에만
+  [/좋은\s*(밤|꿈)|잘\s*자|굿밤|평안|편안|쉬세요|주무세요/,['언니도 좋은 밤 되세요~','언니도 푹 쉬세요!','굿밤이에요 😊','언니도 편안한 밤 되세요']],
+  [/수고/,['언니 수고하셨어요~','오늘도 수고 많으셨어요!','수고하셨어요 😊']],
+  [/안녕|반가|하이|어서\s*오/,['언니 안녕하세요~','안녕하세요!','언니 반가워요 😊','하이요~']],
+  [/좋은\s*(하루|저녁|아침)/,['언니도 좋은 하루 되세요~','네 언니도요 😊']],
+  [/감사|고마/,['감사해요~','네 감사합니다 😊','넵 감사해요!']]];
  for(const [re,list] of sets)if(re.test(q)){for(let i=0;i<list.length;i++){const r=list[(Math.abs(seed)+i)%list.length];if(!duplicateLine(r,recent.slice(0,15))&&!repeatsOwnLine(r,own))return r;}return null;}
  return null;
 }
@@ -705,6 +710,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(/(주말|평일|휴일|일요일|토요일)(에도|이라|이니|인데)/.test(t)&&/담|주문|사|구매|편하/.test(t))return false;
   if(learning?.bad.length&&duplicateLine(t,learning.bad))return false;
   if(r.first&&!tgt&&!GREET.test(t))return false;
+  // [19:33 사장님] «네 감사합니다»류는 그 손님이 감사·안내를 받았을 때만 — 인사·남의 글·알림 뒤에 뜬금없이 안 함
+  if(/^(네|넵|넹)?\s*(감사(합니다|해요|해용|합니당)|고맙(습니다|습니당|어요))[\s~!.😊🙏ㅎ]*$/.test(t.trim())&&!(tgt&&/감사|고마|드려요|드릴게요|보내|확인|챙겨|축하|당첨|선물|포인트/.test(clean(tgt.body))&&mentionsNickname(clean(tgt.body),String(r.actor.nickname||''))))return false;
   return true;
  };
  let text=typeof pick.text==='string'?clean(pick.text):'';
