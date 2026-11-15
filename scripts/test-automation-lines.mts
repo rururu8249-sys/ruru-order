@@ -210,3 +210,13 @@ console.log('ALL OK');
   for(const t of BT)if(/기다리고 있|기다려요|기다릴게요/.test(t))fail('맥락 없는 기다림 '+t);
   console.log('이모티콘·끝맺음·닉네임 ok',siteEmojiText('예뻐요 😊 👍',names,3,4),'|',varyTailAgainst('언니 꼼데 언제 해요?:)',['기다릴게요:)'],5));
 }
+{
+  const {varyLaughAgainst}=await import('../lib/liveAutomationLines');
+  const forms:Record<string,number>={};let prev:string[]=[];
+  for(let i=0;i<400;i++){const t=varyLaughAgainst('안녕하세요~~ ㅎㅎㅎ',prev,i);const m=(t.match(/[ㅋㅎ]+/g)||['(없음)'])[0];forms[m]=(forms[m]||0)+1;
+    for(const p of prev)for(const x of p.match(/[ㅋㅎ]+/g)||[])if(t.includes(x)&&(t.match(/[ㅋㅎ]+/g)||[] as string[]).includes(x))fail('앞 글과 같은 웃음 '+x+' | '+t);
+    prev=[t,...prev].slice(0,3);}
+  if(Object.keys(forms).length<6||Math.max(...Object.values(forms))>400*0.4)fail('웃음 모양 쏠림 '+JSON.stringify(forms));
+  if(varyLaughAgainst('ㅋㅋ',[],1).length===0)fail('웃음만 글 비면 안 됨');
+  console.log('웃음 섞기 ok',JSON.stringify(forms));
+}

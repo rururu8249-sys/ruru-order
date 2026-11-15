@@ -257,7 +257,7 @@ const planOf=(a:Action)=>((a as unknown as {plan?:Record<string,unknown>}).plan|
 async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:string,plan:Record<string,unknown>,source:number|null,label:string):Promise<boolean>{
  const s=x.sessions.find(v=>v.actor_id===actor.id);
  if(!s||!text)return false;
- if(!/주문|종료/.test(label)){const last=x.messages.find(m=>m.automation_actor_id);if(last&&Date.parse(String(last.created_at))>x.now-180000&&similarNick(String(actor.nickname||''),String(last.nickname||'')))return false;}
+ if(!/주문|종료/.test(label)){const last=x.messages.find(m=>m.automation_actor_id&&m.badge!=='bot');if(last&&Date.parse(String(last.created_at))>x.now-180000&&similarNick(String(actor.nickname||''),String(last.nickname||'')))return false;}
  try{await automationRpc(x.db,'live_automation_ai_admission',{p_actor:actor.id,p_kind:kind});}catch{return false;}
  const action=await automationRpc<Action>(x.db,'live_automation_action',{p_session:s.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,...plan},p_manual:false,p_source:source,p_revision:x.c.revision});
  const claimed=await automationRpc<Action|null>(x.db,'live_automation_claim',{p_action:action.id,p_revision:x.c.revision});
@@ -612,7 +612,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  // 그 밖의 손님을 말하게 고르면 전부 AI_NOT_ELIGIBLE 로 막혀 조용해졌음 → 처음부터 말할 수 있는 손님만 후보로.
  // [2026-11-15 03:47 사장님 「민여사 불렀는데 대답 안 함」] 자정이 지나도 이 방송에서 주문한 손님은 계속, 사람이 이름을 부른 손님은 장바구니·주문 없어도 답할 수 있게.
  const called=newestHuman?roster.filter(r=>mentionsNickname(String(newestHuman.body||''),r.actor.nickname)):[];
- const lastAiRow=messages.find(m=>m.automation_actor_id);
+ const lastAiRow=messages.find(m=>m.automation_actor_id&&m.badge!=='bot'); // 주문 알림(루루동이 봇 글)은 빼고 진짜 가상 손님 글만
  const lastAiNick=lastAiRow&&Date.parse(String(lastAiRow.created_at))>now-180000?String(lastAiRow.nickname||''):'';
  const speakable0=roster.filter(r=>r.cart.length>0||r.ordered.length>0||called.includes(r));
  // [18:57 사장님 「닉네임도 맘맘 똑같고」] 바로 앞 가상 손님과 비슷한 닉네임(○○맘·○○맘)은 이번 차례 빼기(불린 손님은 그대로)

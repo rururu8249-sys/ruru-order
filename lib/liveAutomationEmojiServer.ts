@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { encodeEmojiTokens } from "./liveChatEmoji";
 import { readEmojiSetting } from "./liveChatEmojiServer";
-import { hashOf, siteEmojiText, varyTailAgainst } from "./liveAutomationLines";
+import { hashOf, siteEmojiText, varyLaughAgainst, varyTailAgainst } from "./liveAutomationLines";
 
 // DB live_automation_chat 이 거절하는 말(같은 규칙) — 이모티콘 이름 때문에 글이 막히면 이모티콘 없이 보냄
 const DB_REJECT = /(테스트|\btest\b|\bAI\b|API|프롬프트|한도|시스템|결제.{0,3}완료|입금.{0,3}완료|https?:\/\/)/i;
@@ -15,9 +15,9 @@ const DB_REJECT = /(테스트|\btest\b|\bAI\b|API|프롬프트|한도|시스템|
 export async function automationChatBody(sb: SupabaseClient, bc: string | number, actorId: string, body: string): Promise<string> {
   let text = body;
   try {
-    const { data } = await sb.from("live_chat_messages").select("body").eq("broadcast_id", bc).not("automation_actor_id", "is", null).is("hidden_at", null).order("id", { ascending: false }).limit(2);
+    const { data } = await sb.from("live_chat_messages").select("body").eq("broadcast_id", bc).not("automation_actor_id", "is", null).or("badge.is.null,badge.neq.bot").is("hidden_at", null).order("id", { ascending: false }).limit(3);
     const prev = (data || []).map((r) => String((r as { body?: unknown }).body || ""));
-    text = varyTailAgainst(text, prev, hashOf(actorId + ":" + body));
+    text = varyLaughAgainst(varyTailAgainst(text, prev, hashOf(actorId + ":" + body)), prev, hashOf("l:" + actorId + ":" + body + Date.now()));
   } catch { /* 앞 글 못 읽음 — 그대로 */ }
   try {
     const setting = await readEmojiSetting(sb);

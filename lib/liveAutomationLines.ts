@@ -375,6 +375,20 @@ export function varyTailAgainst(text:string,prev:string[],seed:number):string{
   const alts=(q?['','','ㅎㅎ']:['','~','!','..','ㅎㅎ','^^']).filter(a=>a===''||(!used.has(a==='ㅎㅎ'?'ㅎ':a)&&a!==k));
   return core+(alts[hashOf('tail:'+seed)%alts.length]||'');
 }
+/** [19:38 사장님 「ㅋㅋ·ㅎㅎ 2개 말랬더니 3개로 통일이냐」] 모든 가상 손님 글의 웃음(ㅋ·ㅎ 몇 개든)을 글마다 다른 모양으로 —
+ *  없음·1~5개·이모지·ㅋ↔ㅎ, 바로 앞 가상 손님 글 3개에 나온 웃음 모양은 안 씀 */
+export function varyLaughAgainst(text:string,prev:string[],seed:number):string{
+  const used=new Set<string>();for(const p of prev.slice(0,3))for(const m of String(p||'').match(/[ㅋㅎ]+/g)||[])used.add(m);
+  let i=0;
+  const out=String(text||'').replace(/[ㅋㅎ]+/g,run=>{
+    const k=hashOf('lg:'+seed+':'+(i++));
+    const base=k%5===0?(run[0]==='ㅋ'?'ㅎ':'ㅋ'):run[0];
+    const forms=['',base,base.repeat(2),base.repeat(3),base.repeat(4),base.repeat(2),base,'',base.repeat(5),EMOJIS[k%EMOJIS.length],base.repeat(3),''];
+    for(let j=0;j<forms.length;j++){const f=forms[(Math.floor(k/7)+j)%forms.length];if(f===''||!used.has(f))return f;}
+    return '';
+  }).replace(/\s{2,}/g,' ').trim();
+  return out||text;
+}
 /** 유니코드 이모지 일부 → 사장님이 등록한 사이트 이모티콘 «:이름:»(섞어 씀). 손님마다 즐겨 쓰는 3개, 한 글 최대 max개. */
 export function siteEmojiText(text:string,names:string[],actorSeed:number,msgSeed:number,max=3):string{
   const all=[...new Set(names.filter(n=>/^[^:\s]{1,10}$/.test(n)))];if(!all.length)return text;
