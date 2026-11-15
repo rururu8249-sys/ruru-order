@@ -14,6 +14,7 @@ import {
   botRefOfProduct,
   parseLiveChatBotSetting,
   pickFaq,
+  isCompletionReport,
   pickProductForChat,
   pickProductsForShortChat,
   productBotText,
@@ -125,7 +126,7 @@ export async function runLiveChatBot(sb: SupabaseClient, bc: string, body: strin
       else for (const sp of pickProductsForShortChat(body, cands)) await postBot(sb, bc, botRefOfProduct(sp), sp.text);
     }
     const faq = pickFaq(body, setting.faqs);
-    if (faq && !opts.staff && !faqEchoesAnswer(body, faq.faq.answer)) await postBot(sb, bc, botRefOfFaq(faq.faq), faq.faq.answer);
+    if (faq && !opts.staff && !isCompletionReport(body) && !faqEchoesAnswer(body, faq.faq.answer)) await postBot(sb, bc, botRefOfFaq(faq.faq), faq.faq.answer);
   } catch {
     /* 봇 실패는 손님 글과 무관 */
   }

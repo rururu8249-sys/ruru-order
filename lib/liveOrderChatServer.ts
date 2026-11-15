@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LIVE_CHAT_KEY, parseLiveChatSetting } from "@/lib/liveChat";
 import { AUTO_TEST_AVATAR, isAutoTestRow } from "@/lib/autoTestOrder";
+import { orderNoticePlan } from "@/lib/liveAutomationLines";
 import {
   LIVE_CHAT_BOT_KAKAO,
   LIVE_CHAT_BOT_KEY,
@@ -69,7 +70,7 @@ async function insertBot(sb: SupabaseClient, bc: string, body: string, ref: stri
 }
 
 /** 주문서 제출 직후 — 「🛒 OO님 상품 외 N종 주문 감사합니다!」(+카드면 결제 링크 안내). 주문서마다 한 번. */
-export async function announceOrderThanks(sb: SupabaseClient, groupId: string): Promise<void> {
+export async function announceOrderThanks(sb: SupabaseClient, groupId: string, opts: { force?: boolean } = {}): Promise<void> {
   try {
     const g = String(groupId ?? "").trim();
     if (!g) return;
@@ -81,6 +82,14 @@ export async function announceOrderThanks(sb: SupabaseClient, groupId: string): 
     if (!String(rows[0].youtube_nickname ?? "").trim()) return;
     if(rows.some(r=>isAutoTestRow(r as Record<string,unknown>))){
       const action=(rows[0] as Record<string,unknown>).automation_action_id;
+      // [2026-11-15 14:26 사장님] 주문서마다 랜덤 — «먼저 말하고 바로 주문 알림»이면 여기선 알림을 미룸
+      //   (같은 틱의 대화 차례가 가상 손님 말 → 알림 순서로 올림, 75초 넘게 못 올리면 자동 실행이 알림만 올림). 채팅 꺼져 있으면 안 미룸.
+      if(action&&!opts.force&&orderNoticePlan(g)==='first'){
+        const {data:act}=await sb.from('live_automation_actions').select('campaign_id').eq('id',action).maybeSingle();
+        const cid=(act as {campaign_id?:unknown}|null)?.campaign_id;
+        const {data:camp}=cid?await sb.from('live_automation_campaigns').select('chat_enabled').eq('id',cid).maybeSingle():{data:null};
+        if((camp as {chat_enabled?:unknown}|null)?.chat_enabled===true)return;
+      }
       if(action)await sb.rpc('live_automation_order_notice',{p_action:action,p_body:orderThanksText(rows)});
       // [2026-11-13 23:06] 자동 테스트 카드 주문도 실제처럼 카드 결제 링크 안내(주문서마다 한 번)
       if(rows.some(isCardOrderRow)){

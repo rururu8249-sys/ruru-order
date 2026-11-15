@@ -8,6 +8,7 @@ import {loadAutomationChoices,readAutomationSettings,liveCardChoices} from './li
 import {automationPost,runOrderAction} from './liveAutomationTransport';
 import {pickOrderLines,pickCardFocusedLines,type AutoTestSettings,type AutoTestPick} from './autoTestOrder';
 import {runConversations} from './liveAutomationConversation';
+import {flushDeferredOrderNotices} from './liveAutomationDirector';
 import {interleaveOrderStages,planOrderJourney,isNightKst} from './liveAutomationTempo';
 type Wave={id:string;mode:string;at:string;offsets:number[];planned?:boolean};
 type LiveCampaign=Campaign & {tempo_plan?:Wave;next_chat_at?:string|null};
@@ -135,6 +136,8 @@ async function actionsTick(db:SupabaseClient,c:LiveCampaign,origin:string,transp
  if(c.chat_enabled&&deadline-Date.now()>=30000){
    try{await runConversations(db,c,origin,transport)}catch(reason){results.push({status:'rejected',reason})}
  }
+ // [2026-11-15 14:26] «가상 손님 말 → 주문 알림» 으로 미룬 알림이 45초 넘게 안 나갔으면 알림만 올림(채팅 차례가 막혔거나 손님이 나간 경우)
+ try{await flushDeferredOrderNotices(db,c)}catch(reason){results.push({status:'rejected',reason})}
  return results;
 }
 export async function runAutomationTick(db:SupabaseClient,origin:string,kind:'presence'|'actions',transport:typeof fetch=fetch) {

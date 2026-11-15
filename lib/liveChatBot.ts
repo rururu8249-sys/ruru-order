@@ -181,6 +181,12 @@ export function pickProductForChat(body: string, cands: BotCandidate[]): BotProd
   return null;
 }
 
+/** [2026-11-15 14:15 사장님] «카결 완료했어요»처럼 끝냈다는 보고 — 자주 묻는 말 자동 답을 붙이지 않음(묻는 말일 때만 답) */
+export function isCompletionReport(body: string): boolean {
+  const t = String(body || "");
+  if (/[?？]|나요|까요|되나|될까|어떻게|어디|언제|맞나|인가요|가요\s*$/.test(t)) return false;
+  return /(카결|카드|결제|입금|송금|이체|주문서|주문)/.test(t) && /(완료|했어|했습|했당|했음|했어용|했어여|햇어|보냈|넣었|끝냈|마쳤)/.test(t);
+}
 /** 자주 묻는 말 — 첫 번째로 맞는 답(띄어쓰기 무시로 비교) */
 export function pickFaq(body: string, faqs: LiveChatFaq[]): { index: number; faq: LiveChatFaq } | null {
   const hay = String(body || "").replace(/\s+/g, "").toLowerCase();
