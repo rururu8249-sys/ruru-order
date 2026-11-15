@@ -24,6 +24,20 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right, onOpenCh
   const [editing, setEditing] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
+  // 총관리자 판 탭 — «자주 쓰는 말» 권한 회원(예: 동쓰) 목록 보기·복사(편집은 그분이)
+  const [members, setMembers] = useState<{ kakaoId: string; nickname: string; phrases: string[] }[]>([]);
+  const [tab, setTab] = useState("");
+  useEffect(() => {
+    if (own) return;
+    let alive = true;
+    const load = () => fetch("/api/live-chat/quick-phrases?members=1", { cache: "no-store", headers: { ...chatIdentityHeaders() } })
+      .then((r) => r.json()).then((j) => { if (alive && j?.ok && Array.isArray(j.members)) setMembers(j.members); }).catch(() => {});
+    void load();
+    const t = setInterval(load, 30_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [own]);
+  const member = tab ? members.find((m) => m.kakaoId === tab) ?? null : null;
+  const shown = member ? cleanQuickPhrases(member.phrases) : phrases;
   const live = useRef({ phrases, send: (async () => {}) as (p: string, i: number, to: "yt" | "site") => Promise<void>, editing: false });
 
   useEffect(() => {
@@ -85,7 +99,7 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right, onOpenCh
     const next = [...list]; [next[i], next[j]] = [next[j], next[i]]; return next;
   });
 
-  useEffect(() => { live.current = { phrases, send, editing: editing !== null }; });
+  useEffect(() => { live.current = { phrases: shown, send, editing: editing !== null }; });
   useEffect(() => { onOpenChange?.(loaded && open); }, [loaded, open]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!loaded) return null;
   const rightCss = typeof right === "number" ? `${right}px` : right || "0px";
@@ -106,12 +120,21 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right, onOpenCh
           style={{ ...wrap, width: `${QUICK_PHRASE_COLUMN - 24}px`, maxHeight: "calc(100% - 32px)", display: "flex", flexDirection: "column", background: "rgba(15,15,15,0.92)", border: "1px solid #333333", borderRadius: "12px", color: "#FFFFFF", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "2px", padding: "8px 6px 4px 12px", flexShrink: 0 }}>
             <strong style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap" }}>{own ? "내 자주 쓰는 말" : "자주 쓰는 말"}</strong>
-            <button type="button" onClick={openEdit} style={plain} aria-label="자주 쓰는 말 편집">편집</button>
+            {member ? null : <button type="button" onClick={openEdit} style={plain} aria-label="자주 쓰는 말 편집">편집</button>}
             <button type="button" onClick={() => toggle(false)} style={plain} aria-label="자주 쓰는 말 접기">접기</button>
           </div>
+          {members.length ? (
+            <div role="tablist" style={{ display: "flex", gap: "4px", padding: "2px 8px 8px", overflowX: "auto", flexShrink: 0 }}>
+              {[{ kakaoId: "", nickname: "내 문구" }, ...members].map((m) => {
+                const on = tab === m.kakaoId;
+                return <button key={m.kakaoId || "mine"} type="button" role="tab" aria-selected={on} onClick={() => setTab(m.kakaoId)}
+                  style={{ height: "32px", padding: "0 12px", border: on ? "none" : "1px solid #555555", borderRadius: "9999px", background: on ? "#FFFFFF" : "transparent", color: on ? "#0F0F0F" : "#DDDDDD", fontSize: "13px", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0 }}>{m.nickname}</button>;
+              })}
+            </div>
+          ) : null}
           <div data-live-scroll style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: "6px" }}>
-            {phrases.length === 0 ? <div style={{ padding: "8px 4px", fontSize: "13px", color: "#AAAAAA", lineHeight: 1.5 }}>「편집」에서 자주 쓰는 말을 넣어 두세요.</div> : null}
-            {phrases.map((p, i) => (
+            {shown.length === 0 ? <div style={{ padding: "8px 4px", fontSize: "13px", color: "#AAAAAA", lineHeight: 1.5 }}>{member ? `${member.nickname}님이 아직 넣은 말이 없어요.` : "「편집」에서 자주 쓰는 말을 넣어 두세요."}</div> : null}
+            {shown.map((p, i) => (
               <div key={p} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px 8px 10px", border: "1px solid #3A3A3A", borderRadius: "8px", background: "#222222" }}>
                 {i < 9 ? <span aria-hidden style={{ flexShrink: 0, width: "18px", height: "18px", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "12px", fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{i + 1}</span> : null}
                 <span title={p} style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 500, lineHeight: 1.4, wordBreak: "keep-all", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p}</span>

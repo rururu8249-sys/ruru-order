@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/youtube";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { chatIdentityFromRequest, sameChatOrigin, verifiedChatRole } from "@/lib/liveChatSession";
+import { readMemberRoles } from "@/lib/liveMemberRoles";
 import { QUICK_PHRASES_KEY, cleanQuickPhrases, readQuickPhrases } from "@/lib/liveChatQuickPhrases";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,6 +26,17 @@ export async function GET(request: NextRequest) {
   try {
     const a = await access(request);
     if (!a) return fail("관리자 로그인 또는 채팅 본인 확인이 필요해요.", 403);
+    // 총관리자 판 탭 — «자주 쓰는 말» 권한만 받은 회원들 목록(보기·복사용)
+    if (request.nextUrl.searchParams.get("members") === "1") {
+      if (!a.owner) return reply({ ok: true, members: [] });
+      const sb = getServiceClient();
+      const people = [...(await readMemberRoles(sb)).values()].filter((m) => m.perms.includes("phrases") && !m.perms.includes("host") && !m.perms.includes("owner"));
+      if (!people.length) return reply({ ok: true, members: [] });
+      const { data, error } = await sb.from("settings").select("key, value").in("key", people.map((m) => ownKey(m.kakao_id)));
+      if (error) return fail("자주 쓰는 말을 읽지 못했어요.", 503);
+      const byKey = new Map((data ?? []).map((r) => [String(r.key), r.value]));
+      return reply({ ok: true, members: people.map((m) => ({ kakaoId: m.kakao_id, nickname: m.nickname || "회원", phrases: byKey.has(ownKey(m.kakao_id)) ? readQuickPhrases(byKey.get(ownKey(m.kakao_id))) : [] })) });
+    }
     const member = (request.nextUrl.searchParams.get("member") || "").trim();
     if (member) {
       if (!a.owner || !/^\d{1,20}$/.test(member)) return fail("총관리자만 볼 수 있어요.", 403);
