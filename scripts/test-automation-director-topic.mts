@@ -132,3 +132,21 @@ console.log('ok pay talk');}
  for(const t of ['블랙 예뻐요','159에 53인데 몇 입으면 될까요?']) if(sb(t,false)) throw new Error('배송 아님: '+t);
  console.log('PASS 배송 얘기 — 해배 단정·평가·반박·여부 질문 막음, 해외 카드 기간 질문만');
 }
+
+// [09:41] 숫자 사이즈(36·38) 콕 집는 사이즈 질문도 버림
+{
+ const {vagueProductQuestion:vq}=await import('../lib/liveAutomationDirector');
+ if(!vq('프222 키 163에 53인데 36하면 맞을까요?'))throw new Error('36 콕 집기 막아야 함');
+ if(!vq('MX-136 160에 50인데 38로 될까요?'))throw new Error('38 콕 집기 막아야 함');
+ if(vq('프222 키 163에 53인데 몇 입으면 될까요?'))throw new Error('추천 받는 질문은 허용');
+ console.log('PASS 숫자 사이즈 콕 집기 막음');
+}
+
+// [09:43] 안내 글 대꾸형 시작 말은 규칙 문자열로 확인(acceptable 안 — 소스 검사)
+{
+ const fs=await import('node:fs');
+ const src=fs.readFileSync(new URL('../lib/liveAutomationDirector.ts',import.meta.url),'utf8');
+ if(!src.includes("if(!tgt&&/^(아니|아닌데|아닌가|맞아요|맞네|그쵸|그죠|그니까)/.test(t.trim()))return false;"))throw new Error('대꾸 거름 없음');
+ if(!src.includes('[사람처럼 — 티 나는 말 금지]'))throw new Error('사람처럼 규칙 없음');
+ console.log('PASS 안내 글 대꾸·티 나는 말 규칙');
+}
