@@ -185,6 +185,18 @@ async function noteDecision(db:SupabaseClient,entry:Record<string,unknown>){
 //   → 카결 링크 안내 답은 Gemini 없이 코드가 정함: 안내마다 반은 답 안 함, 반은 8~60초 사이 아무 때나 짧게(넵!·넹~·알겠습니당…).
 //   2분 30초 지나면 늦은 답은 안 함.
 export const humanReplyDelay=(id:number)=>4000+(Math.abs(id*104729)%41000);
+/** [2026-11-15 09:31 사장님] 배송 얘기 — 해배=해외배송 2~3주·국내 2~3일은 시스템이 아는 사실.
+ *  손님(AI)은 해외배송 여부를 묻지 않고(상품에 표시됨), 배송을 단정·평가·반박하지 않는다.
+ *  해외배송 카드일 때만 «언제쯤 받아요?/얼마나 걸려요?» 질문 하나 허용. */
+export function shippingTalkBlocked(t:string,overseas:boolean):boolean{
+ if(!/배송|해배|해외|국내|택배|도착|오래\s*걸|걸리|걸려|받아요|받을|받나|받으/.test(t))return false;
+ if(!overseas)return true;
+ if(/해외\s*배송\s*(인가|이에|이죠|맞|이야)|해배\s*(인가|이에|이죠|맞|이야|인\s*줄)|국내|인\s*줄|오래\s*걸리네|아니/.test(t))return true;
+ const asksWhen=/(얼마나|언제|며칠).{0,10}(걸|와|받|도착|오)/.test(t);
+ const isQuestion=/\?|나요|까요|ㄹ까|가요|요\s*$/.test(t);
+ return !(asksWhen&&isQuestion);
+}
+
 export function cardAckPlan(noticeId:number,noticeAt:number,now:number):'wait'|'go'|'skip'{
  if(Math.abs(noticeId)%2===1)return 'skip';
  const age=now-noticeAt;
@@ -313,7 +325,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   `[지금 상품 카드] ${cardText}`,
   ...(rejectedLines.length?[`[방금 규칙에 걸려 버려진 말 — 이런 말·비슷한 말은 다시 고르지 말 것(다른 손님이나 다른 얘기, 또는 침묵)]\n${rejectedLines.join('\n')}`]:[]),
   subscribeOn?'[구독 무배] 지금 «유튜브 구독 인증하면 배송비 무료» 행사 중 — 처음 온 손님이 가끔 «구독하면 무배?»«구독 인증 어디서 해요?»처럼 물어도 자연스럽다.':'[구독 무배] 지금 구독 무료배송 행사 없음 — 구독·무배·무료배송 얘기 금지.',
-  card?.overseas?'[해외배송 상품] 지금 카드 상품은 해외배송이다 — 가끔 «해외배송인가요?»«해배인가요?»«배송 얼마나 걸려요?»«주문하면 언제쯤 받아요?» 같은 질문이 자연스럽다(답은 하지 않음).':'[배송] 지금 카드 상품은 해외배송이 아니다 — 해외배송·해배 질문 금지.',
+  '[배송 사실 — 손님도 이미 아는 것] 해배=해외배송이고 평균 2~3주 걸린다(쇼핑도우미 안내에도 있음). 국내 일반 상품은 2~3일. 상품이 해외배송인지는 상품에 이미 표시돼 있으니 «해외배송인가요?»«해배인가요?»«국내배송이에요?» 같이 묻지 않는다. 배송 기간·방식을 단정하거나 «오래 걸리네» 같은 평가, 쇼핑도우미·루루동이 안내에 반박·대꾸하는 말 절대 금지. 배송 얘기는 웬만하면 하지 않는다.'+(card?.overseas?' 지금 카드 상품은 해외배송 — 아주 가끔 «주문하면 언제쯤 받아요?» 정도 질문만 허용.':' 지금 카드 상품은 해외배송이 아니다 — 배송 얘기 금지.'),
   `[가상 손님 목록 — 이 중에서만 고른다]\n${rosterText}`,
   `[대화 — 오래된 것부터]\n${transcript}`,
   `[진짜 유튜브 손님 말투 — 지난 방송 채팅 분석]\n${YOUTUBE_STYLE_RULES.map(x=>`- ${x}`).join('\n')}\n예(그대로 베끼지 말고 느낌만): ${pickStyleLines(now,30).filter(x=>!namesSize(x)&&!vaguePointerQuestion(x)).slice(0,12).join(' / ')}\n주문 있는 가상 손님만 쓸 수 있는 말투 예: ${ORDERED_STYLE_LINES.join(' / ')}\n결제확인 받은 가상 손님만 쓸 수 있는 말투 예: ${PAID_STYLE_LINES.join(' / ')}`,
@@ -348,7 +360,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   // 시청 상태 혼잣말은 금지 — 단 방송 시간이 아닐 때 «다시보기 보면서 주문/담기» 얘기는 사장님 요청(08:26)이라 허용
   if(/다시\s*보기|구경\s*(하는|중|하고)/.test(t)&&!(mode!=='live'&&/다시\s*보기/.test(t)&&/주문|담/.test(t)))return false;
   if(!subscribeOn&&/무배|무료\s*배송|구독.{0,6}(하면|인증|무료)/.test(t))return false;
-  if(!card?.overseas&&/해외\s*배송|해배/.test(t))return false;
+  if(shippingTalkBlocked(t,Boolean(card?.overseas)))return false;
   if(weekend&&WORK.test(t))return false;
   // [2026-11-15 08:26 사장님] 주말이라서 담는 게 아님(주말에도 방송함) — «방송 시간 아닌데도 다시보기로 주문» 이 맞는 말
   if(/(주말|평일|휴일|일요일|토요일)(에도|이라|이니|인데)/.test(t)&&/담|주문|사|구매|편하/.test(t))return false;

@@ -122,3 +122,13 @@ console.log('ok pay talk');}
   if (!lo || !hi) throw new Error('빠르게·늦게 섞이지 않음');
   console.log('card ack plan ok', skip, Math.min(...delays), Math.max(...delays));
 }
+
+// [09:31] 배송 얘기 — 해배 단정·평가·반박 금지, 해외배송 여부 묻지 않음
+{
+ const {shippingTalkBlocked:sb}=await import('../lib/liveAutomationDirector');
+ const bad:[string,boolean][]=[['해배인 줄 알았더니 오래 걸리네용',true],['아니 국내배송 ㅎ',true],['해배인가요?',true],['해외배송인가요?',true],['배송 얼마나 걸려요?',false],['국내배송이에요?',true],['오래 걸리네요',true]];
+ for(const [t,o] of bad) if(!sb(t,o)) throw new Error('막아야 함: '+t);
+ for(const t of ['주문하면 언제쯤 받아요?','배송 얼마나 걸려요?','며칠 걸려요?']) if(sb(t,true)) throw new Error('해외 카드면 허용: '+t);
+ for(const t of ['블랙 예뻐요','159에 53인데 몇 입으면 될까요?']) if(sb(t,false)) throw new Error('배송 아님: '+t);
+ console.log('PASS 배송 얘기 — 해배 단정·평가·반박·여부 질문 막음, 해외 카드 기간 질문만');
+}
