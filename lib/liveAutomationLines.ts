@@ -82,6 +82,7 @@ export const VISIT_RE = /소개|인스타|밴드|유튜브|채널\s*추가|알�
 export function combineLines(heads:string[],cores:string[],tails:string[],max=45):string[]{
   const out=new Set<string>();const seps=[' ','. ','! ','~ ',', '];
   heads.forEach((h,hi)=>cores.forEach((c,ci)=>tails.forEach((t,ti)=>{
+    if(h&&c.includes(h.split(' ').pop()!))return; // «저도 저도…»처럼 겹치는 앞말 안 붙임
     const sep=seps[(hi*7+ci*3+ti)%seps.length];
     const line=[h,c].filter(Boolean).join(' ')+(t?(/[?!]$/.test(c)?' ':sep)+t:'');
     const clean=line.replace(/\s+/g,' ').replace(/\s([.!~,])/g,'$1').trim();
@@ -351,3 +352,59 @@ export function fixLaughCount(text: string, seed = 0): string {
 export const EMOJI_ONLY_LINES = ['👍','😍','💕💕','🙌','😊😊','👏👏','🥰','✨✨','😆','🤗','💖💖','🔥🔥','👍👍','😍😍','🥰🥰','👏','💕','🙌🙌','😁','❤️'];
 /** 사이트 이모티콘(그림)을 누가 쓰면 가끔 */
 export const EMOJI_CUTE_LINES = combineLines(['','와','오','헐'],['이모티콘 귀엽다','이모티콘 너무 귀여워요','이모티콘 뭐예요 귀엽네요','그 이모티콘 귀여워요','이모티콘 탐나요','이모티콘 넘 귀엽네'],['','ㅋ','ㅎㅎㅎ','😆','🥰']);
+
+// ───────── ⑪ 다른 가상 손님 질문에 «시스템이 아는 사실»로 짧게 답 ─────────
+// [2026-11-15 14:53 사장님 「구독인증하면 무배냐 같은 건 다른 AI가 답하기 좋다 — 잘 캐치해서 한두 마디」]
+//   사실이 정해진 것만: 구독 무배(켜져 있을 때만)·카드결제(부가세 7%·카톡 링크)·해외배송 기간(2~3주, 해외배송 카드일 때)·
+//   방송 아닐 때도 주문 가능·주문 방법. 모르는 것(품질·재고·사이즈·국내 배송 날짜)은 답하지 않음.
+export type FactTopic='subscribe'|'card'|'overseas'|'replay'|'how';
+export function factTopic(text:string,o:{subscribeOn:boolean;overseas:boolean;live:boolean}):FactTopic|null{
+  const t=String(text||'');
+  if(!/[?？]|나요|까요|인가|되나|돼요|어떻게|어디|가요|예요|에요|ㄹ까|맞죠|죠/.test(t))return null;
+  if(/구독/.test(t)&&/무배|무료|배송비|인증/.test(t))return o.subscribeOn?'subscribe':null;
+  if(/카드|카결/.test(t)&&/돼|되|가능|어떻게|결제/.test(t))return 'card';
+  if(o.overseas&&/(얼마나|언제|며칠|몇\s*주).{0,10}(걸|와|받|도착|오)/.test(t))return 'overseas';
+  if(!o.live&&/(방송\s*(안|아닌|끝)|지금도|다시보기)/.test(t)&&/주문|담|사|구매/.test(t))return 'replay';
+  if(/주문\s*(어떻게|방법)|어떻게\s*주문|어디서\s*주문/.test(t))return 'how';
+  return null;
+}
+const FACT_LINES:Record<FactTopic,{heads:string[];cores:string[];tails:string[]}>={
+  subscribe:{heads:['','네','맞아요','네네'],cores:['주문서에서 유튜브 구독 캡처 올리면 배송비 빠져요','주문서 쓸 때 구독 인증하면 무배예요','구독 캡처를 주문서에 올리시면 돼요','주문서 화면에 구독 인증하는 칸 있어요','구독하고 캡처해서 주문서에 올리면 무배래요'],tails:['','쉬워요','꼭 하세요','배송비 아껴요']},
+  card:{heads:['','네','카드 돼요','네네'],cores:['주문서에서 카드결제 고르면 카톡으로 링크 와요','카드는 부가세 7% 붙어요','주문서에서 카드 고르시면 결제 링크 카톡으로 와요','카드결제 되는데 부가세 7% 추가예요'],tails:['','편해요','참고하세요']},
+  overseas:{heads:['','이거','해외배송이라'],cores:['해외배송이라 2~3주 정도 걸린대요','보통 2~3주 걸린다고 하더라구요','해외배송은 2~3주 정도래요','2~3주쯤 걸린대요'],tails:['','기다려야죠 뭐','조금 기다려야 해요']},
+  replay:{heads:['','네','지금도'],cores:['방송 아닐 때도 담고 주문할 수 있어요','다시보기 보면서 주문해도 돼요','지금도 상품 담아서 주문서 내면 돼요'],tails:['','편해요','저도 그렇게 해요']},
+  how:{heads:['','상품','그거'],cores:['상품 눌러서 담고 주문서 내시면 돼요','담기 누르고 아래 주문서에서 제출하면 돼요','상품 선택 누르고 담은 다음 주문서 쓰시면 돼요'],tails:['','쉬워요','금방 해요']},
+};
+export const FACT_ANSWERS:Record<FactTopic,string[]>=Object.fromEntries((Object.keys(FACT_LINES) as FactTopic[]).map(k=>[k,combineLines(FACT_LINES[k].heads,FACT_LINES[k].cores,FACT_LINES[k].tails,60).filter(l=>!/^(네|네네|맞아요|카드 돼요|이거|해외배송이라|지금도|상품|그거)$/.test(l))])) as Record<FactTopic,string[]>;
+export function factAnswerText(topic:FactTopic,seed:number):string{const p=FACT_ANSWERS[topic];return p[hashOf('fa:'+topic+seed)%p.length];}
+
+// ───────── ⑫ 다른 가상 손님 말에 맞장구 (사장님 14:54 「다시보기 좋다 → 저도 여기 좋은 거 같아요」·「7시 기대 → 저도 7시 딱 대기 중」) ─────────
+export type AgreeTopic='replay'|'nextShow'|'site'|'pretty'|'thanks'|'hello'|'brand';
+export function agreeTopic(text:string):AgreeTopic|null{
+  const t=String(text||'');
+  if(/[?？]/.test(t))return null;
+  if(/다시\s*보기/.test(t)&&/좋|편|최고|굿/.test(t))return 'replay';
+  if(/\d{1,2}\s*시/.test(t)&&/방송|올게|대기|기다|기대/.test(t))return 'nextShow';
+  if(/사이트|여기/.test(t)&&/좋|편|신기|깔끔/.test(t))return 'site';
+  if(/(또\s*언제|또\s*해|다시\s*들어|기다리고|재입고)/.test(t)&&BRAND_WORDS.some(([re])=>re.test(t)))return 'brand';
+  if(/수고|고생|감사했|즐거웠/.test(t))return 'thanks';
+  if(/예쁘|이쁘|예뻐|이뻐|예쁜|이쁜/.test(t))return 'pretty';
+  if(/^(안녕|하이|반가)/.test(t.trim()))return 'hello';
+  return null;
+}
+const AGREE_LINES:Record<AgreeTopic,{heads:string[];cores:string[];tails:string[]}>={
+  replay:{heads:['','저도','그쵸','맞아요','진짜','인정'],cores:['여기 좋은 거 같아요','다시보기로 주문하니까 편해요','방송 놓쳐도 주문할 수 있어서 좋아요','저도 다시보기로 보고 있어요','시간 맞추기 힘든데 다행이에요','이거 편하더라구요'],tails:['','완전','ㅋ','😊','편해요']},
+  nextShow:{heads:['','저도','오 저도','그쵸'],cores:['{t} 딱 대기 중이에요','{t} 알람 맞춰놨어요','{t}에 꼭 들어올 거예요','{t} 기다리고 있어요','{t}엔 일찍 들어와야겠어요','{t} 방송 놓치면 안 돼요'],tails:['','설레요','🙌','두근두근','같이 봐요']},
+  site:{heads:['','저도','그쵸','맞아요','오'],cores:['여기 좋은 거 같아요','사이트 편하더라구요','보면서 바로 담으니까 좋아요','저도 처음에 신기했어요','여기 편해서 자주 와요'],tails:['','완전','😊','진짜요']},
+  pretty:{heads:['','그쵸','저도','진짜','맞아요'],cores:['예쁘더라구요','저도 그거 눈여겨보고 있었어요','색감 좋아요','저도 고민 중이에요','예뻐서 탐나요'],tails:['','😍','고민돼요','ㅎ']},
+  thanks:{heads:['','그쵸','저도','맞아요'],cores:['오늘 수고 많으셨어요','언니 고생하셨어요','오늘 재밌었어요','다음에 또 봬요'],tails:['','🥰','~','다들 들어가세요']},
+  hello:{heads:['','어','오'],cores:['반가워요','안녕하세요','하이요','어서 오세요'],tails:['','👋','😊','~']},
+  brand:{heads:['','저도','오 저도','완전'],cores:['그거 기다리고 있어요','저도 그거 또 했으면 좋겠어요','저도 기다리는 중이에요','그거 또 해주시면 좋겠다'],tails:['','제발','🙏','같이 기다려요']},
+};
+export const AGREE_ANSWERS:Record<AgreeTopic,string[]>=Object.fromEntries((Object.keys(AGREE_LINES) as AgreeTopic[]).map(k=>[k,combineLines(AGREE_LINES[k].heads,AGREE_LINES[k].cores,AGREE_LINES[k].tails,50).filter(l=>!/^(저도|그쵸|맞아요|진짜|인정|오 저도|오|어|완전)$/.test(l))])) as Record<AgreeTopic,string[]>;
+export function agreeAnswerText(topic:AgreeTopic,source:string,seed:number):string|null{
+  const pool=AGREE_ANSWERS[topic];
+  let line=pool[hashOf('ag:'+topic+seed)%pool.length];
+  if(line.includes('{t}')){const m=String(source).match(/(오전|오후|아침|점심|저녁|밤)?\s*(\d{1,2})\s*시/);if(!m)return null;line=line.split('{t}').join(`${m[2]}시`);}
+  return line;
+}

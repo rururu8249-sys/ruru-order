@@ -3,7 +3,7 @@ import {FAREWELL_LINES,VISIT_LINES,ORDER_FIRST_LINES,ORDER_AFTER_LINES,GREETINGS
 import {safeConversationLine} from '../lib/liveAutomationPersona';
 import {advisesOthers,orderedAskBlocked} from '../lib/liveAutomationDirector';
 import {falseExperience} from '../lib/liveAutomationDialogue';
-import {fixLaughCount,EMOJIS,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,topBrands,brandAskText,BRAND_ASK_TEMPLATES,SMALL_TALKS,smallTalkPool,smallTalkAnswer} from '../lib/liveAutomationLines';
+import {factTopic,FACT_ANSWERS,factAnswerText,agreeTopic,AGREE_ANSWERS,agreeAnswerText,fixLaughCount,EMOJIS,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,topBrands,brandAskText,BRAND_ASK_TEMPLATES,SMALL_TALKS,smallTalkPool,smallTalkAnswer} from '../lib/liveAutomationLines';
 import {isCompletionReport} from '../lib/liveChatBot';
 
 const fail=(m:string)=>{throw new Error(m);};
@@ -151,4 +151,20 @@ if(!/주문/.test(smallTalkAnswer(cartTalk,1,{cart:true,ordered:true}))||/주문
 // 이미 주문한 손님이 주문 전 질문(사장님 캡처 «구독인증하면무배인가요?»)
 for(const t of ['구독인증하면무배인가요?','카드 결제 되나요?','주문 어떻게 해요?','배송비 얼마예요?','계좌 어디예요?'])if(!orderedAskBlocked(t))fail('주문 뒤 질문 못 거름 '+t);
 for(const t of ['주문서 낼 때 구독 인증했어요','블랙 이쁘네요','160에 50인데 몇 입으면 될까요?'])if(orderedAskBlocked(t))fail('거르면 안 됨 '+t);
+// 가상 손님 질문에 사실로 답 / 맞장구 (사장님 캡처 문장들)
+const on={subscribeOn:true,overseas:true,live:false};
+const fq:[string,string|null][]=[['구독인증하면무배인가요?','subscribe'],['카드결제 되나요?','card'],['이거 배송 얼마나 걸려요?','overseas'],['방송 안 할 때도 주문돼요?','replay'],['주문 어떻게 해요?','how'],['블랙 이쁘다','null']];
+for(const [t,e] of fq)if(String(factTopic(t,on))!==e)fail('사실 질문 '+t+' '+factTopic(t,on));
+if(factTopic('구독인증하면무배인가요?',{...on,subscribeOn:false}))fail('구독 무배 꺼졌는데 답');
+if(factTopic('이거 배송 얼마나 걸려요?',{...on,overseas:false}))fail('국내 배송 날짜 지어냄');
+for(const k of Object.keys(FACT_ANSWERS) as (keyof typeof FACT_ANSWERS)[]){checkPool('사실 답 '+k,FACT_ANSWERS[k],12,60);for(const t of FACT_ANSWERS[k])if(/저도\s*저도|네\s*네\s*네/.test(t))fail('겹침 '+t);}
+if(!FACT_ANSWERS.overseas.every(t=>/2~3주/.test(t)))fail('해외배송 기간');
+if(!FACT_ANSWERS.card.some(t=>/7%/.test(t)))fail('카드 부가세');
+const ag:[string,string|null][]=[['다시보기 보면서 주문할 수 있어서 좋네요~ㅎ','replay'],['오늘 저녁 7시 방송 기대돼용!','nextShow'],['여기 사이트 좋네요','site'],['알로 또 언제 해요? 기다릴게요','null'],['알로 기다리고 있어요','brand'],['오늘 수고하셨어요','thanks'],['안녕하세요 반가워요~','hello'],['베이지 너무 이쁘다','pretty']];
+for(const [t,e] of ag)if(String(agreeTopic(t))!==e)fail('맞장구 주제 '+t+' '+agreeTopic(t));
+for(const k of Object.keys(AGREE_ANSWERS) as (keyof typeof AGREE_ANSWERS)[]){const pool=AGREE_ANSWERS[k].map(t=>t.split('{t}').join('7시'));checkPool('맞장구 '+k,pool,15,50);for(const t of pool)if(/(저도|그쵸|맞아요|진짜)\s+\1/.test(t))fail('겹침 '+t);}
+const ns2=new Set<string>();for(let i=0;i<60;i++){const t=agreeAnswerText('nextShow','오늘 저녁 7시 방송 기대돼용!',i)!;if(!/7시/.test(t))fail('시간 '+t);ns2.add(t);}
+if(ns2.size<20)fail('7시 맞장구 다양성 '+ns2.size);
+if(agreeAnswerText('nextShow','방송 기대돼요',1)!==null&&/\{t\}|\d시/.test(String(agreeAnswerText('nextShow','방송 기대돼요',1))))fail('시간 없는데 지어냄');
+console.log('답·맞장구 ok |',factAnswerText('subscribe',3),'|',agreeAnswerText('replay','',5),'|',[...ns2].slice(0,4).join(' / '));
 console.log('ALL OK');

@@ -21,7 +21,7 @@ import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
-import {EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
+import {agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
 import {announceOrderThanks} from './liveOrderChatServer';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
@@ -472,6 +472,40 @@ export function orderedAskBlocked(t:string):boolean{
  const asking=/[?？]|나요|까요|인가|되나|돼요\?|어떻게|어디|가요$/.test(t);
  return asking&&/구독|무배|무료\s*배송|배송비|카드\s*(결제)?\s*(돼|되|가능)|결제\s*(방법|어떻게)|주문\s*(어떻게|방법)|계좌|입금\s*(어디|어떻게)|합배송/.test(t);
 }
+
+/** [2026-11-15 14:53~14:54 사장님] 다른 가상 손님 말에 한두 마디 — 사실이 정해진 질문엔 답(65%), 좋다·기대된다 같은 말엔 맞장구(35%).
+ *  그 글 뒤에 아무도(사람·가상 손님) 말 안 했을 때만, 10~40초 뒤, 방 전체 2분에 한 번. */
+async function replyToAiFlow(x:CodeCtx):Promise<boolean>{
+ const m=x.messages.find(v=>v.badge!=='bot');
+ if(!m||!m.automation_actor_id)return false; // 가장 최근 글이 가상 손님 글일 때만
+ const at=Date.parse(String(m.created_at)),mid=Number(m.id);
+ if(!(at>x.now-120000))return false;
+ if(x.now<at+10000+(hashOf('rw:'+mid)%30000))return false;
+ if(x.actions.some(a=>Number(planOf(a).replyToAi)===mid))return false;
+ if(x.actions.some(a=>planOf(a).replyToAi&&Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-120000))return false;
+ // 이 글이 다른 가상 손님에 대한 답·맞장구였으면 또 받지 않음(끝없는 주고받기 금지)
+ if(x.actions.some(a=>String(a.actor_id)===String(m.automation_actor_id)&&(planOf(a).replyToAi||planOf(a).role==='a'||planOf(a).sizeFor||planOf(a).askLunaFor)&&clean(planOf(a).text)===clean(m.body)))return false;
+ const body=clean(m.body);
+ if(x.actions.some(a=>planOf(a).role==='q'&&clean(planOf(a).text)===body))return false; // 손님끼리 묻기는 그쪽에서 답함
+ const subscribeOn=await readSubscribeFreeShipConfig(x.db).then(cfg=>isSubscribeFreeShipActive(cfg)).catch(()=>false);
+ const card=await readDialogueCard(x.db,x.c.broadcast_id).catch(()=>null);
+ const fact=factTopic(body,{subscribeOn,overseas:Boolean(card?.overseas),live:x.live});
+ let text:string|null=null;
+ if(fact){
+  if(hashOf('fq:'+mid)%100>=65)return false;
+  if((fact==='card'||fact==='overseas')&&x.messages.some(v=>Number(v.id)>mid&&v.badge==='bot'))return false; // 쇼핑도우미가 이미 답함
+  text=factAnswerText(fact,mid);
+ }else{
+  const ag=agreeTopic(body);
+  if(!ag||hashOf('aq:'+mid)%100>=35)return false;
+  text=agreeAnswerText(ag,body,mid);
+ }
+ if(!text)return false;
+ const cands=x.actors.filter(a=>String(a.id)!==String(m.automation_actor_id)&&x.sessions.some(s=>s.actor_id===a.id));
+ if(!cands.length)return false;
+ const actor=cands[hashOf('ra:'+mid)%cands.length];
+ return postCodeLine(x,actor,'chat',personaVoice(text,seedOf(actor),mid),{replyToAi:mid},null,fact?'가상 손님 질문에 답':'맞장구');
+}
 export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch=fetch){
  if(!c.chat_enabled)return;
  // [2026-11-14] 학습 노트 — 3시간마다(새 채팅 40개 이상) 자동 정리, 실패해도 대화는 계속
@@ -506,6 +540,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  if(await humanSizeAskFlow(codeCtx,holds).catch(()=>false))return;
  if(await smallTalkAnswerFlow(codeCtx,holds).catch(()=>false))return;
  if(await emojiCuteFlow(codeCtx).catch(()=>false))return;
+ if(await replyToAiFlow(codeCtx).catch(()=>false))return;
  if(await greetFlow(codeCtx).catch(()=>false))return;
  // 언제 판단할지: 사람이 새 글을 쓰면(아직 판단 안 한 글) 10초 뒤 바로, 아니면 AI 글 사이 20~45초 + 확률(밤엔 아주 드물게)
  const considered=Math.max(0,...actions.map(a=>Number((a as Action&{source_message_id?:unknown}).source_message_id)||0));
