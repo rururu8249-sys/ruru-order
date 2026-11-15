@@ -57,5 +57,5 @@ export async function verifiedChatRole(sb: SupabaseClient, identity: ChatIdentit
   const isOp = (ops.data ?? []).some(o => String(o.customer_phone).replace(/\D/g, "") === identity.phone);
   // [2026-11-13] 채팅 관리자(mods·R) = 글 삭제·금지·차단·지운 글 원문만. 그 밖의 관리는 총관리자·관리자 시험 계정(isManager)만
   const isManager = isOwner || isOp;
-  return mergeFlags(fromTable, { isOwner, isMod: isOwner || setting.mods.includes(identity.phone) || isOp, isManager, seeTest: isManager, persona: isOwner });
+  return mergeFlags(fromTable, { isOwner, isMod: isOwner || setting.mods.includes(identity.phone) || isOp, isManager, seeTest: isManager, persona: isOwner, phrases: isManager });
 }

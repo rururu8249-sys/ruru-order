@@ -18,7 +18,7 @@ export function verifyChatAccount() {
   const popup = window.open(url, "ruru-chat-verification", "width=480,height=720");
   if (!popup) window.location.assign(url);
 }
-export type ChatPerms = { owner: boolean; host: boolean; moderate: boolean; test: boolean; persona: boolean; memory?: boolean };
+export type ChatPerms = { owner: boolean; host: boolean; moderate: boolean; test: boolean; persona: boolean; memory?: boolean; phrases?: boolean };
 const NO_PERMS: ChatPerms = { owner: false, host: false, moderate: false, test: false, persona: false };
 type PrivateState = { memoryPublic?: boolean; perms: ChatPerms; testMessages: Record<string,{nickname:string;body:string}>; avatars: Record<string,string>; verified: boolean; canReviewDeleted: boolean; ownIds: number[]; hiddenIds: number[]; deletedMessages: LiveChatMessage[]; commandMessages: LiveChatMessage[] };
 const EMPTY: PrivateState = { perms: NO_PERMS, testMessages: {}, avatars: {}, verified: false, canReviewDeleted: false, ownIds: [], hiddenIds: [], deletedMessages: [], commandMessages: [] };
@@ -73,7 +73,7 @@ export function useLiveChatPrivate(bc: string, enabled: boolean, messages: LiveC
         const m = parseChatMessage(raw); return m && m.broadcastId === bc ? { ...m, privateCommand: true } : null;
       }).filter(Boolean) as LiveChatMessage[] : [];
       const pr = j.perms && typeof j.perms === "object" ? j.perms : null;
-      const perms: ChatPerms = pr ? { owner: pr.owner === true, host: pr.host === true, moderate: pr.moderate === true, test: pr.test === true, persona: pr.persona === true, memory: pr.memory === true } : NO_PERMS;
+      const perms: ChatPerms = pr ? { owner: pr.owner === true, host: pr.host === true, moderate: pr.moderate === true, test: pr.test === true, persona: pr.persona === true, memory: pr.memory === true, phrases: pr.phrases === true } : NO_PERMS;
       // [2026-11-15] 테스트 글 원문은 서버가 「테스트 표시 보기」 권한일 때만 보냄 — 채팅 정리 권한과 따로
       setState({ memoryPublic: j.memoryPublic === true, perms, testMessages: j.canReviewDeleted || perms.test ? (j.testMessages || {}) : {}, avatars: j.canReviewDeleted ? (j.avatars || {}) : {}, verified: j.verified === true, canReviewDeleted: j.canReviewDeleted === true, ownIds: j.ownIds || [], hiddenIds: j.hiddenIds || [], deletedMessages, commandMessages });
     }).catch(() => { /* 네트워크 실패 — 직전 화면 유지(사진이 진짜↔기본으로 깜박이지 않게) */ });

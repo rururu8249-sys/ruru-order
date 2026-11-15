@@ -112,6 +112,8 @@ type Props = {
     canModerate: boolean;
     /** [2026-11-13] 그 밖의 관리(상품 선택·소개영상·카드·자주 쓰는 말·보는 사람·PC 두 칸) — 총관리자·관리자 시험 계정만. 채팅 관리자(R)는 일반 손님 화면 */
     canManage?: boolean;
+    /** [2026-11-15] 자주 쓰는 말만 쓰는 회원(본인 목록) */
+    canQuickPhrases?: boolean;
     onSend: (body: string, target?: ChatProductSelection, manual?: ManualChatSelection) => Promise<{ ok: boolean; message?: string }>;
     /** 고정 댓글(없으면 null) */
     pinned: LiveChatMessage | null;
@@ -1028,12 +1030,12 @@ export default function LiveWatchView(props: Props) {
 
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
   // [2026-11-12 사장님 22:34] 관리자(채팅 관리 권한)는 넓은 PC에서 유튜브 채팅창을 사이트 채팅 옆에 나란히 — 두 칸이면 조금 좁게
-  const adminDual = Boolean(isWidePc && chat?.canManage && videoId);
+  const adminDual = Boolean(isWidePc && (chat?.canManage || chat?.canQuickPhrases) && videoId);
   const desktopChatWidth = adminDual ? "clamp(260px, 24vw, 440px)" : "clamp(280px, 35vw, 560px)";
   const videoRight = isDesktop && !focus ? (adminDual ? `calc(${desktopChatWidth} * 2)` : desktopChatWidth) : 0;
   // [11:46 사장님] 자주 쓰는 말 판이 열려 있으면 영상 칸을 그만큼 좁혀 영상이 왼쪽으로 가고, 판은 영상과 채팅 사이 빈칸에(영상 안 가림)
   const [quickOpen, setQuickOpen] = useState(false);
-  const quickShown = isDesktop && !!chat?.canManage && !focus;
+  const quickShown = isDesktop && !!(chat?.canManage || chat?.canQuickPhrases) && !focus;
   const videoAreaRight = quickShown && quickOpen ? `calc(${videoRight || "0px"} + ${QUICK_PHRASE_COLUMN}px)` : videoRight;
   const [pageHost, setPageHost] = useState("");
   useEffect(() => { setPageHost(window.location.hostname); }, []);
@@ -1728,7 +1730,7 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 관리자 PC — 자주 쓰는 말(영상 칸 왼쪽 아래) */}
-      {quickShown && chat ? <ChatQuickPhrases right={videoRight} onOpenChange={setQuickOpen} onNotice={setChatHint} onSendSite={(phrase) => chat.onSend(phrase).catch(() => ({ ok: false, message: "사이트 채팅에 못 보냈어요" }))} /> : null}
+      {quickShown && chat ? <ChatQuickPhrases own={!chat.canManage} right={videoRight} onOpenChange={setQuickOpen} onNotice={setChatHint} onSendSite={(phrase) => chat.onSend(phrase).catch(() => ({ ok: false, message: "사이트 채팅에 못 보냈어요" }))} /> : null}
 
       {/* 채팅 안내(보냄 실패·금지 등) */}
       {chatHint ? (

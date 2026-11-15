@@ -15,6 +15,7 @@ const GROUPS: { key: string; label: string }[] = [
   { key: "owner", label: "총관리자" },
   { key: "sub", label: "부관리자" },
   { key: "chat", label: "채팅 관리자" },
+  { key: "chatPhrases", label: "채팅 관리자 + 자주 쓰는 말" },
   { key: "custom", label: "직접 고른 권한" },
 ];
 
@@ -33,6 +34,29 @@ function PermChips({ perms, badge }: { perms: MemberPerm[]; badge: MemberBadge |
           {p === "owner" ? `총관리자 · ${badge === "crown" ? "금색 왕관" : "분홍 왕관"}` : MEMBER_PERM_INFO[p].label}
         </span>
       ))}
+    </div>
+  );
+}
+
+// [2026-11-15] «자주 쓰는 말» 권한만 받은 회원의 본인 목록 — 총관리자 읽기만(그분이 방송 화면에서 고침)
+function MemberPhrases({ kakaoId }: { kakaoId: string }) {
+  const [state, setState] = useState<{ phrases: string[]; saved: boolean } | null | "error">(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/live-chat/quick-phrases?member=${encodeURIComponent(kakaoId)}`, { cache: "no-store" })
+      .then((r) => r.json()).then((j) => { if (alive) setState(j?.ok ? { phrases: j.phrases || [], saved: j.saved === true } : "error"); })
+      .catch(() => { if (alive) setState("error"); });
+    return () => { alive = false; };
+  }, [kakaoId]);
+  return (
+    <div className="mt-4">
+      <div className="text-[13px] font-semibold text-ink-soft">이분의 자주 쓰는 말 (보기만)</div>
+      <div className="mt-1 rounded-lg border border-line px-3 py-2 text-[13px] text-ink">
+        {state === null ? <span className="text-ink-mute">불러오는 중…</span>
+          : state === "error" ? <span className="text-danger-tx">못 불러왔어요</span>
+          : !state.phrases.length ? <span className="text-ink-mute">{state.saved ? "비어 있어요" : "아직 안 만들었어요"}</span>
+          : <ol className="list-decimal space-y-1 pl-5">{state.phrases.map((t, i) => <li key={i} className="break-words">{t}</li>)}</ol>}
+      </div>
     </div>
   );
 }
@@ -219,7 +243,7 @@ export default function MemberRolesCard() {
             </div>
             <div className="overflow-y-auto px-5 py-4">
               <div className="text-[13px] font-semibold text-ink-soft">역할</div>
-              <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-surface-2 p-1 sm:grid-cols-4">
+              <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-surface-2 p-1 sm:grid-cols-3">
                 {[...MEMBER_PRESETS.map((p) => ({ key: p.key, label: p.label, perms: p.perms as MemberPerm[] | null })), { key: "custom", label: "직접 고르기", perms: null }].map((p) => {
                   const on = draftPreset === p.key;
                   return (
@@ -259,6 +283,7 @@ export default function MemberRolesCard() {
                   </div>
                 </div>
               ) : null}
+              {edit.perms.includes("phrases") && !edit.perms.includes("host") && !edit.perms.includes("owner") ? <MemberPhrases kakaoId={edit.kakaoId} /> : null}
               <p className="mt-4 text-[13px] text-ink-mute">저장하면 그분 다음 채팅 글부터 표시가 바뀌고, 방송 화면은 새로고침하면 바로 적용돼요.</p>
             </div>
             <div className="flex items-center gap-2 border-t border-line px-5 py-3">

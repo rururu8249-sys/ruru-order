@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       return message ? { ...message, deletedByAuthor: true } : null;
     }).filter(Boolean);
     const commandMessages = (commands.data ?? []).map(row => parseChatMessage(role.isMod ? { ...row, hidden_at: null, pinned_at: null } : publicChatRow({ ...row, hidden_at: null, pinned_at: null }))).filter(Boolean);
-    return json({ ok: true, verified: Boolean(identity), canReviewDeleted: role.isMod, perms: admin ? null : { owner: role.isOwner, host: role.isManager, moderate: role.isMod, test: role.seeTest, persona: role.persona, memory: Boolean(role.memory) }, memoryPublic, avatars, testMessages, ownIds: (own.data ?? []).map(r => r.id), hiddenIds: (hidden.data ?? []).map(r => r.id), deletedMessages, commandMessages });
+    return json({ ok: true, verified: Boolean(identity), canReviewDeleted: role.isMod, perms: admin ? null : { owner: role.isOwner, host: role.isManager, moderate: role.isMod, test: role.seeTest, persona: role.persona, memory: Boolean(role.memory), phrases: Boolean(role.phrases) }, memoryPublic, avatars, testMessages, ownIds: (own.data ?? []).map(r => r.id), hiddenIds: (hidden.data ?? []).map(r => r.id), deletedMessages, commandMessages });
   } catch { return fail("채팅 권한을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.", 503); }
 }
 

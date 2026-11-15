@@ -7,15 +7,17 @@ const R = load("lib/liveMemberRoles.ts");
 
 // 프리셋 → 판정
 const f = (p) => R.flagsFromPerms(R.cleanPerms(p));
-assert.deepEqual(f(["owner"]), { isOwner: true, isManager: true, isMod: true, seeTest: true, persona: true, memory: true });
-assert.deepEqual(f(["moderate", "test", "persona"]), { isOwner: false, isManager: false, isMod: true, seeTest: true, persona: true, memory: false }, "부관리자");
-assert.deepEqual(f(["moderate"]), { isOwner: false, isManager: false, isMod: true, seeTest: false, persona: false, memory: false }, "채팅 관리자 = 테스트 표시 안 봄");
-assert.deepEqual(f(["host"]), { isOwner: false, isManager: true, isMod: true, seeTest: true, persona: false, memory: false }, "방송 진행 = 예전 isManager");
-assert.deepEqual(f(["test"]), { isOwner: false, isManager: false, isMod: false, seeTest: true, persona: false, memory: false });
-assert.deepEqual(f(["memory"]), { isOwner: false, isManager: false, isMod: false, seeTest: false, persona: false, memory: true }, "구매 얘기 시험 보기만 — [테스트] 표시 없음");
+assert.deepEqual(f(["owner"]), { isOwner: true, isManager: true, isMod: true, seeTest: true, persona: true, memory: true, phrases: true });
+assert.deepEqual(f(["moderate", "test", "persona"]), { isOwner: false, isManager: false, isMod: true, seeTest: true, persona: true, memory: false, phrases: false }, "부관리자");
+assert.deepEqual(f(["moderate"]), { isOwner: false, isManager: false, isMod: true, seeTest: false, persona: false, memory: false, phrases: false }, "채팅 관리자 = 테스트 표시 안 봄");
+assert.deepEqual(f(["host"]), { isOwner: false, isManager: true, isMod: true, seeTest: true, persona: false, memory: false, phrases: true }, "방송 진행 = 예전 isManager");
+assert.deepEqual(f(["test"]), { isOwner: false, isManager: false, isMod: false, seeTest: true, persona: false, memory: false, phrases: false });
+assert.deepEqual(f(["memory"]), { isOwner: false, isManager: false, isMod: false, seeTest: false, persona: false, memory: true, phrases: false }, "구매 얘기 시험 보기만 — [테스트] 표시 없음");
+assert.deepEqual(f(["moderate", "phrases"]), { isOwner: false, isManager: false, isMod: true, seeTest: false, persona: false, memory: false, phrases: true }, "채팅 관리자 + 자주 쓰는 말 = 방송 진행 아님");
 assert.deepEqual(R.cleanPerms(["owner", "hack", "owner", 3]), ["owner"], "모르는 값·중복 버림");
 assert.equal(R.presetOf(["moderate"]), "chat");
 assert.equal(R.presetOf(["persona", "test", "moderate"]), "sub");
+assert.equal(R.presetOf(["phrases", "moderate"]), "chatPhrases");
 assert.equal(R.presetOf(["moderate", "test"]), "custom");
 assert.equal(R.badgeFromRole(["owner"], "crown_pink"), "crown_pink");
 assert.equal(R.badgeFromRole(["owner"], null), "crown");

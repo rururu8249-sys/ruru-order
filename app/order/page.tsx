@@ -8473,6 +8473,8 @@ export default function OrderPage() {
                 // [2026-11-15] 방송 화면 권한(설정 › 방송 화면 권한, 카카오 계정 기준)도 함께 — 서버가 다시 확인
                 canModerate: !viewAsCustomer && (privateChat.perms.moderate || operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null),
                 canManage: !viewAsCustomer && (privateChat.perms.host || operatorTestAccount !== null || isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone))),
+                // [2026-11-15] «자주 쓰는 말» 권한만 받은 회원 — 본인 목록(서버가 다시 확인)
+                canQuickPhrases: !viewAsCustomer && privateChat.perms.phrases === true,
                 emojis: liveChatEmojis,
                 canEmoji: liveChatCanEmoji,
                 onSend: async (body, target, manual) => {

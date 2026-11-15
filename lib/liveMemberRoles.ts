@@ -6,7 +6,7 @@
 //   돈·주문·입금 무관.
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const MEMBER_PERMS = ["owner", "host", "moderate", "test", "persona", "memory"] as const;
+export const MEMBER_PERMS = ["owner", "host", "moderate", "test", "persona", "memory", "phrases"] as const;
 export type MemberPerm = (typeof MEMBER_PERMS)[number];
 export type MemberBadge = "crown" | "crown_pink";
 
@@ -16,13 +16,15 @@ export const MEMBER_PERM_INFO: Record<MemberPerm, { label: string; desc: string 
   moderate: { label: "채팅 정리", desc: "글 삭제 · 5분 금지 · 접속 차단 · 손님이 지운 글 보기" },
   test: { label: "테스트 표시 보기", desc: "[테스트] 글·테스트 시청자 표시" },
   persona: { label: "닉네임 골라 보내기", desc: "자동 테스트 손님 이름으로 채팅 보내기" },
+  phrases: { label: "자주 쓰는 말", desc: "방송 화면(PC)에서 자주 쓰는 말 — 유튜브 복사·사이트 채팅 보내기. 본인만의 목록(총관리자 목록과 따로, 총관리자는 볼 수 있음)" },
   memory: { label: "구매 얘기 시험 보기", desc: "자동 테스트 손님의 «지난번 ○○ 샀었는데 좋았어요» 글을 일반 손님 화면 그대로 보기([테스트] 표시 없이) — 일반 계정으로 실전처럼 시험할 때" },
 };
 
 export const MEMBER_PRESETS: { key: string; label: string; desc: string; perms: MemberPerm[] }[] = [
-  { key: "owner", label: "총관리자", desc: "모든 기능", perms: ["owner", "host", "moderate", "test", "persona", "memory"] },
+  { key: "owner", label: "총관리자", desc: "모든 기능", perms: ["owner", "host", "moderate", "test", "persona", "memory", "phrases"] },
   { key: "sub", label: "부관리자", desc: "채팅 정리 · 테스트 보기 · 닉네임 골라 보내기", perms: ["moderate", "test", "persona"] },
   { key: "chat", label: "채팅 관리자", desc: "채팅 정리만 (R 표시)", perms: ["moderate"] },
+  { key: "chatPhrases", label: "채팅 관리자 + 자주 쓰는 말", desc: "채팅 정리 · 내 자주 쓰는 말(유튜브 복사·사이트 보내기)", perms: ["moderate", "phrases"] },
 ];
 
 export function cleanPerms(raw: unknown): MemberPerm[] {
@@ -35,7 +37,7 @@ export function presetOf(perms: MemberPerm[]): string {
   return MEMBER_PRESETS.find((p) => [...p.perms].sort().join(",") === key)?.key ?? "custom";
 }
 
-export type MemberFlags = { isOwner: boolean; isManager: boolean; isMod: boolean; seeTest: boolean; persona: boolean; memory?: boolean };
+export type MemberFlags = { isOwner: boolean; isManager: boolean; isMod: boolean; seeTest: boolean; persona: boolean; memory?: boolean; phrases?: boolean };
 export const NO_MEMBER_FLAGS: MemberFlags = { isOwner: false, isManager: false, isMod: false, seeTest: false, persona: false };
 
 /** 권한 → 화면·서버가 쓰는 판정. 총관리자는 전부, 방송 진행은 채팅 정리·테스트 보기도 포함(예전 isManager 와 같음). */
@@ -43,7 +45,7 @@ export function flagsFromPerms(perms: MemberPerm[]): MemberFlags {
   const has = (p: MemberPerm) => perms.includes(p);
   const isOwner = has("owner");
   const isManager = isOwner || has("host");
-  return { isOwner, isManager, isMod: isManager || has("moderate"), seeTest: isManager || has("test"), persona: isOwner || has("persona"), memory: isOwner || has("memory") };
+  return { isOwner, isManager, isMod: isManager || has("moderate"), seeTest: isManager || has("test"), persona: isOwner || has("persona"), memory: isOwner || has("memory"), phrases: isManager || has("phrases") };
 }
 
 /** 채팅 글 옆 표시 — 총관리자 왕관, 채팅 정리·방송 진행 R, 나머지 없음 */
@@ -54,7 +56,7 @@ export function badgeFromRole(perms: MemberPerm[], badge: MemberBadge | null): M
 }
 
 export function mergeFlags(a: MemberFlags, b: MemberFlags): MemberFlags {
-  return { isOwner: a.isOwner || b.isOwner, isManager: a.isManager || b.isManager, isMod: a.isMod || b.isMod, seeTest: a.seeTest || b.seeTest, persona: a.persona || b.persona, memory: Boolean(a.memory || b.memory) };
+  return { isOwner: a.isOwner || b.isOwner, isManager: a.isManager || b.isManager, isMod: a.isMod || b.isMod, seeTest: a.seeTest || b.seeTest, persona: a.persona || b.persona, memory: Boolean(a.memory || b.memory), phrases: Boolean(a.phrases || b.phrases) };
 }
 
 export type MemberRoleRow = { kakao_id: string; perms: MemberPerm[]; badge: MemberBadge | null; nickname: string | null; updated_at?: string | null };

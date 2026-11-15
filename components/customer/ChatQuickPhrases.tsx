@@ -15,7 +15,7 @@ type SendResult = { ok: boolean; message?: string };
 // 판이 열려 있으면 영상과 채팅 사이에 이만큼 자리를 비워 둠(영상은 왼쪽으로 밀림)
 export const QUICK_PHRASE_COLUMN = 420;
 
-export default function ChatQuickPhrases({ onSendSite, onNotice, right, onOpenChange }: { onSendSite: (phrase: string) => Promise<SendResult>; onNotice?: (message: string) => void; right?: string | number; onOpenChange?: (open: boolean) => void }) {
+export default function ChatQuickPhrases({ onSendSite, onNotice, right, onOpenChange, own = false }: { own?: boolean; onSendSite: (phrase: string) => Promise<SendResult>; onNotice?: (message: string) => void; right?: string | number; onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(() => { try { return typeof window === "undefined" || localStorage.getItem(OPEN_KEY) !== "0"; } catch { return true; } });
   const toggle = (next: boolean) => { setOpen(next); try { localStorage.setItem(OPEN_KEY, next ? "1" : "0"); } catch {} };
   const [phrases, setPhrases] = useState<string[]>([]);
@@ -32,10 +32,10 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right, onOpenCh
       .then((r) => r.json())
       .then((j) => {
         if (!alive) return;
-        setPhrases(j?.ok && Array.isArray(j.phrases) ? cleanQuickPhrases(j.phrases) : [...DEFAULT_QUICK_PHRASES]);
+        setPhrases(j?.ok && Array.isArray(j.phrases) ? cleanQuickPhrases(j.phrases) : own ? [] : [...DEFAULT_QUICK_PHRASES]);
         setLoaded(true);
       })
-      .catch(() => { if (alive) { setPhrases((cur) => cur.length ? cur : [...DEFAULT_QUICK_PHRASES]); setLoaded(true); } });
+      .catch(() => { if (alive) { setPhrases((cur) => cur.length || own ? cur : [...DEFAULT_QUICK_PHRASES]); setLoaded(true); } });
     return () => { alive = false; };
   }, []);
   // 유튜브 = 클립보드 복사(유튜브 채팅칸에 붙여넣기 — 유튜브 화면은 남의 사이트라 글을 직접 못 넣음, API 는 하루 한도를 써서 안 씀).
@@ -105,7 +105,7 @@ export default function ChatQuickPhrases({ onSendSite, onNotice, right, onOpenCh
         <section data-live-quick-phrases="open" aria-label="자주 쓰는 말" onClick={(e) => e.stopPropagation()}
           style={{ ...wrap, width: `${QUICK_PHRASE_COLUMN - 24}px`, maxHeight: "calc(100% - 32px)", display: "flex", flexDirection: "column", background: "rgba(15,15,15,0.92)", border: "1px solid #333333", borderRadius: "12px", color: "#FFFFFF", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "2px", padding: "8px 6px 4px 12px", flexShrink: 0 }}>
-            <strong style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap" }}>자주 쓰는 말</strong>
+            <strong style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap" }}>{own ? "내 자주 쓰는 말" : "자주 쓰는 말"}</strong>
             <button type="button" onClick={openEdit} style={plain} aria-label="자주 쓰는 말 편집">편집</button>
             <button type="button" onClick={() => toggle(false)} style={plain} aria-label="자주 쓰는 말 접기">접기</button>
           </div>
