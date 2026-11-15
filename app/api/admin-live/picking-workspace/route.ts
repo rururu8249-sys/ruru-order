@@ -63,11 +63,13 @@ export async function POST(request: NextRequest) {
         if (page.length < 1000) return result;
       }
     };
-    const [selectedRows, paidTodayRows, repickRowsAll, recentCardWithoutTimeRows] = await Promise.all([
+    // [2026-11-16 사장님 「고객이슈에 등록해야만 나오게」] 오늘 결제된 지난 주문·최근 카드결제 자동 추가는 안 함
+    //   (자정에 숫자가 바뀌어 헷갈림). 지난 방송 주문은 그 방송을 골라 물건챙기기에서 확인. 다시 챙기기만 고객이슈 기준으로 남김.
+    const paidTodayRows: OrderRow[] = [];
+    const recentCardWithoutTimeRows: OrderRow[] = [];
+    const [selectedRows, repickRowsAll] = await Promise.all([
       loadPickingWorkspaceRows(source, broadcastIds),
-      readAllSafetyRows("paid_today"),
       readAllSafetyRows("repick"),
-      readAllSafetyRows("recent_card_without_time"),
     ]);
     // [2026-11-03 사장님 「고객이슈에 있는 거 아니면 굳이 띄우지 마」] 「다시 챙기기」(상품 바꾼 뒤 챙김 풀린 줄)는
     //   그 주문에 «아직 안 끝난 고객이슈»(본문 「주문번호: 코드」, 해결·삭제 아님)가 있을 때만 추가 작업으로 띄운다.
