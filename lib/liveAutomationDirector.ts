@@ -22,7 +22,7 @@ import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
-import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,emojiReactText,fixLaughCount,BRAND_WORDS,brandAskText,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,fillVisitLine,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText,recentNameSet,similarToRecent} from './liveAutomationLines';
+import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,emojiReactText,fixLaughCount,BRAND_WORDS,brandAskText,topProductNamesByBrand,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,fillVisitLine,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText,recentNameSet,similarToRecent} from './liveAutomationLines';
 import {announceOrderThanks} from './liveOrderChatServer';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
@@ -407,11 +407,12 @@ async function humanSizeAskFlow(x:CodeCtx,holds:Row[]):Promise<boolean>{
 }
 
 // [2026-11-15 14:47 사장님] 최근 90일 많이 팔린 브랜드(알로·룰루레몬 가중) — 1시간 기억
-let brandCache:{at:number;list:string[]}|null=null;
+let brandCache:{at:number;list:string[];names:Map<string,string[]>}|null=null;
 async function hotBrands(db:SupabaseClient,now:number):Promise<string[]>{
  if(brandCache&&now-brandCache.at<3600000)return brandCache.list;
  const r=await rows<Row>(db.from('orders').select('product_name').gte('created_at',new Date(now-90*86400000).toISOString()).neq('is_deleted',true).neq('is_test_order',true).is('automation_actor_id',null).limit(5000)).catch(()=>[] as Row[]);
- brandCache={at:now,list:topBrands(r.map(x=>String(x.product_name||'')))};
+ const names=r.map(x=>String(x.product_name||''));
+ brandCache={at:now,list:topBrands(names),names:topProductNamesByBrand(names)};
  return brandCache.list;
 }
 /** «알로 또 언제 해요?» — 지금 카드 상품 브랜드는 빼고, 방 전체 20분에 한 번, 한 사람 한 번 */
@@ -424,10 +425,10 @@ async function brandAskFlow(x:CodeCtx,speakers:Actor[],cardName:string):Promise<
  if(!who.length)return false;
  const seed=Math.floor(x.now/60000);
  const actor=who[seed%who.length],brand=brands[Math.min(brands.length-1,Math.floor((hashOf('b:'+seed)%100)/100*Math.min(brands.length,3)))];
- // [19:11 사장님 「등록했던 꼼데 상품명 있을 거 아니야, 구체적으로」] 실제 팔린 그 브랜드 품목(꼼데 가디건·알로 부츠컷팬츠…)을 넣어서
- const items=(await hotSoldItems(x.db,x.now).catch(()=>[] as SoldItem[])).filter(it=>it.brand===brand&&it.item);
- const it=items.length&&hashOf('bi:'+seed)%4!==0?items[hashOf('bit:'+seed)%Math.min(items.length,3)]:null;
- const label=it?`${brand} ${it.item}`:brand;
+ // [23:51 사장님 「몽클레어도 해주세요 말고 정확히 등록된 상품명으로」] 실제 판 등록 상품명(MC-319 연베이지·알로 부츠컷팬츠…)만 — 브랜드 이름만은 안 씀
+ const named=(brandCache?.names.get(brand)||[]);
+ if(!named.length)return false;
+ const label=named[hashOf('bit:'+seed)%Math.min(named.length,3)];
  return postCodeLine(x,actor,'chat',personaVoice(brandAskText(label,seed),seedOf(actor),seed),{brandAsk:brand},null,'브랜드 또 언제');
 }
 /** 손님끼리 한두 마디 — 시작(묻기) */

@@ -243,3 +243,13 @@ console.log('ALL OK');
   if(!similarToRecent('짱둥이',['루루동이']))fail('가게 이름 비슷 통과');
   console.log('비슷한 닉네임 ok',names.join(','));
 }
+// 2026-11-15 23:51 브랜드 요청은 등록 상품명으로
+{
+  const {topProductNamesByBrand,brandAskText}=await import('../lib/liveAutomationLines');
+  const m=topProductNamesByBrand(['MC-319 연베이지','MC-319 연베이지','MC-347 블랙(마야 무광 남성용)','알로 부츠컷팬츠','나이키 운동화','아무거나']);
+  const mc=m.get('몽클레어')||[];
+  if(mc[0]!=='MC-319 연베이지'||!mc.includes('MC-347 블랙'))throw new Error('몽클레어 상품명 '+JSON.stringify(mc));
+  const t=brandAskText(mc[0],3);
+  if(!t.includes('MC-319 연베이지'))throw new Error('문장에 상품명 없음 '+t);
+  console.log('브랜드 상품명 ok',t);
+}

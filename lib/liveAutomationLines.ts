@@ -315,6 +315,22 @@ export function topBrands(productNames:string[],limit=6):string[]{
   for(const b of ['알로','룰루레몬'])if(n.has(b))n.set(b,(n.get(b)||0)*2);
   return [...n.entries()].filter(([,c])=>c>=3).sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([b])=>b);
 }
+// [2026-11-15 23:51 사장님 「몽클레어도 해주세요 말고 정확히 등록된 상품명으로」] 브랜드별 실제 판매된 등록 상품명(많이 팔린 순)
+export function cleanProductName(p:string):string{
+  return String(p||'').replace(/\([^)]*\)|\[[^\]]*\]/g,' ').replace(/샘플할인|특가|해외배송|정품/g,' ').replace(/\s+/g,' ').trim();
+}
+export function topProductNamesByBrand(productNames:string[],limit=5):Map<string,string[]>{
+  const n=new Map<string,Map<string,number>>();
+  for(const raw of productNames){
+    const name=cleanProductName(raw);if(name.length<3||name.length>24)continue;
+    const hit=BRAND_WORDS.find(([re])=>re.test(String(raw||'')));if(!hit)continue;
+    const brand=hit[1]==='룰루'?'룰루레몬':hit[1];
+    const m=n.get(brand)||new Map<string,number>();m.set(name,(m.get(name)||0)+1);n.set(brand,m);
+  }
+  const out=new Map<string,string[]>();
+  for(const [b,m] of n)out.set(b,[...m.entries()].sort((a,c)=>c[1]-a[1]).slice(0,limit).map(([k])=>k));
+  return out;
+}
 const BRAND_HEADS=['','언니','루루언니','혹시','언니 혹시','저기'];
 // [18:57 사장님 「꼼데 뭐? 갑자기 뭘 기다려?」] 앞뒤 없이 «기다리고 있어요» 류 빼고, 묻거나 부탁하는 말만
 const BRAND_CORES=['{b} 또 언제 해요?','{b} 방송 또 해주세요','{b} 다시 들어오면 알려주세요','다음에 {b}도 해주세요','다음 방송 때 {b}도 해주세요','{b} 언제 또 나와요?','{b} 재입고 언제예요?','{b}는 이제 안 해요?','{b} 또 해주시면 안 돼요?','{b}도 다음에 가져와 주세요','{b} 다음 방송에 있어요?','{b} 또 들어와요?'];
