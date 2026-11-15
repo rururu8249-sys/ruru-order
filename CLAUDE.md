@@ -137,6 +137,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-15 **[가상 손님 주문 알림이 사이트에 늦게 뜸(사장님 22:42 깡콩이 — 유튜브엔 바로·사이트엔 장바구니만)]** 실측: 깡콩이 주문 22:39:46 → 사이트 「주문 감사」 22:40:53(67초 늦음). 원인: 주문서 30%는 «가상 손님이 먼저 말하고 그다음 알림»으로 알림을 미뤘는데, 손님 말이 막히면 1분 기록기가 45초 뒤에야 대신 올림. 수정: 알림은 미루지 않고 제출 즉시(lib/liveOrderChatServer), «주문서 넣었어요» 말은 알림 바로 뒤 차례에(director orderNoticeFlow). 돈·주문 무접촉. lines·director-topic·worker·live-order-chat·conversation·tsc 0·build(BANKDA). 배포 완료 004b3bb9 — 실방송 확인 필요
 - 2026-11-15 **[가상 손님 «막스119 36호 품절인가용?»(사장님 21:14 「시스템 안 봐?」)]** 품절·재고·남은 수량·옵션(사이즈·색) 있나요 질문은 상품에 표시돼 있으니 버림(lib/liveAutomationDirector stockQuestionBlocked), 지시문에도 «품절 여부·남은 수량은 화면에 있음». 「각인 있나요·숏 패딩도 있나요」 같은 상품 질문은 그대로. director-topic·worker·conversation·chat-context·lines·tsc 0·build(BANKDA). 돈·주문 무접촉. 배포 완료 9a220a62 — 실방송 확인 필요
 - 2026-11-15 **[가상 손님 닉네임 또 비슷(사장님 20:46 «꾸둥이님» 뒤 별둥이)]** 원인: 비슷한 닉네임 검사가 «바로 앞 가상 손님» 하나만 봤음. 수정: 최근 5분·8개 글의 말한 사람 전부(사람·관리자·가상 손님)+글 속 «○○님»으로 부른 이름+가게 이름(루루동이)과 비슷하면 그 차례에 말 안 함(동이=둥이로 봄, lib/liveAutomationLines recentNameSet·similarToRecent), «○○둥이·○○동이» 이름은 후보에서 빼고 남은 안 쓴 후보도 지움(worker). test-automation-lines·nickname-similar·director-topic·worker·tsc 0·build(BANKDA). 돈·주문 무접촉. 배포 완료 1d08011e — 실방송 확인 필요
 - 2026-11-15 **[자주 쓰는 말 판 탭(사장님 20:18)]** 총관리자 방송 화면 판 위에 탭 「내 문구 | 동쓰 …」(«자주 쓰는 말» 권한 회원 목록, quick-phrases?members=1 총관리자만·30초마다 새로) — 회원 탭은 보기·유튜브 복사·사이트 보내기만(편집은 그분이). 단축키 안내는 윈도우면 Alt(맥만 ⌥ Option). 배포 완료 e6efadec — 실화면 확인 필요
