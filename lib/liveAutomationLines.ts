@@ -71,18 +71,31 @@ export const VISIT_LINES: string[] = [
   '친구가 여기서 샀다고 해서 와봤어요', '인스타 릴스 보고 왔어요', '안녕하세요 처음 왔어요 소개받고 왔어요', '밴드 들어왔어요 반가워요', '지인이 링크 보내줘서 왔어요',
   '하이요 인스타 보고 왔어요', '유튜브 구독하고 왔어요', '언니 친구 추천으로 왔어요', '단톡방에서 소개받고 왔어요', '언니 밴드 가입했어요 잘 부탁드려요',
   '인스타 팔로우하고 왔어요', '유튜브 알림 보고 들어왔어요', '소개받고 왔는데 옷이 많네요', '친구 따라 왔어요 반가워요', '안녕하세요 밴드 보고 왔어요',
+  // [2026-11-15 14:40 사장님] 유튜브 보고·구독하고 사이트로 넘어온 말
+  '유튜브 보고 왔어요', '유튜브 구독하고 사이트로 넘어왔어요', '유튜브에서 링크 타고 왔어요', '유튜브 방송 보다가 넘어왔어요', '유튜브 설명란 보고 들어왔어요',
+  '유튜브 구독 눌렀어요', '유튜브로 보다가 사이트로 왔어요', '유튜브 채팅 보다가 링크 눌렀어요', '유튜브 보고 사이트 처음 와봐요', '유튜브 구독하고 알림 설정했어요',
 ];
-export const VISIT_RE = /소개|인스타|밴드|채널\s*추가|알고리즘|추천으로|따라\s*왔|링크\s*보내|구독하고|팔로우/;
+export const VISIT_RE = /소개|인스타|밴드|유튜브|채널\s*추가|알고리즘|추천으로|따라\s*왔|링크\s*보내|구독하고|팔로우/;
 
 // ───────── ③ 주문서 넣었다는 말 ─────────
-export const ORDER_FIRST_LINES: string[] = [
-  '주문서 넣었어요 확인 부탁드려요', '주문서 제출했어요', '방금 주문서 넣었어요', '주문서 넣었습니다 확인해주세요', '주문 넣었어요 확인 부탁드려요',
-  '주문서 보냈어요', '언니 주문서 넣었어요', '주문했어요 확인 부탁드립니다', '주문서 냈어요', '저 주문서 넣었어요',
-];
-export const ORDER_AFTER_LINES: string[] = [
-  '주문서 넣었어요 확인 부탁드려요', '저 주문했어요', '주문 완료했어요 확인 부탁드려요', '감사합니다 주문 넣었어요', '주문서 확인 부탁드려요',
-  '저 주문했어요 잘 부탁드려요', '방금 주문서 넣었어요', '주문했어요 빨리 받고 싶어요', '주문서 넣었습니다', '언니 주문 확인 부탁드려요',
-];
+// [2026-11-15 14:42 사장님 「너무 똑같다 — 오만가지로」] 앞말 × 본말 × 뒷말 × 이음(. ! ~ 띄어쓰기)으로 조합 — 겹치지 않게 수백 가지
+export function combineLines(heads:string[],cores:string[],tails:string[],max=45):string[]{
+  const out=new Set<string>();const seps=[' ','. ','! ','~ ',', '];
+  heads.forEach((h,hi)=>cores.forEach((c,ci)=>tails.forEach((t,ti)=>{
+    const sep=seps[(hi*7+ci*3+ti)%seps.length];
+    const line=[h,c].filter(Boolean).join(' ')+(t?sep+t:'');
+    const clean=line.replace(/\s+/g,' ').replace(/\s([.!~,])/g,'$1').trim();
+    if(clean.length>=2&&clean.length<=max)out.add(clean);
+  })));
+  return [...out];
+}
+const ORDER_HEADS=['','언니','루루언니','저','방금','드디어','고민하다가','언니 저','저도','고민 끝에'];
+const ORDER_CORES_FIRST=['주문서 넣었어요','주문서 제출했어요','주문 넣었어요','주문서 보냈어요','주문했어요','주문서 냈어요','주문서 썼어요','주문 들어갔어요','주문서 올렸어요','주문 완료요'];
+const ORDER_TAILS_FIRST=['','확인 부탁드려요','확인해주세요','확인 부탁드립니다','잘 부탁드려요','확인 좀 해주세요','봐주세요','부탁드려요','감사합니다'];
+export const ORDER_FIRST_LINES: string[] = combineLines(ORDER_HEADS,ORDER_CORES_FIRST,ORDER_TAILS_FIRST);
+const ORDER_CORES_AFTER=['주문서 넣었어요','주문했어요','주문 넣었어요','주문서 제출했어요','주문 들어갔네요','주문 완료했어요','주문서 보냈어요','주문 잘 들어갔네요','주문 접수됐네요','저 주문했어요'];
+const ORDER_TAILS_AFTER=['','확인 부탁드려요','잘 부탁드려요','빨리 받고 싶어요','감사합니다','기대돼요','설레요','감사해요 언니','고민 끝','이쁘게 보내주세요'];
+export const ORDER_AFTER_LINES: string[] = combineLines(['','언니','루루언니','방금','저','와','드디어'],ORDER_CORES_AFTER,ORDER_TAILS_AFTER);
 /** 주문서마다 정함 — first: 가상 손님이 먼저 말하고 바로 주문 알림 / after: 알림 뒤에 말함 / none: 말 안 함 */
 export function orderNoticePlan(groupId: string): 'first' | 'after' | 'none' {
   const n = hashOf('order-notice:' + groupId) % 100;
@@ -120,23 +133,41 @@ const SIZE_REPLIES = [
   '{b} 정도일 거 같은데 방송 때 {n}한테 꼭 물어보세요',
   '음 {b} 쯤? 정확한 건 {n}이 제일 잘 알아요',
   '{h} {w}면 {b} 많이 입던데 {n}한테 확실하게 물어보세요',
+  '저랑 비슷하시네요 저는 {b} 입는데 옷마다 달라서 {n}한테 물어봐요',
+  '{b} 아닐까 싶은데 {n}이 실측 재주실 거예요',
+  '보통은 {b}인데 이 옷은 {n}한테 꼭 물어보세요',
+  '{n} 실측 보고 말씀해주시는 게 정확해요 대충 {b}일 듯요',
+  '그 정도면 {b} 많이 입으시던데요 {n}한테 확인해보세요',
+  '{b} 같아요 근데 핏이 다 달라서 {n}한테 물어보시는 게 좋아요',
 ];
+// [2026-11-15 14:41 사장님] 진짜 손님 사이즈 질문엔 숫자 없이 «방송 때 루루언니한테 물어보세요»만 — 자연스럽게 여러 모양으로
+const ASK_HEADS=['','저도 궁금했는데','저도 그거 궁금해요','사이즈는','그건','옷마다 달라서','저도 늘 헷갈리는데','이 옷은','브랜드마다 달라서','저번에 저도 물어봤는데'];
+const ASK_CORES=['{n}한테 물어보시면 실측 보고 알려주세요','방송 때 {n}한테 물어보세요','{n}한테 물어보시는 게 제일 정확해요','{n}이 실측 재서 알려주실 거예요','{n}한테 키 몸무게 말하면 딱 골라주세요','{n}이 사이즈 잘 봐주세요','방송할 때 {n}한테 꼭 물어보세요','{n}한테 여쭤보세요'];
+const ASK_TAILS=['','저도 그렇게 해요','그게 확실해요','친절하게 알려주세요','금방 답해주실 거예요'];
+export const SIZE_ASK_LUNA_LINES: string[] = combineLines(ASK_HEADS,ASK_CORES,ASK_TAILS,60);
+export function honorificOf(seed:number):string{const p=rng(seed+101)();return p < 0.62 ? '루루언니' : p < 0.76 ? '루언니' : p < 0.88 ? '루사장님' : '루루사장님';}
+/** 진짜 손님 사이즈 질문에 — 숫자 없이 «루루언니한테 물어보세요» */
+export function askLunaText(seed:number):string{
+  const n=honorificOf(seed);
+  return SIZE_ASK_LUNA_LINES[hashOf('ask:'+seed)%SIZE_ASK_LUNA_LINES.length].split('{n}').join(n).replace(/(루루언니|루언니)이 /g,'$1가 ').replace(/(사장님)이 /g,'$1이 ');
+}
 export function sizeAnswerText(h: number, w: number, seed: number): string | null {
   const b = koreanSizeBand(h, w);
   if (!b) return null;
   const r = rng(seed);
   const p = r();
-  const n = p < 0.62 ? '루루언니' : p < 0.76 ? '루언니' : p < 0.88 ? '루사장님' : '루루사장님';
+  void p;
+  const n = honorificOf(seed);
   const t = SIZE_REPLIES[Math.floor(r() * SIZE_REPLIES.length)];
-  return t.replace('{h}', String(h)).replace('{w}', String(w)).replace('{b}', b + ' 사이즈').replace('{n}', n).replace('{n}', n);
+  return t.replace('{h}', String(h)).replace('{w}', String(w)).replace('{b}', b + ' 사이즈').split('{n}').join(n).replace(/(루루언니|루언니)이 /g,'$1가 ');
 }
 
 // ───────── ⑤ 말투 버릇(사람마다 일정하게) ─────────
-export type Voice = { spacing: 'tight' | 'loose' | 'neat'; mark: '~' | '!' | '..' | '^^' | '.' | ''; ending: '요' | '여' | '용' | '당'; typo: number };
+export type Voice = { spacing: 'tight' | 'loose' | 'neat'; mark: '~' | '!' | '..' | '^^' | '.' | '' | ':)'; ending: '요' | '여' | '용' | '당'; typo: number };
 export function voiceOf(actorSeed: number): Voice {
   const s = hashOf('voice:' + actorSeed);
   const spacing = (['tight', 'loose', 'neat', 'neat', 'neat'] as const)[s % 5];
-  const mark = (['~', '!', '..', '^^', '.', '', '~', '!'] as const)[(s >>> 3) % 8];
+  const mark = (['~', '!', '..', '^^', '.', '', '~', '!', ':)'] as const)[(s >>> 3) % 9]; // [14:40 사장님] :) 웃는 표시 쓰는 사람도
   const ending = (['요', '여', '용', '요', '요', '당'] as const)[(s >>> 6) % 6];
   const typo = (s >>> 9) % 4 === 0 ? 0.4 : 0.05;
   return { spacing, mark, ending, typo };
@@ -167,7 +198,7 @@ export function personaVoice(text: string, actorSeed: number, msgSeed: number): 
   let body = m ? m[1] : s;
   const tail = m ? m[2].trim() : '';
   if (!body) return s;
-  if (/[ㅋㅎㅠㅜ]$|\p{Extended_Pictographic}$/u.test(body)) return body + tail;
+  if (/[ㅋㅎㅠㅜ]$|\p{Extended_Pictographic}$|:-?\)$/u.test(body)) return body + tail;
   const question = /\?|？/.test(tail);
   // 어미 버릇 — «요»로 끝날 때만 가끔
   if (/요$/.test(body) && v.ending !== '요' && r() < 0.55) body = body.replace(/요$/, v.ending === '당' ? (/[다]요$/.test(body) ? '요' : '용') : v.ending);
@@ -175,6 +206,7 @@ export function personaVoice(text: string, actorSeed: number, msgSeed: number): 
   // 끝 부호 버릇
   if (question) return body + (v.mark === '~' && r() < 0.3 ? '?~' : v.mark === '!' && r() < 0.3 ? '?!' : r() < 0.15 ? '??' : '?');
   const want = r() < 0.78 ? v.mark : tail;
+  if (want === ':)') return body + (r() < 0.25 ? ' :)' : r() < 0.4 ? ':-)' : ':)');
   const mark = want === '~' ? (r() < 0.3 ? '~~' : '~') : want === '!' ? (r() < 0.3 ? '!!' : '!') : want === '..' ? (r() < 0.5 ? '...' : '..') : want;
   return body + mark;
 }
@@ -182,7 +214,7 @@ export function personaVoice(text: string, actorSeed: number, msgSeed: number): 
 // ───────── ⑥ 들어온 가상 손님 인사 (방송 시작 초~중반에 많이, 그 뒤·다시보기엔 드물게) ─────────
 // [2026-11-15 14:30 사장님] 다양하게, 쌩뚱맞은 말 금지. kind: plain=기본 인사 / visit=어떻게 왔는지(방 전체 6분에 한 번) /
 //   start=방송 막 시작(시작 15분 안·생방송만) / live=언니 칭찬(생방송만) / morning·evening=시간대
-export type Greeting={text:string;kind:'plain'|'visit'|'start'|'live'|'morning'|'evening'|'next'};
+export type Greeting={text:string;kind:'plain'|'visit'|'site'|'start'|'live'|'morning'|'evening'|'next'};
 export const GREETINGS:Greeting[]=[
   ...['안녕하세요','안녕하세요~','언니 안녕하세요','하이요','반가워요','안녕하세요 반가워요','언니 하이','안녕하세용','루루언니 안녕하세요','왔어요~',
       '들어왔어요','언니 저 왔어요','안녕하세요 오늘도 왔어요','오늘도 출석이요','출석했어요','안녕하세요 오늘 처음 왔어요','오늘 처음 와봤어요','처음 왔어요 반가워요','안녕하세요 구경하러 왔어요','언니 반가워요'
@@ -192,15 +224,21 @@ export const GREETINGS:Greeting[]=[
      ].map(text=>({text,kind:'start' as const})),
   ...['언니 너무 예뻐요','언니 오늘 너무 귀여우세요','루루언니 오늘 예쁘시네요','언니 목소리 좋아요','언니 오늘 분위기 좋아요','언니 보러 왔어요','안녕하세요 언니 오늘도 예쁘세요','언니 오늘 기분 좋아 보여요'
      ].map(text=>({text,kind:'live' as const})),
+  // [2026-11-15 14:40 사장님] 사이트 칭찬 — 방 전체 8분에 한 번
+  ...['여기 사이트 좋네요','와 신기하다','사이트에서 바로 주문되니까 편하네요','방송 보면서 바로 담을 수 있어서 좋아요','여기 사이트 신기해요','사이트 깔끔하고 좋네요',
+      '채팅도 되고 주문도 되네요 신기해요','와 이렇게 보면서 주문하는 거 처음이에요','사이트 보기 편해요','여기서 바로 살 수 있어서 좋네요','사이트 잘 만들었네요',
+      '주문서 쓰기 편하네요','상품 보기 편해서 좋아요','이거 완전 편하다','방송이랑 같이 보니까 좋네요'
+     ].map(text=>({text,kind:'site' as const})),
   ...['좋은 아침이에요','굿모닝이요','아침부터 왔어요'].map(text=>({text,kind:'morning' as const})),
   ...['좋은 저녁이에요','저녁 먹고 왔어요','퇴근하고 바로 왔어요'].map(text=>({text,kind:'evening' as const})),
 ];
 /** 지금 쓸 수 있는 인사 — 생방송인지·시작 몇 분째인지·한국 몇 시인지·소개 인사를 방금 누가 했는지에 따라 */
-export function greetingPool(o:{live:boolean;sinceStartMs:number;kstHour:number;visitRecently:boolean;weekend:boolean;nextShow?:NextShow|null}):Greeting[]{
+export function greetingPool(o:{live:boolean;sinceStartMs:number;kstHour:number;visitRecently:boolean;weekend:boolean;nextShow?:NextShow|null;siteRecently?:boolean}):Greeting[]{
   const next=!o.live?nextShowLines(o.nextShow??null).map(text=>({text,kind:'next' as const})):[];
   return [...next,...next,...GREETINGS].filter(g=>g.kind==='next'||
     g.kind==='plain'||
     (g.kind==='visit'&&!o.visitRecently)||
+    (g.kind==='site'&&!o.siteRecently)||
     (g.kind==='start'&&o.live&&o.sinceStartMs>=0&&o.sinceStartMs<15*60000)||
     (g.kind==='live'&&o.live)||
     (g.kind==='morning'&&o.kstHour>=6&&o.kstHour<11)||

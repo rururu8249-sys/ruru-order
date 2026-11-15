@@ -21,7 +21,7 @@ import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
-import {parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
+import {askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText} from './liveAutomationLines';
 import {announceOrderThanks} from './liveOrderChatServer';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
@@ -210,7 +210,7 @@ export function cardAckPlan(noticeId:number,noticeAt:number,now:number):'wait'|'
  if(!(age>=0)||age>150000)return 'skip';
  return age>=8000+(Math.abs(noticeId*7919)%52000)?'go':'wait';
 }
-const CARD_ACKS=['넵!','넹~','네 알겠습니다','알겠습니당','넵넵','네엥','넵 알겠어요'];
+const CARD_ACKS=['넵!','넹~','네 알겠습니다','알겠습니당','넵넵','네엥','넵 알겠어요','네~','넵 감사해요','알겠어요','네네','넵 언니','네 언니 감사해요','넹넹','알겠습니다 언니','넵 바로 할게요','네 할게요','넵 감사합니다','오케이요','넵넵 감사해요','네 알겠어용'];
 async function cardLinkAck(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch,now:number,sessions:Session[],actors:Actor[],messages:Row[],actions:Action[],mode:string):Promise<boolean>{
  for(const n of messages){
   if(n.badge!=='bot'||!/카톡\s*카드결제\s*링크/.test(String(n.body||'')))continue;
@@ -359,15 +359,33 @@ async function greetFlow(x:CodeCtx):Promise<boolean>{
   if((seed%1000)/1000>=greetChance({live:x.live,sinceStartMs:sinceStart}))continue;
   if(x.now<joined+8000+(seed%50000))continue; // 들어오자마자 말고 8~58초 뒤
   const actor=x.actors.find(a=>String(a.id)===String(s.actor_id));if(!actor)continue;
-  const pool=greetingPool({nextShow:x.live?null:x.nextShow,live:x.live,sinceStartMs:sinceStart,kstHour:k.getUTCHours(),visitRecently:acted('greetVisit',360000),weekend:k.getUTCDay()===0||k.getUTCDay()===6});
+  const pool=greetingPool({nextShow:x.live?null:x.nextShow,live:x.live,sinceStartMs:sinceStart,kstHour:k.getUTCHours(),visitRecently:acted('greetVisit',360000),siteRecently:acted('greetSite',480000),weekend:k.getUTCDay()===0||k.getUTCDay()===6});
   const recent=recentBodies(x);
   let g=null as (typeof pool)[number]|null;
   for(let i=0;i<pool.length;i++){const c=pool[(seed+i*7)%pool.length];if(!duplicateLine(c.text,recent)){g=c;break;}}
   if(!g)continue;
   const text=personaVoice(g.text,seedOf(actor),seed);
-  if(await postCodeLine(x,actor,'chat',text,{greet:true,...(g.kind==='visit'?{greetVisit:true}:{})},null,'들어온 인사'))return true;
+  if(await postCodeLine(x,actor,'chat',text,{greet:true,...(g.kind==='visit'?{greetVisit:true}:{}),...(g.kind==='site'?{greetSite:true}:{})},null,'들어온 인사'))return true;
  }
  return false;
+}
+
+/** [2026-11-15 14:41 사장님] 진짜 손님 사이즈 질문 — 가끔(35%) 가상 손님이 숫자 없이 «방송 때 루루언니한테 물어보세요»(관리자가 먼저 답하면 안 함) */
+async function humanSizeAskFlow(x:CodeCtx,holds:Row[]):Promise<boolean>{
+ const q=x.messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&!['crown','crown_pink','mod'].includes(String(m.badge||''))&&Date.parse(String(m.created_at))>x.now-180000);
+ if(!q)return false;
+ const body=clean(q.body);
+ if(!isSizeQuestion(body)&&!/사이즈|몇\s*입|몇\s*사이즈|맞을까|클까|작을까/.test(body))return false;
+ const qid=Number(q.id);
+ if(hashOf('hsize:'+qid)%100>=35)return false;
+ if(x.now<Date.parse(String(q.created_at))+20000+(hashOf('hsd:'+qid)%50000))return false;
+ if(x.actions.some(a=>planOf(a).askLunaFor===qid))return false;
+ if(x.messages.some(m=>Number(m.id)>qid&&(m.badge!=='bot')))return false; // 그 뒤 누가(사장님·손님·가상 손님) 말했으면 안 끼어듦
+ const holdSessions=new Set(holds.map(h=>String(h.session_id)));
+ const cands=x.actors.filter(a=>x.orders.some(o=>String(o.automation_actor_id)===String(a.id))||x.sessions.some(s=>s.actor_id===a.id&&holdSessions.has(String(s.id))));
+ if(!cands.length)return false;
+ const actor=cands[hashOf('ha:'+qid)%cands.length];
+ return postCodeLine(x,actor,'reply',personaVoice(askLunaText(qid),seedOf(actor),qid),{askLunaFor:qid},qid,'사이즈는 루루언니한테');
 }
 export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string,transport:typeof fetch=fetch){
  if(!c.chat_enabled)return;
@@ -400,6 +418,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  if(await orderNoticeFlow(codeCtx).catch(()=>false))return;
  if(await farewellFlow(codeCtx).catch(()=>false))return;
  if(await sizeAnswerFlow(codeCtx,holds).catch(()=>false))return;
+ if(await humanSizeAskFlow(codeCtx,holds).catch(()=>false))return;
  if(await greetFlow(codeCtx).catch(()=>false))return;
  // 언제 판단할지: 사람이 새 글을 쓰면(아직 판단 안 한 글) 10초 뒤 바로, 아니면 AI 글 사이 20~45초 + 확률(밤엔 아주 드물게)
  const considered=Math.max(0,...actions.map(a=>Number((a as Action&{source_message_id?:unknown}).source_message_id)||0));

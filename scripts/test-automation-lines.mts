@@ -1,5 +1,5 @@
 // [2026-11-15 14:15~14:30 사장님 「모든 글들 테스트 해야함」] 코드가 정한 가상 손님 말 전부 검사
-import {FAREWELL_LINES,VISIT_LINES,ORDER_FIRST_LINES,ORDER_AFTER_LINES,GREETINGS,farewellPlan,orderNoticePlan,orderAfterDelay,koreanSizeBand,parseHeightWeight,isSizeQuestion,sizeAnswerText,personaVoice,voiceOf,greetingPool,greetChance,isEndNotice,parseNextShow,nextShowLines} from '../lib/liveAutomationLines';
+import {FAREWELL_LINES,VISIT_LINES,ORDER_FIRST_LINES,ORDER_AFTER_LINES,GREETINGS,farewellPlan,orderNoticePlan,orderAfterDelay,koreanSizeBand,parseHeightWeight,isSizeQuestion,sizeAnswerText,personaVoice,voiceOf,greetingPool,greetChance,isEndNotice,parseNextShow,nextShowLines,SIZE_ASK_LUNA_LINES,askLunaText,combineLines} from '../lib/liveAutomationLines';
 import {safeConversationLine} from '../lib/liveAutomationPersona';
 import {advisesOthers} from '../lib/liveAutomationDirector';
 import {isCompletionReport} from '../lib/liveChatBot';
@@ -8,12 +8,12 @@ const fail=(m:string)=>{throw new Error(m);};
 // DB(live_automation_chat)가 거절하는 말과 같은 규칙
 const DB_BAD=/(테스트|\btest\b|\bAI\b|API|프롬프트|한도|시스템|결제.{0,3}완료|입금.{0,3}완료|https?:\/\/)/i;
 const ODD=/가상|봇|자동|인공지능|\d{2,3}-\d{3,4}-\d{4}/;
-function checkPool(name:string,pool:string[],min:number){
+function checkPool(name:string,pool:string[],min:number,maxLen=45){
   if(pool.length<min)fail(`${name} ${pool.length}개 < ${min}`);
   const seen=new Set<string>();
   for(const t of pool){
     if(seen.has(t))fail(`${name} 중복: ${t}`);seen.add(t);
-    if(t.length<2||t.length>45)fail(`${name} 길이: ${t}`);
+    if(t.length<2||t.length>maxLen)fail(`${name} 길이: ${t}`);
     if(DB_BAD.test(t)||ODD.test(t)||!safeConversationLine(t,false))fail(`${name} 금지어: ${t}`);
     // 모든 말투(버릇) 64가지로 바꿔도 DB 통과·길이 100 이하·숫자 그대로
     for(let a=0;a<64;a++){const v=personaVoice(t,a*37+1,a);if(DB_BAD.test(v)||v.length>100||v.replace(/\D/g,'')!==t.replace(/\D/g,''))fail(`${name} 말투 변형 문제: ${t} → ${v}`);}
@@ -21,10 +21,17 @@ function checkPool(name:string,pool:string[],min:number){
   console.log(name,'ok',pool.length);
 }
 checkPool('방송 종료 인사',FAREWELL_LINES,100);
-checkPool('소개·인스타·밴드',VISIT_LINES,30);
-checkPool('주문서 먼저',ORDER_FIRST_LINES,10);
-checkPool('주문 알림 뒤',ORDER_AFTER_LINES,10);
-checkPool('들어온 인사',GREETINGS.map(g=>g.text),60);
+checkPool('소개·인스타·밴드·유튜브',VISIT_LINES,40);
+if(VISIT_LINES.filter(t=>/유튜브/.test(t)).length<12)fail('유튜브 말 부족');
+if(GREETINGS.filter(g=>g.kind==='site').length<15)fail('사이트 칭찬 부족');
+checkPool('주문서 먼저',ORDER_FIRST_LINES,300);
+checkPool('주문 알림 뒤',ORDER_AFTER_LINES,300);
+checkPool('사이즈는 루루언니한테',SIZE_ASK_LUNA_LINES.map(t=>t.split('{n}').join('루루언니')),150,70);
+for(const t of [...ORDER_FIRST_LINES,...ORDER_AFTER_LINES])if(/\s[.!~,]|[.!~,]{2,}\S|^[.!~, ]|요[가-힣]/.test(t))fail('조합 모양 이상: '+t);
+if(!ORDER_FIRST_LINES.includes('주문서 넣었어요. 확인 부탁드려요')&&!ORDER_FIRST_LINES.some(t=>/주문서 넣었어요[.!~] 확인/.test(t)))fail('부호 섞인 모양 없음');
+for(let i=0;i<400;i++){const t=askLunaText(i);if(/\d/.test(t)||/언니이 |\{n\}/.test(t)||!/(루루언니|루언니|루사장님|루루사장님)/.test(t))fail('루루언니 답 '+t);}
+console.log('예시',ORDER_FIRST_LINES.slice(0,40).filter((_,i)=>i%7===0).join(' / '),'|',askLunaText(3),'|',askLunaText(8));
+checkPool('들어온 인사',GREETINGS.map(g=>g.text),95);
 
 // 종료 안내 감지 — 사장님 실제 문구
 if(!isEndNotice('✅ 라이브방송이 종료되었습니다. 현재는 사이트에서 다시보기 시청과 실시간 채팅이 가능하며, 원하는 상품도 바로 주문하실 수 있습니다🙂'))fail('종료 안내 감지');
@@ -80,10 +87,11 @@ for(const t of ['카드결제 되나요?','카결 어떻게 해요','입금 계�
 // 말투 버릇 — 사람마다 일정, 사람끼리 다양
 const marks=new Set<string>(),spacing=new Set<string>(),typoPeople=new Set<number>();
 for(let a=0;a<300;a++){const v=voiceOf(a);marks.add(v.mark);spacing.add(v.spacing);if(v.typo>0.1)typoPeople.add(a);}
-if(marks.size<6||spacing.size<3||typoPeople.size<30)fail('버릇 종류 부족');
+if(!marks.has(':)'))fail('웃는 표시 :) 버릇 없음');
+if(marks.size<7||spacing.size<3||typoPeople.size<30)fail('버릇 종류 부족');
 const sample=new Set<string>();for(let a=0;a<200;a++)sample.add(personaVoice('오늘 예쁜 옷 많았네요',a,a));
 if(sample.size<15)fail('같은 말 모양 다양성 '+sample.size);
-if(![...sample].some(x=>/~$/.test(x))||![...sample].some(x=>/!$/.test(x))||![...sample].some(x=>/\.\.$/.test(x))||![...sample].some(x=>x.includes('예쁜옷')))fail('버릇 모양 누락');
+if(![...sample].some(x=>/~$/.test(x))||![...sample].some(x=>/!$/.test(x))||![...sample].some(x=>/\.\.$/.test(x))||![...sample].some(x=>x.includes('예쁜옷'))||![...sample].some(x=>/:-?\)$/.test(x)))fail('버릇 모양 누락');
 if(personaVoice('버58 160에 52인데 몇 입으면 될까요?',3,4).replace(/\s/g,'').indexOf('버58')!==0)fail('상품번호 건드림');
 if(!/\?/.test(personaVoice('방송 지금 시작한 거죠?',9,9)))fail('물음표 사라짐');
 console.log('말투 ok',[...sample].slice(0,8).join(' / '));
@@ -93,6 +101,8 @@ const live0=greetingPool({live:true,sinceStartMs:2*60000,kstHour:20,visitRecentl
 const live60=greetingPool({live:true,sinceStartMs:60*60000,kstHour:14,visitRecently:true,weekend:true});
 const replay=greetingPool({live:false,sinceStartMs:-1,kstHour:23,visitRecently:false,weekend:false});
 if(!live0.some(g=>g.kind==='start')||!live0.some(g=>g.kind==='live')||!live0.some(g=>g.kind==='visit')||!live0.some(g=>g.kind==='evening'))fail('시작 직후 인사 종류');
+if(!live60.some(g=>g.kind==='site'))fail('사이트 칭찬 안 나옴');
+if(greetingPool({live:true,sinceStartMs:1,kstHour:14,visitRecently:false,weekend:false,siteRecently:true}).some(g=>g.kind==='site'))fail('사이트 칭찬 8분 제한');
 if(live60.some(g=>g.kind==='start'||g.kind==='visit'||g.kind==='evening'||g.kind==='morning'))fail('1시간 뒤·소개 직후 인사');
 if(replay.some(g=>g.kind==='start'||g.kind==='live'))fail('다시보기인데 방송 인사');
 if(greetChance({live:true,sinceStartMs:10*60000})<=greetChance({live:true,sinceStartMs:90*60000}))fail('초반 인사 확률');
