@@ -139,6 +139,8 @@ export function vaguePointerQuestion(text:string):boolean{
 export function vagueProductRemark(text:string):boolean{
  if(ASKING.test(text))return false;
  if(namesSize(text)||/(^|[^A-Za-z])(xs|s|m|l|xl|xxl|2xl)(?![A-Za-z])/i.test(text.replace(/[A-Za-z]{2,3}\s?-?\s?\d{2,4}/g,' ')))return true;
+ // [2026-11-15 23:42 사장님 「36사이즈 핏 이쁘겠당 — 사이즈 넣어서 이쁘겠다니 어설퍼」] 숫자 사이즈(36사이즈·240호)를 넣은 감탄도 버림
+ if(/(^|[^\d])\d{1,3}\s*(호|사이즈|size)/i.test(text))return true;
  if(DETAIL_Q.test(text)&&!HAS_REF.test(text))return true;
  return false;
 }
