@@ -416,28 +416,54 @@ export function agreeAnswerText(topic:AgreeTopic,source:string,seed:number):stri
 //   ⚠ 실제로 안 산 구매 후기라 «테스트 표시 보기» 권한이 있는 화면(관리자·부관리자·테스트 계정)에만 보이고
 //   일반 손님 화면에선 숨김(isTestOnlyLine — useLiveChatPrivate).
 const ITEM_STOP=/^(블랙|화이트|베이지|브라운|카멜|그레이|네이비|아이보리|핑크|레드|초코|차콜|크림|카키|민트|실버|골드|퍼플|블루|그린|옐로우|오렌지|와인|버건디|소라|하늘|모카|라벤더|올리브|검정|흰색|회색|남성용|여성용|공용|정품|신상|특가|샘플할인|해외배송|사이즈|프리|기본|무광|유광|세트|컬러)$/;
-export type SoldItem={brand:string;item:string;count:number};
-export function soldItems(productNames:string[],limit=12):SoldItem[]{
-  const n=new Map<string,SoldItem>();
-  for(const raw of productNames){
-    const p=String(raw||'');
+export type SoldItem={brand:string;item:string;count:number;colors:string[];sizes:string[]};
+export type SoldRow={product_name?:unknown;color?:unknown;size?:unknown};
+const cleanOpt=(v:unknown)=>{const t=String(v??'').trim();return !t||/^(없음|기본|free|프리|-|옵션없음|단일)$/i.test(t)||t.length>10?'':t;};
+/** 실제 주문 줄(상품명·색상·사이즈) → 브랜드+품목별로 많이 팔린 순, 그 상품에서 실제로 나간 색상·사이즈 */
+export function soldItems(rowsOrNames:(string|SoldRow)[],limit=12):SoldItem[]{
+  const n=new Map<string,{brand:string;item:string;count:number;colors:Map<string,number>;sizes:Map<string,number>}>();
+  for(const r0 of rowsOrNames){
+    const r=typeof r0==='string'?{product_name:r0}:r0;
+    const p=String(r.product_name||'');
     const hit=BRAND_WORDS.find(([re])=>re.test(p));
     if(!hit)continue;
     const brand=hit[1]==='룰루'?'룰루레몬':hit[1];
     const words=p.replace(hit[0],' ').replace(/[A-Za-z]{1,4}\s*-?\s*\d+/g,' ').replace(/\([^)]*\)/g,' ').split(/[\s/·,]+/).filter(w=>/^[가-힣]{2,8}$/.test(w)&&!ITEM_STOP.test(w)&&!BRAND_WORDS.some(([re])=>re.test(w)));
     const item=words[0]||'';
     const key=brand+'|'+item;
-    const cur=n.get(key)||{brand,item,count:0};cur.count++;n.set(key,cur);
+    const cur=n.get(key)||{brand,item,count:0,colors:new Map(),sizes:new Map()};cur.count++;
+    const c=cleanOpt(r.color),z=cleanOpt(r.size);
+    if(c)cur.colors.set(c,(cur.colors.get(c)||0)+1);
+    if(z)cur.sizes.set(z,(cur.sizes.get(z)||0)+1);
+    n.set(key,cur);
   }
-  return [...n.values()].map(v=>({...v,count:v.count*(v.brand==='알로'||v.brand==='룰루레몬'?2:1)})).filter(v=>v.count>=2).sort((a,b)=>b.count-a.count).slice(0,limit);
+  const top=(m:Map<string,number>)=>[...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k])=>k);
+  return [...n.values()].map(v=>({brand:v.brand,item:v.item,count:v.count*(v.brand==='알로'||v.brand==='룰루레몬'?2:1),colors:top(v.colors),sizes:top(v.sizes)})).filter(v=>v.count>=2).sort((a,b)=>b.count-a.count).slice(0,limit);
 }
-const MEMORY_HEADS=['','지난번에','저번에','전에','저번 방송에서','예전에'];
-const MEMORY_CORES=['{x} 샀었는데 너무 좋았어요','{x} 샀었는데 진짜 편해요','{x} 샀던 거 매일 입어요','{x} 샀는데 만족해요','{x} 사봤는데 최고예요','{x} 샀었는데 예뻐서 또 사고 싶어요','{x} 샀었는데 주변에서 다 물어봐요','{x} 사서 잘 입고 있어요'];
-const MEMORY_TAILS=['','또 언제 해요?','또 해주세요','강추예요','다음에 또 살래요','완전 득템이었어요'];
-export const MEMORY_TEMPLATES:string[]=combineLines(MEMORY_HEADS,MEMORY_CORES,MEMORY_TAILS,70);
+// [2026-11-15 15:24 사장님 「무슨 사이즈 샀었는데 언니가 추천해준 대로 샀더니 딱이다·언니 최고」] 실제 주문의 색상·사이즈까지 넣어 여러 갈래로
+const MEMORY_GROUPS:{need:'none'|'size'|'color';heads:string[];cores:string[];tails:string[]}[]=[
+  {need:'none',heads:['','지난번에','저번에','전에','저번 방송에서','예전에'],cores:['{x} 샀었는데 너무 좋았어요','{x} 샀었는데 진짜 편해요','{x} 샀던 거 매일 입어요','{x} 샀는데 만족해요','{x} 사봤는데 최고예요','{x} 샀었는데 예뻐서 또 사고 싶어요','{x} 샀었는데 주변에서 다 물어봐요','{x} 사서 잘 입고 있어요','{x} 샀는데 남편이 이쁘대요','{x} 샀는데 딸이 뺏어 갔어요'],tails:['','또 언제 해요?','또 해주세요','강추예요','다음에 또 살래요','완전 득템이었어요']},
+  {need:'size',heads:['','저번에','지난번에','언니'],cores:['언니 말 듣고 {x} {s}{rs} 샀는데 딱이에요','{x} {s} 샀는데 언니 추천 최고였어요','{x} {s}{rs} 샀는데 딱 맞아요','언니가 추천해준 대로 {x} {s} 샀는데 딱이에요','{x} {s} 샀었는데 사이즈 딱이었어요','언니 말대로 {x} {s}{rs} 샀더니 핏 예뻐요','{x} {s} 고민하다 샀는데 잘 맞아요','{x} {s}{rs} 산 거 진짜 잘 샀어요','{x} 추천해주신 {s} 사이즈 완전 딱이에요','{x} {s} 산 거 진짜 딱 맞아요'],tails:['','언니 최고예요','역시 언니 눈썰미','감사해요 언니','언니 믿고 사요','다음에도 골라주세요']},
+  {need:'color',heads:['','저번에','지난번에','전에'],cores:['{x} {c} 샀는데 언니 말대로 너무 예뻐요','{x} {c} 샀는데 색감 너무 예뻐요','{x} {c}{ro} 샀는데 잘 샀어요','{x} {c} 샀었는데 실물이 더 예뻐요','{x} {c} 샀던 거 너무 잘 입고 있어요','{x} {c} 샀는데 어디에나 잘 어울려요','{x} {c}{ro} 산 거 칭찬 많이 받아요'],tails:['','다른 색도 탐나요','언니 최고','또 사고 싶어요','강추해요']},
+];
+export const MEMORY_TEMPLATES:{need:'none'|'size'|'color';text:string}[]=MEMORY_GROUPS.flatMap(g=>combineLines(g.heads,g.cores,g.tails,80).map(text=>({need:g.need,text})));
+/** «블랙으로·베이지로·M으로·S로·240으로» — 끝소리에 맞는 조사 */
+export function roParticle(w:string):'로'|'으로'{
+  const t=String(w||'').trim();if(!t)return '로';
+  const ch=t[t.length-1];const c=ch.charCodeAt(0);
+  if(c>=0xac00&&c<=0xd7a3){const j=(c-0xac00)%28;return j===0||j===8?'로':'으로';}
+  if(/[0-9]/.test(ch))return /[036]/.test(ch)?'으로':'로'; // 영·삼·육 받침
+  const up=ch.toUpperCase();
+  if(/[MN]/.test(up))return '으로'; // 엠·엔
+  return '로'; // 엘·에스·엑스·에프·…
+}
+const ro=roParticle;
 export function purchaseMemoryText(it:SoldItem,seed:number):string{
   const x=it.item?`${it.brand} ${it.item}`:it.brand;
-  return MEMORY_TEMPLATES[hashOf('mem:'+seed)%MEMORY_TEMPLATES.length].split('{x}').join(x);
+  const usable=MEMORY_TEMPLATES.filter(t=>t.need==='none'||(t.need==='size'&&it.sizes.length>0)||(t.need==='color'&&it.colors.length>0));
+  const t=usable[hashOf('mem:'+seed)%usable.length].text;
+  const c=it.colors[hashOf('mc:'+seed)%Math.max(1,it.colors.length)]||'',z=it.sizes[hashOf('ms:'+seed)%Math.max(1,it.sizes.length)]||'';
+  return t.split('{x}').join(x).split('{s}').join(z).split('{c}').join(c).split('{ro}').join(ro(c)).split('{rs}').join(ro(z)).replace(/\s{2,}/g,' ').trim();
 }
 /** 일반 손님 화면에서 숨길 «시험용» 가상 손님 글(지어낸 구매 후기) */
-export const isTestOnlyLine=(body:string)=>/(샀었|샀던|샀는데|사봤는데|사서\s*잘)/.test(String(body||''));
+export const isTestOnlyLine=(body:string)=>/(샀었|샀던|샀는데|샀더니|사봤는데|사서\s*잘|산\s*거|추천해주신)/.test(String(body||''));

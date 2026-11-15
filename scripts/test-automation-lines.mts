@@ -3,7 +3,7 @@ import {FAREWELL_LINES,VISIT_LINES,ORDER_FIRST_LINES,ORDER_AFTER_LINES,GREETINGS
 import {safeConversationLine} from '../lib/liveAutomationPersona';
 import {advisesOthers,orderedAskBlocked} from '../lib/liveAutomationDirector';
 import {falseExperience} from '../lib/liveAutomationDialogue';
-import {soldItems,purchaseMemoryText,MEMORY_TEMPLATES,isTestOnlyLine,factTopic,FACT_ANSWERS,factAnswerText,agreeTopic,AGREE_ANSWERS,agreeAnswerText,fixLaughCount,EMOJIS,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,topBrands,brandAskText,BRAND_ASK_TEMPLATES,SMALL_TALKS,smallTalkPool,smallTalkAnswer} from '../lib/liveAutomationLines';
+import {roParticle,soldItems,purchaseMemoryText,MEMORY_TEMPLATES,isTestOnlyLine,factTopic,FACT_ANSWERS,factAnswerText,agreeTopic,AGREE_ANSWERS,agreeAnswerText,fixLaughCount,EMOJIS,EMOJI_ONLY_LINES,EMOJI_CUTE_LINES,topBrands,brandAskText,BRAND_ASK_TEMPLATES,SMALL_TALKS,smallTalkPool,smallTalkAnswer} from '../lib/liveAutomationLines';
 import {isCompletionReport} from '../lib/liveChatBot';
 
 const fail=(m:string)=>{throw new Error(m);};
@@ -168,10 +168,20 @@ if(ns2.size<20)fail('7시 맞장구 다양성 '+ns2.size);
 if(agreeAnswerText('nextShow','방송 기대돼요',1)!==null&&/\{t\}|\d시/.test(String(agreeAnswerText('nextShow','방송 기대돼요',1))))fail('시간 없는데 지어냄');
 console.log('답·맞장구 ok |',factAnswerText('subscribe',3),'|',agreeAnswerText('replay','',5),'|',[...ns2].slice(0,4).join(' / '));
 // 지난 구매 얘기(시험용) — 실제 판 상품명에서 브랜드+품목, 일반 손님 화면엔 숨김 판정
-const si=soldItems([...[...Array(5)].map(()=>'알로 부츠컷팬츠 블랙/M'),...[...Array(3)].map(()=>'룰루레몬 얼라인 레깅스 그레이'),...[...Array(4)].map(()=>'MC-320 블랙 패딩'),'나이키 운동화']);
+const si=soldItems([...[...Array(5)].map((_,i)=>({product_name:'알로 부츠컷팬츠',color:'블랙',size:i<3?'M':'S'})),...[...Array(3)].map(()=>({product_name:'룰루레몬 얼라인 레깅스',color:'그레이',size:'6'})),...[...Array(4)].map(()=>({product_name:'MC-320 블랙 패딩',color:'블랙',size:'없음'})),'나이키 운동화']);
+if(si[0].sizes[0]!=='M'||si[0].colors[0]!=='블랙'||si.find(v=>v.brand==='몽클레어')?.sizes.length!==0)fail('사이즈·색 고르기 '+JSON.stringify(si));
+for(const t of MEMORY_TEMPLATES)if(!isTestOnlyLine(t.text))fail('숨김 판정 안 되는 문장 '+t.text);
+if(MEMORY_TEMPLATES.filter(t=>t.need==='size').length<200||MEMORY_TEMPLATES.filter(t=>t.need==='color').length<100)fail('사이즈·색 구매 얘기 수 '+MEMORY_TEMPLATES.filter(t=>t.need==='size').length+'/'+MEMORY_TEMPLATES.filter(t=>t.need==='color').length);
+const memOut=new Set<string>();for(let i=0;i<400;i++){const t=purchaseMemoryText(si[0],i);memOut.add(t);if(/\{|\s{2}/.test(t))fail('빈칸 '+t);}
+if(![...memOut].some(t=>/M으로|M 샀/.test(t))||![...memOut].some(t=>/언니가 추천해준 대로|언니 말 듣고/.test(t))||![...memOut].some(t=>/블랙/.test(t))||![...memOut].some(t=>/언니 최고|역시 언니/.test(t)))fail('구매 얘기 종류');
+for(let i=0;i<200;i++){const t=purchaseMemoryText(si.find(v=>v.brand==='몽클레어')!,i);if(/\{|사이즈 딱|\s(으로|로)\s|추천해주신\s+사이즈/.test(t))fail('사이즈 없는데 사이즈 말 '+t);}
 if(si[0].brand!=='알로'||si[0].item!=='부츠컷팬츠'||!si.some(v=>v.brand==='룰루레몬'&&v.item==='얼라인')||!si.some(v=>v.brand==='몽클레어')||si.some(v=>v.brand==='나이키'))fail('판 상품 읽기 '+JSON.stringify(si));
-if(MEMORY_TEMPLATES.length<200)fail('구매 얘기 수 '+MEMORY_TEMPLATES.length);
+if(MEMORY_TEMPLATES.length<400)fail('구매 얘기 수 '+MEMORY_TEMPLATES.length);
 for(let i=0;i<300;i++){const t=purchaseMemoryText(si[i%si.length],i);if(!isTestOnlyLine(t))fail('숨김 판정 못 함 '+t);if(DB_BAD.test(t)||t.length>100||t.includes('{x}'))fail('구매 얘기 '+t);const v=personaVoice(t,i,i);if(!isTestOnlyLine(v))fail('말투 바꾼 뒤 숨김 판정 못 함 '+v);}
 for(const t of ['블랙 이쁘네요','알로 또 언제 해요?','주문서 넣었어요 확인 부탁드려요'])if(isTestOnlyLine(t))fail('숨기면 안 됨 '+t);
-console.log('지난 구매 얘기 ok |',purchaseMemoryText(si[0],1),'|',purchaseMemoryText(si[1],7));
+for(const [w,e] of [['블랙','으로'],['M','으로'],['S','로'],['6','으로'],['240','으로'],['카멜','로'],['베이지','로'],['XL','로']] as const)if(roParticle(w)!==e)fail('로/으로 '+w);
+if([...memOut].some(t=>/블랙로|M로/.test(t)))fail('조사 틀림');
+if([...memOut].some(t=>!t.includes('부츠컷팬츠')))fail('상품 없이 말함 '+[...memOut].find(t=>!t.includes('부츠컷팬츠')));
+
+console.log('지난 구매 얘기 ok',memOut.size,'가지 |',[...memOut].slice(0,6).join(' / '));
 console.log('ALL OK');

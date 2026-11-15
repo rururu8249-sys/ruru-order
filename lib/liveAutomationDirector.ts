@@ -511,8 +511,8 @@ async function replyToAiFlow(x:CodeCtx):Promise<boolean>{
 let soldCache:{at:number;list:SoldItem[]}|null=null;
 async function hotSoldItems(db:SupabaseClient,now:number):Promise<SoldItem[]>{
  if(soldCache&&now-soldCache.at<3600000)return soldCache.list;
- const r=await rows<Row>(db.from('orders').select('product_name').gte('created_at',new Date(now-90*86400000).toISOString()).lt('created_at',new Date(now-30*86400000).toISOString()).neq('is_deleted',true).neq('is_test_order',true).is('automation_actor_id',null).limit(5000)).catch(()=>[] as Row[]);
- soldCache={at:now,list:soldItems(r.map(x=>String(x.product_name||'')))};
+ const r=await rows<Row>(db.from('orders').select('product_name,color,size').gte('created_at',new Date(now-90*86400000).toISOString()).lt('created_at',new Date(now-30*86400000).toISOString()).neq('is_deleted',true).neq('is_test_order',true).is('automation_actor_id',null).limit(5000)).catch(()=>[] as Row[]);
+ soldCache={at:now,list:soldItems(r as {product_name?:unknown;color?:unknown;size?:unknown}[])};
  return soldCache.list;
 }
 /** 지난 구매 얘기 — 방 전체 12분에 한 번·한 사람 한 번. 일반 손님 화면엔 안 보임(isTestOnlyLine) */
