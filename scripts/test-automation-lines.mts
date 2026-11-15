@@ -97,11 +97,11 @@ for(const t of ['카드결제 되나요?','카결 어떻게 해요','입금 계�
 // 말투 버릇 — 사람마다 일정, 사람끼리 다양
 const marks=new Set<string>(),spacing=new Set<string>(),typoPeople=new Set<number>();
 for(let a=0;a<300;a++){const v=voiceOf(a);marks.add(v.mark);spacing.add(v.spacing);if(v.typo>0.1)typoPeople.add(a);}
-if(!marks.has(':)'))fail('웃는 표시 :) 버릇 없음');
+if(marks.has(':)'))fail('옛 웃음 표시 :) 버릇 남음(23:55 폐지)');
 if(marks.size<7||spacing.size<3||typoPeople.size<30)fail('버릇 종류 부족');
 const sample=new Set<string>();for(let a=0;a<200;a++)sample.add(personaVoice('오늘 예쁜 옷 많았네요',a,a));
 if(sample.size<15)fail('같은 말 모양 다양성 '+sample.size);
-if(![...sample].some(x=>/~$/.test(x))||![...sample].some(x=>/!$/.test(x))||![...sample].some(x=>/\.\.$/.test(x))||![...sample].some(x=>x.includes('예쁜옷'))||![...sample].some(x=>/:-?\)$/.test(x)))fail('버릇 모양 누락');
+if(![...sample].some(x=>/~$/.test(x))||![...sample].some(x=>/!$/.test(x))||![...sample].some(x=>/\.\.$/.test(x))||![...sample].some(x=>x.includes('예쁜옷'))||[...sample].some(x=>/:-?\)$/.test(x)))fail('버릇 모양 누락(또는 :) 남음)');
 if(personaVoice('버58 160에 52인데 몇 입으면 될까요?',3,4).replace(/\s/g,'').indexOf('버58')!==0)fail('상품번호 건드림');
 if(!/\?/.test(personaVoice('방송 지금 시작한 거죠?',9,9)))fail('물음표 사라짐');
 console.log('말투 ok',[...sample].slice(0,8).join(' / '));
@@ -252,4 +252,13 @@ console.log('ALL OK');
   const t=brandAskText(mc[0],3);
   if(!t.includes('MC-319 연베이지'))throw new Error('문장에 상품명 없음 '+t);
   console.log('브랜드 상품명 ok',t);
+}
+// 2026-11-15 23:55 :-) 폐지·등록 이모티콘 많이
+{
+  const {modernizeEmoticons,siteEmojiText}=await import('../lib/liveAutomationLines');
+  for(const t of ['실물 궁금하당:-)','예뻐요 :)','좋아요;)']){const o=modernizeEmoticons(t,1,2);if(/[:;]-?\)/.test(o))throw new Error(':-) 남음 '+o);}
+  const names=['하트','동실장','루루업','감사합니다','최고야'];
+  let site=0;for(let i=0;i<300;i++){const o=siteEmojiText(modernizeEmoticons('실물 궁금하당:-)',i,i*13),names,i,i*7);if(/[:;]-?\)/.test(o))throw new Error(':) 남음 '+o);if(/:[^:\s]+:/.test(o))site++;}
+  if(site<180)throw new Error('등록 이모티콘 적음 '+site);
+  console.log('옛 웃음 표시 없음·등록 이모티콘',site,'/300');
 }

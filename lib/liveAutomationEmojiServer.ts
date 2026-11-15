@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { encodeEmojiTokens } from "./liveChatEmoji";
 import { readEmojiSetting } from "./liveChatEmojiServer";
-import { hashOf, siteEmojiText, varyLaughAgainst, varyTailAgainst } from "./liveAutomationLines";
+import { hashOf, modernizeEmoticons, siteEmojiText, varyLaughAgainst, varyTailAgainst } from "./liveAutomationLines";
 
 // DB live_automation_chat 이 거절하는 말(같은 규칙) — 이모티콘 이름 때문에 글이 막히면 이모티콘 없이 보냄
 const DB_REJECT = /(테스트|\btest\b|\bAI\b|API|프롬프트|한도|시스템|결제.{0,3}완료|입금.{0,3}완료|https?:\/\/)/i;
@@ -22,8 +22,8 @@ export async function automationChatBody(sb: SupabaseClient, bc: string | number
   try {
     const setting = await readEmojiSetting(sb);
     const on = setting.items.filter((e) => e.on);
-    if (!on.length) return text;
-    const withNames = siteEmojiText(text, on.map((e) => e.name), hashOf("actor:" + actorId), hashOf(text + actorId));
+    if (!on.length) return text.replace(/\s*[:;]-?[)D](?![A-Za-z0-9가-힣])/g, "").trim() || text;
+    const withNames = siteEmojiText(modernizeEmoticons(text, hashOf("actor:" + actorId), hashOf(text + actorId)), on.map((e) => e.name), hashOf("actor:" + actorId), hashOf(text + actorId));
     const encoded = encodeEmojiTokens(withNames, on).text;
     if (encoded.trim().length >= 1 && encoded.trim().length <= 100 && !DB_REJECT.test(encoded)) return encoded;
     return text.replace(/\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic})*/gu, "").replace(/\s{2,}/g, " ").trim() || text;

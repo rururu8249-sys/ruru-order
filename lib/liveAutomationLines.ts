@@ -180,7 +180,7 @@ export type Voice = { spacing: 'tight' | 'loose' | 'neat'; mark: '~' | '!' | '..
 export function voiceOf(actorSeed: number): Voice {
   const s = hashOf('voice:' + actorSeed);
   const spacing = (['tight', 'loose', 'neat', 'neat', 'neat'] as const)[s % 5];
-  const mark = (['~', '!', '..', '^^', '.', '', '~', '!', ':)', 'emoji', 'emoji'] as const)[(s >>> 3) % 11]; // [14:49 사장님] 이모지 쓰는 사람도 // [14:40 사장님] :) 웃는 표시 쓰는 사람도
+  const mark = (['~', '!', '..', '^^', '.', '', '~', '!', 'emoji', 'emoji', 'emoji'] as const)[(s >>> 3) % 11]; // [23:55 사장님 「:-) 언제적 이모티콘」] :) 버릇 폐지 → 이모지(등록 이모티콘으로 바뀜) // [14:49 사장님] 이모지 쓰는 사람도 // [14:40 사장님] :) 웃는 표시 쓰는 사람도
   const ending = (['요', '여', '용', '요', '요', '당'] as const)[(s >>> 6) % 6];
   const typo = (s >>> 9) % 4 === 0 ? 0.4 : 0.05;
   return { spacing, mark, ending, typo };
@@ -450,13 +450,22 @@ export function siteEmojiText(text:string,names:string[],actorSeed:number,msgSee
   const out=String(text).replace(new RegExp(PICTO,'gu'),e=>{
     i++;
     // [19:11 사장님 「기본 이모지도 써도 돼, 섞어 가면서」] 손님마다 등록 이모티콘 쓰는 비율(30~70%)이 다르고, 글마다 섞임
-    const useSite=e===prevEmoji?prevName!=='':(hashOf('mix:'+msgSeed+':'+i)%100)<30+hashOf('ratio:'+actorSeed)%41;
+    const useSite=e===prevEmoji?prevName!=='':(hashOf('mix:'+msgSeed+':'+i)%100)<60+hashOf('ratio:'+actorSeed)%36; // [23:55 사장님 「등록한 이모티콘 활용 많이」] 60~95%
     if(!useSite){prevEmoji=e;prevName='';return e;}
     if(n>=max)return '';
     const name=e===prevEmoji&&prevName?prevName:fav[hashOf('se:'+msgSeed+':'+i)%fav.length];
     prevEmoji=e;prevName=name;n++;return ':'+name+':';
   });
   return out.replace(/\s{2,}/g,' ').trim()||text;
+}
+/** [2026-11-15 23:55 사장님 「:-) 언제적 이모티콘이냐 — 등록한 이모티콘 많이」] :) :-) ;) 같은 옛날 웃음 표시는 이모지로 바꾸고,
+ *  이모지가 하나도 없는 글엔 가끔(글·손님마다 35~65%) 하나 붙임 → 그다음 siteEmojiText 가 등록 이모티콘으로 바꿈 */
+export function modernizeEmoticons(text:string,actorSeed:number,msgSeed:number):string{
+  let t=String(text||'').replace(/\s*[:;]-?[)D](?![A-Za-z0-9가-힣])/g,' 😊').replace(/\s{2,}/g,' ').trim();
+  if(!new RegExp(PICTO,'u').test(t)&&t.length<=90&&!/[?？]$/.test(t)&&(hashOf('add:'+msgSeed)%100)<35+hashOf('addr:'+actorSeed)%31){
+    t=t+' '+EMOJIS[hashOf('ae:'+msgSeed)%EMOJIS.length];
+  }
+  return t;
 }
 export const EMOJIS = ['😊','🥰','😆','😍','💕','👍','🙌','✨','🤗','😁','💖','👏','😘','🤭'];
 export function fixLaughCount(text: string, seed = 0): string {
