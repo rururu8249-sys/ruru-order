@@ -24,11 +24,14 @@ async function dropStaleNames(db:SupabaseClient,keep:Set<string>) {
    for(let i=0;i<stale.length;i+=100)await db.from('live_automation_nickname_pool').delete().eq('status','unused').in('nickname_key',stale.slice(i,i+100));
  }catch{/* 못 지워도 채우기는 계속 */}
 }
+let poolCleaned=false;
 async function ensurePool(db:SupabaseClient) {
  // [2026-11-15 사장님 «매 방송 같은 닉네임 안 됨»] 이름은 NICKNAME_CANDIDATES(실제 회원 닉네임 꼴 2,210개).
  // 쓴 이름은 3일(한국 날짜) 뒤에 후보로 되돌린다(DB recycle, 모자라면 1일) — 연달아 며칠 같은 이름이 안 나옴.
- const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]/.test(x.nickname));
+ // [2026-11-15 20:46 사장님] «○○둥이·○○동이»는 가게 이름(루루동이)과 비슷해서 후보에서 뺌
+ const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]/.test(x.nickname)&&!/[둥동]이$/.test(x.nickname));
  const keep=new Set(candidates.map(x=>nicknameCollisionKey(x.nickname)));
+ if(!poolCleaned){poolCleaned=true;await dropStaleNames(db,keep);}
  let recycled=0;
  try { recycled=Number(await automationRpc(db,'live_automation_pool_recycle',{}))||0; } catch { /* 되돌리기 실패해도 후보 채우기는 계속 */ }
  if(recycled>0)await dropStaleNames(db,keep);

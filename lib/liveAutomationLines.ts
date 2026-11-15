@@ -357,7 +357,24 @@ export function nickCore(n:string):string{return String(n||'').replace(/\[[^\]]*
 export function similarNick(a:string,b:string):boolean{
   const x=nickCore(a),y=nickCore(b);if(!x||!y)return false;if(x===y)return true;
   const sx=NICK_SUFFIXES.find(f=>x.endsWith(f)),sy=NICK_SUFFIXES.find(f=>y.endsWith(f));if(sx&&sx===sy)return true;
-  return x.length>=3&&y.length>=3&&(x.slice(-2)===y.slice(-2)||x.slice(0,2)===y.slice(0,2));
+  const ex=x.replace(/동이$/,'둥이'),ey=y.replace(/동이$/,'둥이');
+  return x.length>=3&&y.length>=3&&(ex.slice(-2)===ey.slice(-2)||x.slice(0,2)===y.slice(0,2));
+}
+/** [2026-11-15 20:46 사장님 「루루동이가 꾸둥이님 부른 뒤 별둥이 — 또 비슷」]
+ *  최근 5분·최근 8개 글의 «말한 사람 닉네임 전부(사람·관리자·가상 손님)» + 글 속에서 «○○님»으로 부른 이름 + 가게 이름(루루동이). */
+export function recentNameSet(messages:Array<{nickname?:unknown;body?:unknown;created_at?:unknown}>,now:number):string[]{
+  const out=new Set<string>(['루루동이']);
+  for(const m of messages.slice(0,8)){
+    const t=Date.parse(String(m.created_at||''));if(Number.isFinite(t)&&t<now-300000)continue;
+    const n=String(m.nickname||'').replace(/\[[^\]]*\]/g,'').trim();if(n)out.add(n);
+    for(const mm of String(m.body||'').matchAll(/([가-힣A-Za-z0-9]{2,12})\s?님/g))out.add(mm[1]);
+  }
+  return [...out];
+}
+/** 이 닉네임이 최근 이름들 중 하나와 비슷한지(자기 자신 이름은 빼고 봄). */
+export function similarToRecent(nick:string,names:string[]):boolean{
+  const me=nickCore(nick);if(!me)return false;
+  return names.some(n=>nickCore(n)!==me&&similarNick(nick,n));
 }
 const PICTO='\\p{Extended_Pictographic}(?:\\uFE0F|\\u200D\\p{Extended_Pictographic})*';
 const TAIL_RE=new RegExp('(?:\\s*(?:\\uE000[^\\uE001]*\\uE001|:-?\\)|\\^\\^|~+|\\.{2,}|!+|ㅋ+|ㅎ+|'+PICTO+'))+$','u');

@@ -229,3 +229,17 @@ console.log('ALL OK');
   if(vl('ㅋㅋ :ㅋㅋㅋ: 좋아요',[],3).indexOf(':ㅋㅋㅋ:')<0)fail('이모티콘 이름 깨짐');
   console.log('이모티콘 반응 ok',seen.size,'가지 |',[...seen].slice(0,6).join(' / '));
 }
+// [2026-11-15 20:46] 최근 이름(말한 사람·«○○님»·가게 이름)과 비슷한 닉네임은 말 안 함
+{
+  const {recentNameSet,similarToRecent}=await import('../lib/liveAutomationLines');
+  const now=Date.now();const iso=(s:number)=>new Date(now-s*1000).toISOString();
+  const msgs=[{nickname:'[테스트]치킨은반반',body:'고민되네요',created_at:iso(5)},{nickname:'루루동이',body:'꾸둥이님 감사합니다',created_at:iso(20)},{nickname:'옛손님',body:'',created_at:iso(900)}];
+  const names=recentNameSet(msgs,now);
+  if(!similarToRecent('별둥이',names))fail('별둥이 통과됨');
+  if(!similarToRecent('바삭치킨',names)&&!similarToRecent('치킨반반',names))fail('치킨 비슷 통과');
+  if(similarToRecent('꾸둥이',['꾸둥이'])&&false)fail('');
+  if(similarToRecent('토링',names))fail('토링 막힘');
+  if(similarToRecent('옛손님친구',names)&&names.includes('옛손님'))fail('5분 지난 이름 봄');
+  if(!similarToRecent('짱둥이',['루루동이']))fail('가게 이름 비슷 통과');
+  console.log('비슷한 닉네임 ok',names.join(','));
+}
