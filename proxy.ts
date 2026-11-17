@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { authorizedInternalCronRequest } from "@/lib/internalCronAuth";
 
 const ADMIN_PAGE_PREFIXES = ["/admin-live"]; // [2026-09-07] 1·2세대 관리자(/admin, /admin-v2) 페이지 삭제. API /api/admin-v2 는 그대로 보호.
 const ADMIN_API_PREFIXES = ["/api/admin-live", "/api/admin-v2", "/api/bankda"];
@@ -9,8 +10,6 @@ const INTERNAL_CRON_API_PATHS = [
   "/api/bankda/sync-deposits",
   "/api/admin-v2/auto-payment-match/run",
 ];
-
-const INTERNAL_CRON_BYPASS_TOKEN = "ruru-bankda-cron-internal-v1";
 
 function startsWithPath(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(prefix + "/");
@@ -28,25 +27,7 @@ function isInternalCronApi(pathname: string) {
   return INTERNAL_CRON_API_PATHS.includes(pathname);
 }
 
-function getBearerToken(value: string) {
-  return value.startsWith("Bearer ") ? value.slice("Bearer ".length).trim() : "";
-}
-
-function isAuthorizedInternalCronRequest(request: NextRequest) {
-  const providedSecret =
-    request.headers.get("x-ruru-internal-cron") ||
-    getBearerToken(request.headers.get("authorization") || "");
-
-  const allowedSecrets = [
-    INTERNAL_CRON_BYPASS_TOKEN,
-    String(process.env.CRON_SECRET || "").trim(),
-    String(process.env.BANKDA_CRON_SECRET || "").trim(),
-  ].filter(Boolean);
-
-  return Boolean(providedSecret && allowedSecrets.includes(providedSecret));
-}
-
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const shouldProtectPage = isAdminPage(pathname);
   const shouldProtectApi = isAdminApi(pathname);
@@ -58,7 +39,7 @@ export async function middleware(request: NextRequest) {
   if (
     shouldProtectApi &&
     isInternalCronApi(pathname) &&
-    isAuthorizedInternalCronRequest(request)
+    authorizedInternalCronRequest(request)
   ) {
     const response = NextResponse.next();
     response.headers.set("Cache-Control", "no-store");

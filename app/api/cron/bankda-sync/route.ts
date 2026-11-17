@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizedInternalCronRequest, internalCronSecret } from "@/lib/internalCronAuth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const INTERNAL_CRON_BYPASS_TOKEN = "ruru-bankda-cron-internal-v1";
 
 async function readJsonSafe(response: Response) {
   const text = await response.text();
@@ -17,58 +16,11 @@ async function readJsonSafe(response: Response) {
   }
 }
 
-function getProvidedSecret(request: NextRequest) {
-  const auth = request.headers.get("authorization") || "";
-  const bearer = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
-
-  return (
-    bearer ||
-    request.headers.get("x-cron-secret") ||
-    request.nextUrl.searchParams.get("secret") ||
-    ""
-  ).trim();
-}
-
-function isVercelCronRequest(request: NextRequest) {
-  const userAgent = request.headers.get("user-agent") || "";
-
-  return userAgent.includes("vercel-cron/1.0");
-}
-
-function getInternalCronSecret() {
-  return INTERNAL_CRON_BYPASS_TOKEN;
-}
-
 function assertAuthorized(request: NextRequest) {
-  const cronSecret = String(process.env.CRON_SECRET || "").trim();
-  const bankdaCronSecret = String(process.env.BANKDA_CRON_SECRET || "").trim();
-  const providedSecret = getProvidedSecret(request);
-
-  const allowedSecrets = [cronSecret, bankdaCronSecret].filter(Boolean);
-
-  if (providedSecret && allowedSecrets.includes(providedSecret)) {
-    return { ok: true, status: 200, message: "" };
-  }
-
-  // Vercel Cron 공식 호출은 user-agent: vercel-cron/1.0 과 x-vercel-cron-schedule 헤더를 포함합니다.
-  // CRON_SECRET 헤더 반영이 꼬여도 Vercel Cron 자체는 통과시켜 Bankda 서버 자동동기화를 살립니다.
-  if (isVercelCronRequest(request)) {
-    return { ok: true, status: 200, message: "" };
-  }
-
-  if (allowedSecrets.length === 0) {
-    return {
-      ok: false,
-      status: 500,
-      message: "CRON_SECRET 또는 BANKDA_CRON_SECRET 환경변수가 설정되지 않았습니다.",
-    };
-  }
-
-  return {
-    ok: false,
-    status: 401,
-    message: "Bankda cron 인증 실패",
-  };
+  const configured = Boolean(String(process.env.CRON_SECRET || process.env.BANKDA_CRON_SECRET || "").trim());
+  if (!configured) return { ok: false, status: 503, message: "Cron 인증 설정이 필요합니다." };
+  if (!authorizedInternalCronRequest(request)) return { ok: false, status: 401, message: "Bankda cron 인증 실패" };
+  return { ok: true, status: 200, message: "" };
 }
 
 async function handleBankdaCron(request: NextRequest) {
@@ -87,14 +39,14 @@ async function handleBankdaCron(request: NextRequest) {
 
   const origin = new URL(request.url).origin;
 
-  const internalCronSecret = getInternalCronSecret();
+  const internalSecret = internalCronSecret();
 
   const syncResponse = await fetch(`${origin}/api/bankda/sync-and-auto-match`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-ruru-internal-cron": internalCronSecret,
-      Authorization: `Bearer ${internalCronSecret}`,
+      "x-ruru-internal-cron": internalSecret,
+      Authorization: `Bearer ${internalSecret}`,
     },
     body: JSON.stringify({
       source: "bankda_server_cron",
