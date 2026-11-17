@@ -681,7 +681,7 @@ export default function LiveWatchView(props: Props) {
     if (!batch) { setDraft(""); setBeforeCaretText(""); setEmojiOpen(false); setComposeOpen(false); }
     // [2026-11-12 22:46 사장님] 인사하기 줄은 「보내기」를 눌러야만 사라짐 — 채팅을 써도 그대로
     const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
-    const r = await (manualChat.selected
+    const r = await (manualChat.selected && !batch
       ? manualChat.send(body, (text, identity) => chat.onSend(text, undefined, identity))
       : chat.onSend(body, commandTarget)).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     if (!r.ok && !batch) {
@@ -1248,7 +1248,25 @@ export default function LiveWatchView(props: Props) {
         adminMode={operatorMode}
         onModeChange={setOperatorMode}
         busy={sending}
-        onIntroduce={async (product) => Boolean(await sendChat(`/선택 상품 1개`, { targets: [{ productId: product.productId, detailName: product.detailName }], mode: "replace" }))}
+        onIntroduce={async (products, options) => {
+          const targets = products.map(p => ({ productId: p.productId, detailName: p.detailName }));
+          // Take the timestamp before the chat command; never invent a position.
+          const point = options.mode === "replace" && options.replaceIntro ? await introPlayer.capture() : null;
+          if (options.replaceIntro && !point) return { ok: false, message: "현재 영상 시간을 확인할 수 없어요. 영상을 재생한 뒤 다시 시도해 주세요. 상품은 변경되지 않았어요." };
+          const ok = await sendChat(`/선택 상품 ${products.length}개`, { targets, mode: options.mode });
+          if (!ok) return { ok: false, message: "상품 위젯 변경에 실패했어요. 현재 표시 상품을 확인해 주세요." };
+          if (!options.replaceIntro || options.mode !== "replace" || !point) return { ok: true, message: `${products.length}개 상품 소개 완료 · 기존 영상 위치 유지` };
+          try {
+            const response = await fetch("/api/live-chat/product-intro/manage", {
+              method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() },
+              body: JSON.stringify({ bc: props.broadcastId, videoId: point.videoId, targets, action: "change", capture: point }),
+            });
+            const saved = await response.json().catch(() => null);
+            if (!response.ok || !saved?.ok) return { ok: true, message: `상품 소개 완료 · 영상 위치 변경 실패: ${saved?.message || "다시 확인해 주세요"}` };
+            if (props.broadcastId) { invalidateProductIntroCatalog(props.broadcastId, videoId); void loadProductIntroCatalog(props.broadcastId, videoId).catch(() => {}); }
+            return { ok: true, message: `상품 소개 + 영상 위치 ${products.length}개 변경 완료` };
+          } catch { return { ok: true, message: "상품 소개 완료 · 영상 위치 저장에 실패했어요. 위치만 다시 확인해 주세요." }; }
+        }}
       /> : null}
       {/* PC 영상 영역 / 폰은 기존 화면 전체 배치 */}
       <div data-live-video="1" style={isDesktop ? { position: "absolute", left: 0, right: videoAreaRight, top: 0, bottom: 0, overflow: "hidden" } : { display: "contents" }}>
