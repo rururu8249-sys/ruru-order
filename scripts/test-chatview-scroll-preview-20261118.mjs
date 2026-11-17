@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {newScrollPreviewMessages} from '../lib/chatViewScrollPreview.ts';
+const bc='b';
+const m=(id,body,botRef='',badge=null)=>({id,broadcastId:bc,nickname:'손님'+id,body,botRef,badge,avatar:'',hidden:false,createdAt:new Date().toISOString(),pinned:false});
+const history=[m(1,'안녕하세요'),m(2,'장바구니 담음','c:1','bot'),m(3,'주문서 제출 완료','o:3','bot'),m(4,'입금 확인되었습니다','ap:4','bot'),m(5,'카드 결제 완료','card:5','bot'),m(6,'입금 확인 부탁드려요'),m(7,'배송은 언제 되나요?')];
+assert.deepEqual(newScrollPreviewMessages(history,1).map(x=>x.id),[6,7]);
+assert.deepEqual(newScrollPreviewMessages(history,7),[]);
+assert.deepEqual(newScrollPreviewMessages(history,5).map(x=>x.id),[6,7]);
+const code=fs.readFileSync('app/chat-view/ChatViewClient.tsx','utf8');
+assert.match(code,/scrollPreviewIsFresh/);
+assert.match(code,/setTimeout\(\(\)=>setScrollPreviewIsFresh\(false\),8000\)/);
+assert.match(code,/className="ruru-chat-scroll-jump"/);
+assert.match(code,/openLatestSiteChat/);
+assert.match(code,/새 글 보기 ↓/);
+assert.match(code,/testMessageIds\.has\(scrollPreview\.message\.id\)/);
+console.log('PASS: scrolled site chat preview excludes cart/order/payment; N clears after 8s or latest jump; test prefix retained');

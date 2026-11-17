@@ -21,6 +21,7 @@ import {createChatViewUnread, reduceChatViewUnread} from "@/lib/chatViewUnread";
 import {ChatViewNotice} from "./ChatViewNotice";
 import "./chat-view.css";
 import {includeChatViewMessage,includeChatViewNoticeMessage} from "@/lib/chatViewFilter";
+import {newScrollPreviewMessages} from "@/lib/chatViewScrollPreview";
 import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
 
 type Bc = { id: string; title: string; videoId: string; paused: boolean };
@@ -34,6 +35,15 @@ const BADGE: Record<string, { label: string; bg: string; fg: string }> = {
 // [16:11 사장님] 어두운 화면(눈 덜 피곤) — 유튜브 어두운 채팅과 같은 색
 const C = { page: "#000000", panel: "#0F0F0F", line: "#2A2A2A", btn: "#1F1F1F", ink: "#F1F1F1", soft: "#AAAAAA", mute: "#8A8A8A" };
 // 유튜브 확대 배율과 사이트 글자 크기는 각각 이 기기에만 기억.
+
+// Match the pastel nickname color used by the customer live chat view.
+function chatViewSoftNickColor(hex: string): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return "rgba(255,255,255,0.8)";
+  const rgb = parseInt(match[1], 16);
+  const pastel = (channel: number) => Math.round(channel + (255 - channel) * 0.45);
+  return `rgb(${pastel((rgb >> 16) & 255)}, ${pastel((rgb >> 8) & 255)}, ${pastel(rgb & 255)})`;
+}
 
 export default function ChatViewClient() {
   const [bc, setBc] = useState<Bc | null>(null);
@@ -60,6 +70,12 @@ export default function ChatViewClient() {
   const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(displayMessages, `${sizeIdx}:${tab}`, tab === "site");
   const [recent, setRecent] = useState<Array<{ id: number; at: number }>>([]);
   const seen = useRef<{ bc: string; maxId: number } | null>(null);
+  // Site-chat history reader: separate from YouTube overlay unread state.
+  // Only real conversation messages create a preview while reading older chat.
+  const [scrollPreview, setScrollPreview] = useState<{message:LiveChatMessage; count:number; arrivedAt:number}|null>(null);
+  const [scrollPreviewIsFresh, setScrollPreviewIsFresh] = useState(false);
+  const scrollPreviewSeen = useRef<{bc:string; maxId:number}|null>(null);
+
 
   // 글자 크기(이 기기에만)
   useEffect(() => {
@@ -190,6 +206,35 @@ export default function ChatViewClient() {
       Math.max(1, Math.min(...recent.map((r) => r.at + 15000)) - Date.now()));
     return () => window.clearTimeout(t);
   }, [recent]);
+
+  // Observe actual site-chat message arrivals, not new renders or scroll position changes.
+  // Ignore cart/order/payment bots using the exact same filter as the YouTube overlay.
+  useEffect(() => {
+    const maxId = displayMessages.reduce((max,m)=>Math.max(max,m.id),0);
+    const previous = scrollPreviewSeen.current;
+    scrollPreviewSeen.current = {bc:bcId,maxId:Math.max(maxId,previous?.bc===bcId?previous.maxId:0)};
+    if (!previous || previous.bc!==bcId) {setScrollPreview(null); return;}
+    if (tabRef.current !== 'site' || atBottom) return;
+    const added = newScrollPreviewMessages(displayMessages,previous.maxId);
+    if (!added.length) return;
+    const newest = added[added.length-1];
+    setScrollPreview(prev=>({message:newest,count:(prev?.count||0)+added.length,arrivedAt:Date.now()}));
+    setScrollPreviewIsFresh(true);
+  }, [displayMessages,bcId,atBottom]);
+  // N highlights the arrival briefly; the latest message preview remains until seen.
+  useEffect(() => {
+    if (!scrollPreview) return;
+    const timer = window.setTimeout(()=>setScrollPreviewIsFresh(false),8000);
+    return () => window.clearTimeout(timer);
+  }, [scrollPreview?.arrivedAt]);
+  useEffect(() => {
+    if (atBottom || tab !== 'site') {setScrollPreview(null);setScrollPreviewIsFresh(false);}
+  }, [atBottom,tab]);
+  const openLatestSiteChat = () => {
+    setScrollPreview(null);
+    setScrollPreviewIsFresh(false);
+    followLatest();
+  };
 
   // 화면 꺼짐 방지(되는 브라우저만 — 크롬 OK)
   useEffect(() => {
@@ -340,11 +385,11 @@ export default function ChatViewClient() {
             const b = palette ? {label:"AI",bg:palette.badge,fg:palette.ink} : m.badge ? BADGE[m.badge] : null;
             return (
               <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "var(--chat-row-gap, 10px)", padding: "var(--chat-row-padding, 7px 8px)" }}>
-                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size="1.6em" frame={palette?.frame || staffAvatarFrame(m.badge)} color={palette ? undefined : avatarColorMap.get(m.id)} />
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size={30} frame={palette?.frame || staffAvatarFrame(m.badge)} color={palette ? undefined : avatarColorMap.get(m.id)} />
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
-                  <span style={{ fontWeight: 700, color: palette?.nick || "#C2C2C2", marginRight: "8px" }}>{(testMessageIds.has(m.id)||m.avatar==='autotest')&&m.badge!=='bot'&&!m.nickname.startsWith('[테스트]')?`[테스트]${m.nickname}`:m.nickname}</span>
+                  <span style={{ fontWeight: 700, color: palette?.nick || chatViewSoftNickColor(avatarColorMap.get(m.id) || "#FFFFFF"), marginRight: "8px" }}>{(testMessageIds.has(m.id)||m.avatar==='autotest')&&m.badge!=='bot'&&!m.nickname.startsWith('[테스트]')?`[테스트]${m.nickname}`:m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}
                   <ChatBodyView body={m.body} emojis={emojiMap} />
@@ -360,9 +405,16 @@ export default function ChatViewClient() {
           <span>새 글 최대 3개 강조</span>
         </div>
         {!atBottom ? (
-          <button type="button" onClick={followLatest}
-            style={{ position: "absolute", left: "50%", bottom: "48px", transform: "translateX(-50%)", height: "44px", padding: "0 18px", border: "none", borderRadius: "9999px", background: "#F1F1F1", color: "#0F0F0F", fontSize: "16px", fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
-            새 글 보기 ↓
+          <button type="button" onClick={openLatestSiteChat} aria-label={scrollPreview?`새 글 보기: ${scrollPreview.message.nickname} ${scrollPreview.message.body}`:'최신 글로 이동'}
+            className="ruru-chat-scroll-jump">
+            {scrollPreview ? <span className="ruru-chat-scroll-jump-preview">
+              {scrollPreviewIsFresh ? <span className="ruru-chat-scroll-jump-n" aria-label="새 글">N</span> : null}
+              <span className="ruru-chat-scroll-jump-text">
+                <b>{(testMessageIds.has(scrollPreview.message.id)||scrollPreview.message.avatar==='autotest')&&scrollPreview.message.badge!=='bot'&&!scrollPreview.message.nickname.startsWith('[테스트]')?`[테스트]${scrollPreview.message.nickname}`:scrollPreview.message.nickname}</b>
+                <span>{scrollPreview.message.body}</span>
+              </span>
+              <span className="ruru-chat-scroll-jump-count">{scrollPreview.count>1?`${scrollPreview.count}개 · `:''}새 글 보기 ↓</span>
+            </span> : <span>새 글 보기 ↓</span>}
           </button>
         ) : null}
       </section>
