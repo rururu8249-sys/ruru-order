@@ -141,3 +141,23 @@
     will-change:auto;
   }
 }
+
+/* Site chat only: unobtrusive jump-to-latest preview while reading older messages. */
+.ruru-chat-view .ruru-chat-scroll-jump{
+  position:absolute;z-index:5;left:50%;bottom:48px;transform:translateX(-50%);
+  display:flex;align-items:center;justify-content:center;max-width:calc(100% - 24px);
+  min-height:46px;padding:7px 14px;border:1px solid #505963;border-radius:18px;
+  background:rgba(244,247,250,.97);color:#15191e;font-size:15px;font-weight:750;
+  box-shadow:0 3px 14px rgba(0,0,0,.5);white-space:nowrap;touch-action:manipulation;
+}
+.ruru-chat-view .ruru-chat-scroll-jump-preview{display:flex;align-items:center;gap:8px;max-width:100%;min-width:0}
+.ruru-chat-view .ruru-chat-scroll-jump-n{display:inline-flex;align-items:center;justify-content:center;flex:none;
+  width:24px;height:24px;border-radius:50%;background:#E3344F;color:#fff;font-size:12px;font-weight:900}
+.ruru-chat-view .ruru-chat-scroll-jump-text{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;font-size:14px;font-weight:500}
+.ruru-chat-view .ruru-chat-scroll-jump-text b{font-weight:800;flex:none;max-width:38%;overflow:hidden;text-overflow:ellipsis}
+.ruru-chat-view .ruru-chat-scroll-jump-text span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ruru-chat-view .ruru-chat-scroll-jump-count{flex:none;font-size:12px;color:#415569;font-weight:800}
+@media(max-width:390px){.ruru-chat-view .ruru-chat-scroll-jump{padding:8px 10px}
+ .ruru-chat-view .ruru-chat-scroll-jump-text{font-size:12px;gap:4px}
+ .ruru-chat-view .ruru-chat-scroll-jump-count{font-size:11px}}

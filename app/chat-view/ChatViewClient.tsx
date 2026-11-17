@@ -21,6 +21,7 @@ import {createChatViewUnread, reduceChatViewUnread} from "@/lib/chatViewUnread";
 import {ChatViewNotice} from "./ChatViewNotice";
 import "./chat-view.css";
 import {includeChatViewMessage,includeChatViewNoticeMessage} from "@/lib/chatViewFilter";
+import {newScrollPreviewMessages} from "@/lib/chatViewScrollPreview";
 import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
 
 type Bc = { id: string; title: string; videoId: string; paused: boolean };
@@ -69,6 +70,12 @@ export default function ChatViewClient() {
   const { boxRef, contentRef, atBottom, followLatest } = useChatAutoScroll(displayMessages, `${sizeIdx}:${tab}`, tab === "site");
   const [recent, setRecent] = useState<Array<{ id: number; at: number }>>([]);
   const seen = useRef<{ bc: string; maxId: number } | null>(null);
+  // Site-chat history reader: separate from YouTube overlay unread state.
+  // Only real conversation messages create a preview while reading older chat.
+  const [scrollPreview, setScrollPreview] = useState<{message:LiveChatMessage; count:number; arrivedAt:number}|null>(null);
+  const [scrollPreviewIsFresh, setScrollPreviewIsFresh] = useState(false);
+  const scrollPreviewSeen = useRef<{bc:string; maxId:number}|null>(null);
+
 
   // 글자 크기(이 기기에만)
   useEffect(() => {
@@ -199,6 +206,35 @@ export default function ChatViewClient() {
       Math.max(1, Math.min(...recent.map((r) => r.at + 15000)) - Date.now()));
     return () => window.clearTimeout(t);
   }, [recent]);
+
+  // Observe actual site-chat message arrivals, not new renders or scroll position changes.
+  // Ignore cart/order/payment bots using the exact same filter as the YouTube overlay.
+  useEffect(() => {
+    const maxId = displayMessages.reduce((max,m)=>Math.max(max,m.id),0);
+    const previous = scrollPreviewSeen.current;
+    scrollPreviewSeen.current = {bc:bcId,maxId:Math.max(maxId,previous?.bc===bcId?previous.maxId:0)};
+    if (!previous || previous.bc!==bcId) {setScrollPreview(null); return;}
+    if (tabRef.current !== 'site' || atBottom) return;
+    const added = newScrollPreviewMessages(displayMessages,previous.maxId);
+    if (!added.length) return;
+    const newest = added[added.length-1];
+    setScrollPreview(prev=>({message:newest,count:(prev?.count||0)+added.length,arrivedAt:Date.now()}));
+    setScrollPreviewIsFresh(true);
+  }, [displayMessages,bcId,atBottom]);
+  // N highlights the arrival briefly; the latest message preview remains until seen.
+  useEffect(() => {
+    if (!scrollPreview) return;
+    const timer = window.setTimeout(()=>setScrollPreviewIsFresh(false),8000);
+    return () => window.clearTimeout(timer);
+  }, [scrollPreview?.arrivedAt]);
+  useEffect(() => {
+    if (atBottom || tab !== 'site') {setScrollPreview(null);setScrollPreviewIsFresh(false);}
+  }, [atBottom,tab]);
+  const openLatestSiteChat = () => {
+    setScrollPreview(null);
+    setScrollPreviewIsFresh(false);
+    followLatest();
+  };
 
   // 화면 꺼짐 방지(되는 브라우저만 — 크롬 OK)
   useEffect(() => {
@@ -369,9 +405,16 @@ export default function ChatViewClient() {
           <span>새 글 최대 3개 강조</span>
         </div>
         {!atBottom ? (
-          <button type="button" onClick={followLatest}
-            style={{ position: "absolute", left: "50%", bottom: "48px", transform: "translateX(-50%)", height: "44px", padding: "0 18px", border: "none", borderRadius: "9999px", background: "#F1F1F1", color: "#0F0F0F", fontSize: "16px", fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
-            새 글 보기 ↓
+          <button type="button" onClick={openLatestSiteChat} aria-label={scrollPreview?`새 글 보기: ${scrollPreview.message.nickname} ${scrollPreview.message.body}`:'최신 글로 이동'}
+            className="ruru-chat-scroll-jump">
+            {scrollPreview ? <span className="ruru-chat-scroll-jump-preview">
+              {scrollPreviewIsFresh ? <span className="ruru-chat-scroll-jump-n" aria-label="새 글">N</span> : null}
+              <span className="ruru-chat-scroll-jump-text">
+                <b>{(testMessageIds.has(scrollPreview.message.id)||scrollPreview.message.avatar==='autotest')&&scrollPreview.message.badge!=='bot'&&!scrollPreview.message.nickname.startsWith('[테스트]')?`[테스트]${scrollPreview.message.nickname}`:scrollPreview.message.nickname}</b>
+                <span>{scrollPreview.message.body}</span>
+              </span>
+              <span className="ruru-chat-scroll-jump-count">{scrollPreview.count>1?`${scrollPreview.count}개 · `:''}새 글 보기 ↓</span>
+            </span> : <span>새 글 보기 ↓</span>}
           </button>
         ) : null}
       </section>
