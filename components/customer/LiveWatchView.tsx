@@ -1118,9 +1118,6 @@ export default function LiveWatchView(props: Props) {
             onSubmit={(e) => { e.preventDefault(); if (productPickerOpen) return; if (composingRef.current) { composingRef.current = false; inputRef.current?.blur(); } if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } setEmojiOpen(false); void sendChat(inputRef.current?.text() || undefined); }}
             style={{ position: "relative", width: "100%", maxWidth: "560px", margin: "0 auto", background: isDesktop ? "#0F0F0F" : "#FFFFFF", padding: isDesktop ? "12px 0 calc(12px + env(safe-area-inset-bottom))" : emojiOpen ? "12px 16px 0" : "12px 16px calc(12px + env(safe-area-inset-bottom))", borderRadius: isDesktop ? 0 : "16px 16px 0 0", boxSizing: "border-box", ...(isDesktop ? { position: "relative", flexShrink: 0, order: 5, borderTop: "1px solid #333333", pointerEvents: "auto" } : {}) }}
           >
-            {manualChat.available && !viewerMode ? <div style={{ marginBottom: isDesktop ? 8 : 0 }}>
-              <AutomationNicknamePicker state={manualChat} dark={isDesktop} disabled={sending} onPicked={() => { if (composeOpen && !emojiOpen) inputRef.current?.focus(); }} />
-            </div> : null}
             {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onApply={(products, mode, replaceIntro) => {
               setEmojiOpen(false);
               void (async () => {
@@ -1626,7 +1623,6 @@ export default function LiveWatchView(props: Props) {
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
       <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: isDesktop ? "8px 12px calc(8px + env(safe-area-inset-bottom))" : "6px 10px calc(6px + env(safe-area-inset-bottom))", display: "flex", flexWrap: isDesktop ? "wrap" : "nowrap", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
-        {!isDesktop && !composeOpen && !focus && !viewerMode ? <AutomationNicknamePicker state={manualChat} dark disabled={sending} /> : null}
         {/* [2026-11-12 사장님 그립 참고] 폰 = 가게 그림 + 빨간 숫자 + 「상품」(옆 주문서·더보기와 같은 모양), PC = 예전 넓은 버튼 */}
         {!isDesktop ? (
           <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ flexShrink: 0, width: "44px", padding: 0, border: "none", background: "transparent", color: "#FFFFFF", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer" }}>
@@ -1684,6 +1680,12 @@ export default function LiveWatchView(props: Props) {
                 <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
               </button>
             </div>
+            {manualChat.available && !viewerMode ? (
+              <div data-live-more-nickname-picker style={{ margin: "0 0 10px", padding: "10px 12px", borderRadius: "12px", background: "#2C2C2E" }}>
+                <div style={{ marginBottom: 6, fontSize: 13, fontWeight: 700, color: "#D1D1D6" }}>관리자 · 보내는 닉네임</div>
+                <AutomationNicknamePicker state={manualChat} dark disabled={sending} />
+              </div>
+            ) : null}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {(() => {
                 const base = (props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지\u2060·\u2060쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 }));
