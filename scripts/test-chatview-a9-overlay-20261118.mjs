@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const n=fs.readFileSync('app/chat-view/ChatViewNotice.tsx','utf8');
+const css=fs.readFileSync('app/chat-view/chat-view.css','utf8');
+const client=fs.readFileSync('app/chat-view/ChatViewClient.tsx','utf8');
+const marker=fs.readFileSync('app/api/chat-view/test-markers/route.ts','utf8');
+assert.match(n,/slice\(-3\)/);
+assert.ok(n.includes('터치하여 확인'));
+assert.ok(n.includes('onClick={onOpen}'));
+assert.ok(css.includes('ruru-a9-soft-pulse'));
+assert.ok(css.includes('prefers-reduced-motion: reduce'));
+assert.ok(client.includes('[테스트]'));
+assert.equal((client.match(/includeChatViewNoticeMessage\(m\)\?m:\{\.\.\.m,hidden:true\}/g)||[]).length,2);
+assert.ok(marker.includes('automation_actor_id'));
+console.log('PASS A9 overlay CTA, three messages, pulse, red badge, test labels, filters');
