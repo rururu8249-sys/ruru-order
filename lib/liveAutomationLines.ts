@@ -65,11 +65,11 @@ export function farewellPlan(noticeId: number, actorIds: string[]): { actorId: s
 
 // ───────── ② 어떻게 왔는지 (소개·인스타·밴드) ─────────
 export const VISIT_LINES: string[] = [
-  '안녕하세요 지인 소개로 왔어요', '친구 소개로 들어왔어요~', '언니가 알려줘서 와봤어요', '밴드 가입했어요!', '밴드 보고 들어왔어요', '밴드 가입하고 처음 와봐요', '카톡 채널 추가하고 왔어요',
+  '안녕하세요 지인 소개로 왔어요', '친구 소개로 들어왔어요~', '언니가 알려줘서 와봤어요', '유튜브 알림 보고 왔어용', '인스타 릴스 보고 들어왔어요', '친구가 알려줘서 왔어요', '카톡 채널 추가하고 왔어요',
   '유튜브 보다가 떠서 들어왔어요', '알고리즘이 여기로 데려왔어요', '동생이 여기 옷 예쁘다고 해서 왔어요', '회사 동료 추천으로 왔어요', '엄마가 여기 좋다고 해서 와봤어요',
-  '친구가 여기서 샀다고 해서 와봤어요', '안녕하세요 처음 왔어요 소개받고 왔어요', '밴드 들어왔어요 반가워요', '지인이 링크 보내줘서 왔어요',
-  '유튜브 구독하고 왔어요', '언니 친구 추천으로 왔어요', '단톡방에서 소개받고 왔어요', '언니 밴드 가입했어요 잘 부탁드려요',
-  '유튜브 알림 보고 들어왔어요', '소개받고 왔는데 옷이 많네요', '친구 따라 왔어요 반가워요', '안녕하세요 밴드 보고 왔어요',
+  '친구가 여기서 샀다고 해서 와봤어요', '안녕하세요 처음 왔어요 소개받고 왔어요', '아는 언니 소개로 왔어요', '지인이 링크 보내줘서 왔어요',
+  '유튜브 구독하고 왔어요', '언니 친구 추천으로 왔어요', '단톡방에서 소개받고 왔어요', '인스타에서 보고 왔어용',
+  '유튜브 알림 보고 들어왔어요', '소개받고 왔는데 옷이 많네요', '친구 따라 왔어요 반가워요', '유튜브 보고 처음 왔어요',
   // [2026-11-15 14:40 사장님] 유튜브 보고·구독하고 사이트로 넘어온 말
   '유튜브 보고 왔어요', '유튜브 구독하고 사이트로 넘어왔어요', '유튜브에서 링크 타고 왔어요', '유튜브 방송 보다가 넘어왔어요', '유튜브 설명란 보고 들어왔어요',
   '유튜브 구독 눌렀어요', '유튜브로 보다가 사이트로 왔어요', '유튜브 채팅 보다가 링크 눌렀어요', '유튜브 보고 사이트 처음 와봐요', '유튜브 구독하고 알림 설정했어요',
@@ -87,7 +87,7 @@ VISIT_LINES.push('{insta}','{insta}','{insta}','{insta}','{insta}','{insta}');
 export function fillVisitLine(text:string,seed:number):string{
   return text==='{insta}'?INSTA_VISIT_LINES[hashOf('insta:'+seed)%INSTA_VISIT_LINES.length]:text;
 }
-export const VISIT_RE = /소개|인스타|밴드|유튜브|채널\s*추가|알고리즘|추천으로|따라\s*왔|링크\s*보내|구독하고|팔로우/;
+export const VISIT_RE = /소개|인스타|유튜브|채널\s*추가|알고리즘|추천으로|따라\s*왔|링크\s*보내|구독하고|팔로우/;
 
 // ───────── ③ 주문서 넣었다는 말 ─────────
 // [2026-11-15 14:42 사장님 「너무 똑같다 — 오만가지로」] 앞말 × 본말 × 뒷말 × 이음(. ! ~ 띄어쓰기)으로 조합 — 겹치지 않게 수백 가지
@@ -228,13 +228,15 @@ export function personaVoice(text: string, actorSeed: number, msgSeed: number): 
 // ───────── ⑥ 들어온 가상 손님 인사 (방송 시작 초~중반에 많이, 그 뒤·다시보기엔 드물게) ─────────
 // [2026-11-15 14:30 사장님] 다양하게, 쌩뚱맞은 말 금지. kind: plain=기본 인사 / visit=어떻게 왔는지(방 전체 6분에 한 번) /
 //   start=방송 막 시작(시작 15분 안·생방송만) / live=언니 칭찬(생방송만) / morning·evening=시간대
-export type Greeting={text:string;kind:'plain'|'emoji'|'visit'|'site'|'start'|'live'|'morning'|'evening'|'next'};
+export type Greeting={text:string;kind:'plain'|'emoji'|'visit'|'site'|'start'|'live'|'morning'|'evening'|'next'|'off'};
 export const GREETINGS:Greeting[]=[
   ...['안녕하세요','안녕하세요~','언니 안녕하세요','하이요','반가워요','안녕하세요 반가워요','언니 하이','안녕하세용','루루언니 안녕하세요','왔어요~',
       '들어왔어요','언니 저 왔어요','안녕하세요 오늘도 왔어요','오늘도 출석이요','출석했어요','안녕하세요 오늘 처음 왔어요','오늘 처음 와봤어요','처음 왔어요 반가워요','안녕하세요 구경하러 왔어요','언니 반가워요'
      ].map(text=>({text,kind:'plain' as const})),
   ...['👋','👋👋','안녕하세요 👋','하이 👋','안녕하세요 😊','반가워요 🥰','왔어요 🙌','안녕하세용 💕'].map(text=>({text,kind:'plain' as const})),
   ...VISIT_LINES.map(text=>({text,kind:'visit' as const})),
+  // RURU_CONTEXT_FLOW_20261118: 방송 종료·대기 때만 나오는 짧은 상황형 인사.
+  ...['지금 라이브 아니죠?', '아 방송 놓쳤네요 ㅠ', '방송 끝난 거죠?', '다음 방송 언제 해요?', '지금 주문은 가능하죠?', '아 늦게 왔네요'].map(text=>({text,kind:'off' as const})),
   ...['방송 지금 시작한 거죠?','방금 시작했나요?','딱 맞춰 왔네요','시작하자마자 왔어요','알림 보고 바로 들어왔어요','오늘 방송 기다렸어요','오늘 뭐 나와요?','오늘도 기대돼요','시작했네요 반가워요','늦지 않게 왔어요'
      ].map(text=>({text,kind:'start' as const})),
   ...['언니 너무 예뻐요','언니 오늘 너무 귀여우세요','루루언니 오늘 예쁘시네요','언니 목소리 좋아요','언니 오늘 분위기 좋아요','언니 보러 왔어요','안녕하세요 언니 오늘도 예쁘세요','언니 오늘 기분 좋아 보여요'
@@ -252,6 +254,7 @@ export function greetingPool(o:{live:boolean;sinceStartMs:number;kstHour:number;
   const next=!o.live?nextShowLines(o.nextShow??null).map(text=>({text,kind:'next' as const})):[];
   return [...next,...next,...GREETINGS].filter(g=>g.kind==='next'||
     g.kind==='plain'||
+    (g.kind==='off'&&!o.live)||
     (g.kind==='visit'&&!o.visitRecently)||
     (g.kind==='site'&&!o.siteRecently)||
     (g.kind==='start'&&o.live&&o.sinceStartMs>=0&&o.sinceStartMs<15*60000)||
@@ -558,7 +561,7 @@ export function soldItems(rowsOrNames:(string|SoldRow)[],limit=12):SoldItem[]{
     if(!hit)continue;
     const brand=hit[1]==='룰루'?'룰루레몬':hit[1];
     const words=p.replace(hit[0],' ').replace(/[A-Za-z]{1,4}\s*-?\s*\d+/g,' ').replace(/\([^)]*\)/g,' ').split(/[\s/·,]+/).filter(w=>/^[가-힣]{2,8}$/.test(w)&&!ITEM_STOP.test(w)&&!BRAND_WORDS.some(([re])=>re.test(w)));
-    const item=words[0]||'';
+    const item=words[0] && /^(쭈리|기모|크롭|오버핏|후드|니트)$/.test(words[0]) && words[1] ? `${words[0]} ${words[1]}` : words[0]||'';
     const key=brand+'|'+item;
     const cur=n.get(key)||{brand,item,count:0,colors:new Map(),sizes:new Map()};cur.count++;
     const c=cleanOpt(r.color),z=cleanOpt(r.size);
