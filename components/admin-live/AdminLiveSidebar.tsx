@@ -212,7 +212,7 @@ export default function AdminLiveSidebar({
 
         {/* [2026-10-21 a4-1] 방송 카드 — 대기: [방송 시작] · 방송 중: 제목·경과·[방송 종료]. 「방송 관리」= 제목·URL·방송 화면 공지·알림 발송 창 */}
         {broadcastCard ? (
-          <section className="mt-3 shrink-0 rounded-xl border border-line bg-surface p-3">
+          <section data-ruru-broadcast-workspace="v2" className="mt-3 shrink-0 rounded-2xl border border-line bg-surface p-3">
             <div className="flex items-center gap-2">
               <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn && !broadcastCard.paused ? "bg-danger-tx" : "bg-line"}`} />
               <span className="text-[13px] font-bold text-ink">{broadcastOn ? (broadcastCard.paused ? "잠시 쉬는 중" : "방송 중") : "방송 대기"}</span>
@@ -221,7 +221,7 @@ export default function AdminLiveSidebar({
             {broadcastOn && broadcastCard.title ? <div className="mt-1 truncate text-[13px] font-semibold text-ink-soft" title={broadcastCard.title}>{broadcastCard.title}</div> : null}
             {/* [2026-11-09 사장님 「껐다 켰다 귀찮다」·13:55 「버튼 3개 한 줄 별로」] 방송 중: 1줄 [잠시 멈춤 ↔ 다시 시작] 전체 폭(방송 중 제일 자주 누르는 버튼), 2줄 [방송 종료][방송 관리]. 멈춤은 status 안 바꿈(표시만) */}
             {broadcastOn && broadcastCard.onTogglePause ? (
-              <button type="button" disabled={broadcastCard.saving} onClick={() => broadcastCard.onTogglePause?.()} title={broadcastCard.paused ? "손님 화면에 다시 「라이브 방송 중」" : "방송은 켜 둔 채 손님 화면에 「잠시 쉬는 중」(상품·주문 그대로)"} className={broadcastCard.paused ? "mt-2 h-10 w-full rounded-lg bg-ink text-[13px] font-bold text-white transition disabled:opacity-50" : "mt-2 h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2 disabled:opacity-50"}>{broadcastCard.paused ? "▶ 다시 시작" : "잠시 멈춤 · 손님 화면만 쉬는 중으로"}</button>
+              <button type="button" disabled={broadcastCard.saving} onClick={() => broadcastCard.onTogglePause?.()} title={broadcastCard.paused ? "손님 화면에 다시 「라이브 방송 중」" : "방송은 켜 둔 채 손님 화면에 「잠시 쉬는 중」(상품·주문 그대로)"} className={broadcastCard.paused ? "mt-2 h-10 w-full rounded-lg bg-ink text-[13px] font-bold text-white transition disabled:opacity-50" : "mt-2 h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2 disabled:opacity-50"}>{broadcastCard.paused ? "▶ 다시 시작" : "잠시 멈춤"}</button>
             ) : null}
             <div className="mt-1.5 grid grid-cols-2 gap-1.5">
               {broadcastOn ? (
@@ -229,12 +229,12 @@ export default function AdminLiveSidebar({
               ) : (
                 <button type="button" disabled={broadcastCard.saving} onClick={() => { broadcastCard.onStart(); onCloseNav?.(); }} className="h-9 rounded-lg bg-ink text-[13px] font-bold text-white transition disabled:opacity-50">방송 시작</button>
               )}
-              <button type="button" onClick={() => { broadcastCard.onManage(); onCloseNav?.(); }} className="h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2">현재 방송 설정</button>
+              <button type="button" onClick={() => { broadcastCard.onManage(); onCloseNav?.(); }} className="h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2">방송 설정</button>
             </div>
-            {/* [2026-11-13] 자동 테스트 주문 — 스위치 하나 · 지금 테스트 · 테스트 주문 삭제 */}
-            {broadcastOn ? <AutoTestOrderSettings /> : null}
           </section>
         ) : null}
+        {/* Independent automation card: no nested controls inside the broadcast card. */}
+        {broadcastOn ? <AutoTestOrderSettings /> : null}
 
         {/* [2026-08-29 사장님 요청] 실시간 접속자 — 사이드바에서 바로 보이게 */}
         <AdminLiveSidebarPresence onOpenVisitStats={() => { onOpenVisitStats?.(); onCloseNav?.(); }} />
