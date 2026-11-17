@@ -23,7 +23,7 @@ import {readLearning,refreshLearning} from './liveAutomationLearningServer';
 import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
-import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,emojiReactText,fixLaughCount,BRAND_WORDS,brandAskText,topProductNamesByBrand,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,fillVisitLine,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText,recentNameSet,similarToRecent} from './liveAutomationLines';
+import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,emojiReactText,fixLaughCount,BRAND_WORDS,brandAskText,topProductNamesByBrand,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,farewellTimePool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,fillVisitLine,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText,recentNameSet,similarToRecent} from './liveAutomationLines';
 import {announceOrderThanks} from './liveOrderChatServer';
 import {ORDERED_STYLE_LINES,PAID_STYLE_LINES,YOUTUBE_STYLE_RULES,pickStyleLines} from './liveAutomationStyleBank';
 
@@ -349,6 +349,7 @@ export async function flushDeferredOrderNotices(db:SupabaseClient,c:Campaign,now
 }
 /** 방송 종료 안내(✅ 라이브방송이 종료되었습니다…) 첫 등장 뒤 — 이 방송에서 주문한 가상 손님 중 0~4명이 띄엄띄엄 인사 */
 async function farewellFlow(x:CodeCtx):Promise<boolean>{
+ if(x.mode!=='replay')return false;
  const notice=[...x.messages].reverse().find(m=>!m.automation_actor_id&&isEndNotice(String(m.body||'')))||null; // 가장 먼저 나온 것
  if(!notice)return false;
  const nid=Number(notice.id),at=Date.parse(String(notice.created_at));
@@ -363,7 +364,7 @@ async function farewellFlow(x:CodeCtx):Promise<boolean>{
   const actor=x.actors.find(a=>String(a.id)===p.actorId);if(!actor)continue;
   const used=x.messages.filter(m=>m.automation_actor_id&&Number(m.id)>nid).map(m=>clean(m.body));
   const seed=hashOf(p.actorId+':'+nid);
-  const text=personaVoice(pickLine(FAREWELL_LINES,seed,[...used,...recentBodies(x)]),seedOf(actor),seed);
+  const text=personaVoice(pickLine(farewellTimePool(x.now),seed,[...used,...recentBodies(x)]),seedOf(actor),seed);
   if(await postCodeLine(x,actor,'reply',text,{farewellFor:nid},nid,'방송 종료 인사'))return true;
  }
  return false;
@@ -404,7 +405,7 @@ async function greetFlow(x:CodeCtx):Promise<boolean>{
   if((seed%1000)/1000>=greetChance({live:x.live,sinceStartMs:sinceStart}))continue;
   if(x.now<joined+8000+(seed%50000))continue; // 들어오자마자 말고 8~58초 뒤
   const actor=x.actors.find(a=>String(a.id)===String(s.actor_id));if(!actor)continue;
-  const pool=greetingPool({nextShow:x.live?null:x.nextShow,live:x.live,sinceStartMs:sinceStart,kstHour:k.getUTCHours(),visitRecently:acted('greetVisit',360000),siteRecently:acted('greetSite',480000),weekend:k.getUTCDay()===0||k.getUTCDay()===6});
+  const pool=greetingPool({phase:x.mode,nextShow:x.live?null:x.nextShow,live:x.live,sinceStartMs:sinceStart,kstHour:k.getUTCHours(),visitRecently:acted('greetVisit',360000),siteRecently:acted('greetSite',480000),weekend:k.getUTCDay()===0||k.getUTCDay()===6});
   const recent=recentBodies(x);
   let g=null as (typeof pool)[number]|null;
   for(let i=0;i<pool.length;i++){const c0=pool[(seed+i*7)%pool.length];const c={...c0,text:fillVisitLine(c0.text,seed+i)};if(!duplicateLine(c.text,recent)){g=c;break;}}
@@ -765,7 +766,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   '[루루동이] 매장·샵·오프라인 가게·별도 앱이 없다. 주문은 이 사이트에서 상품을 담고 주문서를 내는 것뿐이다. 없는 장소·경로를 지어내지 않는다.',
   '[사실] 상품 얘기는 지금 상품 카드 정보만 근거로 한다(없는 색·사이즈·소재·가격을 지어내지 않는다). 해 본 적 없는 구매·사용·배송받은 경험, 친구 소개 같은 이야기를 지어내지 않는다. 주문했다는 말은 주문이 있는 손님만, 결제 완료 말은 결제확인 받은 손님만. 영상·소리를 보거나 들은 척하지 않는다. 자기가 지금 뭘 보는 중인지 설명하지 않는다. 테스트·AI·가상·시스템 같은 말 금지.',
   // RURU_OFF_PHASE_20261118: paused and replay are two distinct situations, not one generic off mode.
-  `[상황] 지금 ${mode==='live'?'실시간 생방송 중. 서버에서 확인된 현재 상품 카드에만 반응하고 질문하거나 고민한다. 실제 대화가 없으면 침묵한다.':mode==='paused'?'방송은 종료되지 않았고 잠시 쉬는 중. 방송이 현재 진행 중인 것처럼 판매자에게 질문하거나 지금 보여 달라고 하지 않는다. 재개 시각이 확인되지 않으면 지어내지 않는다. 대화가 필요하면 짧게 기다림·쉬는 중 확인만 한다.':'생방송이 끝났거나 지금 라이브가 아닌 다시보기 상태. 놓친 아쉬움·다음 방송 문의·다시보기에서 상품 선택에 관한 말만 드물게 한다. 재개/다음 방송 시각을 지어내지 않고, 진행자가 지금 보여주거나 답할 것처럼 요청하지 않는다.'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
+  `[상황] 지금 ${mode==='live'?'실시간 생방송 중. 서버에서 확인된 현재 상품 카드에만 반응하고 질문하거나 고민한다. 실제 대화가 없으면 침묵한다.':mode==='paused'?'실제 방송이 끝나 송출만 멈춰 둔 상태. 방송 종료 버튼 여부와 무관하게 대화에서는 방송이 끝난 것으로 간주한다. 종료·놓친 아쉬움·다음 방송 질문은 가능하지만 현재 진행 중인 것처럼 질문하거나 재개 시각을 지어내지 않는다.':'생방송이 끝났거나 지금 라이브가 아닌 다시보기 상태. 놓친 아쉬움·다음 방송 문의·다시보기에서 상품 선택에 관한 말만 드물게 한다. 재개/다음 방송 시각을 지어내지 않고, 진행자가 지금 보여주거나 답할 것처럼 요청하지 않는다.'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
   ...(nextShow?[`[다음 방송] 관리자 안내: «${clean(pausedRaw).slice(0,80)}» → ${nextShow.when} 방송 예정. 가끔 «${nextShow.when} 방송 때 올게요»처럼 말해도 된다. 날짜·시간을 바꾸거나 지어내지 말 것.`]:[]),
   `[지금 상품 카드] ${cardText}`,
   ...(rejectedLines.length?[`[방금 규칙에 걸려 버려진 말 — 이런 말·비슷한 말은 다시 고르지 말 것(다른 손님이나 다른 얘기, 또는 침묵)]\n${rejectedLines.join('\n')}`]:[]),
@@ -790,8 +791,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(t.length<1||t.length>70)return false;
   if(/밴드/.test(t))return false;
   if(mode!=='live'&&/(지금|방금|현재).{0,12}(입으|보여|설명|방송.{0,3}(중이|하|켜져))/.test(t)&&!/방송.{0,3}(중.{0,3}아니|끝|종료)/.test(t))return false;
-  if(mode==='paused'&&/(방송\s*(끝|종료|놓쳤)|다시보기\s*(중|보고)|방송\s*(언제\s*끝))/.test(t))return false;
-  if(mode==='replay'&&/(방송\s*(곧\s*재개|잠시\s*쉬는\s*중)|잠깐\s*쉬었다\s*오)/.test(t))return false;
+  // Paused is off-air for AI chat: allow end-of-broadcast reactions without changing broadcast status.
+  if(mode!=='live'&&/(방송\s*(곧\s*재개|잠시\s*쉬는\s*중)|잠깐\s*쉬었다\s*오)/.test(t))return false;
   if(!safeConversationLine(t,r.paid.length>0)||/가상|봇|자동|테스트/.test(t))return false;
   const pk=r.paid.includes('card')?'card':r.paid.includes('bank')?'bank':undefined;
   if(falseExperience(t.replace(/(링크|카톡|톡|문자|알림).{0,6}(받았|왔)/g,''),pk))return false;

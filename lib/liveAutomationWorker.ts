@@ -10,6 +10,7 @@ import {pickOrderLines,pickCardFocusedLines,type AutoTestSettings,type AutoTestP
 import {runConversations} from './liveAutomationConversation';
 import {flushDeferredOrderNotices} from './liveAutomationDirector';
 import {interleaveOrderStages,planOrderJourney,isNightKst} from './liveAutomationTempo';
+import {streamModeOf} from './autoTestOrderServer';
 type Wave={id:string;mode:string;at:string;offsets:number[];planned?:boolean};
 type LiveCampaign=Campaign & {tempo_plan?:Wave;next_chat_at?:string|null};
 const nowIso=()=>new Date().toISOString();
@@ -24,12 +25,14 @@ async function dropStaleNames(db:SupabaseClient,keep:Set<string>) {
    for(let i=0;i<stale.length;i+=100)await db.from('live_automation_nickname_pool').delete().eq('status','unused').in('nickname_key',stale.slice(i,i+100));
  }catch{/* 못 지워도 채우기는 계속 */}
 }
+
+const EXCLUDED_AWKWARD_NICKNAMES = new Set<string>(["느린손뜨개", "달달머리핀", "달달빵집", "달달손뜨개", "동글빵집", "동글솜사탕", "동글숲길", "동글우산", "말랑바다", "말랑바람", "말랑빵집", "바삭양말", "바삭우산", "바삭편지", "바삭하루", "반짝리본", "반짝솜사탕", "보송양말", "보송우산", "보송이슬", "살랑무지개", "살랑빵집", "살랑손뜨개", "상큼한풍선", "새콤리본", "새콤바다", "새콤빵집", "새콤아침", "소소한앞치마", "수줍은빵집", "수줍은수국", "촉촉리본", "촉촉서랍", "촉촉털실", "촉촉하루", "포근한산책", "포근한수국", "포근한화분", "폭신머리핀", "폭신앞치마", "행복한리본"]);
 let poolCleaned=false;
 async function ensurePool(db:SupabaseClient) {
  // [2026-11-15 사장님 «매 방송 같은 닉네임 안 됨»] 이름은 NICKNAME_CANDIDATES(실제 회원 닉네임 꼴 2,210개).
  // 쓴 이름은 3일(한국 날짜) 뒤에 후보로 되돌린다(DB recycle, 모자라면 1일) — 연달아 며칠 같은 이름이 안 나옴.
  // [2026-11-15 20:46 사장님] «○○둥이·○○동이»는 가게 이름(루루동이)과 비슷해서 후보에서 뺌
- const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]/.test(x.nickname)&&!/[둥동]이$/.test(x.nickname));
+ const candidates=NICKNAME_CANDIDATES.filter(x=>!/[0-9]/.test(x.nickname)&&!/[둥동]이$/.test(x.nickname)&&!EXCLUDED_AWKWARD_NICKNAMES.has(x.nickname));
  const keep=new Set(candidates.map(x=>nicknameCollisionKey(x.nickname)));
  if(!poolCleaned){poolCleaned=true;await dropStaleNames(db,keep);}
  let recycled=0;
@@ -99,8 +102,8 @@ async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettin
    if(started.length)wave=await automationRpc<Wave>(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});
  }
  if(!wave||Date.parse(wave.at)>Date.now()+150000)return;
- // [2026-11-13 사장님] 밤 12~6시는 주문이 거의 없게 — 차례가 와도 90%는 조용한 차례로 미룬다(20~30분 뒤 다시).
- if(isNightKst()&&Math.random()<.9){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:true});return;}
+ // Actual LIVE broadcasts are never slowed solely because of local night hours.
+ // Only the guarded actionsTick caller can start a new order wave.
  const choices=await loadAutomationChoices(db,c.broadcast_id,settings),excluded=new Set<string>();
  if(!choices.length){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:true});return;}
  // Expired schedules are replanned; resuming a worker never catches up a backlog.
@@ -127,18 +130,26 @@ async function actionsTick(db:SupabaseClient,c:LiveCampaign,origin:string,transp
  const results:PromiseSettledResult<unknown>[]=[];
  const record=async(work:()=>Promise<unknown>)=>{try{results.push({status:'fulfilled',value:await work()})}catch(reason){results.push({status:'rejected',reason})}};
  let settings:AutoTestSettings|undefined;
- try {
-   settings=await readAutomationSettings(db);
-   if(c.orders_enabled)await planWave(db,c,settings);
- }catch(reason){results.push({status:'rejected',reason})}
+  // A campaign can remain enabled even when actual streaming has stopped.
+  // Unknown mode blocks NEW orders, without changing existing queued actions.
+  let liveNow=false;
+  try {
+    const {data,error}=await db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle();
+    if(error)throw Error(error.message);
+    if(data)liveNow=(await streamModeOf(db,data))==='live';
+  }catch(reason){results.push({status:'rejected',reason})}
+  try {
+    settings=await readAutomationSettings(db);
+    if(c.orders_enabled&&liveNow)await planWave(db,c,settings);
+  }catch(reason){results.push({status:'rejected',reason})}
  try {
    const due=await rows<Action>(db.from('live_automation_actions').select('*').eq('campaign_id',c.id).eq('kind','order')
      .in('status',['pending','claimed','uncertain']).lte('due_at',nowIso()).order('due_at').limit(24));
    const selected=settings?interleaveOrderStages(due):[];
    const receiptAt=Math.floor(Math.random()*(selected.length+1));
    for(let i=0;i<=selected.length;i++){
-     // 밤 12~6시는 입금 알림도 드물게(그 틱의 10%만)
-     if(c.orders_enabled&&i===receiptAt&&(!isNightKst()||Math.random()<.1))await record(()=>automationRpc(db,'live_automation_drain_payments',{p_campaign:c.id,p_revision:c.revision}));
+      // During a confirmed live broadcast do not suppress payment notices by clock time.
+      if(c.orders_enabled&&i===receiptAt&&(liveNow||!isNightKst()||Math.random()<.1))await record(()=>automationRpc(db,'live_automation_drain_payments',{p_campaign:c.id,p_revision:c.revision}));
      const a=selected[i];if(!a)continue;
      if(deadline-Date.now()<22000)break; // Leave unclaimed work for the next tick.
      await record(async()=>{

@@ -44,6 +44,17 @@ export const FAREWELL_LINES: string[] = [
 ];
 
 // 방송 종료 안내(관리자 자주 쓰는 말) 첫 등장 판정
+export function farewellTimePool(now: number): string[] {
+  const hour = new Date(now + 9*3600000).getUTCHours();
+  const base = FAREWELL_LINES.filter(x => !/(밤|잘\s*자|굿밤|점심|저녁|아침)/.test(x));
+  const custom = hour >= 5 && hour < 11 ? ['언니 오늘도 고생하셨어요 좋은 아침 보내세요']
+    : hour >= 11 && hour < 15 ? ['고생하셨어요 점심 맛있게 드세요']
+    : hour >= 17 && hour < 21 ? ['언니 수고하셨어요 저녁 맛있게 드세요']
+    : ['언니 오늘도 고생하셨어요', '오늘도 감사했어요 푹 쉬세요'];
+  if(hour >= 21 || hour < 5) custom.push('언니 고생하셨어요 편히 주무세요','오늘도 감사합니다 좋은 밤 되세요');
+  return [...custom,...base];
+}
+
 export const isEndNotice = (body: string): boolean => /라이브\s*방송이?\s*종료/.test(String(body || ''));
 
 /** 종료 안내 하나에 대한 인사 계획 — 몇 명(0~4)·각자 몇 초 뒤. 첫 사람은 조금 뒤, 그다음은 띄엄띄엄, 한 명쯤은 한참 뒤(한 템포 늦게). */
@@ -250,12 +261,12 @@ export const GREETINGS:Greeting[]=[
   ...['좋은 저녁이에요','저녁 먹고 왔어요','퇴근하고 바로 왔어요'].map(text=>({text,kind:'evening' as const})),
 ];
 /** 지금 쓸 수 있는 인사 — 생방송인지·시작 몇 분째인지·한국 몇 시인지·소개 인사를 방금 누가 했는지에 따라 */
-export function greetingPool(o:{live:boolean;sinceStartMs:number;kstHour:number;visitRecently:boolean;weekend:boolean;nextShow?:NextShow|null;siteRecently?:boolean}):Greeting[]{
+export function greetingPool(o:{live:boolean;sinceStartMs:number;kstHour:number;visitRecently:boolean;weekend:boolean;nextShow?:NextShow|null;siteRecently?:boolean;phase?:'live'|'paused'|'replay'}):Greeting[]{
   const next=!o.live?nextShowLines(o.nextShow??null).map(text=>({text,kind:'next' as const})):[];
   return [...next,...next,...GREETINGS].filter(g=>g.kind==='next'||
     g.kind==='plain'||
-    (g.kind==='off'&&!o.live)||
-    (g.kind==='visit'&&!o.visitRecently)||
+    (g.kind==='off'&&(o.phase?o.phase==='replay':!o.live))||
+    (g.kind==='visit'&&!o.visitRecently&&(o.live||!/유튜브\s*(?:방송|라이브|채팅)\s*(?:보면서|보다가)|유튜브\s*방송\s*보던\s*중/.test(g.text)))||
     (g.kind==='site'&&!o.siteRecently)||
     (g.kind==='start'&&o.live&&o.sinceStartMs>=0&&o.sinceStartMs<15*60000)||
     (g.kind==='live'&&o.live)||

@@ -19,20 +19,31 @@ export function chatIntent(text:string):ChatIntent {
  if(/색상|컬러|베이지|아이보리|블랙|초코|그레이|네이비|브라운|검정|색깔/.test(t))return 'color';
  if(/가격|얼마|금액/.test(t))return 'price';
  if(/배송|택배|언제.{0,6}(받|와)/.test(t))return 'delivery';
- if(/방송.{0,8}(놓쳤|끝났|종료)|다시\s*보기|다음\s*방송/.test(t))return 'replay';
+ if(/방송.{0,8}(놓쳤|끝났|끝난|종료)|다시\s*보기|다음\s*방송/.test(t))return 'replay';
  if(/방송.{0,8}(쉬는|잠시|재개)|다시\s*시작/.test(t))return 'pause';
  if(/입어\s*(봐|주|줘)|보여\s*(줘|주)|뒤태|착용해|지금.{0,8}(보여|입어|설명)/.test(t))return 'live-action';
  if(/유튜브|인스타|소개|추천받|친구가|지인이/.test(t))return 'visit';
  return 'other';
 }
+export function timeAppropriateTestChat(text:string,now:number):boolean {
+ const hour=new Date(now+9*3600000).getUTCHours();
+ if(/(굿모닝|좋은\s*아침|아침\s*인사)/.test(text)&&!(hour>=5&&hour<12))return false;
+ if(/(점심\s*(맛있게|맛나게)|맛있는\s*점심)/.test(text)&&!(hour>=10&&hour<15))return false;
+ if(/(저녁\s*(맛있게|맛나게)|맛있는\s*저녁)/.test(text)&&!(hour>=16&&hour<22))return false;
+ if(/(굿밤|잘\s*자요|잘\s*주무|편히\s*주무|좋은\s*밤)/.test(text)&&!(hour>=20||hour<6))return false;
+ return true;
+}
+
 export function judgeTestChat(q:QualityInput):QualityResult {
  const text=String(q.text||'').trim(), intent=chatIntent(text);
  const fail=(reason:string):QualityResult=>({ok:false,reason,intent});
  if(!text||text.length>100)return fail('invalid-length');
+ if(!timeAppropriateTestChat(text,q.now))return fail('wrong-kst-greeting');
  if(/밴드/.test(text))return fail('band-forbidden');
+ if(q.mode!=='live'&&/(?:지금|방금|막)\s*(?:유튜브|라이브)|유튜브\s*(?:라이브|생방송|방송)\s*(?:보면서|보다가)\s*(?:바로\s*)?(?:넘어|들어|왔)/.test(text))return fail('off-live-current-stream-claim');
  if(q.mode!=='live'&&/(입어\s*(봐|주|줘)|보여\s*(줘|주)|착용해|지금.{0,8}(입어|보여|설명))/.test(text))return fail('off-live-request');
- if(q.mode==='paused'&&/(방송.{0,6}(끝났|놓쳤|종료)|다시\s*보기.{0,5}(보고|중))/.test(text))return fail('paused-as-ended');
- if(q.mode==='replay'&&/(잠시\s*쉬는|곧\s*재개|잠깐\s*쉬었다|다시\s*시작.{0,5}(하겠|하나))/.test(text))return fail('ended-as-paused');
+ // Operationally paused can mean broadcast finished; only AI chat policy treats it as off-air.
+ if(q.mode!=='live'&&/(잠시\s*쉬는|곧\s*재개|잠깐\s*쉬었다|다시\s*시작.{0,5}(하겠|하나))/.test(text))return fail('ended-as-paused');
  if(q.mode!=='live'&&intent==='size')return fail('off-size-talk');
  const recent=q.recent.filter(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-30*60_000);
  if(recent.some(r=>norm(r.text)===norm(text)))return fail('exact-repetition');
