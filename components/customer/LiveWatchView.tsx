@@ -52,7 +52,6 @@ import { ChatProductThumb } from "./ChatProductThumb";
 import { chatProductPhoto } from "@/lib/chatProductPhoto";
 import { LiveWelcomeChip } from "./LiveWelcomeChip";
 import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
-import { isTestOnlyLine } from "@/lib/liveAutomationLines";
 import { useManualAutomationChat } from "@/lib/useManualAutomationChat";
 import type { ManualChatSelection } from "@/lib/liveAutomationManualChat";
 import { AutomationNicknamePicker } from "./AutomationNicknamePicker";
@@ -437,13 +436,13 @@ export default function LiveWatchView(props: Props) {
   const [operatorMode, setOperatorMode] = useState(true);
   const viewCanManage = Boolean(operatorMode && chat?.canManage);
   const viewerMode = Boolean(chat?.canManage && !operatorMode);
-  // A viewer preview must not expose staff-only chat rows or test actors.
-  // Server permissions are unchanged; this only controls the visible preview.
+  // Viewer preview must display the same public chat (including test actors).
+  // Only staff-only command receipts and deleted entries remain hidden.
+  // The [테스트] prefix is presentation-only and removed below, not the message.
   const visibleChatMessages = useMemo(() => {
     const rows = chat?.messages ?? [];
     if (!viewerMode) return rows;
-    return rows.filter(m => !m.privateCommand && !m.deletedByAuthor &&
-      !(m.avatar === "autotest" || /^\[테스트\]/.test(m.nickname) || isTestOnlyLine(m.body)));
+    return rows.filter(m => !m.privateCommand && !m.deletedByAuthor);
   }, [chat?.messages, viewerMode]);
   const [composeOpen, setComposeOpen] = useState(false);
   const manualChat = useManualAutomationChat(props.broadcastId || "", Boolean(chat?.canWrite && !viewerMode));
@@ -1533,6 +1532,7 @@ export default function LiveWatchView(props: Props) {
             <div ref={chatContentRef} style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0 }}>
             {greetingAnchor?.afterId === null ? greetingRow : null}
             {visibleChatMessages.map((m) => { const palette=notificationPresentation(m); const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
+              const displayNick = viewerMode ? m.nickname.replace(/^\[테스트\]\s*/, "") : m.nickname;
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
               const localLine = !Number.isInteger(m.id);
               const canMod = !viewerMode && chat.canModerate && !localLine && !m.deletedByAuthor && !m.privateCommand;
@@ -1559,13 +1559,13 @@ export default function LiveWatchView(props: Props) {
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
-                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} frame={palette?.frame || staffAvatarFrame(m.badge)} color={palette ? undefined : color} />
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || displayNick} frame={palette?.frame || staffAvatarFrame(m.badge)} color={palette ? undefined : color} />
                 <span style={{ minWidth: 0, flex: 1, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: 12, color: "#ccc", marginBottom: 3 }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: 12, color: "#a8c7fa", marginBottom: 3 }}>나만 보이는 명령어</span> : null}
                   {/* [12:54 사장님 「유튜브랑 똑같이」] 사장님 유튜브 캡처에서 잰 값: 닉네임 흐린 흰색(약 80%)·보통 굵기, 글 흰색·보통 굵기 */}
                   {/* [13:44 사장님 「닉네임만 연한 색」] 닉네임만 사람마다 정해진 색을 흰색과 반쯤 섞은 연한 색(글은 흰색 그대로), 루루동이 안내는 흐린 흰색 */}
-                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: palette?.nick || softNickColor(color) }}>{m.nickname}</span>
+                  <span style={{ fontWeight: chatView.bold ? 700 : 400, color: palette?.nick || softNickColor(color) }}>{displayNick}</span>
                   <ChatBadge badge={m.badge} palette={palette} />
                   {botProduct ? <ChatProductThumb src={chatProductPhoto(props.items, botProduct)} name="안내 상품 사진" /> : null}
                   <span style={{ marginLeft: m.badge ? "4px" : "8px", color: "#FFFFFF" /* 글은 유튜브처럼 늘 흰색 — 연한 색 글은 밝은 배경에서 안 읽힘(12:49), 닉네임만 사람 색 */ }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
