@@ -8,7 +8,6 @@ import {notificationPresentation,staffAvatarFrame} from "@/lib/chatPresentation"
 //   z-index 60: 아래 메뉴(40)·장바구니 바(39) 위, 옵션 창·주문서 창(100) 아래 → 옵션 창이 방송 위로 올라온다.
 
 import { ProductIntroManager } from "./ProductIntroManager";
-import LiveOperatorControl from "./LiveOperatorControl";
 import { useRpsGame } from '@/components/rps/useRpsGame';
 import { RpsWidget } from '@/components/rps/RpsWidget';
 import { RpsAdmin } from '@/components/rps/RpsAdmin';
@@ -387,7 +386,6 @@ export default function LiveWatchView(props: Props) {
   const isDesktop = useIsDesktop(640);
   // [2026-11-12] 관리자 유튜브 채팅창 나란히 — 넓은 PC(1024↑)에서만
   const isWidePc = useIsDesktop(1024);
-  const isSpaciousPc = useIsDesktop(1600);
   // 이 화면이 열려 있는 동안 접속 신호에 «방송 보는 중» 표식(닫히면 다음 신호에서 빠짐)
   useEffect(() => { setLiveWatching(true); return () => setLiveWatching(false); }, []);
   const { videoId, title, paused, pausedText, pinned, items, cartCount, cartTotalText, orderToasts } = props;
@@ -439,7 +437,6 @@ export default function LiveWatchView(props: Props) {
   const [operatorMode, setOperatorMode] = useState(true);
   const viewCanManage = Boolean(operatorMode && chat?.canManage);
   const viewerMode = Boolean(chat?.canManage && !operatorMode);
-  const [operatorDockOpen, setOperatorDockOpen] = useState(false);
   // A viewer preview must not expose staff-only chat rows or test actors.
   // Server permissions are unchanged; this only controls the visible preview.
   const visibleChatMessages = useMemo(() => {
@@ -1051,12 +1048,8 @@ export default function LiveWatchView(props: Props) {
   const videoRight = isDesktop && !focus ? (adminDual ? `calc(${desktopChatWidth} * 2)` : desktopChatWidth) : 0;
   // [11:46 사장님] 자주 쓰는 말 판이 열려 있으면 영상 칸을 그만큼 좁혀 영상이 왼쪽으로 가고, 판은 영상과 채팅 사이 빈칸에(영상 안 가림)
   const [quickOpen, setQuickOpen] = useState(false);
-  const quickShown = isDesktop && !!(viewCanManage || (!chat?.canManage && chat?.canQuickPhrases)) && !focus && !operatorDockOpen;
-  const operatorDockEnabled = Boolean(isSpaciousPc && viewCanManage && !focus);
-  const dockSpace = operatorDockEnabled && operatorDockOpen ? 350 : 0;
-  const videoAreaRight = dockSpace
-    ? `calc(${videoRight || "0px"} + ${dockSpace}px)`
-    : quickShown && quickOpen ? `calc(${videoRight || "0px"} + ${QUICK_PHRASE_COLUMN}px)` : videoRight;
+  const quickShown = isDesktop && !!(viewCanManage || (!chat?.canManage && chat?.canQuickPhrases)) && !focus;
+  const videoAreaRight = quickShown && quickOpen ? `calc(${videoRight || "0px"} + ${QUICK_PHRASE_COLUMN}px)` : videoRight;
   const [pageHost, setPageHost] = useState("");
   useEffect(() => { setPageHost(window.location.hostname); }, []);
   // [2026-11-12] 관리자 — 숫자 누르면 «지금 방송 보는 사람» 목록(10초마다 새로)
@@ -1129,7 +1122,25 @@ export default function LiveWatchView(props: Props) {
             {manualChat.available && !viewerMode ? <div style={{ marginBottom: isDesktop ? 8 : 0 }}>
               <AutomationNicknamePicker state={manualChat} dark={isDesktop} disabled={sending} onPicked={() => { if (composeOpen && !emojiOpen) inputRef.current?.focus(); }} />
             </div> : null}
-            {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onIntro={chat?.canModerate ? (products) => { setIntroChosen(products.map(widgetTargetKey)); setIntroManage(products[0]?.texts[0] ?? ""); setDraft(""); } : undefined} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
+            {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onApply={(products, mode, replaceIntro) => {
+              setEmojiOpen(false);
+              void (async () => {
+                const targets = products.map(p => ({ productId: p.productId, detailName: p.detailName }));
+                const point = replaceIntro ? await introPlayer.capture() : null;
+                if (replaceIntro && !point) { setComposeHint("현재 영상 시간을 확인할 수 없어요. 영상 재생 후 다시 시도해 주세요."); return; }
+                const ok = await sendChat(`/선택 상품 ${products.length}개`, { targets, mode });
+                if (!ok) { setComposeHint("상품 적용 실패 · 현재 위젯 상태를 확인해 주세요."); return; }
+                if (!replaceIntro || mode !== "replace" || !point) return;
+                try {
+                  const response = await fetch("/api/live-chat/product-intro/manage", { method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() }, body: JSON.stringify({ bc: props.broadcastId, videoId: point.videoId, targets, action: "change", capture: point }) });
+                  const data = await response.json().catch(() => null);
+                  if (!response.ok || !data?.ok) { setChatHint(`상품 변경 완료 · 소개영상 위치 저장 실패: ${data?.message || "확인 필요"}`); return; }
+                  invalidateProductIntroCatalog(props.broadcastId!, videoId);
+                  void loadProductIntroCatalog(props.broadcastId!, videoId).catch(() => {});
+                  setChatHint("상품 및 소개영상 위치 변경 완료");
+                } catch { setChatHint("상품 변경 완료 · 영상 위치 저장 실패. 영상 위치만 재확인해 주세요."); }
+              })();
+            }} /> : null}
             {composeHint ? <div role="status" style={{ marginBottom: "8px", fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{composeHint}</div> : null}
             {showSuggestRow && !productPickerOpen ? (
               // Select a picture, replace its trigger, and open the keyboard-sized drawer.
@@ -1259,34 +1270,6 @@ export default function LiveWatchView(props: Props) {
       onContextMenu={(e) => { if ((e.target as HTMLElement | null)?.tagName === "IMG") e.preventDefault(); }}
       style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: LIVE_FONT, textRendering: "optimizeLegibility", overscrollBehavior: "none", outline: "none" }}
     >
-      {chat?.canManage && props.broadcastId ? <LiveOperatorControl
-        broadcastId={props.broadcastId}
-        adminMode={operatorMode}
-        onModeChange={(mode) => { setOperatorMode(mode); if (!mode) { setOperatorDockOpen(false); setQuickOpen(false); setWatchersOpen(false); setModTarget(null); setChatMenu(null); } }}
-        desktopDock={operatorDockEnabled}
-        dockRight={videoRight || "0px"}
-        onOpenChange={setOperatorDockOpen}
-        busy={sending}
-        onIntroduce={async (products, options) => {
-          const targets = products.map(p => ({ productId: p.productId, detailName: p.detailName }));
-          // Take the timestamp before the chat command; never invent a position.
-          const point = options.mode === "replace" && options.replaceIntro ? await introPlayer.capture() : null;
-          if (options.replaceIntro && !point) return { ok: false, message: "현재 영상 시간을 확인할 수 없어요. 영상을 재생한 뒤 다시 시도해 주세요. 상품은 변경되지 않았어요." };
-          const ok = await sendChat(`/선택 상품 ${products.length}개`, { targets, mode: options.mode });
-          if (!ok) return { ok: false, message: "상품 위젯 변경에 실패했어요. 현재 표시 상품을 확인해 주세요." };
-          if (!options.replaceIntro || options.mode !== "replace" || !point) return { ok: true, message: `${products.length}개 상품 소개 완료 · 기존 영상 위치 유지` };
-          try {
-            const response = await fetch("/api/live-chat/product-intro/manage", {
-              method: "POST", headers: { "Content-Type": "application/json", ...chatIdentityHeaders() },
-              body: JSON.stringify({ bc: props.broadcastId, videoId: point.videoId, targets, action: "change", capture: point }),
-            });
-            const saved = await response.json().catch(() => null);
-            if (!response.ok || !saved?.ok) return { ok: true, message: `상품 소개 완료 · 영상 위치 변경 실패: ${saved?.message || "다시 확인해 주세요"}` };
-            if (props.broadcastId) { invalidateProductIntroCatalog(props.broadcastId, videoId); void loadProductIntroCatalog(props.broadcastId, videoId).catch(() => {}); }
-            return { ok: true, message: `상품 소개 + 영상 위치 ${products.length}개 변경 완료` };
-          } catch { return { ok: true, message: "상품 소개 완료 · 영상 위치 저장에 실패했어요. 위치만 다시 확인해 주세요." }; }
-        }}
-      /> : null}
       {/* PC 영상 영역 / 폰은 기존 화면 전체 배치 */}
       <div data-live-video="1" style={isDesktop ? { position: "absolute", left: 0, right: videoAreaRight, top: 0, bottom: 0, overflow: "hidden" } : { display: "contents" }}>
       {/* [2026-11-15 06:09] 영상은 원본 크기 그대로(자르기·키우기 없음). */}
@@ -1508,6 +1491,7 @@ export default function LiveWatchView(props: Props) {
       <div data-live-chat-panel="1" data-live-rps-layout={rpsActive ? "1" : "0"} data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : bottomBarHeight === null ? "calc(78px + env(safe-area-inset-bottom))" : `${bottomBarHeight + 4}px`, flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: rpsActive ? rpsOverlayBottom ? `max(0px, calc(100% - ${rpsOverlayBottom + (bottomBarHeight ?? 78) + 16}px))` : "28dvh" : "60dvh" }) }}>
         {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
           <span style={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>루루동이 실시간 채팅</span>
+          {chat?.canManage ? <button type="button" onClick={() => { setOperatorMode(v => !v); setQuickOpen(false); setWatchersOpen(false); setModTarget(null); setChatMenu(null); }} aria-label={operatorMode ? "시청자 모드로 보기" : "관리자 모드로 돌아가기"} style={{ fontSize: 12, padding: "6px 9px", border: "1px solid #555", borderRadius: 8, background: operatorMode ? "#303030" : "#fff", color: operatorMode ? "#fff" : "#111", cursor: "pointer", whiteSpace: "nowrap" }}>{operatorMode ? "시청자 모드" : "관리자 복귀"}</button> : null}
           {/* [2026-11-12] 관리자 — 방송 보는 중 / 사이트 전체, 누르면 누가 보는지 */}
           {viewCanManage ? <button type="button" onClick={() => setWatchersOpen(true)} aria-label="지금 방송 보는 사람 목록 보기"
             style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 10px", border: "1px solid #444444", borderRadius: "9999px", background: "#1F1F1F", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -1708,6 +1692,7 @@ export default function LiveWatchView(props: Props) {
                   ...base.slice().sort((x, y) => rank(x.key) - rank(y.key)),
                   { key: "guide", label: "주문 방법", onClick: () => setGuideOpen(true), badge: 0 },
                   ...(chat ? [{ key: "chatview", label: "채팅 글자 크기", onClick: () => setChatViewOpen(true), badge: 0 }] : []),
+                  ...(chat?.canManage ? [{ key: "operator-mode", label: operatorMode ? "시청자 모드" : "관리자 복귀", onClick: () => { setOperatorMode(v => !v); setQuickOpen(false); setModTarget(null); setChatMenu(null); }, badge: 0 }] : []),
                   { key: "share", label: "방송 공유", onClick: shareLive, badge: 0 },
                   ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp, badge: 0 }]),
                   ...((!viewerMode && (rps.admin || chat?.canGrant)) ? [{ key: "rps", label: "게임 · 가위바위보", onClick: () => setRpsAdminOpen(true), badge: 0 }] : []),
