@@ -8,6 +8,7 @@ import {notificationPresentation,staffAvatarFrame} from "@/lib/chatPresentation"
 //   z-index 60: 아래 메뉴(40)·장바구니 바(39) 위, 옵션 창·주문서 창(100) 아래 → 옵션 창이 방송 위로 올라온다.
 
 import { ProductIntroManager } from "./ProductIntroManager";
+import LiveOperatorControl from "./LiveOperatorControl";
 import { useRpsGame } from '@/components/rps/useRpsGame';
 import { RpsWidget } from '@/components/rps/RpsWidget';
 import { RpsAdmin } from '@/components/rps/RpsAdmin';
@@ -433,6 +434,8 @@ export default function LiveWatchView(props: Props) {
   //   이제 칸은 안 건드리고, 방송 화면 안에 넣은 <style> 한 줄로만 잠금 → 방송 화면이 사라지면 잠금도 같이 사라짐.
   // ── 사이트 채팅 ──
   const chat = props.chat ?? null;
+  const [operatorMode, setOperatorMode] = useState(true);
+  const viewCanManage = Boolean(operatorMode && chat?.canManage);
   const [composeOpen, setComposeOpen] = useState(false);
   const manualChat = useManualAutomationChat(props.broadcastId || "", Boolean(chat?.canWrite));
   // PC는 상시 입력칸. 폰 쓰기 창을 연 채 PC 폭으로 바뀌면 방문 기록도 기존 정리 절차로 되돌린다.
@@ -665,7 +668,7 @@ export default function LiveWatchView(props: Props) {
   }, [chatHint]);
   const [introManage, setIntroManage] = useState<string | null>(null);
   const [introChosen, setIntroChosen] = useState<string[]>([]);
-  const productPickerOpen = Boolean(!manualChat.selected && chat?.canManage && draft.trimStart().startsWith("/"));
+  const productPickerOpen = Boolean(!manualChat.selected && viewCanManage && draft.trimStart().startsWith("/"));
   const sendChat = async (bodyOverride?: string, target?: ChatProductSelection) => {
     if (!chat || sending) return;
     const body = (bodyOverride ?? composedDraft).trim();
@@ -697,6 +700,7 @@ export default function LiveWatchView(props: Props) {
       if (r.ok) { setDraft(""); setComposeOpen(false); }
       else setComposeHint(r.message || "못 보냈어요. 선택을 유지했으니 다시 눌러 주세요.");
     } else if (!r.ok) { setChatHint(r.message || "못 보냈어요."); }
+    return Boolean(r.ok);
   };
   // [2026-11-10 04:17 사장님] 화면 빈 곳(영상)을 누르면 «돌려보기 모드» — 채팅·카드가 흐려지고 손가락이 그대로 유튜브 막대로 감.
   //   영상은 유튜브 화면(다른 사이트)이라 누른 걸 직접 못 듣는다 → 누르면 그 화면으로 «포커스»가 넘어가는 순간(창 blur)을 보고 안다.
@@ -1030,12 +1034,12 @@ export default function LiveWatchView(props: Props) {
 
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
   // [2026-11-12 사장님 22:34] 관리자(채팅 관리 권한)는 넓은 PC에서 유튜브 채팅창을 사이트 채팅 옆에 나란히 — 두 칸이면 조금 좁게
-  const adminDual = Boolean(isWidePc && (chat?.canManage || chat?.canQuickPhrases) && videoId);
+  const adminDual = Boolean(isWidePc && (viewCanManage || (!chat?.canManage && chat?.canQuickPhrases)) && videoId);
   const desktopChatWidth = adminDual ? "clamp(260px, 24vw, 440px)" : "clamp(280px, 35vw, 560px)";
   const videoRight = isDesktop && !focus ? (adminDual ? `calc(${desktopChatWidth} * 2)` : desktopChatWidth) : 0;
   // [11:46 사장님] 자주 쓰는 말 판이 열려 있으면 영상 칸을 그만큼 좁혀 영상이 왼쪽으로 가고, 판은 영상과 채팅 사이 빈칸에(영상 안 가림)
   const [quickOpen, setQuickOpen] = useState(false);
-  const quickShown = isDesktop && !!(chat?.canManage || chat?.canQuickPhrases) && !focus;
+  const quickShown = isDesktop && !!(viewCanManage || (!chat?.canManage && chat?.canQuickPhrases)) && !focus;
   const videoAreaRight = quickShown && quickOpen ? `calc(${videoRight || "0px"} + ${QUICK_PHRASE_COLUMN}px)` : videoRight;
   const [pageHost, setPageHost] = useState("");
   useEffect(() => { setPageHost(window.location.hostname); }, []);
@@ -1065,7 +1069,7 @@ export default function LiveWatchView(props: Props) {
     return () => { alive = false; window.clearInterval(t); };
   }, [watchersOpen]);
   // [2026-11-12 사장님] 사이트 상품 카드 켬/끔 — 채팅 관리자만(서버가 다시 확인). 유튜브 위젯·순환은 그대로.
-  const cardAdmin = Boolean(chat?.canManage && props.broadcastId);
+  const cardAdmin = Boolean(viewCanManage && props.broadcastId);
   const siteCardOff = cardOffLocal && cardOffLocal.bc === props.broadcastId ? cardOffLocal.off : liveFeatured.siteCardOff;
   const setSiteCard = async (off: boolean) => {
     if (!props.broadcastId || cardBusy) return;
@@ -1239,6 +1243,13 @@ export default function LiveWatchView(props: Props) {
       onContextMenu={(e) => { if ((e.target as HTMLElement | null)?.tagName === "IMG") e.preventDefault(); }}
       style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: LIVE_FONT, textRendering: "optimizeLegibility", overscrollBehavior: "none", outline: "none" }}
     >
+      {chat?.canManage && props.broadcastId ? <LiveOperatorControl
+        broadcastId={props.broadcastId}
+        adminMode={operatorMode}
+        onModeChange={setOperatorMode}
+        busy={sending}
+        onIntroduce={async (product) => Boolean(await sendChat(`/선택 상품 1개`, { targets: [{ productId: product.productId, detailName: product.detailName }], mode: "replace" }))}
+      /> : null}
       {/* PC 영상 영역 / 폰은 기존 화면 전체 배치 */}
       <div data-live-video="1" style={isDesktop ? { position: "absolute", left: 0, right: videoAreaRight, top: 0, bottom: 0, overflow: "hidden" } : { display: "contents" }}>
       {/* [2026-11-15 06:09] 영상은 원본 크기 그대로(자르기·키우기 없음). */}
@@ -1793,7 +1804,7 @@ export default function LiveWatchView(props: Props) {
         </div>
       ) : null}
 
-      {introManage !== null && chat?.canManage && props.broadcastId ? <ProductIntroManager key={props.broadcastId} broadcastId={props.broadcastId} initialQuery={introManage} initialChosen={introChosen} capture={introPlayer.capture} onClose={() => { setIntroManage(null); setIntroChosen([]); }} /> : null}
+      {introManage !== null && viewCanManage && props.broadcastId ? <ProductIntroManager key={props.broadcastId} broadcastId={props.broadcastId} initialQuery={introManage} initialChosen={introChosen} capture={introPlayer.capture} onClose={() => { setIntroManage(null); setIntroChosen([]); }} /> : null}
 
       {/* 상품 목록 창 */}
       {listOpen ? (

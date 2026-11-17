@@ -5,7 +5,7 @@ let admin=true,mod=false,origin=true,status='ON',deleted=false,widget=true,recor
 const load=createUiLoader({
  'next/server':{NextResponse:{json:(d,i)=>new Response(JSON.stringify(d),i)}},
  '@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>admin},
- '@/lib/liveChatSession':{sameChatOrigin:()=>origin,chatIdentityFromRequest:()=>mod?{sub:'1'}:null,verifiedChatRole:async()=>({isMod:mod})},
+ '@/lib/liveChatSession':{sameChatOrigin:()=>origin,chatIdentityFromRequest:()=>mod?{sub:'1'}:null,verifiedChatRole:async()=>({isMod:mod,isManager:mod})},
  '@/lib/youtube':{getServiceClient:()=>({from(){lookups++;return {select(){return this;},eq(){return this;},async maybeSingle(){return {data:{status,is_deleted:deleted,widget_card_enabled:widget,youtube_live_url:`https://youtu.be/${video}`},error:null};}};}})},
  '@/lib/liveChatProductCommandServer':{loadChatCommandProducts:async()=>catalog,applyProductRotation:async(...args)=>rotations.push(args)},
  '@/lib/productIntroServer':{readProductIntroIndex:async()=>new Map(),productIntroKey:()=>'',saveProductIntros:async(...args)=>{recorded.push(args);return {saved:1,kept:0};},clearProductIntros:async(...args)=>{cleared.push(args);return 2;}},

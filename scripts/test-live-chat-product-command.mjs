@@ -43,16 +43,17 @@ const sb={from(table){let op='read',value,ids=null,start=0,end=999,columns='',pa
   }};return q;
 }};
 const apiLoad=createUiLoader({
-  '@/lib/liveChatSession': {sameChatOrigin:()=>true,chatIdentityFromRequest:()=>identityValid?{sub:'test-actor'}:null,verifiedChatRole:async()=>({isMod:identityValid})},
+  '@/lib/liveChatSession': {sameChatOrigin:()=>true,chatIdentityFromRequest:()=>identityValid?{sub:'test-actor'}:null,verifiedChatRole:async()=>({isMod:identityValid,isManager:identityValid})},
   '@/lib/admin-auth': {verifyAdminSessionFromRequest:async()=>false},
   'next/server':{NextResponse:{json:(data,init)=>new Response(JSON.stringify(data),{status:init?.status??200})},after:fn=>fn()},
   '@/lib/youtube':{getServiceClient:()=>sb},
-  '@/lib/liveChatServer':{chatRoleOfKakao:async()=>{if(roleError)throw Error('offline');return {isMod:mod,badge:mod?'mod':null};}},
+  '@/lib/liveChatServer':{chatRoleOfKakao:async()=>{if(roleError)throw Error('offline');return {isMod:mod,isManager:mod,badge:mod?'mod':null};}},
   '@/lib/liveChatBotServer':{runLiveChatBot:async()=>{botCalls++;}},
 });
 const route=apiLoad('app/api/live-chat/route.ts');
-const send=async (body,target)=>{const res=await route.POST({json:async()=>({kakao_id:'test-actor',bc,body,target})});return {status:res.status,...await res.json()};};
+const send=async (body,target)=>{const res=await route.POST({headers:new Headers(),json:async()=>({kakao_id:'test-actor',bc,body,target})});return {status:res.status,...await res.json()};};
 let picked=await send('/',{productId:'77',detailName:'MC-335 아이보리'});
+if(!picked.ok) console.error('DIAGNOSTIC first slash picker response:',JSON.stringify(picked));
 assert.equal(picked.ok,true,'slash picker selects exact broadcast target');
 reset();picked=await send('/',{productId:'999',detailName:''});assert.equal(picked.ok,false);assert.equal(writes.length,0);
 reset();mod=false;picked=await send('/',{productId:'77',detailName:'MC-335 아이보리'});assert.equal(picked.ok,false);assert.equal(writes.length,0);
