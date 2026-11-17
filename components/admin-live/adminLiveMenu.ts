@@ -40,7 +40,7 @@ export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   { key: "settings", label: "설정", desc: "돈·결제 · 손님 화면(공지사항·쪽지) · 방송·알림 · 상점", defaultKey: "settings" },
 ];
 
-export type AdminLiveCustomersTab = "members" | "issues" | "loyalty" | "link";
+export type AdminLiveCustomersTab = "members" | "ai-members" | "issues" | "loyalty" | "link";
 /** custTab 이 있으면 같은 화면(customers) 안의 탭 — [2026-10-21 a3-2] 고객 메뉴 2층 탭을 1층으로 편 것 */
 export type AdminLiveSubTab = { key: AdminLiveMenuKey; label: string; custTab?: AdminLiveCustomersTab };
 
@@ -62,6 +62,7 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
   // [2026-10-21 a3-2] 2층(회원·이슈·단골 안의 탭) → 1층 6탭. 화면 키는 그대로(customers 안 탭은 custTab 으로 구분)
   customers: [
     { key: "customers", label: "회원", custTab: "members" },
+    { key: "customers", label: "AI 회원", custTab: "ai-members" },
     { key: "customers", label: "고객이슈", custTab: "issues" },
     { key: "customers", label: "단골", custTab: "loyalty" },
     { key: "visits", label: "접속 기록" },

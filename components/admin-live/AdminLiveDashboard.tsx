@@ -576,11 +576,11 @@ export default function AdminLiveDashboard() {
       setDrawer(destination.drawer);
     })();
   };
-  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues" | "loyalty" | "link">("members");
+  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "ai-members" | "issues" | "loyalty" | "link">("members");
   // [2026-10-21 a3-2] 계정 잇기 대기 수 — 상단 탭 배지용(패널이 알려줌)
   const [customersLinkPendingCount, setCustomersLinkPendingCount] = useState(0);
   // [2026-09-25] 고객·이슈 패널의 «현재» 탭 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨긴다(중복 표시 방지).
-  const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "issues" | "loyalty" | "link" | "refund">("members");
+  const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "ai-members" | "issues" | "loyalty" | "link" | "refund">("members");
   // [2026-09-21] 「바로 처리 →」 를 누른 «시각». 탭 이름만 넘기면 두 번째 클릭부터 안 먹는다
   //   (같은 값이라 화면이 바뀐 걸 모른다). 시각은 누를 때마다 달라지므로 매번 확실히 열린다.
   const [customersOpenTabAt, setCustomersOpenTabAt] = useState(0);
@@ -1833,7 +1833,7 @@ export default function AdminLiveDashboard() {
                       value={depositDrawerOpen?'payments':activeMenu==='reports'?'sales':activeMenu==='customers'?`customers:${customersActiveTab}`:activeMenu}
                       onChange={event=>{
                         const v = event.target.value;
-                        if (v.startsWith("customers:")) { setCustomersInitialTab(v.slice(10) as "members" | "issues" | "loyalty" | "link"); setCustomersOpenTabAt(Date.now()); setActiveMenu("customers"); return; }
+                        if (v.startsWith("customers:")) { setCustomersInitialTab(v.slice(10) as "members" | "ai-members" | "issues" | "loyalty" | "link"); setCustomersOpenTabAt(Date.now()); setActiveMenu("customers"); return; }
                         setActiveMenu(v as typeof activeMenu);
                       }}
                       className="mb-2 min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-base font-bold md:hidden"
