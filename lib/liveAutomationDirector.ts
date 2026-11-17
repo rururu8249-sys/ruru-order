@@ -11,6 +11,7 @@ import {AUTOMATION_OWNER} from './liveAutomation';
 import {automationRpc,type Action,type Campaign,type Session,type Actor} from './liveAutomationServer';
 import {automationPost} from './liveAutomationTransport';
 import {streamModeOf} from './autoTestOrderServer';
+import {judgeTestChat,type ChatObservation} from './liveAutomationQualityGate'; // RURU_QUALITY_GATE_V1
 import {unsupportedProductCode,unsuitableSpeech} from './liveAutomationSpeech';
 import {falseExperience} from './liveAutomationDialogue';
 import {mentionsNickname} from './liveAutomationConversation';
@@ -262,7 +263,7 @@ async function cardLinkAck(db:SupabaseClient,c:Campaign,origin:string,transport:
 }
 
 // ───── [2026-11-15 14:15~14:26 사장님] 코드가 정한 말(Gemini 안 부름) ─────
-type CodeCtx={db:SupabaseClient;c:Campaign;origin:string;transport:typeof fetch;now:number;sessions:Session[];actors:Actor[];messages:Row[];actions:Action[];orders:Row[];live:boolean;startedAt:number;spoke:Set<string>;nextShow:NextShow|null};
+type CodeCtx={mode:'live'|'paused'|'replay';db:SupabaseClient;c:Campaign;origin:string;transport:typeof fetch;now:number;sessions:Session[];actors:Actor[];messages:Row[];actions:Action[];orders:Row[];live:boolean;startedAt:number;spoke:Set<string>;nextShow:NextShow|null};
 const planOf=(a:Action)=>((a as unknown as {plan?:Record<string,unknown>}).plan||{});
 /** 가상 손님 한 명이 정해진 말 한 줄 — DB 차례·쉬는 시간 검사(admission)를 그대로 거침. 막히면 false(다음 틱에 다시). */
 async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:string,plan:Record<string,unknown>,source:number|null,label:string):Promise<boolean>{
@@ -278,6 +279,15 @@ async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:strin
    if(last&&x.now-last<minGap)return false;
    if(!x.live&&/사이즈 대략 답|손님끼리|맞장구|이모티콘|이모지만|브랜드 또 언제|지난 구매 얘기/.test(label))return false;
  }
+ // Common quality gate for code-generated messages (not only Gemini output).
+ const latestBroadcast=await x.db.from('broadcasts').select('*').eq('id',x.c.broadcast_id).maybeSingle();
+ if(latestBroadcast.error||!latestBroadcast.data)return false;
+ const latestMode=await streamModeOf(x.db,latestBroadcast.data);
+ if(latestMode!==x.mode)return false;
+ const latestCard=await readDialogueCard(x.db,x.c.broadcast_id).catch(()=>null);
+ const recentForGate:ChatObservation[]=x.messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||'')}));
+ const quality=judgeTestChat({text,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:kind==='reply'&&source!==null,recent:recentForGate});
+ if(!quality.ok)return false;
  try{await automationRpc(x.db,'live_automation_ai_admission',{p_actor:actor.id,p_kind:kind});}catch{return false;}
  const action=await automationRpc<Action>(x.db,'live_automation_action',{p_session:s.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,...plan},p_manual:false,p_source:source,p_revision:x.c.revision});
  const claimed=await automationRpc<Action|null>(x.db,'live_automation_claim',{p_action:action.id,p_revision:x.c.revision});
@@ -602,7 +612,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const nextShow=mode0==='live'?null:parseNextShow(pausedRaw,now);
  if(await cardLinkAck(db,c,origin,transport,now,sessions,actors,messages,actions,mode0).catch(()=>false))return;
  // [2026-11-15 14:15~14:26 사장님] Gemini 없이 코드가 정한 말 — 주문서 넣었다는 말(알림 앞/뒤 랜덤)·방송 종료 인사·사이즈 대략 답
- const codeCtx={db,c,origin,transport,now,sessions,actors,messages,actions,orders,live:mode0==='live',startedAt:Date.parse(String((bc.data as Row).started_at||'')),spoke:new Set(spokeRows.map(r=>String(r.automation_actor_id))),nextShow};
+ const codeCtx={mode:mode0,db,c,origin,transport,now,sessions,actors,messages,actions,orders,live:mode0==='live',startedAt:Date.parse(String((bc.data as Row).started_at||'')),spoke:new Set(spokeRows.map(r=>String(r.automation_actor_id))),nextShow};
  if(await orderNoticeFlow(codeCtx).catch(()=>false))return;
  if(await farewellFlow(codeCtx).catch(()=>false))return;
  if(await sizeAnswerFlow(codeCtx,holds).catch(()=>false))return;
@@ -770,6 +780,18 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  if(speaker&&text&&(wrongPaymentTalk(text,speaker.cardOrder,speaker.bankOrder)||cardLinkTalkBlocked(text,speaker.cardOrder,speaker.paid.includes('card'))))text='';
  // [2026-11-15 07:40 사장님] 상품번호는 손님처럼 줄여 부름(프222·버58·몽319), 웃음·이모지 끝맺음은 최근 AI 글과 안 겹치게
  if(speaker&&text){const sd=seedOf(speaker.actor)+now;text=personaVoice(varyLaughTail(shortProductCodes(text,sd),recentAi,sd),seedOf(speaker.actor),now);}
+ // RURU_QUALITY_GATE_V1: Final validation after persona styling and before any send.
+ if(speaker&&text){
+   const latestBroadcast=await db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle();
+   if(latestBroadcast.error||!latestBroadcast.data)return;
+   const latestMode=await streamModeOf(db,latestBroadcast.data);
+   if(latestMode!==mode)return; // Broadcast changed while Gemini generated a message.
+   const latestCard=await readDialogueCard(db,c.broadcast_id).catch(()=>null);
+   if(String(latestCard?.productId||'')!==String(card?.productId||'')||String(latestCard?.detailName||'')!==String(card?.detailName||''))return;
+   const recentForGate:ChatObservation[]=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||'')}));
+   const quality=judgeTestChat({text,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate});
+   if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
+ }
  // 사람 글은 한 번만 판단 — 침묵이어도 그 글 번호를 남겨 같은 글로 Gemini 를 다시 부르지 않음
  const sourceId=target?Number(target.id):newestHuman?Number(newestHuman.id):null;
  const who=speaker&&text?speaker:(sourceId?roster[0]:null);

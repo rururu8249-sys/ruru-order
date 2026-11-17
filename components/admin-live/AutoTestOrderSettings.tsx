@@ -90,34 +90,56 @@ export default function AutoTestOrderSettings(){
    finally{writing.current=false;setBusy(false)}
  };
 
- return <section className="mt-3 border-t border-line pt-3" aria-label="자동 실행">
+ return <section className="mt-3 border-t border-line pt-3" aria-label="자동 실행" data-ruru-automation-compact="v1">
    <div className="mb-3 flex items-center justify-between gap-2">
-     <div><div className="text-[16px] font-bold text-ink">자동 실행</div><div className="mt-1 text-[13px] text-ink-soft">주문 · 채팅 · 시청자</div></div>
-     <span className="text-[13px] text-ink-soft" role="status">{!state?'확인 중':error?'연결 확인 필요':active?'실행 중':'중지됨'}</span>
-   </div>
-   <button type="button" className={`${button} w-full bg-ink text-white`} disabled={busy||(!error&&(!state||(!active&&(!state.ready||!state.broadcastId))))} onClick={()=>{if(error&&!active)void load();else void control('all',!active)}}>{busy?'변경 중…':active?'중지':error?'다시 확인':'시작'}</button>
-   <div className="mt-2" role="group" aria-label="주문 양"><div className="mb-1 text-[13px] font-bold text-ink">주문 양</div><div className="flex gap-2">{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={pace===k} disabled={!state?.ready} onClick={()=>void changePace(k)} className={`${button} min-w-0 flex-1 whitespace-nowrap ${pace===k?'bg-ink text-white':'border border-line text-ink'}`}>{l}</button>)}</div></div>
-   <div className="mt-2 flex items-center justify-between gap-2"><div className="min-w-0"><div className="text-[13px] font-bold text-ink">구매 얘기 모든 손님 화면에</div><div className="text-[12px] text-ink-mute">켜면 «지난번 ○○ 샀었는데 좋았어요»가 일반 손님에게도 보여요 — 실전 연습용, 손님 오기 전에 끄세요</div></div><button type="button" role="switch" aria-checked={memoryPublic} disabled={!state?.ready} onClick={()=>void toggleMemory()} className={`${button} shrink-0 ${memoryPublic?'bg-ink text-white':'border border-line text-ink'}`}>{memoryPublic?'켬':'끔'}</button></div>
-   <div className="mt-2" role="group" aria-label="채팅 양"><div className="mb-1 text-[13px] font-bold text-ink">채팅 양</div><div className="flex gap-2">{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={chatPace===k} disabled={!state?.ready} onClick={()=>void changeChatPace(k)} className={`${button} min-w-0 flex-1 whitespace-nowrap ${chatPace===k?'bg-ink text-white':'border border-line text-ink'}`}>{l}</button>)}</div></div>
-   <div className="mt-1 flex items-center justify-between gap-2">
-     <a href="/order" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-[13px] font-semibold text-ink">방송화면 열기 ↗</a>
-     <button type="button" className="min-h-11 text-[13px] text-ink-soft" aria-expanded={details} aria-controls="live-automation-details" onClick={()=>setDetails(!details)}>{details?'접기':'상세 설정'}</button>
-   </div>
-   {error?<p role="alert" className="mt-1 text-[13px] text-danger-tx">{error}</p>:null}
-   {state?.viewers?<p className="mt-1 text-[13px] text-ink-soft">시청 중 {state.activeViewers}명 · 보통 2~30명 · 최대 50명</p>:null}
-   {state?.orders&&state.nextOrderAt?<p className="mt-1 text-[13px] text-ink-soft" role="status">{Date.parse(state.nextOrderAt)>Date.now()?`다음 주문 ${time(state.nextOrderAt)}쯤`:'주문 준비·제출 확인 중'}</p>:null}
-   {state?.last&&!AI_SKIP.test(String(state.last.message||''))?<p className={`mt-1 text-[13px] leading-relaxed ${state.last.ok?'text-ink-soft':'text-danger-tx'}`}>{time(state.last.at)} · {state.last.message}</p>:null}
-   {state&&!state.ready?<p className="text-[13px] text-ink-soft">실행 기능을 준비 중이에요.</p>:null}
-   {details?<div id="live-automation-details" className="mt-2 space-y-3 border-t border-line pt-3">
-     {([['orders','자동 주문'],['chat','AI 채팅'],['viewers','시청자 입장·퇴장']] as const).map(([key,label])=><button key={key} type="button" role="switch" aria-checked={Boolean(state?.[key])} aria-label={label} disabled={!state||busy||!state.ready} onClick={()=>void control(key,!state?.[key])} className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-[13px] disabled:opacity-50"><span>{label}</span><span className={`rounded-full px-3 py-1 text-[13px] font-bold ${state?.[key]?'bg-ink text-white':'bg-surface-2 text-ink-soft'}`}>{state?.[key]?'켜짐':'꺼짐'}</span></button>)}
-     <p className="text-[13px] leading-relaxed text-ink-soft">시청자는 보통 2~30명, 가끔 최대 50명까지 늘어요. 주문은 조용한 시간과 몰리는 시간을 섞습니다. 입금 알림은 생성 주문용이며 실제 입금 처리는 하지 않아요.</p>
-     <div className="border-t border-line pt-3 text-[13px] text-ink-soft">
-       <div className="mb-2 font-bold text-ink">AI 사용량</div>
-       {usage.length?usage.map(g=><div key={g.model} className="mb-1 flex flex-wrap justify-between gap-x-2"><span>{g.model.replace('gemini-','').replace('-flash-lite',' Lite').replace('-flash',' Flash')}</span><span>{g.used===null?'확인 불가':`${g.used} / ${g.limit}회`}{g.blockedUntil>Date.now()?` · ${time(g.blockedUntil)}까지 대기`:''}</span></div>):<div>사용량을 확인하지 못했어요.</div>}
-       <p className="mt-2 leading-relaxed">이 사이트에서 집계한 호출 수예요. 미국 서부 자정에 초기화됩니다. 질문·상품 인식·관리자 기능을 우선 처리하고 자동 채팅은 잠시 기다립니다.</p>
+     <div className="min-w-0">
+       <h2 className="text-[15px] font-black text-ink">자동 실행</h2>
+       <p className="mt-0.5 text-[11px] text-ink-mute">주문 · AI 채팅 · 시청자</p>
      </div>
-     <button type="button" className={`${button} w-full border border-line text-ink`} disabled={!state?.ready||busy||runningOnce||Boolean(state.manualAction)} onClick={()=>void run()}>{runningOnce?'주문 처리 중…':'주문 1회 실행'}</button>
-     {orders>0?<button type="button" className={`${button} w-full text-danger-tx`} disabled={!state||busy||runningOnce} onClick={()=>void remove()}>생성 주문 {orders}건 삭제</button>:null}
+     <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${active?'bg-ink text-white':'bg-surface-2 text-ink-soft'}`} role="status">{!state?'확인 중':error?'확인 필요':active?'실행 중':'중지됨'}</span>
+   </div>
+   <button type="button" className={`${button} w-full ${active?'bg-ink text-white':'border border-line bg-surface text-ink'}`} disabled={busy||(!error&&(!state||(!active&&(!state.ready||!state.broadcastId))))} onClick={()=>{if(error&&!active)void load();else void control('all',!active)}}>{busy?'변경 중…':active?'전체 중지':error?'다시 확인':'전체 시작'}</button>
+   <div className="mt-3 space-y-1.5" role="group" aria-label="자동 실행 기능">
+     {([['orders','자동 주문'],['chat','AI 채팅'],['viewers','시청자 입장·퇴장']] as const).map(([key,label])=><button key={key} type="button" role="switch" aria-checked={Boolean(state?.[key])} aria-label={label} disabled={!state||busy||!state.ready} onClick={()=>void control(key,!state?.[key])} className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-2.5 text-left text-[13px] font-semibold text-ink transition hover:bg-surface-2 disabled:opacity-50"><span>{label}</span><span className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-bold ${state?.[key]?'bg-ink text-white':'border border-line bg-surface text-ink-soft'}`}>{state?.[key]?'켜짐':'꺼짐'}</span></button>)}
+   </div>
+   <div className="mt-3 rounded-xl border border-line bg-surface-2/40 p-2.5">
+     <div className="flex items-center justify-between gap-2">
+       <span className="text-[12px] font-bold text-ink">주문 양</span>
+       <div className="flex min-w-0 gap-1" role="group" aria-label="주문 양">{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={pace===k} disabled={!state?.ready} onClick={()=>void changePace(k)} className={`min-h-9 rounded-lg px-2 text-[12px] font-bold transition disabled:opacity-50 ${pace===k?'bg-ink text-white':'border border-line bg-surface text-ink'}`}>{l}</button>)}</div>
+     </div>
+     <div className="mt-2 flex items-center justify-between gap-2">
+       <span className="text-[12px] font-bold text-ink">채팅 양</span>
+       <div className="flex min-w-0 gap-1" role="group" aria-label="채팅 양">{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={chatPace===k} disabled={!state?.ready} onClick={()=>void changeChatPace(k)} className={`min-h-9 rounded-lg px-2 text-[12px] font-bold transition disabled:opacity-50 ${chatPace===k?'bg-ink text-white':'border border-line bg-surface text-ink'}`}>{l}</button>)}</div>
+     </div>
+   </div>
+   <div className="mt-3 space-y-1 text-[12px] text-ink-soft">
+     {state?.viewers?<p>시청 중 <strong className="text-ink">{state.activeViewers}명</strong></p>:null}
+     {state?.orders&&state.nextOrderAt?<p role="status">{Date.parse(state.nextOrderAt)>Date.now()?`다음 주문 ${time(state.nextOrderAt)}쯤`:'주문 준비·제출 확인 중'}</p>:null}
+     {state?.last&&!AI_SKIP.test(String(state.last.message||''))?<p className={`leading-snug ${state.last.ok?'text-ink-soft':'text-danger-tx'}`}>{time(state.last.at)} · {state.last.message}</p>:null}
+     {state&&!state.ready?<p>실행 기능을 준비 중이에요.</p>:null}
+   </div>
+   <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2">
+     <a href="/order" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-[12px] font-semibold text-ink">방송화면 ↗</a>
+     <button type="button" className="inline-flex min-h-11 items-center rounded-lg px-2 text-[12px] font-bold text-ink-soft hover:bg-surface-2" aria-expanded={details} aria-controls="live-automation-details" onClick={()=>setDetails(!details)}>{details?'상세 접기 −':'상세 설정 +'} </button>
+   </div>
+   {error?<p role="alert" className="mt-1 text-[12px] leading-relaxed text-danger-tx">{error}</p>:null}
+   {details?<div id="live-automation-details" className="mt-2 space-y-3 rounded-xl border border-line bg-surface p-3">
+     <div className="text-[12px] font-bold text-ink">AI 사용량 <span className="font-normal text-ink-mute">(사이트 집계)</span></div>
+     {usage.length?usage.map(g=><div key={g.model} className="text-[12px] text-ink-soft">
+       <div className="flex items-center justify-between gap-2"><span>{g.model.replace('gemini-','').replace('-flash-lite',' Lite').replace('-flash',' Flash')}</span><span className="tabular-nums">{g.used===null?'확인 불가':`${g.used} / ${g.limit}`}</span></div>
+       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-ink" style={{width:`${g.used===null?0:Math.min(100,Math.max(0,g.used/g.limit*100))}%`}} /></div>
+       {g.blockedUntil>Date.now()?<div className="mt-1">{time(g.blockedUntil)}까지 대기</div>:null}
+     </div>):<div className="text-[12px] text-ink-soft">사용량을 확인하지 못했어요.</div>}
+     <p className="text-[11px] leading-relaxed text-ink-mute">사이트 자체 호출 집계예요. 실제 API 한도·과금 여부는 Google AI Studio에서 확인해 주세요.</p>
+     <div className="border-t border-line pt-3">
+       <div className="mb-1 text-[12px] font-bold text-ink">실전 연습 설정</div>
+       <div className="flex items-center justify-between gap-2">
+         <div className="min-w-0"><div className="text-[12px] font-semibold text-ink">과거 구매 테스트 문구 공개</div><p className="mt-1 text-[11px] leading-relaxed text-ink-mute">연습 후 반드시 꺼 주세요. 켜면 일반 손님 화면에도 테스트 구매 문구가 보일 수 있어요.</p></div>
+         <button type="button" role="switch" aria-checked={memoryPublic} disabled={!state?.ready} onClick={()=>void toggleMemory()} className={`${button} shrink-0 ${memoryPublic?'bg-ink text-white':'border border-line text-ink'}`}>{memoryPublic?'켬':'끔'}</button>
+       </div>
+     </div>
+     <button type="button" className={`${button} w-full border border-line text-ink`} disabled={!state?.ready||busy||runningOnce||Boolean(state.manualAction)} onClick={()=>void run()}>{runningOnce?'주문 처리 중…':'테스트 주문 1회 실행'}</button>
+     {orders>0?<button type="button" className={`${button} w-full border border-line text-danger-tx`} disabled={!state||busy||runningOnce} onClick={()=>void remove()}>테스트 주문 {orders}건 삭제</button>:null}
    </div>:null}
  </section>;
 }

@@ -1,0 +1,48 @@
+/** Pure fail-closed policy for TEST-chat composition. No DB writes or network calls. */
+export type StreamPhase = 'live'|'paused'|'replay';
+export type ChatIntent = 'size'|'length'|'color'|'price'|'delivery'|'order'|'visit'|'pause'|'replay'|'live-action'|'memory'|'other';
+export type ChatObservation = {text:string; at:number; actorId?:string|null; productKey?:string|null};
+export type QualityInput = {
+  text:string; mode:StreamPhase; now:number; actorId:string;
+  currentProductKey?:string|null; currentProductName?:string|null;
+  priority?:boolean; replyingToHuman?:boolean; recent:ChatObservation[];
+};
+export type QualityResult = {ok:true;intent:ChatIntent}|{ok:false;reason:string;intent:ChatIntent};
+const norm=(t:string)=>t.toLowerCase().replace(/[\s!?.,~ㅋㅎㅠㅜ♡♥\p{Extended_Pictographic}]/gu,'');
+export function chatIntent(text:string):ChatIntent {
+ const t=String(text||'');
+ if(/밴드/.test(t))return 'visit';
+ if(/샀었|샀던|샀는데|샀더니|사봤는데|재구매|지난번.{0,15}(입|구매)/.test(t))return 'memory';
+ if(/주문서|결제|입금|장바구니|카결/.test(t))return 'order';
+ if(/키\s*\d{3}|\d{3}\s*(?:에|\/)\s*\d{2}|몇\s*사이즈|사이즈.{0,10}(추천|입|맞)|\b(?:XS|XXL|XL)\b/.test(t))return 'size';
+ if(/기장|총장|가단|어깨|소매.{0,6}길이|길이/.test(t))return 'length';
+ if(/색상|컬러|베이지|아이보리|블랙|초코|그레이|네이비|브라운|검정|색깔/.test(t))return 'color';
+ if(/가격|얼마|금액/.test(t))return 'price';
+ if(/배송|택배|언제.{0,6}(받|와)/.test(t))return 'delivery';
+ if(/방송.{0,8}(놓쳤|끝났|종료)|다시\s*보기|다음\s*방송/.test(t))return 'replay';
+ if(/방송.{0,8}(쉬는|잠시|재개)|다시\s*시작/.test(t))return 'pause';
+ if(/입어\s*(봐|주|줘)|보여\s*(줘|주)|뒤태|착용해|지금.{0,8}(보여|입어|설명)/.test(t))return 'live-action';
+ if(/유튜브|인스타|소개|추천받|친구가|지인이/.test(t))return 'visit';
+ return 'other';
+}
+export function judgeTestChat(q:QualityInput):QualityResult {
+ const text=String(q.text||'').trim(), intent=chatIntent(text);
+ const fail=(reason:string):QualityResult=>({ok:false,reason,intent});
+ if(!text||text.length>100)return fail('invalid-length');
+ if(/밴드/.test(text))return fail('band-forbidden');
+ if(q.mode!=='live'&&/(입어\s*(봐|주|줘)|보여\s*(줘|주)|착용해|지금.{0,8}(입어|보여|설명))/.test(text))return fail('off-live-request');
+ if(q.mode==='paused'&&/(방송.{0,6}(끝났|놓쳤|종료)|다시\s*보기.{0,5}(보고|중))/.test(text))return fail('paused-as-ended');
+ if(q.mode==='replay'&&/(잠시\s*쉬는|곧\s*재개|잠깐\s*쉬었다|다시\s*시작.{0,5}(하겠|하나))/.test(text))return fail('ended-as-paused');
+ if(q.mode!=='live'&&intent==='size')return fail('off-size-talk');
+ const recent=q.recent.filter(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-30*60_000);
+ if(recent.some(r=>norm(r.text)===norm(text)))return fail('exact-repetition');
+ if(!q.priority&&!q.replyingToHuman){
+  const sameActor=recent.filter(r=>r.actorId===q.actorId);
+  const topicIntent=['size','length','color','price','delivery','replay','pause','visit','memory'];
+  if(topicIntent.includes(intent)&&sameActor.some(r=>chatIntent(r.text)===intent&&
+      (!r.productKey||r.productKey===(q.currentProductKey||''))&&q.now-r.at<20*60_000))return fail('actor-topic-repeat');
+  if(['replay','pause','memory','visit'].includes(intent)&&recent.some(r=>chatIntent(r.text)===intent&&q.now-r.at<6*60_000))return fail('room-topic-repeat');
+  if(!q.currentProductKey&&intent==='other'&&!recent.length)return fail('unmotivated-chat');
+ }
+ return {ok:true,intent};
+}
