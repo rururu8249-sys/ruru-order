@@ -20,7 +20,7 @@ import { CHAT_FONT_SIZES as SIZES, CHAT_YT_SCALES as YT_SCALES, CHAT_FONT_KEY as
 import {createChatViewUnread, reduceChatViewUnread} from "@/lib/chatViewUnread";
 import {ChatViewNotice} from "./ChatViewNotice";
 import "./chat-view.css";
-import {includeChatViewMessage} from "@/lib/chatViewFilter";
+import {includeChatViewMessage,includeChatViewNoticeMessage} from "@/lib/chatViewFilter";
 import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
 
 type Bc = { id: string; title: string; videoId: string; paused: boolean };
@@ -44,6 +44,8 @@ export default function ChatViewClient() {
   const displayMessages = useMemo(()=>privateChat.displayMessages.filter(includeChatViewMessage),[privateChat.displayMessages]);
   const avatarColorMap = useMemo(()=>chatColors(displayMessages),[displayMessages]); // [2026-11-14] 위아래 비슷한 색 안 붙게(방송 화면과 같은 규칙)
   const [emojis, setEmojis] = useState<ChatEmoji[]>([]);
+  // Chat-only observer: message ID-only classification.
+  const [testMessageIds, setTestMessageIds] = useState<Set<number>>(() => new Set());
   const [sizeIdx, setSizeIdx] = useState(SIZES.indexOf(20));
   const [ytSizeIdx, setYtSizeIdx] = useState(YT_SCALES.indexOf(1.5));
   const [tab, setTab] = useState<"yt" | "site">("yt");
@@ -134,7 +136,7 @@ export default function ChatViewClient() {
         const snapshot = (j.messages || []).map(parseChatMessage).filter((m:LiveChatMessage|null) => m?.broadcastId === bcId) as LiveChatMessage[];
         const reconciled = mergeChat(snapshot, [...changedDuringLoad.values()], 200);
         setList(reconciled);
-        dispatchUnread({type:"snapshot",bc:bcId,messages:reconciled.map(m=>includeChatViewMessage(m)?m:{...m,hidden:true}),read:tabRef.current === "site" && document.visibilityState === "visible"});
+        dispatchUnread({type:"snapshot",bc:bcId,messages:reconciled.map(m=>includeChatViewNoticeMessage(m)?m:{...m,hidden:true}),read:tabRef.current === "site" && document.visibilityState === "visible"});
       } catch { /* 다음에 */ } finally { loading = false; }
     };
     const loadEmojis = () => fetch("/api/live-chat/emoji", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (alive && j?.ok) setEmojis(Array.isArray(j.items) ? j.items : []); }).catch(() => {});
@@ -145,7 +147,7 @@ export default function ChatViewClient() {
         const m = parseChatMessage(payload);
         if (!alive || !m || m.broadcastId !== bcId) return;
         if (loading) changedDuringLoad.set(m.id,m);
-        dispatchUnread({type:"event",bc:bcId,messages:[includeChatViewMessage(m)?m:{...m,hidden:true}],read:tabRef.current === "site" && document.visibilityState === "visible"});
+        dispatchUnread({type:"event",bc:bcId,messages:[includeChatViewNoticeMessage(m)?m:{...m,hidden:true}],read:tabRef.current === "site" && document.visibilityState === "visible"});
         privateChat.onPublicMessage(m);
         setList((prev) => (m.hidden ? prev.filter((x) => x.id !== m.id) : mergeChat(prev, [m], 200)));
       },
@@ -200,6 +202,26 @@ export default function ChatViewClient() {
     return () => { document.removeEventListener("visibilitychange", onVis); void lock?.release().catch(() => {}); };
   }, []);
 
+  // Public test label lookup: AI actor and manual test messages, IDs only.
+  useEffect(() => {
+    setTestMessageIds(new Set());
+    if (!bcId) return;
+    let active = true;
+    const sync = async () => {
+      try {
+        const r = await fetch(`/api/chat-view/test-markers?bc=${encodeURIComponent(bcId)}`, {cache: 'no-store'});
+        if (!r.ok) return;
+        const j: {ok?: boolean; ids?: unknown} = await r.json();
+        if (active && j.ok && Array.isArray(j.ids)) setTestMessageIds(new Set(j.ids.filter((v): v is number => Number.isSafeInteger(v) && v > 0)));
+      } catch { /* retry without guessing test status */ }
+    };
+    void sync();
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') void sync(); }, 5000);
+    const visible = () => { if (document.visibilityState === 'visible') void sync(); };
+    document.addEventListener('visibilitychange', visible);
+    return () => { active = false; clearInterval(t); document.removeEventListener('visibilitychange',visible); };
+  }, [bcId]);
+
   const fontPx = SIZES[sizeIdx];
   // [16:11 사장님] 유튜브 채팅도 글자 크기 — 남의 화면(iframe)이라 글자를 못 바꿔 «화면째 확대»(scale). 유튜브 기본 글자 약 13px 기준.
   const ytScale = YT_SCALES[ytSizeIdx];
@@ -238,7 +260,7 @@ export default function ChatViewClient() {
   );
 
   return (
-    <div className="ruru-chat-view" style={{ position: "fixed", inset: 0, background: C.page, color: C.ink, display: "flex", flexDirection: "column", fontFamily: 'Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif', colorScheme: "dark" }}>
+    <div className="ruru-chat-view" style={{ position: "fixed", inset: 0, background: C.page, color: C.ink, display: "flex", flexDirection: "column", fontFamily: 'Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif', colorScheme: "dark" }}>
 
 
       <div className="ruru-chat-toolbar">
@@ -271,7 +293,7 @@ export default function ChatViewClient() {
           </div>
         </header>
         <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden", background: "#0F0F0F" }}>
-      {tab === "yt" && <ChatViewNotice messages={unreadMessages} emojis={emojiMap} onOpen={()=>openTab("site")}/>}
+      {tab === "yt" && <ChatViewNotice messages={unreadMessages.map(m=>(testMessageIds.has(m.id)||m.avatar==='autotest')&&m.badge!=='bot'&&!m.nickname.startsWith('[테스트]')?{...m,nickname:`[테스트]${m.nickname}`}:m)} emojis={emojiMap} onOpen={()=>openTab("site")}/>}
           {ytSrc ? (
             <iframe title="유튜브 채팅" src={ytSrc}
               style={{ position: "absolute", top: 0, left: 0, width: `${100 / ytScale}%`, height: `${100 / ytScale}%`, transform: `scale(${ytScale})`, transformOrigin: "0 0", border: 0, display: "block" }} />
@@ -322,7 +344,7 @@ export default function ChatViewClient() {
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
-                  <span style={{ fontWeight: 700, color: palette?.nick || "#C2C2C2", marginRight: "8px" }}>{m.nickname}</span>
+                  <span style={{ fontWeight: 700, color: palette?.nick || "#C2C2C2", marginRight: "8px" }}>{(testMessageIds.has(m.id)||m.avatar==='autotest')&&m.badge!=='bot'&&!m.nickname.startsWith('[테스트]')?`[테스트]${m.nickname}`:m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}
                   <ChatBodyView body={m.body} emojis={emojiMap} />

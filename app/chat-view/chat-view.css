@@ -52,3 +52,92 @@
 .ruru-chat-notice[data-source=youtube]{background:rgba(66,24,31,.9);border-color:#b46573;border-left-color:#ff8195}
 .ruru-chat-notice[data-source=youtube] .ruru-chat-notice-heading,.ruru-chat-notice[data-source=youtube] .ruru-chat-notice-row>b{color:#ffc5d0}
 .ruru-chat-notice[data-source=youtube] .ruru-chat-notice-open{color:#ffe0e6}
+
+/* Galaxy Tab A9 chat monitor: notification is a fixed overlay ON TOP of the YouTube iframe,
+   not a row inserted between YouTube messages. It persists until the viewer taps it. */
+.ruru-chat-view .ruru-chat-notice{
+  position:absolute;z-index:10;top:0;left:0;right:0;width:100%;
+  margin:0;padding:11px 12px 10px;border:1px solid rgba(166,202,231,.54);
+  border-top:0;border-left:0;border-right:0;border-radius:0 0 14px 14px;
+  background:rgba(22,34,46,.88);-webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
+  color:#f6f8fa;box-shadow:0 8px 25px rgba(0,0,0,.42);
+  cursor:pointer;touch-action:manipulation;
+}
+.ruru-chat-view .ruru-chat-notice-heading{
+  display:flex;align-items:center;gap:7px;min-width:0;margin:0 0 7px;
+  font-size:14px;line-height:25px;font-weight:800;color:#d4edff;
+}
+.ruru-chat-view .ruru-chat-notice-open{
+  display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+  margin-left:auto;padding:3px 9px;border:1px solid rgba(255,255,255,.28);
+  border-radius:8px;background:rgba(6,15,26,.86);color:#fff;
+  font-size:15px;line-height:23px;font-weight:850;letter-spacing:-.02em;
+  white-space:nowrap;text-shadow:0 1px 2px #000;
+}
+.ruru-chat-view .ruru-chat-notice-row{
+  display:flex;align-items:baseline;gap:8px;padding:3px 0;
+  font-size:clamp(15px,3.6vw,19px);font-weight:550;line-height:1.35;
+}
+.ruru-chat-view .ruru-chat-notice-row>b{
+  max-width:42%;color:#c8e7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ruru-chat-view .ruru-chat-notice-body{
+  flex:1;min-width:0;white-space:nowrap;display:block;overflow:hidden;text-overflow:ellipsis;
+}
+.ruru-chat-view .ruru-chat-notice-more{margin-top:5px;color:#ced9e3;font-size:12px}
+.ruru-chat-view .ruru-chat-notice:focus-visible{outline:3px solid #fff;outline-offset:-3px}
+@media (orientation:portrait) and (max-width:700px){
+  .ruru-chat-toolbar{padding:6px 9px;gap:6px}
+  .ruru-chat-brand h1{font-size:15px!important}
+  .ruru-chat-panel-head{padding:8px 10px}
+  .ruru-chat-panel-title h2{font-size:17px}
+  .ruru-chat-grid.one{padding:5px!important}
+}
+@media (max-width:380px){
+  .ruru-chat-view .ruru-chat-notice-heading{font-size:12px}
+  .ruru-chat-view .ruru-chat-notice-open{font-size:13px;padding:2px 6px}
+}
+
+/* A9 v4: acknowledge new SITE chat without aggressive blinking.
+   The notice stays over the YouTube iframe until the viewer taps it. */
+.ruru-chat-view .ruru-chat-notice[data-source="site"] {
+  animation: ruru-a9-soft-arrival 460ms ease-out both,
+             ruru-a9-soft-pulse 2.8s ease-in-out 460ms infinite;
+  will-change: background-color, border-color, box-shadow;
+}
+.ruru-chat-view .ruru-chat-notice .ruru-chat-unread-badge {
+  background: #E5334B;
+  color: #FFFFFF;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 850;
+  animation: ruru-a9-badge-pop 420ms cubic-bezier(.2,.75,.25,1.2) 1;
+}
+.ruru-chat-view .ruru-chat-notice-open {
+  color: #FFFFFF !important;
+  background: rgba(3,12,22,.91);
+  text-shadow: none;
+  font-weight: 850;
+}
+@keyframes ruru-a9-soft-arrival {
+  from {opacity:.78;transform:translateY(-5px)}
+  to {opacity:1;transform:translateY(0)}
+}
+@keyframes ruru-a9-soft-pulse {
+  0%,100% {background-color:rgba(22,34,46,.88);border-bottom-color:rgba(166,202,231,.54);box-shadow:0 8px 25px rgba(0,0,0,.42)}
+  50% {background-color:rgba(36,54,72,.94);border-bottom-color:rgba(179,218,250,.9);box-shadow:0 8px 25px rgba(0,0,0,.42),0 0 13px rgba(116,192,252,.22)}
+}
+@keyframes ruru-a9-badge-pop {
+  0% {transform:scale(.78)}
+  65% {transform:scale(1.10)}
+  100% {transform:scale(1)}
+}
+@media (prefers-reduced-motion: reduce) {
+  .ruru-chat-view .ruru-chat-notice[data-source="site"],
+  .ruru-chat-view .ruru-chat-notice .ruru-chat-unread-badge {
+    animation:none !important;
+    will-change:auto;
+  }
+}
