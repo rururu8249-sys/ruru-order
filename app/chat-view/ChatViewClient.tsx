@@ -35,6 +35,15 @@ const BADGE: Record<string, { label: string; bg: string; fg: string }> = {
 const C = { page: "#000000", panel: "#0F0F0F", line: "#2A2A2A", btn: "#1F1F1F", ink: "#F1F1F1", soft: "#AAAAAA", mute: "#8A8A8A" };
 // 유튜브 확대 배율과 사이트 글자 크기는 각각 이 기기에만 기억.
 
+// Match the pastel nickname color used by the customer live chat view.
+function chatViewSoftNickColor(hex: string): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return "rgba(255,255,255,0.8)";
+  const rgb = parseInt(match[1], 16);
+  const pastel = (channel: number) => Math.round(channel + (255 - channel) * 0.45);
+  return `rgb(${pastel((rgb >> 16) & 255)}, ${pastel((rgb >> 8) & 255)}, ${pastel(rgb & 255)})`;
+}
+
 export default function ChatViewClient() {
   const [bc, setBc] = useState<Bc | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -340,11 +349,11 @@ export default function ChatViewClient() {
             const b = palette ? {label:"AI",bg:palette.badge,fg:palette.ink} : m.badge ? BADGE[m.badge] : null;
             return (
               <div key={m.id} data-chat-id={m.id} className={`ruru-chat-row${isNew ? " ruru-chat-new" : ""}`} style={{ display: "flex", alignItems: "flex-start", gap: "var(--chat-row-gap, 10px)", padding: "var(--chat-row-padding, 7px 8px)" }}>
-                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size="1.6em" frame={palette?.frame || staffAvatarFrame(m.badge)} color={palette ? undefined : avatarColorMap.get(m.id)} />
+                <ChatProfileAvatar src={palette?.avatar || m.avatar} nick={palette?.nickname || m.nickname} size={30} frame={palette?.frame || staffAvatarFrame(m.badge)} color={palette ? undefined : avatarColorMap.get(m.id)} />
                 <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word", color: C.ink, opacity: m.deletedByAuthor ? 0.55 : 1 }}>
                   {m.deletedByAuthor ? <span style={{ display: "block", fontSize: "0.7em" }}>작성자가 삭제한 글 · 관리자에게만 표시</span> : null}
                   {m.privateCommand ? <span style={{ display: "block", fontSize: "0.7em", color: "#a8c7fa" }}>나만 보이는 명령어</span> : null}
-                  <span style={{ fontWeight: 700, color: palette?.nick || "#C2C2C2", marginRight: "8px" }}>{(testMessageIds.has(m.id)||m.avatar==='autotest')&&m.badge!=='bot'&&!m.nickname.startsWith('[테스트]')?`[테스트]${m.nickname}`:m.nickname}</span>
+                  <span style={{ fontWeight: 700, color: palette?.nick || chatViewSoftNickColor(avatarColorMap.get(m.id) || "#FFFFFF"), marginRight: "8px" }}>{(testMessageIds.has(m.id)||m.avatar==='autotest')&&m.badge!=='bot'&&!m.nickname.startsWith('[테스트]')?`[테스트]${m.nickname}`:m.nickname}</span>
                   {b ? <span style={{ display: "inline-flex", alignItems: "center", height: "1.25em", padding: "0 0.4em", marginRight: "6px", borderRadius: "6px", background: b.bg, color: b.fg, fontSize: "0.7em", fontWeight: 800, verticalAlign: "0.12em" }}>{b.label}</span> : null}
                   {isNew ? <span aria-label="새 글" style={{ display: "inline-block", marginRight: "6px", padding: "1px 5px", borderRadius: "4px", background: "rgba(116,192,252,.14)", color: "#A5D8FF", fontSize: "0.6em", fontWeight: 700, verticalAlign: "0.15em", letterSpacing: ".04em" }}>NEW</span> : null}
                   <ChatBodyView body={m.body} emojis={emojiMap} />
