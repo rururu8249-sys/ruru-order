@@ -11,7 +11,7 @@ import {AUTOMATION_OWNER} from './liveAutomation';
 import {automationRpc,type Action,type Campaign,type Session,type Actor} from './liveAutomationServer';
 import {automationPost} from './liveAutomationTransport';
 import {streamModeOf} from './autoTestOrderServer';
-import {judgeTestChat,canContinueTestConversation,type ChatObservation} from './liveAutomationQualityGate'; // RURU_QUALITY_GATE_V1
+import {judgeTestChat,canContinueTestConversation,canContinueOwnTestTurn,planColorTestThread,type ChatObservation} from './liveAutomationQualityGate'; // RURU_QUALITY_GATE_V1
 import {unsupportedProductCode,unsuitableSpeech} from './liveAutomationSpeech';
 import {falseExperience} from './liveAutomationDialogue';
 import {mentionsNickname} from './liveAutomationConversation';
@@ -277,7 +277,10 @@ async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:strin
  // Follow-ups may use 8-90s, while unrelated spontaneous messages retain the 90/240s rule.
  const lastNonBot=x.messages.find(m=>m.badge!=='bot');
  const linkedFollowUp=canContinueTestConversation({mode:x.mode,now:x.now,actorId:String(actor.id),replyToMessageId:Number(plan.replyToAi||0),lastMessage:lastNonBot?{id:Number(lastNonBot.id),actorId:String(lastNonBot.automation_actor_id||''),at:Date.parse(String(lastNonBot.created_at||''))}:null});
- if(!priority&&!linkedFollowUp){
+ const linkedOwn=canContinueOwnTestTurn({mode:x.mode,now:x.now,actorId:String(actor.id),replyToMessageId:Number(plan.replyToAi||0),stage:Number(plan.threadStage||0),lastMessage:lastNonBot?{id:Number(lastNonBot.id),actorId:String(lastNonBot.automation_actor_id||''),at:Date.parse(String(lastNonBot.created_at||''))}:null});
+ // No existing bot/system notice or human message may intervene in a planned thread.
+ const linkedThread=(linkedOwn||linkedFollowUp)&&Number(plan.threadStage||0)>=2&&Number(x.messages[0]?.id||0)===Number(plan.replyToAi||0);
+ if(!priority&&!linkedFollowUp&&!linkedThread){
    const last=x.messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').reduce((v,m)=>Math.max(v,Date.parse(String(m.created_at))||0),0);
    const minGap=x.live?90000:240000;
    if(last&&x.now-last<minGap)return false;
@@ -290,7 +293,7 @@ async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:strin
  if(latestMode!==x.mode)return false;
  const latestCard=await readDialogueCard(x.db,x.c.broadcast_id).catch(()=>null);
  const recentForGate:ChatObservation[]=x.messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||'')}));
- const quality=judgeTestChat({text,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:(kind==='reply'&&source!==null)||linkedFollowUp,recent:recentForGate});
+ const quality=judgeTestChat({text,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:(kind==='reply'&&source!==null)||linkedFollowUp||linkedThread,recent:recentForGate});
  if(!quality.ok)return false;
  try{await automationRpc(x.db,'live_automation_ai_admission',{p_actor:actor.id,p_kind:kind});}catch{return false;}
  const action=await automationRpc<Action>(x.db,'live_automation_action',{p_session:s.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,...plan},p_manual:false,p_source:source,p_revision:x.c.revision});
@@ -533,6 +536,58 @@ export function orderedAskBlocked(t:string):boolean{
  return asking&&/구독|무배|무료\s*배송|배송비|카드\s*(결제)?\s*(돼|되|가능)|결제\s*(방법|어떻게)|주문\s*(어떻게|방법)|계좌|입금\s*(어디|어떻게)|합배송/.test(t);
 }
 
+/** RURU_THREAD_V2: A maximum of three grounded TEST-chat turns on the SAME live product.
+ * Stage 2: same actor adds a short second thought (20-45s after first turn).
+ * Stage 3: another eligible actor briefly responds (42-90s after stage 2).
+ * No background Gemini requests, no synthetic purchases, no imagined options.
+ * A real customer, site notice, card change, or unrelated line breaks this thread. */
+async function continueProductThread(x:CodeCtx,holds:Row[]):Promise<boolean>{
+ if(!x.live||!x.messages.length)return false;
+ const last=x.messages[0];
+ if(last.badge==='bot'||!last.automation_actor_id)return false;
+ const mid=Number(last.id),actorId=String(last.automation_actor_id);
+ const at=Date.parse(String(last.created_at||''));
+ if(!Number.isFinite(mid)||!Number.isFinite(at))return false;
+ const age=x.now-at;
+ if(age<10000||age>90000)return false;
+ if(x.actions.some(a=>Number(planOf(a).threadOf)===mid))return false;
+ const current=await readDialogueCard(x.db,x.c.broadcast_id).catch(()=>null);
+ if(!current||!current.productId||!Array.isArray(current.colors)||current.colors.length<2)return false;
+ const productKey=`${current.productId}:${current.detailName}`;
+ const sourceAction=x.actions.find(a=>String(a.actor_id)===actorId&&clean(planOf(a).text)===clean(last.body));
+ const sourcePlan=sourceAction?planOf(sourceAction):null;
+ // Avoid replacing genuine question/answer, order, welcome, or greeting flows with small talk.
+ if(sourcePlan&&(sourcePlan.greet||sourcePlan.orderLineFor||sourcePlan.farewellFor||(sourcePlan.replyToAi&&!sourcePlan.threadStage)||sourcePlan.smallTalk||sourcePlan.role||sourcePlan.emojiOnly||sourcePlan.emojiCute||sourcePlan.sizeFor))return false;
+ const stage=Number(sourcePlan?.threadStage||0);
+ if(stage===3)return false;
+ const seed=hashOf('thread:'+mid);
+ const chosen=planColorTestThread({mode:x.mode,stage:stage===2?3:2,
+   sourceText:clean(last.body),colors:current.colors,productKey,
+   sourceProductKey:stage===2?String(sourcePlan?.threadProductKey||''):productKey,
+   firstColor:stage===2?String(sourcePlan?.threadFirst||''):undefined,
+   secondColor:stage===2?String(sourcePlan?.threadSecond||''):undefined});
+ if(!chosen)return false;
+ if(stage===0){
+   if(seed%100>=38||age<20000||age>45000)return false;
+   const actor=x.actors.find(a=>String(a.id)===actorId);
+   if(!actor)return false;
+   return postCodeLine(x,actor,'reply',chosen.text,{threadStage:2,threadOf:mid,
+     replyToAi:mid,threadProductKey:productKey,threadFirst:chosen.firstColor,
+     threadSecond:chosen.secondColor},mid,'상품 색상 이어 말하기');
+ }
+ if(stage===2){
+   if(seed%100>=55||age<42000||age>90000)return false;
+   const holders=new Set(holds.map(h=>String(h.session_id)));
+   const eligible=x.actors.filter(a=>String(a.id)!==actorId&&x.sessions.some(s=>s.actor_id===a.id&&
+      (x.orders.some(o=>String(o.automation_actor_id)===String(a.id))||holders.has(String(s.id)))));
+   if(!eligible.length)return false;
+   const actor=eligible[seed%eligible.length];
+   return postCodeLine(x,actor,'reply',chosen.text,{threadStage:3,threadOf:mid,replyToAi:mid,
+     threadProductKey:productKey,threadFirst:chosen.firstColor,threadSecond:chosen.secondColor},mid,'상품 색상 대화 마무리');
+ }
+ return false;
+}
+
 /** [2026-11-15 14:53~14:54 사장님] 다른 가상 손님 말에 한두 마디 — 사실이 정해진 질문엔 답(65%), 좋다·기대된다 같은 말엔 맞장구(35%).
  *  그 글 뒤에 아무도(사람·가상 손님) 말 안 했을 때만, 10~40초 뒤, 방 전체 2분에 한 번. */
 async function replyToAiFlow(x:CodeCtx):Promise<boolean>{
@@ -622,6 +677,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  if(await sizeAnswerFlow(codeCtx,holds).catch(()=>false))return;
  if(await humanSizeAskFlow(codeCtx,holds).catch(()=>false))return;
  if(await smallTalkAnswerFlow(codeCtx,holds).catch(()=>false))return;
+ if(await continueProductThread(codeCtx,holds).catch(()=>false))return;
  if(await emojiCuteFlow(codeCtx).catch(()=>false))return;
  if(await replyToAiFlow(codeCtx).catch(()=>false))return;
  if(await greetFlow(codeCtx).catch(()=>false))return;

@@ -58,3 +58,37 @@ export function canContinueTestConversation(q:{
  return last.id===q.replyToMessageId&&last.actorId.length>0&&last.actorId!==q.actorId&&
   Number.isFinite(last.at)&&q.now-last.at>=8000&&q.now-last.at<=90000;
 }
+
+/** The only allowed same-person exception: stage-2 follow-up to their actual latest message. */
+export function canContinueOwnTestTurn(q:{
+ mode:StreamPhase;now:number;actorId:string;replyToMessageId:number;stage:number;
+ lastMessage:{id:number;actorId:string;at:number}|null;
+}):boolean{
+ if(q.mode!=='live'||q.stage!==2||!q.lastMessage||!Number.isSafeInteger(q.replyToMessageId)||q.replyToMessageId<=0)return false;
+ const l=q.lastMessage;
+ return l.id===q.replyToMessageId&&l.actorId.length>0&&l.actorId===q.actorId&&
+   Number.isFinite(l.at)&&q.now-l.at>=8000&&q.now-l.at<=90000;
+}
+
+/** Fully grounded color discussion. A third turn is a short preference, not advice. */
+export function planColorTestThread(q:{
+ mode:StreamPhase;stage:2|3;sourceText:string;colors:string[];productKey:string;
+ sourceProductKey?:string;firstColor?:string;secondColor?:string;
+}):{text:string;firstColor:string;secondColor:string}|null{
+ if(q.mode!=='live'||!q.productKey||!Array.isArray(q.colors)||q.colors.length<2)return null;
+ const colors=[...new Set(q.colors.map(c=>String(c||'').trim()).filter(c=>c.length>=2&&c.length<=14))];
+ if(colors.length<2)return null;
+ if(q.stage===2){
+   if(/[?？]/.test(q.sourceText)||!/(예쁘|이쁘|고민|끌리|맘에|마음에|괜찮|색감)/.test(q.sourceText))return null;
+   const first=colors.find(c=>q.sourceText.includes(c));
+   if(!first)return null;
+   const second=colors.find(c=>c!==first&&!q.sourceText.includes(c));
+   if(!second)return null;
+   return {text:`근데 ${second}도 고민되네요`,firstColor:first,secondColor:second};
+ }
+ if(q.sourceProductKey!==q.productKey)return null;
+ if(!q.firstColor||!q.secondColor||q.firstColor===q.secondColor)return null;
+ if(!colors.includes(q.firstColor)||!colors.includes(q.secondColor))return null;
+ if(!q.sourceText.includes(q.secondColor))return null;
+ return {text:`저는 ${q.firstColor} 쪽이요`,firstColor:q.firstColor,secondColor:q.secondColor};
+}
