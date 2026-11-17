@@ -336,6 +336,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcProducts, setBcProducts] = useState<ProductRow[]>([]);
   const [bcLoading, setBcLoading] = useState(false);
   const [bcBusy, setBcBusy] = useState(false);
+  const [bcRenameOpen, setBcRenameOpen] = useState(false);
+  const [bcRenameTitle, setBcRenameTitle] = useState("");
+  const selectedBroadcastForEdit = bcList.find((b) => b.id === bcSelId) || null;
   const [bcPinBusy, setBcPinBusy] = useState(false);
   // [2026-09-25 사장님 요청] 방송 목록 기간 필터 — 표시 전용(읽기). 기본 최근 30일.
   const [bcDateFilter, setBcDateFilter] = useState<"recent30" | "recent90" | "all" | "custom">("recent30");
@@ -727,6 +730,28 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
+  const renameDraftBroadcast = async () => {
+    const selected = selectedBroadcastForEdit;
+    const title = bcRenameTitle.trim();
+    if (!selected || selected.started_at || selected.status !== "OFF" || bcBusy) return;
+    if (!title || title.length > 120) { showAdminToast("방송 제목은 1~120자로 입력해주세요.", "warning"); return; }
+    if (title === selected.title) { setBcRenameOpen(false); return; }
+    setBcBusy(true);
+    try {
+      const { data, error } = await adminCatalogWrite({
+        table: "broadcasts", op: "update", values: { public_title: title },
+        filters: [{ type: "eq", col: "id", val: selected.id }, { type: "eq", col: "public_title", val: selected.title }, { type: "eq", col: "status", val: "OFF" }],
+        select: "id,public_title", single: true,
+      });
+      if (error || !data) throw new Error(error?.message || "다른 화면에서 변경되었습니다. 최신 목록을 확인해주세요.");
+      setBcRenameOpen(false);
+      await loadBroadcastList(selected.id);
+      window.dispatchEvent(new Event("ruru-broadcast-list-updated"));
+      showAdminToast("준비 중 방송 제목을 수정했어요. 기존 상품 연결은 그대로예요.", "success");
+    } catch (e) { showAdminToast("방송 제목 저장 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
+    finally { setBcBusy(false); }
+  };
+
   // 방송 숨기기(소프트 삭제): is_deleted=true만 update(진짜 DELETE 아님). ON 방송은 금지.
   const handleHideBroadcast = async (b: { id: string; title: string; status: string }) => {
     if (bcBusy) return;
@@ -770,7 +795,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   useEffect(() => {
-    if (tab === "broadcast" && bcList.length === 0) void loadBroadcastList();
+    if (tab !== "broadcast") return;
+    // Refresh the ON badge after the other panel starts/ends a broadcast.
+    const sync = () => { if (document.visibilityState !== "hidden") void loadBroadcastList(); };
+    window.addEventListener("ruru-broadcast-list-updated", sync);
+    document.addEventListener("visibilitychange", sync);
+    if (bcList.length === 0) void loadBroadcastList();
+    return () => {
+      window.removeEventListener("ruru-broadcast-list-updated", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -2012,9 +2046,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const d = new Date(b.started_at);
                     const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
                     return (
-                      <button type="button" key={b.id} className="group" onClick={() => { setBcSelId(b.id); if (isNarrow) setBcListOpen(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
+                      <button type="button" key={b.id} className="group" onClick={() => { setBcSelId(b.id); setBcRenameOpen(false); if (isNarrow) setBcListOpen(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          {isOn ? <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "1px 6px", borderRadius: "4px", background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" }}>ON</span> : null}
+                          <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "1px 6px", borderRadius: "4px", background: isOn ? "var(--color-ok-bg)" : "var(--color-surface-2)", color: isOn ? "var(--color-ok-tx)" : "var(--color-ink-mute)" }}>{isOn ? "ON" : b.started_at ? "종료" : "준비"}</span>
                           <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: on ? "var(--color-rose-deep)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</span>
                           {/* 켜진 방송(isOn)은 숨기기 불가 — 가드: span 자체를 렌더하지 않음 */}
                           {!isOn ? (
@@ -2079,6 +2113,23 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 ) : null}
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: bcSelId && bcProducts.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 담기</button>
               </div>
+              {selectedBroadcastForEdit ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "10px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
+                  <div style={{ flex: 1, minWidth: "160px" }}>
+                    <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", fontWeight: 700 }}>현재 선택한 방송 · {selectedBroadcastForEdit.status === "ON" ? "진행 중" : selectedBroadcastForEdit.started_at ? "종료됨" : "시작 전"}</div>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>{selectedBroadcastForEdit.title}</div>
+                  </div>
+                  {selectedBroadcastForEdit.status === "OFF" && !selectedBroadcastForEdit.started_at ? (
+                    bcRenameOpen ? (
+                      <div style={{ display: "flex", flex: 2, minWidth: "220px", gap: "6px" }}>
+                        <input aria-label="준비 방송 제목 수정" value={bcRenameTitle} maxLength={120} onChange={(e) => setBcRenameTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void renameDraftBroadcast(); if (e.key === "Escape") setBcRenameOpen(false); }} style={{ minWidth: 0, flex: 1, height: "36px", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 8px", background: "var(--color-surface)", color: "var(--color-ink)" }} />
+                        <button type="button" disabled={bcBusy} onClick={() => void renameDraftBroadcast()} style={{ ...rowBtnPrimary, height: "36px" }}>저장</button>
+                        <button type="button" onClick={() => setBcRenameOpen(false)} style={{ ...rowBtn, height: "36px" }}>취소</button>
+                      </div>
+                    ) : <button type="button" disabled={bcBusy} onClick={() => { setBcRenameTitle(selectedBroadcastForEdit.title); setBcRenameOpen(true); }} style={{ ...rowBtn, height: "36px" }}>방송명 수정</button>
+                  ) : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>진행 중 방송 제목은 「현재 방송 설정」에서 수정</span>}
+                </div>
+              ) : null}
               <div style={{ padding: "8px 12px 0" }}>
                 {/* [2026-11-09 사장님 「방송 중 소개·복사·순환이 불편, 버튼이 많다」] 띠 하나(44px) = 체크 없음: 순환 상태·순환 목록·멈춤 / 체크 있음: 체크 동작 3개.
                     같은 자리라 체크해도 목록이 안 밀린다(11/08 점선 자리 대체). 저장 함수는 11/06 것 그대로(saveRotationTargets·rotationUseAll·toggleWidgetLibraryPause). */}

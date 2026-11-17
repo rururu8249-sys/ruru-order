@@ -77,127 +77,42 @@ async function safeUpsertSetting(key: string, value: string) {
   }
 }
 
-// [2026-09-19 사장님] 「방송 종료했는데 고정이 안 풀리네?」 — 종료·교체 때 고정값을 안 지워
-//   지난 방송에 📌 고정이 그대로 남아 관리자 목록에서 «손님 화면에 이 상품만 보입니다»라고 거짓말을 했다.
-//   (손님 위젯은 ON 방송의 고정값만 읽어 실제 노출 사고는 없었다.) → 방송이 OFF 되는 모든 곳에서 고정도 «자동»으로.
-const WIDGET_PIN_CLEAR = { widget_pin_mode: "auto", widget_pin_product_id: null, widget_pin_detail_name: null } as const;
 
-export async function startAdminLiveBroadcast(input: StartBroadcastInput) {
-  const title = input.title.trim();
-  const youtubeUrl = String(input.youtubeUrl || "").trim();
+// Legacy entry point deliberately disabled: creating and activating in one click
+// produced duplicate broadcasts when a draft had already been prepared.
+export async function startAdminLiveBroadcast(input: StartBroadcastInput): Promise<AdminLiveBroadcast> {
+  void input;
+  throw new Error("상품 > 방송 상품에서 새 방송을 만든 뒤, 방송 시작에서 방송을 직접 선택해주세요.");
+}
 
-  if (!title) {
-    throw new Error("방송 제목을 입력해주세요.");
+async function broadcastLifecycle(action: "createDraft" | "activate" | "end", payload: { title?: string; broadcastId?: string }) {
+  const response = await fetch("/api/admin-live/broadcast-lifecycle", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.data) {
+    throw new Error(result?.error || `방송 처리에 실패했습니다. (${response.status})`);
   }
-
-  const nowIso = new Date().toISOString();
-
-  const { error: closeError } = await adminCatalogWrite({
-    table: "broadcasts",
-    op: "update",
-    values: { status: "OFF", ended_at: nowIso, ...WIDGET_PIN_CLEAR },
-    filters: [{ type: "eq", col: "status", val: "ON" }],
-  });
-
-  if (closeError) throw closeError;
-
-  const payload = {
-    public_title: title,
-    admin_subtitle: "",
-    status: "ON",
-    started_at: nowIso,
-    ended_at: null,
-    shipping_fee: 4000,
-    youtube_live_url: youtubeUrl,
-    youtube_live_enabled: Boolean(youtubeUrl),
-    order_form_enabled: true,
-    is_deleted: false,
-  };
-
-  const { data, error } = await adminCatalogWrite({
-    table: "broadcasts",
-    op: "insert",
-    values: payload,
-    select: "*",
-    single: true,
-  });
-
-  if (error) throw error;
-
-  await safeUpsertSetting("broadcast_status", "ON");
-  await safeUpsertSetting("current_broadcast_name", title);
-
-  return data as AdminLiveBroadcast;
+  window.dispatchEvent(new Event("ruru-broadcast-list-updated"));
+  return result.data as AdminLiveBroadcast;
 }
 
 // 준비된 OFF 방송을 켠다. 새 row를 만들지 않고 해당 id를 ON으로 UPDATE.
 // 기존 ON은 OFF 처리. youtube_live_url/정산·수수료 컬럼은 건드리지 않는다(껍데기가 보유한 값 유지).
 export async function activateBroadcast(broadcastId: string) {
-  if (!broadcastId) {
-    throw new Error("켤 방송 ID가 없습니다.");
-  }
-
-  const nowIso = new Date().toISOString();
-
-  const { error: closeError } = await adminCatalogWrite({
-    table: "broadcasts",
-    op: "update",
-    values: { status: "OFF", ended_at: nowIso, ...WIDGET_PIN_CLEAR },
-    filters: [{ type: "eq", col: "status", val: "ON" }],
-  });
-
-  if (closeError) throw closeError;
-
-  const { data, error } = await adminCatalogWrite({
-    table: "broadcasts",
-    op: "update",
-    values: { status: "ON", started_at: nowIso },
-    filters: [{ type: "eq", col: "id", val: broadcastId }],
-    select: "*",
-    single: true,
-  });
-
-  if (error) throw error;
-
-  await safeUpsertSetting("broadcast_status", "ON");
-  await safeUpsertSetting("current_broadcast_name", String(data?.public_title || ""));
-
-  return data as AdminLiveBroadcast;
+  if (!broadcastId) throw new Error("시작할 방송 ID를 선택해주세요.");
+  return broadcastLifecycle("activate", { broadcastId });
 }
 
 // 방송 껍데기 미리 만들기(켜지 않음). status:"OFF"로 insert만 — 기존 ON 방송은 절대 안 건드린다.
 // settings(broadcast_status/current_broadcast_name)도 안 바꾼다(현재 방송 상태 유지). 정산/수수료 컬럼은 default 그대로.
 export async function createDraftBroadcast(title: string) {
   const cleanTitle = String(title || "").trim();
-
-  if (!cleanTitle) {
-    throw new Error("방송 제목을 입력해주세요.");
-  }
-
-  const payload = {
-    public_title: cleanTitle,
-    admin_subtitle: "",
-    status: "OFF",
-    started_at: null,
-    ended_at: null,
-    shipping_fee: 4000,
-    youtube_live_url: "",
-    youtube_live_enabled: false,
-    order_form_enabled: true,
-    is_deleted: false,
-  };
-
-  const { data, error } = await adminCatalogWrite({
-    table: "broadcasts",
-    op: "insert",
-    values: payload,
-    select: "*",
-    single: true,
-  });
-
-  if (error) throw error;
-
-  return data as AdminLiveBroadcast;
+  if (!cleanTitle) throw new Error("방송 제목을 입력해주세요.");
+  return broadcastLifecycle("createDraft", { title: cleanTitle });
 }
 
 export async function updateAdminLiveBroadcast(input: UpdateBroadcastInput) {
@@ -309,27 +224,8 @@ export async function setBroadcastFeedNotice(broadcastId: string, text: string) 
 }
 
 export async function endAdminLiveBroadcast(broadcastId: string) {
-  if (!broadcastId) {
-    throw new Error("종료할 방송 ID가 없습니다.");
-  }
-
-  const nowIso = new Date().toISOString();
-
-  const { data, error } = await adminCatalogWrite({
-    table: "broadcasts",
-    op: "update",
-    values: { status: "OFF", ended_at: nowIso, order_form_enabled: false, ...WIDGET_PIN_CLEAR },
-    filters: [{ type: "eq", col: "id", val: broadcastId }],
-    select: "*",
-    single: true,
-  });
-
-  if (error) throw error;
-
-  await safeUpsertSetting("broadcast_status", "OFF");
-  await safeUpsertSetting("current_broadcast_name", "");
-
-  return data as AdminLiveBroadcast;
+  if (!broadcastId) throw new Error("종료할 방송 ID가 없습니다.");
+  return broadcastLifecycle("end", { broadcastId });
 }
 
 // 쇼핑몰 열기/닫기 — settings.shop_open 영속(기존 safeUpsertSetting 재사용). 다른 키 안 건드림.

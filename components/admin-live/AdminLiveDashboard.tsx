@@ -57,7 +57,6 @@ import {
   isBroadcastPausedNow,
   setBroadcastFeedPin,
   setShopOpen,
-  startAdminLiveBroadcast,
   updateAdminLiveBroadcast,
   type AdminLiveBroadcast,
 } from "./liveBroadcastController";
@@ -1216,7 +1215,7 @@ export default function AdminLiveDashboard() {
     if (!activeBroadcast) return;
     setBroadcastTitle(activeBroadcast.public_title || "루루동이LIVE");
     setBroadcastYoutubeUrl(activeBroadcast.youtube_live_url || "");
-  }, [activeBroadcast?.id, activeBroadcast?.youtube_live_url]);
+  }, [activeBroadcast?.id, activeBroadcast?.public_title, activeBroadcast?.youtube_live_url]);
 
   // 등록/수정 폼 닫힘 → 상품관리 팝업 자동 복귀
   useEffect(() => {
@@ -1570,21 +1569,13 @@ export default function AdminLiveDashboard() {
     setSavingBroadcast(true);
 
     try {
-      // 준비된 OFF 껍데기(started_at 없음)가 있으면 그걸 켠다(새 row 안 만듦). 없으면 기존대로 새 방송 생성.
-      const draft = broadcasts
-        .filter(
-          (b) =>
-            String(b.status || "").toUpperCase() === "OFF" &&
-            !b.started_at &&
-            b.is_deleted !== true,
-        )
-        .sort((a, b) => String(b.created_at || b.id).localeCompare(String(a.created_at || a.id)))[0];
-
-      if (draft) {
-        await activateBroadcast(draft.id);
-      } else {
-        await startAdminLiveBroadcast(input);
+      // No heuristic/latest-draft lookup: the operator must explicitly select an ID.
+      const target = broadcasts.find((b) => b.id === confirmInput.broadcastId);
+      if (!target || String(target.status || "").toUpperCase() !== "OFF" ||
+          target.started_at || target.is_deleted === true) {
+        throw new Error("선택한 방송이 이미 시작됐거나 목록에서 변경되었습니다. 새로고침 후 다시 선택해주세요.");
       }
+      await activateBroadcast(target.id);
       setBroadcastStartDraft(null);
 
       // 미션 — 방송이 ON 이 된 다음에 저장해야 앵커가 이번 방송으로 잡힌다
@@ -2165,7 +2156,7 @@ export default function AdminLiveDashboard() {
 
           {/* [2026-10-21 a4-1] 방송 관리 창 — 옛 「방송」 메뉴의 컨트롤타워 그대로(핸들러 동일), 자리만 창으로 */}
           {broadcastManageOpen ? (
-            <AdminLiveSideDrawer title="방송 관리" width={560} onClose={() => setBroadcastManageOpen(false)}>
+            <AdminLiveSideDrawer title="현재 방송 설정" width={560} onClose={() => setBroadcastManageOpen(false)}>
               <div className="space-y-3 p-3">
                 <LiveHeader
                   activeBroadcast={activeBroadcast}
@@ -2193,6 +2184,7 @@ export default function AdminLiveDashboard() {
           <LiveBroadcastStartModal
             open={Boolean(broadcastStartDraft)}
             broadcastTitle={broadcastStartDraft?.title || broadcastTitle}
+            drafts={broadcasts.filter((b) => String(b.status || "").toUpperCase() === "OFF" && !b.started_at && b.is_deleted !== true).map((b) => ({ id: b.id, title: b.public_title || "제목 없음" }))}
             saving={savingBroadcast}
             onCancel={() => setBroadcastStartDraft(null)}
             onConfirm={confirmStartBroadcast}

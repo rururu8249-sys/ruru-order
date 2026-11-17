@@ -67,6 +67,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ data: null, error: { message: `잘못된 op: ${op}` } }, { status: 400 });
     }
 
+    // Broadcast lifecycle must be atomic. Do not allow the general catalog
+    // proxy to create/start/end broadcasts through arbitrary partial writes.
+    if (table === "broadcasts") {
+      const vals = body?.values as Record<string, unknown> | null | undefined;
+      const dangerous = ["status", "started_at", "ended_at"];
+      if (op === "insert" || op === "upsert" || op === "delete" ||
+          (vals && (Array.isArray(vals) || dangerous.some((key) => Object.prototype.hasOwnProperty.call(vals, key))))) {
+        return NextResponse.json({ data: null, error: { message: "방송 생성·시작·종료는 방송 관리 전용 경로를 사용해주세요." } }, { status: 409 });
+      }
+    }
+
     const supabase = getServiceClient();
     // [2026-10-26 재고 흐름] 관리자가 재고를 고치면 저장 전후를 비교해 «기록만» 남긴다(저장 자체는 아래 그대로).
     const who = String((session as any)?.sub || "admin");

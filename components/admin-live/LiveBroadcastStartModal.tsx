@@ -19,6 +19,8 @@ export type MissionStartInput = {
 };
 
 export type BroadcastStartConfirmInput = {
+  /** 서버에서 검증할 정확한 방송 ID. 이름/최근 순으로 추측 금지. */
+  broadcastId: string;
   /** null 이면 이번 방송은 미션 없음 */
   mission: MissionStartInput | null;
 };
@@ -26,6 +28,7 @@ export type BroadcastStartConfirmInput = {
 type Props = {
   open: boolean;
   broadcastTitle: string;
+  drafts: Array<{ id: string; title: string }>;
   saving: boolean;
   onCancel: () => void;
   onConfirm: (input: BroadcastStartConfirmInput) => void | Promise<void>;
@@ -41,17 +44,20 @@ function withComma(v: string) {
   return d ? Number(d).toLocaleString("ko-KR") : "";
 }
 
-export default function LiveBroadcastStartModal({ open, broadcastTitle, saving, onCancel, onConfirm }: Props) {
+export default function LiveBroadcastStartModal({ open, drafts, saving, onCancel, onConfirm }: Props) {
   const [missionOn, setMissionOn] = useState(false);
   const [goalType, setGoalType] = useState<MissionGoalType>("amount");
   const [goalValue, setGoalValue] = useState("");
   const [rewardAmount, setRewardAmount] = useState("");
   const [missionTitle, setMissionTitle] = useState("");
   const [error, setError] = useState("");
+  const [selectedBroadcastId, setSelectedBroadcastId] = useState("");
+  const selectedDraft = drafts.find((draft) => draft.id === selectedBroadcastId);
 
   // 열릴 때마다 마지막 값 불러오기(다음 틱 — 서버 렌더와 안 어긋나게)
   useEffect(() => {
     if (!open) return;
+    setSelectedBroadcastId("");
     const timer = window.setTimeout(() => {
       setError("");
       try {
@@ -78,6 +84,10 @@ export default function LiveBroadcastStartModal({ open, broadcastTitle, saving, 
 
   const confirm = async () => {
     setError("");
+    if (!selectedDraft) {
+      setError("시작할 방송을 목록에서 직접 선택해주세요. 선택한 방송만 켜집니다.");
+      return;
+    }
     let mission: MissionStartInput | null = null;
     if (missionOn) {
       if (goalNum <= 0) {
@@ -94,7 +104,7 @@ export default function LiveBroadcastStartModal({ open, broadcastTitle, saving, 
     } catch {
       /* 무시 */
     }
-    await onConfirm({ mission });
+    await onConfirm({ mission, broadcastId: selectedDraft.id });
   };
 
   const segBtn = (activeSeg: boolean) =>
@@ -111,10 +121,21 @@ export default function LiveBroadcastStartModal({ open, broadcastTitle, saving, 
         <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">방송을 시작할까요?</h2>
         <div className="mt-3 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm font-bold text-ink">
           <div className="text-[11px] font-black text-ink-mute">방송 제목</div>
-          <div className="mt-0.5 text-base font-black text-ink">{broadcastTitle || "제목 없음"}</div>
+          <div className="mt-0.5 text-base font-black text-ink">{selectedDraft?.title || "방송을 선택해 주세요"}</div>
           <div className="mt-2 text-xs font-bold leading-5 text-ink-soft">
             지금부터 들어오는 주문이 이 방송으로 묶입니다. 켜져 있던 방송이 있으면 자동으로 종료됩니다.
           </div>
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-line bg-surface px-4 py-3">
+          <label htmlFor="ruru-start-broadcast-id" className="block text-sm font-black text-ink">① 시작할 방송 선택 <span className="text-danger-tx">필수</span></label>
+          <select id="ruru-start-broadcast-id" aria-label="시작할 방송 선택" value={selectedBroadcastId} onChange={(e) => { setSelectedBroadcastId(e.target.value); setError(""); }} className="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink focus:border-rose-deep">
+            <option value="">방송 목록에서 선택</option>
+            {drafts.map((draft) => <option key={draft.id} value={draft.id}>{draft.title}</option>)}
+          </select>
+          <p className="mt-2 text-xs leading-5 text-ink-mute">
+            {drafts.length === 0 ? "시작할 방송이 없어요. 상품 → 방송 상품 → + 새 방송에서 먼저 등록하세요." : "방송 제목만 같아도 다른 방송일 수 있어요. 선택한 방송 ID만 시작합니다."}
+          </p>
         </div>
 
         {/* 미션 게이지 */}
@@ -201,7 +222,7 @@ export default function LiveBroadcastStartModal({ open, broadcastTitle, saving, 
           <button
             type="button"
             onClick={() => void confirm()}
-            disabled={saving}
+            disabled={saving || !selectedDraft}
             className="rounded-2xl bg-rose-deep px-5 py-3 text-sm font-black text-white shadow-sm transition hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
           >
             {saving ? "시작 중..." : missionOn ? "방송 시작 · 미션 켜기" : "방송 시작"}

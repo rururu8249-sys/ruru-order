@@ -229,7 +229,7 @@ export default function AdminLiveSidebar({
               ) : (
                 <button type="button" disabled={broadcastCard.saving} onClick={() => { broadcastCard.onStart(); onCloseNav?.(); }} className="h-9 rounded-lg bg-ink text-[13px] font-bold text-white transition disabled:opacity-50">방송 시작</button>
               )}
-              <button type="button" onClick={() => { broadcastCard.onManage(); onCloseNav?.(); }} className="h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2">방송 관리</button>
+              <button type="button" onClick={() => { broadcastCard.onManage(); onCloseNav?.(); }} className="h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2">현재 방송 설정</button>
             </div>
             {/* [2026-11-13] 자동 테스트 주문 — 스위치 하나 · 지금 테스트 · 테스트 주문 삭제 */}
             {broadcastOn ? <AutoTestOrderSettings /> : null}
