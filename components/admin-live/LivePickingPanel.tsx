@@ -137,6 +137,37 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
   const [periodLoading, setPeriodLoading] = useState(Boolean(broadcastId && !selectionMode));
   const [periodError, setPeriodError] = useState("");
   const [periodView, setPeriodView] = useState<"latest" | "previous" | "all">("all");
+  const [manualSplitOpen, setManualSplitOpen] = useState(false);
+  const [manualSplitAt, setManualSplitAt] = useState("");
+  const [manualSplitSaving, setManualSplitSaving] = useState(false);
+  const [manualSplitError, setManualSplitError] = useState("");
+  const saveManualSplit = async () => {
+    if (!broadcastId || manualSplitSaving) return;
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(manualSplitAt)) {
+      setManualSplitError("오전·저녁을 나눌 날짜와 시각을 입력해 주세요."); return;
+    }
+    const splitDate = new Date(`${manualSplitAt}:00+09:00`);
+    if (!Number.isFinite(splitDate.getTime()) || new Date(splitDate.getTime() + 9*60*60*1000).toISOString().slice(0,16) !== manualSplitAt) {
+      setManualSplitError("날짜와 시각을 다시 확인해 주세요."); return;
+    }
+    setManualSplitSaving(true); setManualSplitError("");
+    try {
+      const res = await fetch("/api/admin-live/broadcast-periods", {
+        method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",
+        body:JSON.stringify({action:"manualSplit",broadcastId,splitAt:splitDate.toISOString()})
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.ok) throw new Error(result?.message || "시각을 저장하지 못했어요.");
+      const read = await fetch(`/api/admin-live/broadcast-periods?${new URLSearchParams({broadcastId})}`,{cache:"no-store"});
+      const refreshed = await read.json().catch(() => null);
+      if (!read.ok || !refreshed?.ok || !Array.isArray(refreshed.periods) || refreshed.periods.length < 2)
+        throw new Error("구분은 저장됐지만 목록 갱신에 실패했어요. 창을 닫았다 다시 열어 주세요.");
+      setPeriods(refreshed.periods);
+      setPeriodView("latest"); setManualSplitOpen(false);
+      setPageIdx({product:0,customer:0}); setListOpen(false);
+    } catch (e) { setManualSplitError(e instanceof Error ? e.message : "저장에 실패했어요."); }
+    finally { setManualSplitSaving(false); }
+  };
   useEffect(() => {
     if (!broadcastId || selectionMode) { setPeriods([]); setPeriodView("all"); setPeriodLoading(false); return; }
     let alive = true;
@@ -581,9 +612,27 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
             {activePeriod ? <span className="text-[11px] text-ink-mute">{periodName(activePeriod,periods)} · {periodTimeLabel(activePeriod)}부터</span> : null}
             {periodLoading ? <span className="text-[11px] text-ink-mute">구간 확인 중…</span> : null}
             {periodError ? <span className="text-[11px] text-danger-tx">{periodError}</span> : null}
-            {!periodLoading && !periodError && periods.length === 0 ? <span className="text-[11px] text-ink-mute">재개 기록 없음 · 전체 주문 표시</span> : null}
+            {!periodLoading && !periodError && periods.length === 0 ? <span className="text-[11px] text-ink-mute">재개 기록 없음 · 아래에서 구분 시각을 지정할 수 있어요</span> : null}
             {activePeriod ? <span className="text-[11px] text-ink-mute">늦은 입금·재챙김은 방송 전체에서 확인</span> : null}
           </div> : null}
+          {!selectionMode && broadcastId && !scopeTooWide && !periodLoading && !periodError && periods.length < 2 ? (
+            <div className="mt-2 rounded-lg border border-line bg-surface px-3 py-2">
+              {!manualSplitOpen ? (
+                <button type="button" onClick={() => {setManualSplitOpen(true);setManualSplitError("");}} className="min-h-10 text-[13px] font-bold text-ink underline underline-offset-2">기존 방송 오전·저녁 나누기 (구분 시각 지정)</button>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="manual-picking-split" className="text-[13px] font-bold text-ink">저녁 방송이 시작된 시각 · 한국시간</label>
+                  <input id="manual-picking-split" type="datetime-local" value={manualSplitAt} onChange={e=>setManualSplitAt(e.target.value)} className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 text-[16px] text-ink" />
+                  <p className="text-[12px] text-ink-soft">입력한 시각 전 주문은 1차, 이후 주문은 2차로 표시합니다. 주문·입금·챙김 기록은 변경되지 않아요.</p>
+                  {manualSplitError ? <p role="alert" className="text-[12px] font-semibold text-danger-tx">{manualSplitError}</p> : null}
+                  <div className="flex gap-2">
+                    <button type="button" disabled={manualSplitSaving || !manualSplitAt} onClick={() => void saveManualSplit()} className="min-h-10 rounded-lg bg-ink px-4 text-[13px] font-bold text-white disabled:opacity-40">{manualSplitSaving ? "저장 중…" : "구간 저장"}</button>
+                    <button type="button" disabled={manualSplitSaving} onClick={() => {setManualSplitOpen(false);setManualSplitError("");}} className="min-h-10 rounded-lg border border-line px-4 text-[13px] text-ink">취소</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
           {!scopeTooWide ? (
             <div className="mt-3 flex flex-col max-sm:mt-1.5">
               {/* [2026-11-03 사장님 「18개가 미입금 포함이야?」] 숫자 3칸(결제완료·챙김·남은) + 미입금은 따로 한 줄 — 숫자 계산 무변경 */}

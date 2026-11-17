@@ -3,7 +3,7 @@ export type BroadcastWorkPeriod = {
   broadcast_id: string;
   started_at: string;
   ended_at: string | null;
-  source: "initial" | "resume";
+  source: "initial" | "resume" | "manual";
 };
 
 export function periodAt(when: string | null | undefined, periods: readonly BroadcastWorkPeriod[]): BroadcastWorkPeriod | null {
