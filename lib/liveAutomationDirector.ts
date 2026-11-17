@@ -11,7 +11,7 @@ import {AUTOMATION_OWNER} from './liveAutomation';
 import {automationRpc,type Action,type Campaign,type Session,type Actor} from './liveAutomationServer';
 import {automationPost} from './liveAutomationTransport';
 import {streamModeOf} from './autoTestOrderServer';
-import {judgeTestChat,type ChatObservation} from './liveAutomationQualityGate'; // RURU_QUALITY_GATE_V1
+import {judgeTestChat,canContinueTestConversation,type ChatObservation} from './liveAutomationQualityGate'; // RURU_QUALITY_GATE_V1
 import {unsupportedProductCode,unsuitableSpeech} from './liveAutomationSpeech';
 import {falseExperience} from './liveAutomationDialogue';
 import {mentionsNickname} from './liveAutomationConversation';
@@ -273,7 +273,11 @@ async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:strin
  // RURU_CONTEXT_FLOW_20261118: 4,800줄 말투 자료는 발화 양을 강제하지 않는다.
  // 주문 이벤트·실제 질문 답은 유지하고, 맥락 없는 자동 인사/맞장구/잡담은 느리게 보낸다.
  const priority=/주문서|주문 알림|종료 인사|카결/.test(label);
- if(!priority){
+ // The last visible non-bot message must be the exact message this reply belongs to.
+ // Follow-ups may use 8-90s, while unrelated spontaneous messages retain the 90/240s rule.
+ const lastNonBot=x.messages.find(m=>m.badge!=='bot');
+ const linkedFollowUp=canContinueTestConversation({mode:x.mode,now:x.now,actorId:String(actor.id),replyToMessageId:Number(plan.replyToAi||0),lastMessage:lastNonBot?{id:Number(lastNonBot.id),actorId:String(lastNonBot.automation_actor_id||''),at:Date.parse(String(lastNonBot.created_at||''))}:null});
+ if(!priority&&!linkedFollowUp){
    const last=x.messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').reduce((v,m)=>Math.max(v,Date.parse(String(m.created_at))||0),0);
    const minGap=x.live?90000:240000;
    if(last&&x.now-last<minGap)return false;
@@ -286,7 +290,7 @@ async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:strin
  if(latestMode!==x.mode)return false;
  const latestCard=await readDialogueCard(x.db,x.c.broadcast_id).catch(()=>null);
  const recentForGate:ChatObservation[]=x.messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||'')}));
- const quality=judgeTestChat({text,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:kind==='reply'&&source!==null,recent:recentForGate});
+ const quality=judgeTestChat({text,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:(kind==='reply'&&source!==null)||linkedFollowUp,recent:recentForGate});
  if(!quality.ok)return false;
  try{await automationRpc(x.db,'live_automation_ai_admission',{p_actor:actor.id,p_kind:kind});}catch{return false;}
  const action=await automationRpc<Action>(x.db,'live_automation_action',{p_session:s.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,...plan},p_manual:false,p_source:source,p_revision:x.c.revision});
@@ -485,7 +489,7 @@ async function smallTalkAnswerFlow(x:CodeCtx,holds:Row[]):Promise<boolean>{
  const ordered=x.orders.some(o=>String(o.automation_actor_id)===String(actor.id));
  const cart=x.sessions.some(s=>s.actor_id===actor.id&&holdSessions.has(String(s.id)));
  const text=personaVoice(smallTalkAnswer(t,qid,{cart,ordered}),seedOf(actor),qid);
- return postCodeLine(x,actor,'chat',text,{smallTalk:t.id,role:'a',answerOf:qa.id},null,'손님끼리 답');
+ return postCodeLine(x,actor,'chat',text,{smallTalk:t.id,role:'a',answerOf:qa.id,replyToAi:qid},null,'손님끼리 답');
 }
 
 /** [2026-11-15 14:49 사장님] 할 말 없을 때 이모지만(👍·😍·💕💕…) — 방 전체 5분에 한 번 */

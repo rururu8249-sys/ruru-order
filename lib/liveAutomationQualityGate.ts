@@ -46,3 +46,15 @@ export function judgeTestChat(q:QualityInput):QualityResult {
  }
  return {ok:true,intent};
 }
+
+/** Only a directly anchored second turn can bypass the general conversation gap.
+ * Unrelated greetings and self-replies are never treated as conversational continuations. */
+export function canContinueTestConversation(q:{
+ mode:StreamPhase;now:number;actorId:string;replyToMessageId:number;
+ lastMessage:{id:number;actorId:string;at:number}|null;
+}):boolean {
+ if(q.mode!=='live'||!q.lastMessage||!Number.isSafeInteger(q.replyToMessageId)||q.replyToMessageId<=0)return false;
+ const last=q.lastMessage;
+ return last.id===q.replyToMessageId&&last.actorId.length>0&&last.actorId!==q.actorId&&
+  Number.isFinite(last.at)&&q.now-last.at>=8000&&q.now-last.at<=90000;
+}
