@@ -17,7 +17,7 @@ export function LiveFeaturedProductCard({product, count, label = '지금 소개�
 }) {
   if (!product || count < 1) return null;
   return <div data-featured-product-card style={{pointerEvents: 'auto', flexShrink: 0, width: '100%', maxWidth: 360, boxSizing: 'border-box', borderRadius: 14, background: '#fff', color: '#111', overflow: 'hidden', boxShadow: '0 2px 12px #0002', display: 'flex', alignItems: 'stretch'}}>
-    <style>{`@keyframes ruruCardIn{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:none}}@media (prefers-reduced-motion: reduce){[data-featured-swap]{animation:none!important}}`}</style>
+    <style>{`@keyframes ruruCardIn{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:none}}@media (prefers-reduced-motion: reduce){[data-featured-swap]{animation:none!important}}@media (max-width: 1023px){[data-featured-product-card]{max-width:none!important;border-radius:12px!important;}[data-featured-swap]{min-height:48px!important;padding:3px 8px!important;gap:8px!important;}[data-featured-image]{width:38px!important;height:38px!important;border-radius:6px!important;}[data-featured-label]{display:none!important;}[data-featured-name]{font-size:13px!important;line-height:17px!important;}[data-featured-price]{font-size:14px!important;line-height:17px!important;}[data-featured-action]{min-height:36px!important;padding:0 11px!important;font-size:12px!important;white-space:nowrap;}}@media (max-width: 359px){[data-featured-action]{padding:0 7px!important;font-size:11px!important;}[data-featured-image]{width:34px!important;height:34px!important;}}`}</style>
     <button key={keyOf(product)} data-featured-swap type="button" disabled={product.soldOut} onClick={() => count > 1 ? onShowProducts() : onOpen(product.id, product.detailName)} aria-label={`${product.name} 상품 선택`}
       style={{flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', border: 0, background: 'transparent', color: 'inherit', textAlign: 'left', fontFamily: 'inherit', cursor: product.soldOut ? 'default' : 'pointer', animation: 'ruruCardIn .32s ease-out'}}>
       <span data-featured-image style={{width: 52, height: 52, flexShrink: 0, background: '#f5f5f5', borderRadius: 8, overflow: 'hidden'}}>
@@ -26,10 +26,10 @@ export function LiveFeaturedProductCard({product, count, label = '지금 소개�
       </span>
       <span style={{minWidth: 0, flex: 1, display: 'grid', gap: 1}}>
         <span data-featured-label style={{fontSize: 11, lineHeight: '13px', color: '#9b3600', fontWeight: 700}}>{label}</span>
-        <span style={{fontSize: 14, lineHeight: '18px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{product.name}</span>
-        <span style={{fontSize: 15, lineHeight: '19px', fontWeight: 800}}>{product.priceText}</span>
+        <span data-featured-name style={{fontSize: 14, lineHeight: '18px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{product.name}</span>
+        <span data-featured-price style={{fontSize: 15, lineHeight: '19px', fontWeight: 800}}>{product.priceText}</span>
       </span>
-      <span style={{flexShrink: 0, minHeight: 40, padding: '0 14px', borderRadius: 24, background: product.soldOut ? '#E5E5E5' : '#111', color: product.soldOut ? '#707072' : '#fff', display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 700}}>{product.soldOut ? '품절' : '상품 선택'}</span>
+      <span data-featured-action style={{flexShrink: 0, minHeight: 40, padding: '0 14px', borderRadius: 24, background: product.soldOut ? '#E5E5E5' : '#111', color: product.soldOut ? '#707072' : '#fff', display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 700}}>{product.soldOut ? '품절' : '상품 선택'}</span>
     </button>
     {onHide ? <button type="button" onClick={onHide} aria-label="사이트 상품 카드 끄기 (관리자)" title="손님 화면에서 이 카드를 숨겨요"
       style={{flexShrink: 0, width: 48, border: 0, borderLeft: '1px solid #eee', background: '#f5f5f5', color: '#707072', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2}}>

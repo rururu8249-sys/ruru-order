@@ -382,7 +382,7 @@ const YT_EDGE_CROP = 0;
 
 export default function LiveWatchView(props: Props) {
   // Live view splits by available width, including unfolded foldables and landscape phones.
-  const isDesktop = useIsDesktop(640);
+  const isDesktop = useIsDesktop(720);
   // [2026-11-12] 관리자 유튜브 채팅창 나란히 — 넓은 PC(1024↑)에서만
   const isWidePc = useIsDesktop(1024);
   // 이 화면이 열려 있는 동안 접속 신호에 «방송 보는 중» 표식(닫히면 다음 신호에서 빠짐)
@@ -1043,7 +1043,7 @@ export default function LiveWatchView(props: Props) {
   // 사장님 유튜브 비교 화면처럼 넓은 PC에서는 채팅에 약 1/3을 배정한다.
   // [2026-11-12 사장님 22:34] 관리자(채팅 관리 권한)는 넓은 PC에서 유튜브 채팅창을 사이트 채팅 옆에 나란히 — 두 칸이면 조금 좁게
   const adminDual = Boolean(isWidePc && (viewCanManage || (!chat?.canManage && chat?.canQuickPhrases)) && videoId);
-  const desktopChatWidth = adminDual ? "clamp(260px, 24vw, 440px)" : "clamp(280px, 35vw, 560px)";
+  const desktopChatWidth = adminDual ? "clamp(260px, 24vw, 440px)" : isWidePc ? "clamp(280px, 35vw, 560px)" : "clamp(260px, 33vw, 330px)";
   const videoRight = isDesktop && !focus ? (adminDual ? `calc(${desktopChatWidth} * 2)` : desktopChatWidth) : 0;
   // [11:46 사장님] 자주 쓰는 말 판이 열려 있으면 영상 칸을 그만큼 좁혀 영상이 왼쪽으로 가고, 판은 영상과 채팅 사이 빈칸에(영상 안 가림)
   const [quickOpen, setQuickOpen] = useState(false);
@@ -1272,7 +1272,7 @@ export default function LiveWatchView(props: Props) {
       {/* PC 영상 영역 / 폰은 기존 화면 전체 배치 */}
       <div data-live-video="1" style={isDesktop ? { position: "absolute", left: 0, right: videoAreaRight, top: 0, bottom: 0, overflow: "hidden" } : { display: "contents" }}>
       {/* [2026-11-15 06:09] 영상은 원본 크기 그대로(자르기·키우기 없음). */}
-      <div style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", overflow: "hidden", containerType: "size", background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 72px - env(safe-area-inset-bottom))` : "calc(100% - 72px - env(safe-area-inset-bottom))", overflow: "hidden", containerType: "size", background: "#000000", transform: isDesktop || videoScale === 1 ? "none" : `scale(${videoScale})`, transformOrigin: "50% 50%", transition: "transform 0.2s" }}>
         <iframe
           ref={iframeRef}
           key={`${videoId}-${reloadKey}`}
@@ -1487,7 +1487,7 @@ export default function LiveWatchView(props: Props) {
           </div>
         </div>
       ) : null}
-      <div data-live-chat-panel="1" data-live-rps-layout={rpsActive ? "1" : "0"} data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : bottomBarHeight === null ? "calc(78px + env(safe-area-inset-bottom))" : `${bottomBarHeight + 4}px`, flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: rpsActive ? rpsOverlayBottom ? `max(0px, calc(100% - ${rpsOverlayBottom + (bottomBarHeight ?? 78) + 16}px))` : "28dvh" : "60dvh" }) }}>
+      <div data-live-chat-panel="1" data-live-rps-layout={rpsActive ? "1" : "0"} data-live-seek={!isDesktop && seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: isDesktop ? "auto" : "16px", right: isDesktop ? 0 : "16px", bottom: isDesktop ? 0 : bottomBarHeight === null ? "calc(78px + env(safe-area-inset-bottom))" : `${bottomBarHeight + 4}px`, flexDirection: "column", gap: "8px", pointerEvents: isDesktop ? "auto" : "none", opacity: !isDesktop && seekMode ? 0.06 : 1, transition: "opacity 0.2s", ...(isDesktop ? { top: 0, width: desktopChatWidth, padding: "0 16px", boxSizing: "border-box", borderLeft: "1px solid #333333", background: "#0F0F0F", minHeight: 0 } : { maxHeight: rpsActive ? rpsOverlayBottom ? `max(0px, calc(100% - ${rpsOverlayBottom + (bottomBarHeight ?? 78) + 16}px))` : "28dvh" : "min(52dvh, 460px)" }) }}>
         {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
           <span style={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>루루동이 실시간 채팅</span>
           {chat?.canManage ? <button type="button" onClick={() => { setOperatorMode(v => !v); setQuickOpen(false); setWatchersOpen(false); setModTarget(null); setChatMenu(null); }} aria-label={operatorMode ? "시청자 모드로 보기" : "관리자 모드로 돌아가기"} style={{ fontSize: 12, padding: "6px 9px", border: "1px solid #555", borderRadius: 8, background: operatorMode ? "#303030" : "#fff", color: operatorMode ? "#fff" : "#111", cursor: "pointer", whiteSpace: "nowrap" }}>{operatorMode ? "시청자 모드" : "관리자 복귀"}</button> : null}
@@ -1625,7 +1625,7 @@ export default function LiveWatchView(props: Props) {
       {rpsAdminOpen && !viewerMode && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onSaved={() => { if (!rps.state?.id || rps.state.status === 'closed') setRpsLaunchKey(rpsSetupKey); }} onClose={() => setRpsAdminOpen(false)}/>}
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
-      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
+      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: isDesktop ? "8px 12px calc(8px + env(safe-area-inset-bottom))" : "6px 10px calc(6px + env(safe-area-inset-bottom))", display: "flex", flexWrap: isDesktop ? "wrap" : "nowrap", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
         {!isDesktop && !composeOpen && !focus && !viewerMode ? <AutomationNicknamePicker state={manualChat} dark disabled={sending} /> : null}
         {/* [2026-11-12 사장님 그립 참고] 폰 = 가게 그림 + 빨간 숫자 + 「상품」(옆 주문서·더보기와 같은 모양), PC = 예전 넓은 버튼 */}
         {!isDesktop ? (
