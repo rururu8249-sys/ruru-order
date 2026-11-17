@@ -53,6 +53,7 @@ import { ChatProductThumb } from "./ChatProductThumb";
 import { chatProductPhoto } from "@/lib/chatProductPhoto";
 import { LiveWelcomeChip } from "./LiveWelcomeChip";
 import { AUTO_TEST_AVATAR } from "@/lib/autoTestOrder";
+import { isTestOnlyLine } from "@/lib/liveAutomationLines";
 import { useManualAutomationChat } from "@/lib/useManualAutomationChat";
 import type { ManualChatSelection } from "@/lib/liveAutomationManualChat";
 import { AutomationNicknamePicker } from "./AutomationNicknamePicker";
@@ -386,6 +387,7 @@ export default function LiveWatchView(props: Props) {
   const isDesktop = useIsDesktop(640);
   // [2026-11-12] 관리자 유튜브 채팅창 나란히 — 넓은 PC(1024↑)에서만
   const isWidePc = useIsDesktop(1024);
+  const isSpaciousPc = useIsDesktop(1600);
   // 이 화면이 열려 있는 동안 접속 신호에 «방송 보는 중» 표식(닫히면 다음 신호에서 빠짐)
   useEffect(() => { setLiveWatching(true); return () => setLiveWatching(false); }, []);
   const { videoId, title, paused, pausedText, pinned, items, cartCount, cartTotalText, orderToasts } = props;
@@ -436,8 +438,18 @@ export default function LiveWatchView(props: Props) {
   const chat = props.chat ?? null;
   const [operatorMode, setOperatorMode] = useState(true);
   const viewCanManage = Boolean(operatorMode && chat?.canManage);
+  const viewerMode = Boolean(chat?.canManage && !operatorMode);
+  const [operatorDockOpen, setOperatorDockOpen] = useState(false);
+  // A viewer preview must not expose staff-only chat rows or test actors.
+  // Server permissions are unchanged; this only controls the visible preview.
+  const visibleChatMessages = useMemo(() => {
+    const rows = chat?.messages ?? [];
+    if (!viewerMode) return rows;
+    return rows.filter(m => !m.privateCommand && !m.deletedByAuthor &&
+      !(m.avatar === "autotest" || /^\[테스트\]/.test(m.nickname) || isTestOnlyLine(m.body)));
+  }, [chat?.messages, viewerMode]);
   const [composeOpen, setComposeOpen] = useState(false);
-  const manualChat = useManualAutomationChat(props.broadcastId || "", Boolean(chat?.canWrite));
+  const manualChat = useManualAutomationChat(props.broadcastId || "", Boolean(chat?.canWrite && !viewerMode));
   // PC는 상시 입력칸. 폰 쓰기 창을 연 채 PC 폭으로 바뀌면 방문 기록도 기존 정리 절차로 되돌린다.
   useEffect(() => { if (isDesktop) setComposeOpen(false); setEmojiOpen(false); }, [isDesktop]);
   const downAt = useRef<{ x: number; y: number } | null>(null);
@@ -654,11 +666,11 @@ export default function LiveWatchView(props: Props) {
     if (!greetOpen) { setGreetingAnchor(null); return; }
     setGreetingAnchor(anchor => anchor ?? {afterId: chat?.messages.at(-1)?.id ?? null});
   }, [greetOpen, chat?.messages]);
-  const hasChat = (chat?.messages.length ?? 0) > 0;
-  const chatColorMap = useMemo(() => chatColors(chat?.messages ?? []), [chat?.messages]);
+  const hasChat = visibleChatMessages.length > 0;
+  const chatColorMap = useMemo(() => chatColors(visibleChatMessages), [visibleChatMessages]);
   // 80개 상한에서도 내용 변경·그림 로드·화면 크기를 추적. 사용자가 지난 글을 읽을 때만 멈춘다.
   const { boxRef: chatBoxRef, contentRef: chatContentRef, atBottom: chatAtBottom, followLatest: chatToBottom } = useChatAutoScroll(
-    chat?.messages, `${isDesktop}:${focus}:${chatView.size}:${chatView.height}:${chatView.bold}`,
+    visibleChatMessages, `${isDesktop}:${focus}:${chatView.size}:${chatView.height}:${chatView.bold}:${viewerMode}`,
     Boolean(chat && (hasChat || isDesktop || greetOpen)),
   );
   useEffect(() => {
@@ -681,7 +693,7 @@ export default function LiveWatchView(props: Props) {
     if (!batch) { setDraft(""); setBeforeCaretText(""); setEmojiOpen(false); setComposeOpen(false); }
     // [2026-11-12 22:46 사장님] 인사하기 줄은 「보내기」를 눌러야만 사라짐 — 채팅을 써도 그대로
     const commandTarget = batch && target.mode === "replace" ? { ...target, intro: await introPlayer.capture() } : target;
-    const r = await (manualChat.selected && !batch
+    const r = await (manualChat.selected && !viewerMode && !batch
       ? manualChat.send(body, (text, identity) => chat.onSend(text, undefined, identity))
       : chat.onSend(body, commandTarget)).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     if (!r.ok && !batch) {
@@ -732,14 +744,14 @@ export default function LiveWatchView(props: Props) {
   const sendGreet = async () => {
     if (!chat) return;
     closeGreet();
-    const r = await (manualChat.selected ? manualChat.send("👋", (text, identity) => chat.onSend(text, undefined, identity)) : chat.onSend("👋")).catch(() => ({ ok: false, message: "못 보냈어요." }));
+    const r = await (manualChat.selected && !viewerMode ? manualChat.send("👋", (text, identity) => chat.onSend(text, undefined, identity)) : chat.onSend("👋")).catch(() => ({ ok: false, message: "못 보냈어요." }));
     if (!r.ok) setChatHint(r.message || "못 보냈어요.");
   };
   const startPress = (m: LiveChatMessage) => {
     if (m.deletedByAuthor || m.privateCommand || (!chat?.canModerate && !chat?.ownIds?.includes(m.id))) return;
     if (pressTimer.current) window.clearTimeout(pressTimer.current);
     pressTimer.current = window.setTimeout(() => {
-      if (chat?.canModerate) setModTarget(m);
+      if (!viewerMode && chat?.canModerate) setModTarget(m);
       else openChatMenu(m, downAt.current?.x ?? 16, downAt.current?.y ?? window.innerHeight - 160, false);
     }, 500);
   };
@@ -1039,8 +1051,12 @@ export default function LiveWatchView(props: Props) {
   const videoRight = isDesktop && !focus ? (adminDual ? `calc(${desktopChatWidth} * 2)` : desktopChatWidth) : 0;
   // [11:46 사장님] 자주 쓰는 말 판이 열려 있으면 영상 칸을 그만큼 좁혀 영상이 왼쪽으로 가고, 판은 영상과 채팅 사이 빈칸에(영상 안 가림)
   const [quickOpen, setQuickOpen] = useState(false);
-  const quickShown = isDesktop && !!(viewCanManage || (!chat?.canManage && chat?.canQuickPhrases)) && !focus;
-  const videoAreaRight = quickShown && quickOpen ? `calc(${videoRight || "0px"} + ${QUICK_PHRASE_COLUMN}px)` : videoRight;
+  const quickShown = isDesktop && !!(viewCanManage || (!chat?.canManage && chat?.canQuickPhrases)) && !focus && !operatorDockOpen;
+  const operatorDockEnabled = Boolean(isSpaciousPc && viewCanManage && !focus);
+  const dockSpace = operatorDockEnabled && operatorDockOpen ? 350 : 0;
+  const videoAreaRight = dockSpace
+    ? `calc(${videoRight || "0px"} + ${dockSpace}px)`
+    : quickShown && quickOpen ? `calc(${videoRight || "0px"} + ${QUICK_PHRASE_COLUMN}px)` : videoRight;
   const [pageHost, setPageHost] = useState("");
   useEffect(() => { setPageHost(window.location.hostname); }, []);
   // [2026-11-12] 관리자 — 숫자 누르면 «지금 방송 보는 사람» 목록(10초마다 새로)
@@ -1110,7 +1126,7 @@ export default function LiveWatchView(props: Props) {
             onSubmit={(e) => { e.preventDefault(); if (productPickerOpen) return; if (composingRef.current) { composingRef.current = false; inputRef.current?.blur(); } if (draftEmojiCount > EMOJI_MAX_PER_MSG) { setComposeHint(`이모티콘은 한 번에 ${EMOJI_MAX_PER_MSG}개까지예요.`); return; } setEmojiOpen(false); void sendChat(inputRef.current?.text() || undefined); }}
             style={{ position: "relative", width: "100%", maxWidth: "560px", margin: "0 auto", background: isDesktop ? "#0F0F0F" : "#FFFFFF", padding: isDesktop ? "12px 0 calc(12px + env(safe-area-inset-bottom))" : emojiOpen ? "12px 16px 0" : "12px 16px calc(12px + env(safe-area-inset-bottom))", borderRadius: isDesktop ? 0 : "16px 16px 0 0", boxSizing: "border-box", ...(isDesktop ? { position: "relative", flexShrink: 0, order: 5, borderTop: "1px solid #333333", pointerEvents: "auto" } : {}) }}
           >
-            {manualChat.available ? <div style={{ marginBottom: isDesktop ? 8 : 0 }}>
+            {manualChat.available && !viewerMode ? <div style={{ marginBottom: isDesktop ? 8 : 0 }}>
               <AutomationNicknamePicker state={manualChat} dark={isDesktop} disabled={sending} onPicked={() => { if (composeOpen && !emojiOpen) inputRef.current?.focus(); }} />
             </div> : null}
             {productPickerOpen && props.broadcastId ? <ChatProductPicker broadcastId={props.broadcastId} query={draft.trimStart().slice(1)} busy={sending} onClose={() => setDraft("")} onIntro={chat?.canModerate ? (products) => { setIntroChosen(products.map(widgetTargetKey)); setIntroManage(products[0]?.texts[0] ?? ""); setDraft(""); } : undefined} onApply={(products, mode) => { setEmojiOpen(false); void sendChat(`/선택 상품 ${products.length}개`, { targets: products.map(p => ({ productId: p.productId, detailName: p.detailName })), mode }); }} /> : null}
@@ -1246,7 +1262,10 @@ export default function LiveWatchView(props: Props) {
       {chat?.canManage && props.broadcastId ? <LiveOperatorControl
         broadcastId={props.broadcastId}
         adminMode={operatorMode}
-        onModeChange={setOperatorMode}
+        onModeChange={(mode) => { setOperatorMode(mode); if (!mode) { setOperatorDockOpen(false); setQuickOpen(false); setWatchersOpen(false); setModTarget(null); setChatMenu(null); } }}
+        desktopDock={operatorDockEnabled}
+        dockRight={videoRight || "0px"}
+        onOpenChange={setOperatorDockOpen}
         busy={sending}
         onIntroduce={async (products, options) => {
           const targets = products.map(p => ({ productId: p.productId, detailName: p.detailName }));
@@ -1490,7 +1509,7 @@ export default function LiveWatchView(props: Props) {
         {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
           <span style={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>루루동이 실시간 채팅</span>
           {/* [2026-11-12] 관리자 — 방송 보는 중 / 사이트 전체, 누르면 누가 보는지 */}
-          {chat?.canManage ? <button type="button" onClick={() => setWatchersOpen(true)} aria-label="지금 방송 보는 사람 목록 보기"
+          {viewCanManage ? <button type="button" onClick={() => setWatchersOpen(true)} aria-label="지금 방송 보는 사람 목록 보기"
             style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 10px", border: "1px solid #444444", borderRadius: "9999px", background: "#1F1F1F", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>
             <IconEyeSmall size={14} />{props.watchingViewers ?? "-"}<span style={{ color: "#AAAAAA", fontWeight: 400 }}>· 사이트 {props.siteViewers ?? "-"}</span>
           </button> : null}
@@ -1529,10 +1548,10 @@ export default function LiveWatchView(props: Props) {
           >
             <div ref={chatContentRef} style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0 }}>
             {greetingAnchor?.afterId === null ? greetingRow : null}
-            {chat.messages.map((m) => { const palette=notificationPresentation(m); const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
+            {visibleChatMessages.map((m) => { const palette=notificationPresentation(m); const color = m.badge === "bot" ? "#FFFFFF" : (chatColorMap.get(m.id) || "#FFFFFF");
               // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
               const localLine = !Number.isInteger(m.id);
-              const canMod = chat.canModerate && !localLine && !m.deletedByAuthor && !m.privateCommand;
+              const canMod = !viewerMode && chat.canModerate && !localLine && !m.deletedByAuthor && !m.privateCommand;
               const canPress = canMod || (!m.deletedByAuthor && !m.privateCommand && Boolean(chat.ownIds?.includes(m.id)));
               const botProduct = m.badge === "bot" && !m.deletedByAuthor ? parseBotRef(m.botRef) : null;
               return (
@@ -1551,7 +1570,7 @@ export default function LiveWatchView(props: Props) {
                   props.onOpenProduct(botProduct.productId, botProduct.detailName || undefined);
                 } : undefined}
                 role={botProduct ? "button" : undefined}
-                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "12px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 400, WebkitFontSmoothing: "antialiased", letterSpacing: "normal", lineHeight: CHAT_LINE_H[chatView.size], wordBreak: "break-word", textShadow: isDesktop ? "none" : CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "12px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 400, WebkitFontSmoothing: "antialiased", letterSpacing: "normal", lineHeight: CHAT_LINE_H[chatView.size], wordBreak: "break-word", textShadow: isDesktop ? "none" : CHAT_TEXT_SHADOW, userSelect: viewCanManage ? "none" : "auto", WebkitUserSelect: viewCanManage ? "none" : "auto" }}
               >
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
@@ -1598,11 +1617,11 @@ export default function LiveWatchView(props: Props) {
               if (!pinOpen && el && el.scrollWidth <= el.clientWidth + 1) return;
               setPinOpen((v) => !v);
             }}
-            onPointerDown={chat.canPin ? (e) => { if (e.button === 0) startPress(chat.pinned!); } : undefined}
-            onPointerUp={chat.canPin ? endPress : undefined}
-            onPointerLeave={chat.canPin ? endPress : undefined}
-            onPointerCancel={chat.canPin ? endPress : undefined}
-            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openChatMenu(chat.pinned!, e.clientX, e.clientY, chat.canPin && Number.isInteger(chat.pinned!.id)); }}
+            onPointerDown={!viewerMode && chat.canPin ? (e) => { if (e.button === 0) startPress(chat.pinned!); } : undefined}
+            onPointerUp={!viewerMode && chat.canPin ? endPress : undefined}
+            onPointerLeave={!viewerMode && chat.canPin ? endPress : undefined}
+            onPointerCancel={!viewerMode && chat.canPin ? endPress : undefined}
+            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openChatMenu(chat.pinned!, e.clientX, e.clientY, !viewerMode && chat.canPin && Number.isInteger(chat.pinned!.id)); }}
             style={{ ...(isDesktop ? { order: 2, flexShrink: 0, maxHeight: "30%", overflowY: "auto" } : {}), pointerEvents: "auto", display: "flex", alignItems: isDesktop && pinOpen ? "flex-start" : "center", gap: "8px", width: "100%", boxSizing: "border-box", minHeight: "44px", padding: "8px 12px", borderRadius: "22px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
           >
             <ChatProfileAvatar src={chat.pinned.avatar} nick={chat.pinned.nickname} frame={staffAvatarFrame(chat.pinned.badge)} />
@@ -1619,11 +1638,11 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {rpsActive && !focus && <div ref={rpsOverlayRef} data-live-rps-overlay className="rps-live-overlay" style={{left:isDesktop?16:12,right:isDesktop?videoAreaRight:12,paddingRight:isDesktop?16:0}}><RpsWidget key={rps.state?.id} game={rps} showSetup={rpsShowSetup} broadcastId={props.broadcastId} onAdmin={() => setRpsAdminOpen(true)}/></div>}
-      {rpsAdminOpen && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onSaved={() => { if (!rps.state?.id || rps.state.status === 'closed') setRpsLaunchKey(rpsSetupKey); }} onClose={() => setRpsAdminOpen(false)}/>}
+      {rpsAdminOpen && !viewerMode && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onSaved={() => { if (!rps.state?.id || rps.state.status === 'closed') setRpsLaunchKey(rpsSetupKey); }} onClose={() => setRpsAdminOpen(false)}/>}
 
       {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
       <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
-        {!isDesktop && !composeOpen && !focus ? <AutomationNicknamePicker state={manualChat} dark disabled={sending} /> : null}
+        {!isDesktop && !composeOpen && !focus && !viewerMode ? <AutomationNicknamePicker state={manualChat} dark disabled={sending} /> : null}
         {/* [2026-11-12 사장님 그립 참고] 폰 = 가게 그림 + 빨간 숫자 + 「상품」(옆 주문서·더보기와 같은 모양), PC = 예전 넓은 버튼 */}
         {!isDesktop ? (
           <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ flexShrink: 0, width: "44px", padding: 0, border: "none", background: "transparent", color: "#FFFFFF", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer" }}>
@@ -1691,7 +1710,7 @@ export default function LiveWatchView(props: Props) {
                   ...(chat ? [{ key: "chatview", label: "채팅 글자 크기", onClick: () => setChatViewOpen(true), badge: 0 }] : []),
                   { key: "share", label: "방송 공유", onClick: shareLive, badge: 0 },
                   ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp, badge: 0 }]),
-                  ...((rps.admin || chat?.canGrant) ? [{ key: "rps", label: "게임 · 가위바위보", onClick: () => setRpsAdminOpen(true), badge: 0 }] : []),
+                  ...((!viewerMode && (rps.admin || chat?.canGrant)) ? [{ key: "rps", label: "게임 · 가위바위보", onClick: () => setRpsAdminOpen(true), badge: 0 }] : []),
                 ];
               })().map((m) => (
                 <button key={m.key} type="button" onClick={() => { setMoreOpen(false); m.onClick(); }} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "56px", padding: "0 12px", border: "none", borderRadius: "12px", background: "#2C2C2E", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>
@@ -1789,13 +1808,13 @@ export default function LiveWatchView(props: Props) {
           }} style={{ position: "absolute", left: chatMenu.x, top: chatMenu.y, width: "220px", padding: "6px", boxSizing: "border-box", border: "1px solid #555", borderRadius: "12px", background: "#272727", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
             <button autoFocus type="button" onClick={() => void copyChatMessage()} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>글 복사하기</button>
             {!chatMenu.message.deletedByAuthor && !chatMenu.message.privateCommand && chat?.ownIds?.includes(chatMenu.message.id) && chat.onDeleteOwn ? <button type="button" onClick={async () => { const id = chatMenu.message.id; closeChatMenu(); const r = await chat.onDeleteOwn!(id); setChatHint(r.message || (r.ok ? "내 글을 삭제했어요." : "삭제하지 못했어요.")); }} style={{ width: "100%", minHeight: 44, border: 0, borderRadius: 8, background: "transparent", color: "#ffb4b4", textAlign: "left", padding: "10px 12px", fontSize: 15 }}>내 글 삭제하기</button> : null}
-            {chatMenu.canManage ? <button type="button" onClick={() => { setModTarget(chatMenu.message); setBanConfirm(false); setChatMenu(null); }} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>채팅 관리</button> : null}
+            {!viewerMode && chatMenu.canManage ? <button type="button" onClick={() => { setModTarget(chatMenu.message); setBanConfirm(false); setChatMenu(null); }} style={{ width: "100%", minHeight: "44px", border: "none", borderRadius: "8px", background: "transparent", color: "#FFF", fontSize: "15px", fontFamily: "inherit", textAlign: "left", padding: "10px 12px", cursor: "pointer" }}>채팅 관리</button> : null}
           </div>
         </div>
       ) : null}
 
       {/* 관리자 — 글 길게 누르면 */}
-      {modTarget && chat ? (
+      {modTarget && chat && !viewerMode ? (
         <div role="dialog" aria-modal="true" aria-label="채팅 관리" onClick={() => { setModTarget(null); setBanConfirm(false); }} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z + 2, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#FFFFFF", color: "#111111", borderRadius: "16px 16px 0 0", padding: "16px 16px calc(16px + env(safe-area-inset-bottom))" }}>
             <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "4px", display: "flex", alignItems: "center" }}>{modTarget.nickname}<ChatBadge badge={modTarget.badge} /></div>
@@ -1835,7 +1854,7 @@ export default function LiveWatchView(props: Props) {
               </span>
               <button type="button" onClick={() => setListOpen(false)} aria-label="닫기" style={{ width: "44px", height: "44px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><IconClose /></button>
             </div>
-            {chat?.canManage && props.broadcastId ? <div style={{padding:"0 16px 10px",flexShrink:0}}><button type="button" onClick={() => { setIntroChosen([]); setIntroManage(""); }} style={{width:"100%",minHeight:44,border:"1px solid #ddd",borderRadius:10,background:"#f5f5f5",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer"}}>관리자 · 소개영상 등록 / 위젯 순환</button></div> : null}
+            {viewCanManage && props.broadcastId ? <div style={{padding:"0 16px 10px",flexShrink:0}}><button type="button" onClick={() => { setIntroChosen([]); setIntroManage(""); }} style={{width:"100%",minHeight:44,border:"1px solid #ddd",borderRadius:10,background:"#f5f5f5",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer"}}>관리자 · 소개영상 등록 / 위젯 순환</button></div> : null}
             {listMode === "featured" ? <div style={{padding: "0 16px 10px", flexShrink: 0}}>
               <p style={{fontSize: 13, color: "#666", margin: "0 0 8px"}}>전체 {totalCount}개 중 소개 중인 상품이에요.</p>
               <button type="button" onClick={() => openProductList("all")} style={{width: "100%", minHeight: 44, borderRadius: 10, border: "1px solid #d5d5d5", background: "#f5f5f5", color: "#111", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>전체 상품 {totalCount}개 보기 →</button>

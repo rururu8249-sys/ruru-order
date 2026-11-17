@@ -10,6 +10,9 @@ type Props = {
   adminMode: boolean;
   onModeChange: (value: boolean) => void;
   busy: boolean;
+  desktopDock?: boolean;
+  dockRight?: string | number;
+  onOpenChange?: (open: boolean) => void;
   onIntroduce: (items: BotCandidate[], options: { mode: "replace" | "append"; replaceIntro: boolean }) => Promise<{ok: boolean; message?: string}>;
 };
 
@@ -18,8 +21,10 @@ const ui: Record<string, CSSProperties> = {
   action: { border: 0, borderRadius: 10, background: "#fff", color: "#151515", fontSize: 13, fontWeight: 800, minHeight: 42, padding: "0 12px", cursor: "pointer" },
 };
 
-export default function LiveOperatorControl({ broadcastId, adminMode, onModeChange, busy, onIntroduce }: Props) {
+export default function LiveOperatorControl({ broadcastId, adminMode, onModeChange, busy, onIntroduce, desktopDock = false, dockRight = "0px", onOpenChange }: Props) {
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (desktopDock && adminMode) setOpen(true); }, [desktopDock, adminMode]);
+  useEffect(() => { onOpenChange?.(Boolean(open && adminMode && desktopDock)); }, [open, adminMode, desktopDock, onOpenChange]);
   const [query, setQuery] = useState("");
   const [catalog, setCatalog] = useState<BotCandidate[]>([]);
   const [recent, setRecent] = useState<BotCandidate[]>([]);
@@ -78,20 +83,22 @@ export default function LiveOperatorControl({ broadcastId, adminMode, onModeChan
       const result = await onIntroduce(items, { mode, replaceIntro: mode === "replace" && replaceIntro });
       if (result.ok) {
         setRecent(prev => [...items, ...prev.filter(old => !items.some(p => old.productId === p.productId && old.detailName === p.detailName))].slice(0, 6));
-        setQuery(""); setPickedCodes([]); setOpen(false); setReplaceIntro(false);
+        setQuery(""); setPickedCodes([]); setReplaceIntro(false);
         setLastNotice(result.message || (items.length > 1 ? `${items.length}개 상품 소개 완료` : "상품 소개 완료"));
       } else setMessage(result.message || "상품 소개에 실패했어요. 다시 확인해 주세요.");
     } catch { setMessage("네트워크 오류가 발생했어요. 현재 상품 상태를 확인해 주세요."); }
     finally { setRunning(false); }
   };
-  return <div data-live-operator-control="1" style={{ position: "fixed", zIndex: 75, top: "calc(6px + env(safe-area-inset-top))", left: "50%", transform: "translateX(-50%)", width: "min(440px, calc(100vw - 16px))", color: "#fff", fontFamily: "inherit", pointerEvents: "none" }}>
+  return <div data-live-operator-control="1" data-operator-dock={desktopDock && open && adminMode ? "open" : "closed"} style={{ position: "fixed", zIndex: 75,
+    ...(desktopDock && open && adminMode ? { top: 0, bottom: 0, right: dockRight, left: "auto", transform: "none", width: 350, padding: "8px", boxSizing: "border-box", borderLeft: "1px solid #414141", background: "#111", display: "flex", flexDirection: "column" } : { top: adminMode ? "calc(64px + env(safe-area-inset-top))" : "auto", bottom: adminMode ? "auto" : "calc(90px + env(safe-area-inset-bottom))", right: desktopDock && adminMode ? dockRight : 8, left: "auto", transform: "none", width: adminMode ? "min(440px, calc(100vw - 16px))" : "auto" }),
+    color: "#fff", fontFamily: "inherit", pointerEvents: "none" }}>
     <div style={{ pointerEvents: "auto", display: "flex", justifyContent: "center", gap: 6, padding: 4, margin: "0 auto", width: "fit-content", maxWidth: "100%", border: "1px solid #424242", borderRadius: 999, background: "rgba(15,15,15,.95)", boxShadow: "0 2px 16px #0008" }}>
-      <button type="button" onClick={() => { onModeChange(true); setOpen(false); }} aria-pressed={adminMode} style={{ ...ui.chip, background: adminMode ? "#fff" : "transparent", color: adminMode ? "#111" : "#ccc", border: "none" }}>관리자 모드</button>
-      <button type="button" onClick={() => { onModeChange(false); setOpen(false); }} aria-pressed={!adminMode} style={{ ...ui.chip, background: !adminMode ? "#fff" : "transparent", color: !adminMode ? "#111" : "#ccc", border: "none" }}>시청자 모드</button>
+      <button type="button" onClick={() => { onModeChange(true); setOpen(false); }} aria-pressed={adminMode} style={{ ...ui.chip, background: adminMode ? "#fff" : "transparent", color: adminMode ? "#111" : "#ccc", border: "none" }}>{adminMode ? "관리자 모드" : "관리자 복귀"}</button>
+      {adminMode ? <button type="button" onClick={() => { onModeChange(false); setOpen(false); }} aria-pressed={!adminMode} style={{ ...ui.chip, background: !adminMode ? "#fff" : "transparent", color: !adminMode ? "#111" : "#ccc", border: "none" }}>시청자 모드</button> : null}
       {adminMode ? <button type="button" style={ui.chip} aria-expanded={open} onClick={() => setOpen(v => !v)}>상품 바로 소개 {open ? "▲" : "▼"}</button> : null}
     </div>
     {lastNotice && !open && adminMode ? <div role="status" style={{ pointerEvents: "auto", background: "#164b34", borderRadius: 10, padding: 9, marginTop: 7, fontSize: 12 }} onClick={() => setLastNotice("")}>{lastNotice} ✕</div> : null}
-    {open && adminMode ? <section aria-label="상품 바로 소개" style={{ pointerEvents: "auto", marginTop: 8, background: "#161616", border: "1px solid #555", boxShadow: "0 12px 32px #000b", borderRadius: 14, padding: 12, maxHeight: "min(530px, calc(100dvh - 75px))", display: "flex", flexDirection: "column" }}>
+    {open && adminMode ? <section aria-label="상품 바로 소개" style={{ pointerEvents: "auto", marginTop: 8, background: "#161616", border: "1px solid #555", boxShadow: "0 12px 32px #000b", borderRadius: 14, padding: 12, maxHeight: desktopDock ? "none" : "min(530px, calc(100dvh - 150px))", flex: desktopDock ? 1 : undefined, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}><strong style={{ flex: 1, fontSize: 15 }}>상품 검색 → 한 번 눌러 소개</strong><button type="button" onClick={() => setOpen(false)} aria-label="상품 바로 소개 닫기" style={ui.chip}>✕</button></div>
       <input ref={input} value={query} onChange={e => setQuery(e.target.value)} placeholder="상품코드 여러 개: BB-111 BB-112, MC-348" aria-label="바로 소개 상품 검색" onKeyDown={e => { if (e.key === "Escape") setOpen(false); if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); if (batch.codes.length && batch.codes.every(code => /^[A-Z]{1,8}-?\d{2,6}[A-Z]?$/.test(code))) { if (batch.matched.length === 1 && batch.codes.length === 1 && !batch.invalid.length && !batch.ambiguous.length && !selected.length) void apply(batch.matched, "replace"); else addCodes(); } else if (results.length === 1) void apply([results[0]], "replace"); } }} style={{ width: "100%", boxSizing: "border-box", height: 46, border: "1px solid #666", borderRadius: 10, background: "#272727", color: "#fff", padding: "0 12px", fontSize: 15, outlineOffset: 2 }} />
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -106,6 +113,7 @@ export default function LiveOperatorControl({ broadcastId, adminMode, onModeChan
       <div style={{ color: "#aaa", fontSize: 11, marginTop: 3 }}>체크하지 않으면 처음 저장한 영상 위치를 유지해요. 영상 시간 확인이 안 되면 변경하지 않아요.</div>
       {loading ? <p role="status">상품을 불러오는 중…</p> : null}
       {message ? <p role="alert" style={{ color: "#ffc7a6", fontSize: 13 }}>{message}</p> : null}
+      {lastNotice ? <p role="status" style={{ color: "#a4e4bd", fontSize: 12 }}>{lastNotice}</p> : null}
       <div data-live-scroll="1" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
         {results.map(p => <button key={`${p.productId}:${p.detailName}`} type="button" disabled={busy || running || p.soldOut} onClick={() => void apply([p], "replace")} style={{ display: "flex", alignItems: "center", width: "100%", minHeight: 62, gap: 10, padding: "6px 8px", border: 0, borderBottom: "1px solid #333", background: "transparent", color: p.soldOut ? "#999" : "#fff", textAlign: "left", cursor: p.soldOut ? "not-allowed" : "pointer" }}>
           <span data-operator-thumbnail="1" role="button" tabIndex={0} aria-label={`${p.texts?.[0] || p.line} 사진 확대`} onClick={e => { e.stopPropagation(); setPreview(p); }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setPreview(p); } }}><ChatProductThumb src={p.imageUrl} name={p.texts?.[0] || p.line} size={46} placeholder /></span>
