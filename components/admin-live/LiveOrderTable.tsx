@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import LivePickingPanel from "./LivePickingPanel";
+import {periodAt, periodName, type BroadcastWorkPeriod} from "@/lib/broadcastWorkPeriods";
 import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import LiveCartHoldsModal from "./LiveCartHoldsModal";
 import { supabase } from "@/lib/supabase";
@@ -477,6 +478,9 @@ type Props = {
   countBaseOrders?: LiveOrder[];
   /** [㉚] 물건챙기기 범위용 — 방송·범위·기간만 적용(상태칩·검색 무관). 없으면 countBaseOrders → orders. */
   pickingBaseOrders?: LiveOrder[];
+  /** Full exact-broadcast range for packing, independent of selected calendar date. */
+  allBroadcastPickingOrders?: LiveOrder[];
+  selectedPickingBroadcastId?: string | null;
   allOrderCount: number;
   selectedOrderId: string;
   onSelectOrder: (order: LiveOrder) => void;
@@ -500,6 +504,8 @@ export default function LiveOrderTable({
   orders,
   countBaseOrders,
   pickingBaseOrders,
+  allBroadcastPickingOrders,
+  selectedPickingBroadcastId,
   allOrderCount,
   selectedOrderId,
   onSelectOrder,
@@ -589,6 +595,25 @@ export default function LiveOrderTable({
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
   const [exportConfirm, setExportConfirm] = useState<"" | "rozen" | "picking">("");
   const [pickingOpen, setPickingOpen] = useState(false);
+  const [visibleWorkPeriods, setVisibleWorkPeriods] = useState<BroadcastWorkPeriod[]>([]);
+  useEffect(() => {
+    if (!selectedPickingBroadcastId) { setVisibleWorkPeriods([]); return; }
+    let alive = true;
+    const read = () => { void fetch(`/api/admin-live/broadcast-periods?${new URLSearchParams({broadcastId:selectedPickingBroadcastId})}`, {cache:"no-store"})
+      .then(async r => { const data = await r.json(); if (!r.ok || !data?.ok) throw Error("조회 실패"); return data.periods as BroadcastWorkPeriod[]; })
+      .then(rows => {if(alive) setVisibleWorkPeriods(rows);})
+      .catch(() => {if(alive) setVisibleWorkPeriods([]);}); };
+    read();
+    const timer = window.setInterval(() => {if(document.visibilityState === "visible") read();},30000);
+    return () => { alive=false; window.clearInterval(timer); };
+  },[selectedPickingBroadcastId]);
+  const workPeriodBadge = (order:LiveOrder) => {
+    if (visibleWorkPeriods.length < 2 || !selectedPickingBroadcastId || order.broadcastId !== selectedPickingBroadcastId) return null;
+    const period = periodAt(order.createdAt || order.submittedAt,visibleWorkPeriods);
+    if (!period) return null;
+    const last = visibleWorkPeriods.at(-1)?.id === period.id;
+    return <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-bold ${last ? "bg-sky-100 text-sky-900" : "bg-surface-2 text-ink-soft"}`} title="같은 방송 안의 작업 구간">{periodName(period,visibleWorkPeriods)}</span>;
+  };
   // Keep the opened work batch visible even when a live completion changes workFilter.
   // Resolve current order data by ID, so cancellations/payment updates still apply.
   const [pickingOrderIds, setPickingOrderIds] = useState<Set<string>>(new Set());
@@ -1030,7 +1055,12 @@ export default function LiveOrderTable({
           pickingSelectedOrders ? (
             <LivePickingPanel orders={pickingSelectedOrders} filterLabel={`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); void onRefresh?.(); }} />
           ) : (
-            <LivePickingPanel orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} scopeTooWide={pickingScopeTooWide} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
+            <LivePickingPanel
+              orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))}
+              fullBroadcastOrders={allBroadcastPickingOrders}
+              broadcastId={selectedPickingBroadcastId || null}
+              filterLabel={pickingScopeLabel} scopeTooWide={pickingScopeTooWide}
+              onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
           )
     ) : null}
     {exportConfirm !== "" ? (
@@ -1491,7 +1521,7 @@ export default function LiveOrderTable({
                           <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} className="h-5 w-5 shrink-0 accent-[var(--color-ink)]" />
                           <span className="min-w-0 truncate text-[14px] font-bold text-ink">{order.isTestOrder ? "[테스트]" : ""}{order.nickname}</span>
                           {order.name ? <span className="shrink-0 text-[13px] text-ink-soft">{order.name}</span> : null}
-                          <span className="ml-auto shrink-0 text-[12px] text-ink-mute tabular-nums">{when}</span>
+                          <span className="ml-auto shrink-0 text-[12px] text-ink-mute tabular-nums">{when} {workPeriodBadge(order)}</span>
                         </div>
                         <div className="mt-1 flex items-start gap-2">
                           <div className="min-w-0 flex-1 text-[14px] leading-snug text-ink [&_*]:!whitespace-normal line-clamp-2">{renderOrderSummary(order,true)}</div>
@@ -1553,7 +1583,7 @@ export default function LiveOrderTable({
                             const wd = ["일","월","화","수","목","금","토"][d.getDay()];
                             const hh = String(d.getHours()).padStart(2, "0");
                             const mi = String(d.getMinutes()).padStart(2, "0");
-                            return <><div>{yy}.{mm}.{dd}</div><div className="text-ink-mute">({wd}) {hh}:{mi}</div></>;
+                            return <><div>{yy}.{mm}.{dd}</div><div className="text-ink-mute">({wd}) {hh}:{mi}</div>{workPeriodBadge(order)}</>;
                           } catch { return <span className="text-[11px]">{src}</span>; }
                         })()}
                       </div>

@@ -147,16 +147,16 @@ export async function setBroadcastPaused(broadcastId: string, paused: boolean) {
   if (!broadcastId) {
     throw new Error("방송 ID가 없습니다.");
   }
-  const { data, error } = await adminCatalogWrite({
-    table: "broadcasts",
-    op: "update",
-    values: { paused_at: paused ? new Date().toISOString() : null },
-    filters: [{ type: "eq", col: "id", val: broadcastId }],
-    select: "*",
-    single: true,
+  // An authenticated server transaction records pause/resume boundaries together
+  // with the existing broadcast state. Orders and picking remain untouched.
+  const response = await fetch("/api/admin-live/broadcast-periods", {
+    method: "POST", cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ broadcastId, paused }),
   });
-  if (error) throw error;
-  return data as AdminLiveBroadcast;
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.ok) throw new Error(result?.message || "방송 상태 저장에 실패했어요.");
+  return { id: broadcastId, paused_at: result.data?.paused_at || null } as AdminLiveBroadcast;
 }
 
 export async function setBroadcastWidgetCard(broadcastId: string, enabled: boolean) {

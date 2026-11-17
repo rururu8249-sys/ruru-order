@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { createUiLoader } from "./admin-ui-test-loader.mjs";
+const {periodAt,periodName,ordersForPeriod} = createUiLoader({})("lib/broadcastWorkPeriods.ts");
+const p=[{id:"1",broadcast_id:"bc",started_at:"2026-11-17T00:00:00Z",ended_at:"2026-11-17T06:00:00Z",source:"initial"},{id:"2",broadcast_id:"bc",started_at:"2026-11-17T09:00:00Z",ended_at:null,source:"resume"}];
+assert.equal(periodAt("2026-11-17T00:00:00Z",p)?.id,"1");
+assert.equal(periodAt("2026-11-17T05:59:59Z",p)?.id,"1");
+assert.equal(periodAt("2026-11-17T06:00:00Z",p),null);
+assert.equal(periodAt("2026-11-17T08:00:00Z",p),null);
+assert.equal(periodAt("2026-11-17T09:00:00Z",p)?.id,"2");
+assert.equal(periodAt(null,p),null);
+assert.equal(periodName(p[1],p),"2차");
+const all=[{createdAt:"2026-11-17T03:00:00Z"},{createdAt:"2026-11-17T07:00:00Z"},{createdAt:"2026-11-17T10:00:00Z"}];
+assert.deepEqual(ordersForPeriod(all,p[1]),[all[2]]);
+assert.equal(all.length,3,"source data must be intact");
+console.log("PASS broadcast work periods: boundary, pause gap, current/previous isolation, all preservation");

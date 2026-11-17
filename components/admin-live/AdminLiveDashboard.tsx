@@ -1937,6 +1937,15 @@ export default function AdminLiveDashboard() {
                       orders={filteredOrders}
                       countBaseOrders={filteredOrdersForCounts}
                       pickingBaseOrders={pickingBaseOrders}
+                      selectedPickingBroadcastId={filters.scope === "shop" ? null : filters.broadcast === "current" ? activeBroadcast?.id || null : broadcasts.find(b => b.id === filters.broadcast)?.id || null}
+                      allBroadcastPickingOrders={(() => {
+                        const bc = filters.broadcast === "current" ? activeBroadcast : broadcasts.find(b => b.id === filters.broadcast);
+                        if (!bc || filters.scope === "shop") return undefined;
+                        const id = String(bc.id);
+                        const base = orders.filter(o => String(o.broadcastId || "") === id && !wholeMovedIds.has(String(o.id)));
+                        const transferred = pulledOrdersForView(pulledVirtualOrders,{kind:"broadcast",broadcastId:id,startedDay:toDateKey(bc.started_at || null)});
+                        return [...base,...transferred.filter(o => !base.some(b => String(b.id) === String(o.id)))];
+                      })()}
                       allOrderCount={orders.length}
                       selectedOrderId={selectedOrder?.id || ""}
                       loading={loading}
