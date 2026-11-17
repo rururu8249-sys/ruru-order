@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { internalCronSecret } from "@/lib/internalCronAuth";
 
 export const dynamic = "force-dynamic";
-
-const INTERNAL_CRON_BYPASS_TOKEN = "ruru-bankda-cron-internal-v1";
 
 async function readJsonSafe(response: Response) {
   const text = await response.text();
@@ -31,20 +30,16 @@ function pickAutoSummary(autoResult: any) {
   };
 }
 
-function getInternalCronSecret() {
-  return INTERNAL_CRON_BYPASS_TOKEN;
-}
-
 async function handleSyncAndAutoMatch(request: NextRequest) {
   const origin = new URL(request.url).origin;
-  const internalCronSecret = getInternalCronSecret();
+  const internalSecret = internalCronSecret();
 
   const syncResponse = await fetch(`${origin}/api/bankda/sync-deposits`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-ruru-internal-cron": internalCronSecret,
-      Authorization: `Bearer ${internalCronSecret}`,
+      "x-ruru-internal-cron": internalSecret,
+      Authorization: `Bearer ${internalSecret}`,
     },
     cache: "no-store",
   });
@@ -68,8 +63,8 @@ async function handleSyncAndAutoMatch(request: NextRequest) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-ruru-internal-cron": internalCronSecret,
-      Authorization: `Bearer ${internalCronSecret}`,
+      "x-ruru-internal-cron": internalSecret,
+      Authorization: `Bearer ${internalSecret}`,
     },
     body: JSON.stringify({ confirm: "RUN_AUTO_MATCH" }),
     cache: "no-store",
