@@ -6,6 +6,7 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {callGeminiJson} from './geminiJson';
 import {buildCompactConversationPrompt,shouldFallbackModel,eligibleTestChatSession} from './liveAutomationCompactPrompt';
+import {shouldRecoverProductSilence,buildFocusedProductPrompt} from './liveAutomationProductOpportunity';
 import {parseDirectorChoice,shouldTryFocusedProductTurn,cardRemainsInRotation,resolveExplicitReplyTarget} from './liveAutomationFocus';
 import {readRoomSignals} from './liveAutomationRoomSignals';
 import {CHAT_RATE_KEY,ratePercent,chatRateConfig} from './liveAutomationRate';
@@ -789,24 +790,23 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  // A verified displayed product can merit a rare, grounded conversational turn.
  // Retry once with a compact prompt if the full-context model returned no valid speaker.
  // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
- if(!firstChoice.speaker&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&shouldTryFocusedProductTurn({
-   now,mode,hasProduct:Boolean(card),hasPendingHuman:Boolean(newestHuman),
-   lastHumanAt,lastAiAt:lastAi,lastFocusAt
- })){
+ if(!firstChoice.speaker&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&(
+   mode==='live'?shouldRecoverProductSilence({
+     now,mode,hasCard:Boolean(card),chatRate,hasPendingHuman:Boolean(newestHuman),
+     lastHumanAt,lastAiAt:lastAi,lastFocusAt,candidates:roster.length
+   }):shouldTryFocusedProductTurn({
+     now,mode,hasProduct:Boolean(card),hasPendingHuman:Boolean(newestHuman),
+     lastHumanAt,lastAiAt:lastAi,lastFocusAt
+   })
+ )){
    await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:true,firstReason:firstChoice.reason,firstModel:ans.note.slice(0,85)});
    const bucket=Math.floor(now/(10*60_000));
    const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
-   const focusedPrompt=[
-    '너는 공개적으로 테스트 계정임이 표시되는 라이브커머스 채팅 시뮬레이션의 대화 생성기다.',
-    '이 방은 지금 잠시 조용하다. 한 번에 단 한 명이, 아래 확인된 상품카드에 관해 짧은 생각 또는 답변이 필요 없는 자연스러운 질문을 한 줄 작성한다. 인사를 채워 넣거나 남의 실제 구매·결제·경험을 자기 일로 말하지 않는다.',
-    '서로 다른 테스트 계정을 한꺼번에 등장시키거나 정해진 대화 순서를 만들지 않는다. 주어진 사실 외의 상품번호, 색, 소재, 재고, 가격을 만들어 내지 않는다.',
-    mode==='live'?'생방송 중이다.':'지금은 생방송 중이 아니다. 진행자에게 즉시 답하거나 입어달라는 요청은 금지한다.',
-    `[현재 검증된 상품] ${cardText}`,
-    `[최근 채팅] ${[...messages].reverse().filter(m=>m.badge!=='bot').slice(-5).map(m=>clean(m.body).slice(0,65)).join(' / ')||'없음'}`,
-    `[참여 가능한 테스트 닉네임] ${candidates.map(r=>r.actor.nickname).join(' / ')}`,
-    '단 한 개의 채팅만 선택하고 다른 사람 이름이나 주문 수를 지어내지 말 것. 상품 코드가 명시돼 있으면 질문에 그 코드를 쓰고, 조언보다는 의견이나 질문을 짧게 남긴다.',
-    'JSON만 반환: {"speaker":"위 목록에서 정확히 하나","replyTo":0,"text":"짧은 상품 관련 발언"}'
-   ].join('\n');
+   const focusedPrompt=buildFocusedProductPrompt({
+     productName:card?.name||'',colors:card?.colors||[],
+     candidates:candidates.map(r=>String(r.actor.nickname)),recentAi
+   });
+   if(!focusedPrompt)return;
    const focused=await callGeminiJson(focusedPrompt,{timeoutMs:12000,maxTokens:200,maxAttempts:2,temperature:.8,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
    const retryChoice=parseDirectorChoice(focused.text,candidates.map(r=>String(r.actor.nickname)));
    lastModelNote=focused.note;
