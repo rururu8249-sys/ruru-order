@@ -91,7 +91,7 @@ const tabs = tree.root.findAll(n => n.type === 'button' && n.props.role === 'tab
 assert.deepEqual(tabs.map(t => t.children.join('')), ['상품별', '손님별'], '보기는 상품별·손님별 두 개뿐');
 assert.equal(tabs[0].props['aria-selected'], true, '기본 = 상품별');
 const nodeText = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText).join('');
-const orderSummaryText = () => nodeText(tree.root.findByProps({'aria-label':'물건챙기기 주문서·상품 현황'})).replace(/\s+/g, '');
+const orderSummaryText = () => nodeText(tree.root.findByProps({'aria-label':'물건챙기기 주문서 현황'})).replace(/\s+/g, '');
 const btn = (f) => tree.root.findAll(n => n.type === 'button' && f(n));
 const byText = (t) => btn(n => nodeText(n) === t)[0];
 const byLabel = (l) => btn(n => n.props['aria-label'] === l)[0];
@@ -104,11 +104,11 @@ assert.ok(
   orderSummaryText().includes('결제완료4건') &&
   orderSummaryText().includes('미결제1건') &&
   orderSummaryText().includes('남은주문서5건') &&
-  orderSummaryText().includes('상품수량8개') &&
-  orderSummaryText().includes('챙김0개') &&
-  orderSummaryText().includes('남은상품8개') &&
+  orderSummaryText().includes('챙김완료0건') &&
+  !orderSummaryText().includes('상품수량') &&
+  !orderSummaryText().includes('남은상품') &&
   orderSummaryText().includes('주문서취소1건·별도'),
-  `정상 주문서 5건/상품 8개/취소 1건 분리 실패, 실제 렌더: ${orderSummaryText()}`
+  `정상 주문서 5건/취소 1건 별도 표시 및 총 상품수량 상단 제거 실패, 실제 렌더: ${orderSummaryText()}`
 );
 assert.ok(text().includes('고객3'), '기본 = 미결제도 보임');
 assert.ok(!text().includes('요약') && !text().includes('안 챙긴 것만') && !text().includes('접기'), '옛 요약·안 챙긴 것만·접기 없음');
@@ -122,7 +122,8 @@ assert.ok(
   orderSummaryText().includes('결제완료주문서4건') &&
   orderSummaryText().includes('미결제1건(표시제외)') &&
   orderSummaryText().includes('남은주문서4건') &&
-  orderSummaryText().includes('상품수량6개') &&
+  !orderSummaryText().includes('상품수량') &&
+  !orderSummaryText().includes('남은상품') &&
   orderSummaryText().includes('주문서취소1건·별도'),
   `미결제 숨김 집계 실패, 실제 렌더: ${orderSummaryText()}`
 );
@@ -136,6 +137,7 @@ assert.equal(rowBtn('고객1').parent.props.onClick, undefined);
 await act(async () => { await rowBtn('고객1').props.onClick(); });
 assert.equal(writes.at(-1).ids.map(String).join(), '1', 'picked_at 저장은 그 줄만');
 assert.equal(rowBtn('고객1').props['aria-pressed'], true);
+assert.ok(orderSummaryText().includes('남은주문서4건'), '챙김 후 주문서가 5건에서 4건으로 감소해야 함');
 await act(async () => { await rowBtn('고객3').props.onClick(); });
 assert.equal(writes.at(-1).ids.map(String).join(), '3', '미결제 줄도 사장님 판단으로 직접 체크 가능');
 // 큰 버튼 = 이 상품의 결제완료·안 챙긴 것만(미결제·이미 챙긴 것 제외)
