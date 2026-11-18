@@ -435,6 +435,7 @@ export default function LiveWatchView(props: Props) {
   const chat = props.chat ?? null;
   const [operatorMode, setOperatorMode] = useState(true);
   const viewCanManage = Boolean(operatorMode && chat?.canManage);
+  const [clearingChatScreen, setClearingChatScreen] = useState(false);
   const viewerMode = Boolean(chat?.canManage && !operatorMode);
   // Viewer preview must display the same public chat (including test actors).
   // Only staff-only command receipts and deleted entries remain hidden.
@@ -1488,6 +1489,22 @@ export default function LiveWatchView(props: Props) {
         {isDesktop ? <div data-live-chat-heading style={{ flexShrink: 0, padding: "20px 0 16px", borderBottom: "1px solid #333333", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
           <span style={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>루루동이 실시간 채팅</span>
           {chat?.canManage ? <button type="button" onClick={() => { setOperatorMode(v => !v); setQuickOpen(false); setWatchersOpen(false); setModTarget(null); setChatMenu(null); }} aria-label={operatorMode ? "시청자 모드로 보기" : "관리자 모드로 돌아가기"} style={{ fontSize: 12, padding: "6px 9px", border: "1px solid #555", borderRadius: 8, background: operatorMode ? "#303030" : "#fff", color: operatorMode ? "#fff" : "#111", cursor: "pointer", whiteSpace: "nowrap" }}>{operatorMode ? "시청자 모드" : "관리자 복귀"}</button> : null}
+          {viewCanManage ? <button type="button" disabled={clearingChatScreen} onClick={async () => {
+            if (!props.broadcastId || !window.confirm('현재 방송의 모든 기존 채팅을 고객·관리자 화면에서 숨길까요?\n\n메시지 기록은 삭제되지 않고 이후 새 채팅은 정상적으로 표시됩니다.')) return;
+            setClearingChatScreen(true);
+            try {
+              const r = await fetch('/api/live-chat/clear-screen', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...chatIdentityHeaders()},
+                body: JSON.stringify({bc: props.broadcastId}),
+              });
+              const j = await r.json().catch(() => ({}));
+              setChatHint(j.message || (r.ok ? '채팅 화면을 비웠어요.' : '채팅 화면을 비우지 못했어요.'));
+            } catch { setChatHint('네트워크 오류로 채팅 화면을 비우지 못했어요.'); }
+            finally { setClearingChatScreen(false); }
+          }} aria-label="현재 방송 채팅 화면 전체 비우기" style={{flexShrink:0, minHeight:36, padding:'6px 10px',border:'1px solid #88515B',borderRadius:8,background:'#302025',color:'#FFD6DA',fontWeight:700,fontSize:12,cursor:'pointer'}}>
+            {clearingChatScreen ? '비우는 중…' : '채팅 화면 비우기'}
+          </button> : null}
           {/* [2026-11-12] 관리자 — 방송 보는 중 / 사이트 전체, 누르면 누가 보는지 */}
           {viewCanManage ? <button type="button" onClick={() => setWatchersOpen(true)} aria-label="지금 방송 보는 사람 목록 보기"
             style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 10px", border: "1px solid #444444", borderRadius: "9999px", background: "#1F1F1F", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>
