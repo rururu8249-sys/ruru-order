@@ -9,8 +9,12 @@ export function assessRoomTurn(x:RoomTurnInput):RoomTurnDecision {
   const reject=(reason:string)=>({ok:false,reason});
   const conversation=x.room.filter(m=>m.kind!=='system' && Number.isFinite(m.at)).sort((a,b)=>b.id-a.id);
   const latest=conversation[0];
-  const aiStreak=conversation.findIndex(m=>m.kind==='human');
-  const continuousAi=aiStreak===-1?conversation.length:aiStreak;
+  // Only a *recent* burst is a burst. Old isolated AI turns must not lock a
+  // product chat forever when the same card remains visible for hours.
+  const streakWindow=x.mode==='live'?12*60_000:18*60_000;
+  const recent=conversation.filter(m=>m.at<=x.now&&x.now-m.at<streakWindow);
+  const aiStreak=recent.findIndex(m=>m.kind==='human');
+  const continuousAi=aiStreak===-1?recent.length:aiStreak;
   const productChanged=Boolean(x.previousProductKey&&x.currentProductKey&&x.previousProductKey!==x.currentProductKey);
   if(x.replyToId>0){
     const target=conversation.find(m=>m.id===x.replyToId);
