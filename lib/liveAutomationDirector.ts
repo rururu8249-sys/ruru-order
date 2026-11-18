@@ -5,6 +5,8 @@
 //   돈·주문·입금 무접촉 — 채팅 글 한 줄만(기존 /api/live-chat 경로 그대로).
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {callGeminiJson} from './geminiJson';
+import {readRoomSignals} from './liveAutomationRoomSignals';
+import {assessRoomTurn,type RoomTurnRow} from './liveAutomationTurnPolicy';
 import {duplicateLine,safeConversationLine} from './liveAutomationPersona';
 import type {AutomationContext} from './liveAutomationAuth';
 import {AUTOMATION_OWNER} from './liveAutomation';
@@ -392,8 +394,12 @@ async function sizeAnswerFlow(x:CodeCtx,holds:Row[]):Promise<boolean>{
 /** [2026-11-15 14:30 사장님] 방송 시작 초~중반에 들어온 가상 손님이 인사 — 다양하게(기본·처음 왔어요·구독·인스타·소개·방송 시작했죠?·언니 예뻐요).
  *  들어온 지 4분 안·이 방송에서 아직 말 안 한 손님만, 손님마다 확률(시작 45분 안 45%), 방 전체 인사는 40초에 한 번·소개 인사는 6분에 한 번. */
 async function greetFlow(x:CodeCtx):Promise<boolean>{
+ // No synthetic arrivals after the live ends; no greeting waves in a busy room.
+ if(!x.live)return false;
  const acted=(key:string,ms:number)=>x.actions.some(a=>planOf(a)[key]&&Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-ms);
- if(acted('greet',40000))return false;
+ if(acted('greet',12*60000))return false;
+ if(x.actions.filter(a=>planOf(a).greet&&Date.parse(String((a as Action&{created_at?:unknown}).created_at))>x.now-60*60000).length>=3)return false;
+ if(x.messages.some(m=>!m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>x.now-90_000))return false;
  const sinceStart=Number.isFinite(x.startedAt)?x.now-x.startedAt:-1;
  const k=kstDate(x.now);
  for(const s of x.sessions){
@@ -672,23 +678,15 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const nextShow=mode0==='live'?null:parseNextShow(pausedRaw,now);
  if(await cardLinkAck(db,c,origin,transport,now,sessions,actors,messages,actions,mode0).catch(()=>false))return;
  // [2026-11-15 14:15~14:26 사장님] Gemini 없이 코드가 정한 말 — 주문서 넣었다는 말(알림 앞/뒤 랜덤)·방송 종료 인사·사이즈 대략 답
- const codeCtx={mode:mode0,db,c,origin,transport,now,sessions,actors,messages,actions,orders,live:mode0==='live',startedAt:Date.parse(String((bc.data as Row).started_at||'')),spoke:new Set(spokeRows.map(r=>String(r.automation_actor_id))),nextShow};
- if(await orderNoticeFlow(codeCtx).catch(()=>false))return;
- if(await farewellFlow(codeCtx).catch(()=>false))return;
- if(await sizeAnswerFlow(codeCtx,holds).catch(()=>false))return;
- if(await humanSizeAskFlow(codeCtx,holds).catch(()=>false))return;
- if(await smallTalkAnswerFlow(codeCtx,holds).catch(()=>false))return;
- if(await continueProductThread(codeCtx,holds).catch(()=>false))return;
- if(await emojiCuteFlow(codeCtx).catch(()=>false))return;
- if(await replyToAiFlow(codeCtx).catch(()=>false))return;
- if(await greetFlow(codeCtx).catch(()=>false))return;
+ // RURU_CONVERSATION_COORDINATOR_V2: no preemptive canned greetings or fixed three-turn conversations.
+ // The model chooses between a grounded turn and silence. System cart/order notices remain untouched.
  // 언제 판단할지: 사람이 새 글을 쓰면(아직 판단 안 한 글) 10초 뒤 바로, 아니면 AI 글 사이 20~45초 + 확률(밤엔 아주 드물게)
  const considered=Math.max(0,...actions.map(a=>Number((a as Action&{source_message_id?:unknown}).source_message_id)||0));
  const newestHuman=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&Number(m.id)>considered&&Date.parse(String(m.created_at))>now-180000)||null;
  const lastAi=Math.max(0,...messages.filter(m=>m.automation_actor_id).map(m=>Date.parse(String(m.created_at))||0));
  const lastAction=Math.max(0,...actions.filter(a=>a.kind!=='order').map(a=>Date.parse(String((a as Action&{created_at?:unknown}).created_at))||0));
  // [2026-11-15 08:49 사장님 «빨리 할 때도·늦게 할 때도·적당히»] 사람 글에 답하는 시각을 글마다 다르게 4~45초(그 안에서 고르게)
- if(newestHuman){if(now-lastAction<10000)return;if(now-Date.parse(String(newestHuman.created_at))<humanReplyDelay(Number(newestHuman.id)))return;}
+ if(newestHuman){if(now-lastAction<10000)return;if(now-Date.parse(String(newestHuman.created_at))<Math.max(8_000,humanReplyDelay(Number(newestHuman.id))))return;}
  else{
   // DB 가 정한 방 쉬는 시간(auto_chat_after) 안이면 Gemini 를 부르지 않음(불러도 글이 막힘)
   const restUntil=Date.parse(String((c as Row).auto_chat_after||''));
@@ -724,39 +722,33 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const called=newestHuman?roster.filter(r=>mentionsNickname(String(newestHuman.body||''),r.actor.nickname)):[];
  const lastAiRow=messages.find(m=>m.automation_actor_id&&m.badge!=='bot'); // 주문 알림(루루동이 봇 글)은 빼고 진짜 가상 손님 글만
  const lastAiNick=lastAiRow&&Date.parse(String(lastAiRow.created_at))>now-180000?String(lastAiRow.nickname||''):'';
- const speakable0=roster.filter(r=>r.cart.length>0||r.ordered.length>0||called.includes(r));
+ const speakable0=roster.filter(r=>r.session.watching||called.includes(r));
  // [18:57 사장님 「닉네임도 맘맘 똑같고」] 바로 앞 가상 손님과 비슷한 닉네임(○○맘·○○맘)은 이번 차례 빼기(불린 손님은 그대로)
  const recentNames=recentNameSet(messages,now);if(lastAiNick)recentNames.push(lastAiNick);
  const notSimilar=speakable0.filter(r=>called.includes(r)||!similarToRecent(String(r.actor.nickname||''),recentNames));
- const speakable=notSimilar.length?notSimilar:speakable0;
+ const speakable=called.length?called:speakable0; // A directly addressed actor takes precedence; a person may also speak twice.
  if(!speakable.length)return;
  roster.splice(0,roster.length,...speakable);
- // [2026-11-15 14:47 사장님] 사람 글이 없을 때 가끔 Gemini 대신 «브랜드 또 언제 해요?»·손님끼리 한두 마디
- if(!newestHuman){
-  const card0=await readDialogueCard(db,c.broadcast_id).catch(()=>null);
-  const roll=Math.random();
-  if(roll<.1&&await brandAskFlow(codeCtx,speakable.map(r=>r.actor),String(card0?.name||'')).catch(()=>false))return;
-  if(roll>=.1&&roll<.2&&await smallTalkStart(codeCtx,speakable.map(r=>r.actor),Boolean(card0)).catch(()=>false))return;
-  if(roll>=.2&&roll<.3&&await emojiFiller(codeCtx,speakable.map(r=>r.actor)).catch(()=>false))return;
-  if(roll>=.3&&roll<.4&&await purchaseMemoryFlow(codeCtx,speakable.map(r=>r.actor)).catch(()=>false))return;
- }
+ // No roulette choosing stock small talk, emoji filler or fake purchase memories.
  const recent=messages.filter(m=>m.badge!=='bot').map(m=>clean(m.body));
  const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));
  const notices=messages.filter(m=>m.badge==='bot'&&/^(c|o|p):/.test(String(m.bot_ref||''))).map(m=>clean(m.body));
  const transcript=[...messages].reverse().map(m=>`#${m.id} ${hhmm(m.created_at)} ${clean(m.nickname)||'알림'}(${roleOf(m)}): ${clean(m.body).slice(0,140)}`).join('\n');
- const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(처음 말하면 짧은 인사부터)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?(r.paid.includes('card')?'(카드결제 주문 — 결제 완료됨)':'(카드결제 주문 — 아직 결제 전, 카톡·링크 얘기 금지)'):''}${r.bankOrder&&!r.cardOrder?'(무통장 주문 — 계좌로 입금, 카드 결제 링크 없음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
+ const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(인사는 강제하지 않음)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?(r.paid.includes('card')?'(카드결제 주문 — 결제 완료됨)':'(카드결제 주문 — 아직 결제 전, 카톡·링크 얘기 금지)'):''}${r.bankOrder&&!r.cardOrder?'(무통장 주문 — 계좌로 입금, 카드 결제 링크 없음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
  const cardText=card?`${spokenCardName(card.name)} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
  // [2026-11-15 08:49] 최근 10분 걸러진 말(규칙 위반) — 같은 말을 계속 골라 30초마다 버려지며 조용해지던 것 막기
+ const roomSignals=await readRoomSignals(db,c.broadcast_id,now).catch(()=>({style:'실제 채팅 표본을 못 읽음',realOrderProducts:[] as string[]}));
  const rejectedLines=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle().then(r=>{try{const v=JSON.parse(String((r.data as {value?:unknown}|null)?.value??'[]'));return Array.isArray(v)?v.filter((e:Row)=>e&&e.result==='rejected'&&Date.parse(String(e.at))>now-600000).map((e:Row)=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6):[];}catch{return [];}},()=>[] as string[]);
  const prompt=[
   '너는 유튜브 라이브커머스 「루루동이」 사이트 채팅방에 있는 가상 손님들의 다음 한 마디를 정한다. 진짜 사람처럼 자연스러워야 한다.',
   '[할 일] 아래 대화 전체를 시간순으로 읽고, 가상 손님 목록 중 지금 말하는 게 자연스러운 한 명과 그 한 마디를 고른다. '+(newestHuman?'자연스러운 말이 정말 없을 때만 speaker를 빈 문자열로 둔다(침묵).':'발언은 선택이다. 방금 등록된 상품·진짜 질문·자기 주문 상태 중 맥락이 없거나 비슷한 말이 최근에 나오면 speaker를 빈 문자열로 두고 침묵한다. 이유 없이 말 수를 채우지 않는다.'),
+  '[대화 원칙] 하나의 실제 대화방이다. 인사·혼잣말·질문·답변의 순서나 메시지 개수는 미리 정하지 않는다. 누가 자기 닉네임을 부르면 그 맥락에 답하고, 다른 가상 손님이 말했더라도 질문이 분명하면 답할 수 있다. 같은 사람이 짧은 말을 연달아 할 수도 있지만 뒤 문장엔 앞 문장의 내용이 이어져야 한다. 이미 두 가상 손님이 차례로 맥락 없는 말을 했다면 새로운 이야기를 억지로 시작하지 말고 침묵한다. 답변할 글이 있을 때만 replyTo에 가장 최근 해당 실제 글 번호를 쓴다. 단순 감탄은 답이 없어도 된다.',
   '[답하기] 사장님·손님이 가상 손님을 부르거나 말을 걸었으면 그 가상 손님이 답한다. 줄임말·별명·닉네임 일부·오타로 불러도 문맥으로 판단한다(예: 여름한아름 → 한아름님, 포도다람쥐 → 포도님). 사이트알림(주문 감사·카드결제 링크·결제 확인)과 이어지는 말이면 그 흐름대로 답한다(카드결제 링크 안내는 «결제하라»는 뜻 — «확인했어요·볼게요» 답 금지, 답한다면 «넵!»«넹~»«네 알겠습니다»«알겠습니당»처럼 짧게만, 안 해도 됨. 그 손님 결제확인 알림(«카드결제완료 감사합니다»·«입금완료 감사합니다»)이 뜬 뒤에만 «카결 완료했어요·결제완료했습니다»처럼 짧게, 가끔은 «카결했어요 확인 부탁드려요·결제했습니다 확인해주세요»처럼 확인을 부탁해도 됨). 주문서를 낸 손님은 가끔 «주문서 넣었어요 확인 부탁드려요»처럼 확인을 부탁해도 된다(매번은 아님). 답할 때 replyTo에 그 글 번호를 넣는다.',
   '[말투] 실제 방송 채팅처럼 보통 2~25자 한 문장. 띄어쓰기·맞춤법은 느슨해도 된다. 사람마다 어미를 다르게(~요/~용/~여/~유/~당/~죠?), 웃음·이모지는 사람마다·상황마다 다르게: 대부분은 안 붙이고, 붙일 땐 ㅋ 하나·ㅋㅋㅋㅋㅋ·ㅎ·ㅎㅎㅎ·😊🥰😆 같은 이모지·~·!! 중 바로 앞 글들과 다른 것으로(매번 ㅋㅋ·ㅎㅎ 두 개 금지, 진지한 질문·아쉬운 말엔 웃음 금지). 문장도 «입금했습니다 확인 부탁드려요»처럼 간결하게 끝내기도 한다. 상품번호는 손님처럼 줄여 부른다: 프라다=프라·프라다·푸라닭·프·프라땡·pd, 막스마라=막스·막땡·막지마라·mx, 몽클레어=몽·몽클·몽ㅋ·mc, 버버리=버·버버·버땡·bb + 번호(예: 프222·버땡58·몽ㅋ319·mx117). 흔한 유형: 가격 질문, 사이즈 고민(66이면 라지 될까요?), 번호로 묻기, 짧은 감탄(이쁘다/요고 귀엽네요), 결제·배송 질문, 다른 손님 질문에 짧게 거들기, 인사. 예시를 그대로 쓰지 말고 매번 새로 쓴다. 바로 앞 글들의 첫 단어·어미·문장 모양을 따라 하지 않는다(누가 하이 했으면 하이 금지). 한 글 안에서 같은 말을 두 번 쓰지 않는다. 고객센터·광고·설명 말투 금지.',
   '[웃음] 끝에 ㅋㅋ·ㅎㅎ 를 습관처럼 붙이지 말 것. 대부분은 웃음 없이 끝내고, 붙일 때도 ㅋ 하나·ㅋㅋㅋㅋ·이모지처럼 매번 다르게.',
   '[말투 다양하게] 같은 뜻이라도 사람마다 쓰는 모양이 다르다: 띄어쓰기를 잘하는 사람·다 붙여 쓰는 사람, 끝에 마침표(.)나 ^^ 찍는 사람, ~당·~여·~용·~욤처럼 어미를 살짝 바꾸는 사람, 「?.?」「~~」「!!!!」처럼 부호를 늘이는 사람. 최근 채팅에 나온 말투와 같은 모양으로 쓰지 말 것.',
-  '[실제 채팅 분석 적용] 기존 약 4,800줄 자료의 특징은 상품 질문·색 고민·사이즈 고민 중심이고 주문 완료 보고는 드물다. 상품명이 모호하거나 현재 카드가 아니면 임의 보충 금지. 혼잣말을 연속 생성하지 말고 침묵한다.',
-  '[상품] 상품 얘기는 «지금 상품 카드» 상품만 한다(카드가 없으면 상품 얘기 대신 인사·짧은 반응). 사이트알림에 나온 다른 손님의 장바구니·주문 상품 이름·색은 말하지 않는다(지금 소개 중인 상품이 아님). 카드에 없는 색 이름 금지.',
+  '[실제 채팅 분석 적용] 실시간 및 지난 방송의 사람 채팅은 상품 번호·색상·사이즈를 구체적으로 묻고 실제 대화에 반응한다. 예문을 복사하거나 인사를 채워 넣지 않는다. 첫 발언이라고 인사를 할 필요 없다. 방송 중 확인할 수 있는 상품·대화 맥락이 없으면 침묵한다. 주문/결제 완료 보고와 유입 경로·구독·팔로우 자랑은 자동으로 만들어 내지 않는다. 같은 주제의 글이 연속되지 않도록 한다.',
+  '[상품] 상품 얘기는 «지금 상품 카드» 상품만 한다. 카드가 없고 진짜 손님에게 답할 이유도 없으면 speaker는 빈 문자열로 두고 침묵한다. 카드가 없다는 이유로 인사나 빈말을 만들지 않는다. 사이트알림에 나온 다른 손님의 장바구니·주문 상품 이름·색은 말하지 않는다. 카드에 없는 색 이름 금지.',
   '[질문은 내 것만] 가상 손님은 방송 목소리를 듣지 못하고 정답을 모른다. 다른 손님 질문(사이즈 추천 등)에 답하거나 «~면 M 하시면 돼요» 같은 추천·안내를 절대 하지 않는다. 사이즈 얘기는 자기 키·몸무게를 말하고 몇 사이즈를 입으면 되는지 «추천을 받는» 질문만 한다 — S·M·L·엑라·2 같은 사이즈를 먼저 말하지 않는다. 아무도 안 물었는데 혼자 결론 내지 않는다. 상품 치수·핏·소재를 물을 땐 반드시 어느 상품인지 상품번호(줄임말+번호, 예: 버110·몽346)를 넣고, 사이즈 질문은 키·몸무게를 같이 말하고 사이즈는 묻기만 한다 — 예: 「버110 160에 52인데 몇 입으면 될까요?」「BB-58 안에 두꺼운 거 입으려면 168에 62인데 뭐가 맞을까요?」「몽346 키 165 몸무게 58이면 몇 사이즈요?」. «블랙 XL도 핏 예쁘겠당»처럼 사이즈를 집어 감탄하거나 상품번호 없이 핏·치수 얘기를 하지 않는다. 주어 없이 «베이지 엑라 커요?»·«요고 품번이 뭐예여?»처럼 묻지 않는다 — 무엇을 가리키는지 꼭 말한다: 「지금 입으신 거 품번이 뭐예요?」「방금 보여주신 와인색 품번 알려주세요」. «요고·이거·그거»만 쓰지 않는다. «S면 맞을까요?»처럼 사이즈를 콕 집어 묻지 않는다. 36·38 같은 숫자 사이즈도 집지 않는다. 같은 손님은 사이즈 질문을 한 번만 한다(이미 물었으면 다시 묻지 않음 — 표현만 바꿔 다시 묻는 것도 금지).',
   '[내 얘기는 1인칭] 사이트알림 「○○님 … 주문 감사합니다」의 ○○가 가상 손님 목록에 있으면 그건 그 손님 «본인» 주문이다. 그 손님이 말할 땐 자기 이름을 남처럼 부르지 않고(「별빛님도 주문하셨네요 축하해요」 금지) 「저 주문했어요 ㅎㅎ」처럼 1인칭으로만, 자기 주문을 스스로 축하하지 않는다. 다른 가상 손님은 남의 주문에 굳이 축하하지 않는다.',
   '[반복 금지] 각 가상 손님의 «이미 한 말»과 같은 뜻을 또 하지 않는다(카톡 확인하겠다고 이미 했으면 다시 카톡 얘기 금지 — 다른 짧은 반응이나 침묵). 진짜 손님은 «카톡 확인했어요»«주문완료했어요» 같은 보고를 거의 안 한다 — 다른 가상 손님이 최근에 한 보고는 아무도 또 하지 않고, «장바구니 담았어요»는 하지 않는다. 대신 카드 상품 질문(색·사이즈·보여 달라·두 개 중 뭐가 나은지)을 더 자주 한다.',
@@ -766,9 +758,11 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   '[루루동이] 매장·샵·오프라인 가게·별도 앱이 없다. 주문은 이 사이트에서 상품을 담고 주문서를 내는 것뿐이다. 없는 장소·경로를 지어내지 않는다.',
   '[사실] 상품 얘기는 지금 상품 카드 정보만 근거로 한다(없는 색·사이즈·소재·가격을 지어내지 않는다). 해 본 적 없는 구매·사용·배송받은 경험, 친구 소개 같은 이야기를 지어내지 않는다. 주문했다는 말은 주문이 있는 손님만, 결제 완료 말은 결제확인 받은 손님만. 영상·소리를 보거나 들은 척하지 않는다. 자기가 지금 뭘 보는 중인지 설명하지 않는다. 테스트·AI·가상·시스템 같은 말 금지.',
   // RURU_OFF_PHASE_20261118: paused and replay are two distinct situations, not one generic off mode.
-  `[상황] 지금 ${mode==='live'?'실시간 생방송 중. 서버에서 확인된 현재 상품 카드에만 반응하고 질문하거나 고민한다. 실제 대화가 없으면 침묵한다.':mode==='paused'?'실제 방송이 끝나 송출만 멈춰 둔 상태. 방송 종료 버튼 여부와 무관하게 대화에서는 방송이 끝난 것으로 간주한다. 종료·놓친 아쉬움·다음 방송 질문은 가능하지만 현재 진행 중인 것처럼 질문하거나 재개 시각을 지어내지 않는다.':'생방송이 끝났거나 지금 라이브가 아닌 다시보기 상태. 놓친 아쉬움·다음 방송 문의·다시보기에서 상품 선택에 관한 말만 드물게 한다. 재개/다음 방송 시각을 지어내지 않고, 진행자가 지금 보여주거나 답할 것처럼 요청하지 않는다.'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
+  `[상황] 지금 ${mode==='live'?'실시간 생방송 중. 서버에서 확인된 현재 상품 카드에만 반응하고 질문하거나 고민한다. 실제 대화가 없으면 침묵한다.':mode==='paused'?'실제 송출은 멈춰 있지만 상품카드는 남아 있고 주문서도 연동될 수 있다. 현재 상품카드를 보며 색상·디자인·가격·사이즈 관련 의견이나 질문은 가능하다. 다만 진행자가 즉시 답하거나 착용해 주는 것으로 가정하지 않는다. 재개 시각을 지어내지 않는다.':'생방송은 끝났지만 상품카드와 다시보기를 볼 수 있다. 현재 보이는 상품에 관해 간결한 생각이나 질문을 드물게 할 수 있다. 재개/다음 방송 시각을 지어내거나 진행자가 지금 답·시연할 것처럼 요청하지 않는다.'}. 한국 시각 ${k.toISOString().slice(0,16).replace('T',' ')} ${weekday}요일${weekend?' 주말(업무·출근·점심시간 얘기 금지)':''}. 밤에 아침인사, 낮에 잘자요 금지.`,
   ...(nextShow?[`[다음 방송] 관리자 안내: «${clean(pausedRaw).slice(0,80)}» → ${nextShow.when} 방송 예정. 가끔 «${nextShow.when} 방송 때 올게요»처럼 말해도 된다. 날짜·시간을 바꾸거나 지어내지 말 것.`]:[]),
   `[지금 상품 카드] ${cardText}`,
+  `[실제 채팅의 관찰 통계 — 말투를 복사하거나 횟수를 강제하지 말 것] ${roomSignals.style}`,
+  `[해당 방송 실제 고객 주문에서 관심이 있었던 품목 — 테스트 주문 제외] ${roomSignals.realOrderProducts.join(' / ')||'없음'}. 현재 카드와 일치할 때만 관심 주제로 참고. 다른 사람이 주문했다는 사실을 입에 올리거나 주문량·인기를 지어내지 않는다. 고객 개인 정보·주문 상태·결제 정보는 발언 금지.`,
   ...(rejectedLines.length?[`[방금 규칙에 걸려 버려진 말 — 이런 말·비슷한 말은 다시 고르지 말 것(다른 손님이나 다른 얘기, 또는 침묵)]\n${rejectedLines.join('\n')}`]:[]),
   subscribeOn?'[구독 무배] 지금 «유튜브 구독 인증하면 배송비 무료» 행사 중 — 구독 인증은 이 사이트 주문서 화면에서 유튜브 구독 캡처를 올리는 것이다. 처음 온 손님이 가끔 «구독하면 무배?»«구독 인증 어디서 해요?»처럼 묻거나, 주문한 손님이 «주문서 낼 때 구독 인증했어요»라고 할 수 있다. 다른 곳(샵·매장·앱)에서 신청했다는 말 금지.':'[구독 무배] 지금 구독 무료배송 행사 없음 — 구독·무배·무료배송 얘기 금지.',
   '[배송 사실 — 손님도 이미 아는 것] 해배=해외배송이고 평균 2~3주 걸린다(쇼핑도우미 안내에도 있음). 국내 일반 상품은 2~3일. 상품이 해외배송인지는 상품에 이미 표시돼 있으니 «해외배송인가요?»«해배인가요?»«국내배송이에요?» 같이 묻지 않는다. 배송 기간·방식을 단정하거나 «오래 걸리네» 같은 평가, 쇼핑도우미·루루동이 안내에 반박·대꾸하는 말 절대 금지. 배송 얘기는 웬만하면 하지 않는다.'+(card?.overseas?' 지금 카드 상품은 해외배송 — 아주 가끔 «주문하면 언제쯤 받아요?» 정도 질문만 허용.':' 지금 카드 상품은 해외배송이 아니다 — 배송 얘기 금지.'),
@@ -784,7 +778,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  try{const p=JSON.parse(ans.text||'{}');if(p&&typeof p==='object')pick=p as Row;}catch{/* 침묵 */}
  const speaker=roster.find(r=>r.actor.nickname===String(pick.speaker||'').trim())||null;
  const replyId=Number(pick.replyTo)||0;
- const target0=replyId?messages.find(m=>Number(m.id)===replyId&&!m.automation_actor_id&&m.badge!=='bot')||null:null;
+ const target0=replyId?messages.find(m=>Number(m.id)===replyId&&m.badge!=='bot'&&now-Date.parse(String(m.created_at))<150000)||null:null; // May be a real person OR another TEST actor.
  // 사람 새 글이 있는데 글 번호를 안 줬으면 그 글에 대한 반응으로 봄(사람 글 뒤엔 «답»만 들어갈 수 있음)
  const target=target0||(newestHuman&&speaker?newestHuman:null);
  const acceptable=(t:string,r:(typeof roster)[number],tgt:Row|null)=>{
@@ -828,7 +822,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   // [2026-11-15 08:26 사장님] 주말이라서 담는 게 아님(주말에도 방송함) — «방송 시간 아닌데도 다시보기로 주문» 이 맞는 말
   if(/(주말|평일|휴일|일요일|토요일)(에도|이라|이니|인데)/.test(t)&&/담|주문|사|구매|편하/.test(t))return false;
   if(learning?.bad.length&&duplicateLine(t,learning.bad))return false;
-  if(r.first&&!tgt&&!GREET.test(t))return false;
+  // First-time actors may be silent, answer a person, or discuss a grounded product.
   // [19:33 사장님] «네 감사합니다»류는 그 손님이 감사·안내를 받았을 때만 — 인사·남의 글·알림 뒤에 뜬금없이 안 함
   if(/^(네|넵|넹)?\s*(감사(합니다|해요|해용|합니당)|고맙(습니다|습니당|어요))[\s~!.😊🙏ㅎ]*$/.test(t.trim())&&!(tgt&&/감사|고마|드려요|드릴게요|보내|확인|챙겨|축하|당첨|선물|포인트/.test(clean(tgt.body))&&mentionsNickname(clean(tgt.body),String(r.actor.nickname||''))))return false;
   return true;
@@ -852,14 +846,26 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    const recentForGate:ChatObservation[]=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||'')}));
    const quality=judgeTestChat({text,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate});
    if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
+   if(text){
+    const room:RoomTurnRow[]=messages.map(m=>({id:Number(m.id),at:Date.parse(String(m.created_at||'')),
+      actorId:m.automation_actor_id?String(m.automation_actor_id):null,
+      kind:(m.badge==='bot'?'system':m.automation_actor_id?'ai':'human') as RoomTurnRow['kind']}));
+    const priorProduct=[...actions].filter(a=>typeof planOf(a).chatProductKey==='string'&&String(planOf(a).chatProductKey)).sort((a,b)=>
+      Date.parse(String((b as Action&{created_at?:unknown}).created_at||''))-Date.parse(String((a as Action&{created_at?:unknown}).created_at||'')))[0]?.plan;
+    const roomPolicy=assessRoomTurn({now,mode:latestMode,
+      currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:'',
+      previousProductKey:priorProduct?String(priorProduct.chatProductKey||''):'',
+      replyToId:target?Number(target.id):0,speakerId:String(speaker.actor.id),room});
+    if(!roomPolicy.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'room:'+roomPolicy.reason});}
+   }
  }
  // 사람 글은 한 번만 판단 — 침묵이어도 그 글 번호를 남겨 같은 글로 Gemini 를 다시 부르지 않음
- const sourceId=target?Number(target.id):newestHuman?Number(newestHuman.id):null;
+ const sourceId=target&&!target.automation_actor_id?Number(target.id):newestHuman?Number(newestHuman.id):null;
  const who=speaker&&text?speaker:(sourceId?roster[0]:null);
  if(!who)return;
- const kind=speaker&&text&&target?'reply':'chat';
+ const kind=speaker&&text&&target&&!target.automation_actor_id?'reply':'chat';
  try{await automationRpc(db,'live_automation_ai_admission',{p_actor:who.actor.id,p_kind:kind})}catch(e){void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:'막힘 '+String((e as Error)?.message||e).slice(0,40),result:'blocked'});return}
- const action=await automationRpc<Action>(db,'live_automation_action',{p_session:who.session.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,mode},p_manual:false,p_source:sourceId,p_revision:c.revision});
+ const action=await automationRpc<Action>(db,'live_automation_action',{p_session:who.session.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,mode,chatProductKey:card?`${card.productId}:${card.detailName}`:'',replyToAi:target?.automation_actor_id?Number(target.id):null},p_manual:false,p_source:sourceId,p_revision:c.revision});
  const claimed=await automationRpc<Action|null>(db,'live_automation_claim',{p_action:action.id,p_revision:c.revision});
  if(!claimed)return;
  const skip=(message:string)=>automationRpc(db,'live_automation_complete',{p_action:claimed.id,p_lease:claimed.lease_token,p_status:'skipped',p_result:{ok:false,message}}).catch(()=>{});
