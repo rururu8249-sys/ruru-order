@@ -667,7 +667,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   rows<Row>(db.from('live_automation_cart_holds').select('session_id,items').in('session_id',sessions.map(s=>s.id)).gt('expires_at',new Date(now).toISOString())),
   rows<Row>(db.from('orders').select('automation_actor_id,product_name,color,size,payment_method,order_group_id,created_at').in('automation_actor_id',ids).eq('broadcast_id',c.broadcast_id).neq('is_deleted',true)),
   rows<Action>(db.from('live_automation_actions').select('*').eq('campaign_id',c.id).gte('created_at',new Date(now-3600000).toISOString()).limit(500)),
-  rows<Row>(db.from('live_chat_messages').select('id,nickname,body,created_at,badge,bot_ref,automation_actor_id').eq('broadcast_id',c.broadcast_id).is('hidden_at',null).order('id',{ascending:false}).limit(40)),
+  rows<Row>(db.from('live_chat_messages').select('id,nickname,body,created_at,badge,bot_ref,automation_actor_id,automation_action_id').eq('broadcast_id',c.broadcast_id).is('hidden_at',null).order('id',{ascending:false}).limit(40)),
   db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle(),
   rows<Row>(db.from('live_automation_payment_events').select('actor_id,kind').eq('campaign_id',c.id).eq('status','sent').limit(500)),
   rows<Row>(db.from('live_chat_messages').select('automation_actor_id').eq('broadcast_id',c.broadcast_id).in('automation_actor_id',ids).limit(2000)),
@@ -895,14 +895,16 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    const quality=judgeTestChat({text,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate});
    if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
    if(text){
+    // Join each AI message to the actual action that produced it, so the
+    // room can distinguish a reply to a customer from a fresh product topic.
+    const actionById=new Map(actions.map(a=>[String(a.id),a]));
     const room:RoomTurnRow[]=messages.map(m=>({id:Number(m.id),at:Date.parse(String(m.created_at||'')),
       actorId:m.automation_actor_id?String(m.automation_actor_id):null,
-      kind:(m.badge==='bot'?'system':m.automation_actor_id?'ai':'human') as RoomTurnRow['kind']}));
-    const priorProduct=[...actions].filter(a=>typeof planOf(a).chatProductKey==='string'&&String(planOf(a).chatProductKey)).sort((a,b)=>
-      Date.parse(String((b as Action&{created_at?:unknown}).created_at||''))-Date.parse(String((a as Action&{created_at?:unknown}).created_at||'')))[0]?.plan;
+      kind:(m.badge==='bot'?'system':m.automation_actor_id?'ai':'human') as RoomTurnRow['kind'],
+      responseToId:Number(actionById.get(String(m.automation_action_id||''))?.source_message_id)||0,
+      asksQuestion:/[?？]|나요|까요|어때|뭐가/.test(clean(m.body))}));
     const roomPolicy=assessRoomTurn({now,mode:latestMode,
-      currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:'',
-      previousProductKey:priorProduct?String(priorProduct.chatProductKey||''):'',
+      currentProductKey:card?`${card.productId}:${card.detailName}`:'',
       replyToId:target?Number(target.id):0,speakerId:String(speaker.actor.id),room});
     if(!roomPolicy.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'room:'+roomPolicy.reason});}
    }
