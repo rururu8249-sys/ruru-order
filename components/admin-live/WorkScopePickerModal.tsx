@@ -54,7 +54,7 @@ export default function WorkScopePickerModal({work,currentLabel,allOrders,curren
       :'선택한 범위에 작업할 주문이 없습니다. 방송이나 날짜를 다시 선택해 주세요.');return;}
     // Keep both paid and unpaid in the data, even in paid-only display mode:
     // the existing picker must still allow "미결제 보기" without reloading.
-    onConfirm({kind,label:label.trim()||'선택한 범위',orders:eligible,includeUnpaid:paymentView==='all'});
+    onConfirm({kind,label:label.trim()||'선택한 범위',orders:eligible,includeUnpaid:paymentView==='all',canceledCount:summary.canceled});
   };
   const labelCls='flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface px-3 py-3 text-[13px] font-semibold';
   const stat=(s:WorkScopeSummary)=>scopeCountLabel(s);
@@ -95,14 +95,20 @@ export default function WorkScopePickerModal({work,currentLabel,allOrders,curren
         <section className="rounded-xl border border-line bg-surface-2/40 p-3" aria-label="실제 작업할 주문서 수" aria-live="polite">
           <div className="flex items-center justify-between gap-2 text-sm font-black text-ink">
             <span>{work==='picking'?'챙길 주문서':'송장 출력할 주문서'}</span>
-            <strong className="text-[23px] tabular-nums">{summary.eligible}건</strong>
+            <strong className="text-[23px] tabular-nums">{visibleCount}건</strong>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 text-[13px]">
             <div className="rounded-lg bg-surface px-3 py-2"><span className="block text-ink-soft">결제완료</span><strong className="text-base text-ink tabular-nums">{summary.paid}건</strong></div>
             <div className="rounded-lg bg-surface px-3 py-2"><span className="block text-ink-soft">미결제·확인대기</span><strong className="text-base text-ink tabular-nums">{summary.unpaid}건</strong></div>
           </div>
-          {(summary.canceled>0||summary.excluded>0)?<p className="mt-2 text-[11px] leading-relaxed text-ink-mute">
-            제외: {summary.canceled>0?`주문취소 ${summary.canceled}건`:''}{summary.canceled>0&&summary.excluded>0?' · ':''}{summary.excluded>0?`기타 제외 ${summary.excluded}건`:''} — 위 주문서 수에는 포함하지 않습니다.
+          {work==='picking'?<p className="mt-2 text-[12px] font-semibold text-ink-soft">
+            {paymentView==='all'
+              ? `미결제 포함 ${summary.eligible}건 = 결제완료 ${summary.paid}건 + 미결제 ${summary.unpaid}건`
+              : `결제완료 ${summary.paid}건만 보기 · 미결제 ${summary.unpaid}건은 목록에서 숨김`}
+          </p>:null}
+          {(summary.canceled>0||summary.excluded>0)?<p className="mt-1.5 text-[11px] leading-relaxed text-ink-mute">
+            {summary.canceled>0?`주문서 취소 ${summary.canceled}건 (별도 · 정상 주문서 집계 제외)`:''}
+            {summary.canceled>0&&summary.excluded>0?' · ':''}{summary.excluded>0?`작업 제외 ${summary.excluded}건 (별도)`:''}
           </p>:null}
         </section>
         {work==='picking'?<section className="rounded-xl border border-line p-3" aria-label="물건챙기기 결제 상태 표시">
@@ -110,11 +116,11 @@ export default function WorkScopePickerModal({work,currentLabel,allOrders,curren
           <div className="grid grid-cols-2 gap-2">
             <label className={`flex cursor-pointer flex-col gap-1 rounded-lg border px-3 py-3 text-[12px] ${paymentView==='paid'?'border-ink bg-surface-2':'border-line'}`}>
               <span className="flex items-center gap-2 font-bold"><input type="radio" name="picking-payment-view" checked={paymentView==='paid'} onChange={()=>{setPaymentView('paid');setError('')}} className="accent-ink"/> 결제완료만 보기</span>
-              <span className="pl-6 text-ink-soft">{summary.paid}건</span>
+              <span className="pl-6 text-ink-soft">결제완료 {summary.paid}건</span>
             </label>
             <label className={`flex cursor-pointer flex-col gap-1 rounded-lg border px-3 py-3 text-[12px] ${paymentView==='all'?'border-ink bg-surface-2':'border-line'}`}>
               <span className="flex items-center gap-2 font-bold"><input type="radio" name="picking-payment-view" checked={paymentView==='all'} onChange={()=>{setPaymentView('all');setError('')}} className="accent-ink"/> 미결제 포함 보기</span>
-              <span className="pl-6 text-ink-soft">{summary.eligible}건 (완료 {summary.paid} + 미결제 {summary.unpaid})</span>
+              <span className="pl-6 text-ink-soft">총 {summary.eligible}건 · 결제완료 {summary.paid}건 + 미결제 {summary.unpaid}건</span>
             </label>
           </div>
           <p className="mt-2 text-[11px] text-ink-mute">물건챙기기 화면 안에서도 미결제를 다시 보거나 숨길 수 있어요. 미결제 주문도 데이터에서 빼지 않습니다.</p>
