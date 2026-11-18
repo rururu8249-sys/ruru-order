@@ -18,6 +18,8 @@ export default function AutoTestOrderSettings(){
  const [busy,setBusy]=useState(false),[runningOnce,setRunningOnce]=useState(false);
  const [pace,setPace]=useState<'low'|'normal'|'high'>('normal');
  const [chatPace,setChatPace]=useState<'low'|'normal'|'high'>('normal');
+ const [orderRate,setOrderRate]=useState(50),[chatRate,setChatRate]=useState(50);
+ const savedRates=useRef({order:50,chat:50}),rateDragging=useRef(false);
  const [memoryPublic,setMemoryPublic]=useState(false);
  const reads=useRef(0),writing=useRef(false);
  const load=useCallback(async()=>{
@@ -27,7 +29,9 @@ export default function AutoTestOrderSettings(){
      const r=await fetch('/api/admin-live/auto-test-order',{cache:'no-store'}),j=await r.json();
      if(stamp!==reads.current)return;
      if(!r.ok||!j.ok)throw Error(j.message||'실행 상태를 확인하지 못했어요.');
-     setState(j.state);setPace(j.pace==='low'||j.pace==='high'?j.pace:'normal');setChatPace(j.chatPace==='low'||j.chatPace==='high'?j.chatPace:'normal');setMemoryPublic(j.memoryPublic===true);setUsage(Array.isArray(j.gemini)?j.gemini:[]);setOrders(Number(j.testOrders)||0);setError('');
+     setState(j.state);setPace(j.pace==='low'||j.pace==='high'?j.pace:'normal');setChatPace(j.chatPace==='low'||j.chatPace==='high'?j.chatPace:'normal');
+     if(!rateDragging.current){const o=Number.isSafeInteger(j.orderRate)?j.orderRate:50,ch=Number.isSafeInteger(j.chatRate)?j.chatRate:50;setOrderRate(o);setChatRate(ch);savedRates.current={order:o,chat:ch};}
+     setMemoryPublic(j.memoryPublic===true);setUsage(Array.isArray(j.gemini)?j.gemini:[]);setOrders(Number(j.testOrders)||0);setError('');
    }catch(e){if(stamp===reads.current)setError(e instanceof Error?e.message:'연결을 확인해 주세요.');}
  },[]);
  const active=Boolean(state?.orders||state?.chat||state?.viewers||state?.manualAction||runningOnce);
@@ -61,6 +65,19 @@ export default function AutoTestOrderSettings(){
    if(next===chatPace||writing.current)return;const prev=chatPace;setChatPace(next);setError('');
    try{await post({action:'chat-pace',pace:next});showAdminToast(next==='low'?'AI 채팅을 적게 해요.':next==='high'?'AI 채팅을 많이 해요.':'AI 채팅 양을 보통으로 했어요.','success')}
    catch(e){setChatPace(prev);setError(e instanceof Error?e.message:'다시 시도해 주세요.')}
+ };
+ const saveRate=async(kind:'order'|'chat',value:number)=>{
+   if(writing.current||!state?.ready||!Number.isSafeInteger(value)||value<0||value>100)return;
+   if(value===savedRates.current[kind])return;
+   writing.current=true;setBusy(true);setError('');
+   try{
+     await post({action:kind==='order'?'order-rate':'chat-rate',percent:value});
+     savedRates.current={...savedRates.current,[kind]:value};
+     showAdminToast(`${kind==='order'?'주문':'채팅'} 양 ${value}% 저장됐어요.`,'success');
+   }catch(e){
+     if(kind==='order')setOrderRate(savedRates.current.order);else setChatRate(savedRates.current.chat);
+     setError(e instanceof Error?e.message:'비율을 저장하지 못했어요.');
+   }finally{writing.current=false;setBusy(false);void load();}
  };
  const toggleMemory=async()=>{
    if(writing.current)return;const next=!memoryPublic;setMemoryPublic(next);setError('');
@@ -103,15 +120,30 @@ export default function AutoTestOrderSettings(){
    <div className="mt-3 space-y-1.5" role="group" aria-label="자동 실행 기능">
      {([['orders','자동 주문'],['chat','AI 채팅'],['viewers','시청자 입장·퇴장']] as const).map(([key,label])=><button key={key} type="button" role="switch" aria-checked={Boolean(state?.[key])} aria-label={label} disabled={!state||busy||!state.ready} onClick={()=>void control(key,!state?.[key])} className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-2.5 text-left text-[13px] font-semibold text-ink transition hover:bg-surface-2 disabled:opacity-50"><span>{label}</span><span className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-bold ${state?.[key]?'bg-ink text-white':'border border-line bg-surface text-ink-soft'}`}>{state?.[key]?'켜짐':'꺼짐'}</span></button>)}
    </div>
-   <div className="mt-3 rounded-xl border border-line bg-surface-2/40 p-2.5">
-     <div className="flex items-center justify-between gap-2">
-       <span className="text-[12px] font-bold text-ink">주문 양</span>
-       <div className="flex min-w-0 gap-1" role="group" aria-label="주문 양">{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={pace===k} disabled={!state?.ready} onClick={()=>void changePace(k)} className={`min-h-9 rounded-lg px-2 text-[12px] font-bold transition disabled:opacity-50 ${pace===k?'bg-ink text-white':'border border-line bg-surface text-ink'}`}>{l}</button>)}</div>
+   <div className="mt-3 space-y-4 rounded-xl border border-line bg-surface-2/40 p-3">
+     <div role="group" aria-label="주문 양">
+       <div className="mb-2 flex items-center justify-between"><label htmlFor="ruru-order-rate" className="text-[12px] font-bold text-ink">주문 양</label><output htmlFor="ruru-order-rate" className="text-[15px] font-black tabular-nums text-ink">{orderRate}%</output></div>
+       <input id="ruru-order-rate" type="range" min="0" max="100" step="1" value={orderRate} disabled={!state?.ready||busy} aria-label="주문량 1퍼센트 단위 조절"
+         onChange={e=>setOrderRate(Number(e.currentTarget.value))} onPointerDown={()=>{rateDragging.current=true}}
+         onPointerUp={e=>{rateDragging.current=false;void saveRate('order',Number(e.currentTarget.value))}}
+         onPointerCancel={()=>{rateDragging.current=false}}
+         onKeyUp={e=>void saveRate('order',Number(e.currentTarget.value))}
+         onBlur={e=>{rateDragging.current=false;void saveRate('order',Number(e.currentTarget.value))}}
+         className="h-8 w-full cursor-pointer accent-ink" />
+       <div className="flex justify-between text-[10px] text-ink-mute"><span>0% · 새 테스트 주문 중지</span><span>100% · 최대</span></div>
      </div>
-     <div className="mt-2 flex items-center justify-between gap-2">
-       <span className="text-[12px] font-bold text-ink">채팅 양</span>
-       <div className="flex min-w-0 gap-1" role="group" aria-label="채팅 양">{([['low','적게'],['normal','보통'],['high','많게']] as const).map(([k,l])=><button key={k} type="button" aria-pressed={chatPace===k} disabled={!state?.ready} onClick={()=>void changeChatPace(k)} className={`min-h-9 rounded-lg px-2 text-[12px] font-bold transition disabled:opacity-50 ${chatPace===k?'bg-ink text-white':'border border-line bg-surface text-ink'}`}>{l}</button>)}</div>
+     <div role="group" aria-label="채팅 양">
+       <div className="mb-2 flex items-center justify-between"><label htmlFor="ruru-chat-rate" className="text-[12px] font-bold text-ink">채팅 양</label><output htmlFor="ruru-chat-rate" className="text-[15px] font-black tabular-nums text-ink">{chatRate}%</output></div>
+       <input id="ruru-chat-rate" type="range" min="0" max="100" step="1" value={chatRate} disabled={!state?.ready||busy} aria-label="채팅량 1퍼센트 단위 조절"
+         onChange={e=>setChatRate(Number(e.currentTarget.value))} onPointerDown={()=>{rateDragging.current=true}}
+         onPointerUp={e=>{rateDragging.current=false;void saveRate('chat',Number(e.currentTarget.value))}}
+         onPointerCancel={()=>{rateDragging.current=false}}
+         onKeyUp={e=>void saveRate('chat',Number(e.currentTarget.value))}
+         onBlur={e=>{rateDragging.current=false;void saveRate('chat',Number(e.currentTarget.value))}}
+         className="h-8 w-full cursor-pointer accent-ink" />
+       <div className="flex justify-between text-[10px] text-ink-mute"><span>0% · AI 채팅 중지</span><span>100% · 최대</span></div>
      </div>
+     <p className="text-[11px] leading-relaxed text-ink-mute">손을 떼거나 방향키로 조절하면 저장돼요. 비율은 테스트 자동화 강도이며 시간당 건수를 보장하지 않아요. 기존 안전 제한과 실제 주문은 그대로 유지돼요.</p>
    </div>
    <div className="mt-3 space-y-1 text-[12px] text-ink-soft">
      {state?.viewers?<p>시청 중 <strong className="text-ink">{state.activeViewers}명</strong></p>:null}

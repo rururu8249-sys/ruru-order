@@ -7,6 +7,7 @@ import {readAutoTestRows,deleteAutoTestOrders} from '@/lib/autoTestOrderServer';
 import {readGeminiUsage} from '@/lib/geminiGate';
 import {readLearning,refreshLearning,removeLearning} from '@/lib/liveAutomationLearningServer';
 import type {AutomationFeature} from '@/lib/liveAutomation';
+import {ORDER_RATE_KEY,CHAT_RATE_KEY,ratePercent,legacyPercent,percentValid} from '@/lib/liveAutomationRate';
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
 export const maxDuration=60;
@@ -20,8 +21,8 @@ export async function GET(request:NextRequest){
  if(!await verifyAdminSessionFromRequest(request))return fail('관리자 로그인이 필요해요.',401);
  try{
    const db=getServiceClient();
-   const [state,rows,gemini,paceRow,learning,chatPaceRow,memoryRow]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle(),readLearning(db),db.from('settings').select('value').eq('key',CHAT_PACE_KEY).maybeSingle(),db.from('settings').select('value').eq('key','live_automation_memory_public').maybeSingle()]);
-   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value),chatPace:paceOf((chatPaceRow.data as {value?:unknown}|null)?.value),learning:learning.notes,memoryPublic:String((memoryRow.data as {value?:unknown}|null)?.value??'').includes('on')},{headers:{'Cache-Control':'no-store'}});
+   const [state,rows,gemini,paceRow,learning,chatPaceRow,memoryRow,orderRateRow,chatRateRow]=await Promise.all([readAutomationState(db),readAutoTestRows(db,null),readGeminiUsage(db),db.from('settings').select('value').eq('key',PACE_KEY).maybeSingle(),readLearning(db),db.from('settings').select('value').eq('key',CHAT_PACE_KEY).maybeSingle(),db.from('settings').select('value').eq('key','live_automation_memory_public').maybeSingle(),db.from('settings').select('value').eq('key',ORDER_RATE_KEY).maybeSingle(),db.from('settings').select('value').eq('key',CHAT_RATE_KEY).maybeSingle()]);
+   return NextResponse.json({ok:true,state,testOrders:new Set(rows.map(r=>String(r.order_group_id))).size,gemini,pace:paceOf((paceRow.data as {value?:unknown}|null)?.value),chatPace:paceOf((chatPaceRow.data as {value?:unknown}|null)?.value),orderRate:ratePercent((orderRateRow.data as {value?:unknown}|null)?.value,(paceRow.data as {value?:unknown}|null)?.value),chatRate:ratePercent((chatRateRow.data as {value?:unknown}|null)?.value,(chatPaceRow.data as {value?:unknown}|null)?.value),learning:learning.notes,memoryPublic:String((memoryRow.data as {value?:unknown}|null)?.value??'').includes('on')},{headers:{'Cache-Control':'no-store'}});
  }catch{return fail('실행 상태를 확인하지 못했어요.',503)}
 }
 export async function POST(request:NextRequest){
@@ -36,9 +37,28 @@ export async function POST(request:NextRequest){
      const state=await controlAutomation(db,body.feature as AutomationFeature|'all',body.enabled,body.revision);
      return NextResponse.json({ok:true,state});
    }
+   // 0..100% are TEST generation intensity, not real orders or a guaranteed hourly count.
+   if(body.action==='order-rate'){
+     if(!percentValid(body.percent))return fail('주문량은 0~100 사이 정수여야 합니다.');
+     const saved=await db.from('settings').upsert([{key:ORDER_RATE_KEY,value:String(body.percent)},{key:PACE_KEY,value:'high'}],{onConflict:'key'});
+     if(saved.error)throw Error('ORDER_RATE_SAVE');
+     // Replan distant waves; pending submissions continue unchanged.
+     const camps=await db.from('live_automation_campaigns').select('id,next_order_at').eq('orders_enabled',true);
+     for(const c of (camps.data||[]) as {id:string;next_order_at:string|null}[]){
+       if(!c.next_order_at||Date.parse(c.next_order_at)-Date.now()>120000)
+         await db.rpc('live_automation_plan_tempo',{p_campaign:c.id,p_quiet:body.percent===0});
+     }
+     return NextResponse.json({ok:true,orderRate:body.percent});
+   }
+   if(body.action==='chat-rate'){
+     if(!percentValid(body.percent))return fail('채팅량은 0~100 사이 정수여야 합니다.');
+     const saved=await db.from('settings').upsert([{key:CHAT_RATE_KEY,value:String(body.percent)}],{onConflict:'key'});
+     if(saved.error)throw Error('CHAT_RATE_SAVE');
+     return NextResponse.json({ok:true,chatRate:body.percent});
+   }
    if(body.action==='pace'){
      if(!['low','normal','high'].includes(body.pace))return fail('주문 양을 확인해 주세요.');
-     const saved=await db.from('settings').upsert([{key:PACE_KEY,value:body.pace}],{onConflict:'key'});
+     const saved=await db.from('settings').upsert([{key:PACE_KEY,value:body.pace},{key:ORDER_RATE_KEY,value:String(legacyPercent(body.pace))}],{onConflict:'key'});
      if(saved.error)throw Error('PACE_SAVE');
      // 다음 주문이 2분보다 멀면 새 양으로 바로 다시 계획
      const camps=await db.from('live_automation_campaigns').select('id,next_order_at').eq('orders_enabled',true);
@@ -54,7 +74,7 @@ export async function POST(request:NextRequest){
    }
    if(body.action==='chat-pace'){
      if(!['low','normal','high'].includes(body.pace))return fail('채팅 양을 확인해 주세요.');
-     const saved=await db.from('settings').upsert([{key:CHAT_PACE_KEY,value:body.pace}],{onConflict:'key'});
+     const saved=await db.from('settings').upsert([{key:CHAT_PACE_KEY,value:body.pace},{key:CHAT_RATE_KEY,value:String(legacyPercent(body.pace))}],{onConflict:'key'});
      if(saved.error)throw Error('PACE_SAVE');
      return NextResponse.json({ok:true,chatPace:body.pace});
    }

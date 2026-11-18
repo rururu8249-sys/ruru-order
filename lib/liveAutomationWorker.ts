@@ -11,6 +11,7 @@ import {runConversations} from './liveAutomationConversation';
 import {flushDeferredOrderNotices} from './liveAutomationDirector';
 import {interleaveOrderStages,planOrderJourney,isNightKst} from './liveAutomationTempo';
 import {streamModeOf} from './autoTestOrderServer';
+import {ORDER_RATE_KEY,ratePercent,admitTestOrderPercent} from './liveAutomationRate';
 type Wave={id:string;mode:string;at:string;offsets:number[];planned?:boolean};
 type LiveCampaign=Campaign & {tempo_plan?:Wave;next_chat_at?:string|null};
 const nowIso=()=>new Date().toISOString();
@@ -91,6 +92,10 @@ function planLines(picks:AutoTestPick[]):AutomationLine[] {
  return picks.map(({productId,productName,color,size,unitPrice,qty})=>({productId,productName,color:color==='없음'?'':color,size:size==='없음'?'':size,unitPrice,qty}));
 }
 async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettings) {
+ const rateRead=await db.from('settings').select('value').eq('key',ORDER_RATE_KEY).maybeSingle();
+ if(rateRead.error)throw Error('ORDER_RATE_READ');
+ const orderRate=rateRead.data?ratePercent((rateRead.data as {value?:unknown}).value):null;
+ if(orderRate===0)return; // 0% stops NEW test orders, not existing pending orders.
  const pending=await rows<Action>(db.from('live_automation_actions').select('id,plan,status').eq('campaign_id',c.id).eq('kind','order').in('status',['pending','claimed','uncertain']).limit(12));
  // A slow shopper must not pause everyone. Bound the backlog and finish starting
  // the current wave before admitting another, but allow already-staged carts.
@@ -109,7 +114,8 @@ async function planWave(db:SupabaseClient,c:LiveCampaign,settings:AutoTestSettin
  // Expired schedules are replanned; resuming a worker never catches up a backlog.
  if(Date.parse(wave.at)<Date.now()-180000){await automationRpc(db,'live_automation_plan_tempo',{p_campaign:c.id,p_quiet:false});return;}
  const focus=await liveCardChoices(db,c.broadcast_id,choices); // 라이브 중엔 상품 카드 위주
- for(const offset of wave.offsets.slice(0,Math.min(8,12-pending.length))) {
+ for(const [offsetIndex,offset] of wave.offsets.slice(0,Math.min(8,12-pending.length)).entries()) {
+   if(orderRate!==null&&!admitTestOrderPercent(orderRate,String(wave.id),offsetIndex))continue;
    await automationRpc(db,'live_automation_order_admission',{p_campaign:c.id,p_action:null});
    let picks:AutoTestPick[]=[];
    for(let attempt=0;attempt<5;attempt++){
