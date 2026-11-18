@@ -557,17 +557,16 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
           {!scopeTooWide ? (
             <div className="mt-1.5 space-y-1.5">
               {loading ? <p className="text-[13px] font-semibold text-ink">챙김 상태 확인 중…</p> : (
-                <section aria-label="물건챙기기 주문서·상품 현황" className="rounded-lg border border-line bg-surface-2 px-2.5 py-1.5">
+                <section aria-label="물건챙기기 주문서 현황" className="rounded-lg border border-line bg-surface-2 px-2.5 py-1.5">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px] text-ink tabular-nums">
                     <strong className="text-[14px] font-black">{showUnpaid?'미결제 포함 정상 주문서':'결제완료 주문서'} {visibleOrderCount}건</strong>
                     <span>결제완료 <b className="font-black">{paidOrderCount}건</b></span>
                     <span className={unpaidOrderCount>0?'font-semibold text-danger-tx':'text-ink-soft'}>미결제 {unpaidOrderCount}건{!showUnpaid?' (표시 제외)':''}</span>
-                    {canceledCount>0?<span className="text-ink-mute">주문서 취소 {canceledCount}건 · 별도</span>:null}
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px] text-ink-soft tabular-nums">
                     <span className="font-black text-ink">남은 주문서 {remainingOrderCount}건</span>
                     <span>챙김 완료 {visibleOrderCount-remainingOrderCount}건</span>
-                    <span>상품 수량 {totalAll}개 · 챙김 {gotAll}개 · 남은 상품 {remainAll}개</span>
+                    {canceledCount>0?<span className="text-ink-mute">주문서 취소 {canceledCount}건 · 별도</span>:null}
                   </div>
                   <div className="mt-1 h-1 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width]" style={{width:`${pct}%`}} /></div>
                 </section>
