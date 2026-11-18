@@ -27,7 +27,7 @@ import { pulledForOf, shortDateWithWeekday } from "@/lib/orderPickPull";
 import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
-type Props = { orders: LiveOrder[]; fullBroadcastOrders?: LiveOrder[]; broadcastId?: string | null; filterLabel: string; scopeTooWide?: boolean; selectedCount?: number; scopeLocked?: boolean; onClose: () => void };
+type Props = { orders: LiveOrder[]; fullBroadcastOrders?: LiveOrder[]; broadcastId?: string | null; filterLabel: string; scopeTooWide?: boolean; selectedCount?: number; scopeLocked?: boolean; initialShowUnpaid?: boolean; onClose: () => void };
 
 /** 줄 종류 — normal(이 출고 주문) · past(지난 주문을 이 출고로 넘김) · late(범위 밖 늦은 입금) · repick(상품 변경 뒤 다시 챙기기) */
 export type PickKind = "normal" | "past" | "late" | "repick";
@@ -129,7 +129,7 @@ export function includedNote(rows: readonly PickRow[]): string {
 const productKey = (r: PickRow) => `${r.productId || ""}|${r.productName}`;
 const optionKey = (r: PickRow) => `${r.color}|${r.size}|${r.optionText}`;
 
-export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcastId, filterLabel, scopeTooWide = false, selectedCount = 0, scopeLocked = false, onClose }: Props) {
+export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcastId, filterLabel, scopeTooWide = false, selectedCount = 0, scopeLocked = false, initialShowUnpaid = true, onClose }: Props) {
   // [2026-11-05] 선택 모드 = 주문서에서 체크한 주문만(필터·기간 무관). 서버 «오늘 추가 작업»(범위 밖 늦은 입금·다시 챙기기)은 안 붙인다 — 고른 주문만 보이게.
   const selectionMode = selectedCount > 0 || scopeLocked;
   // Immutable explicit scope chosen before opening; no asynchronous period auto-switch.
@@ -147,7 +147,7 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
   const [dragDx, setDragDx] = useState(0);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   // [2026-11-03 사장님 「돈 안 받았어도 챙겨야 할 때가 있다, 총 몇 개 옆에 (미결제 N)」] 기본 = 미결제도 같이 보임(줄마다 빨간 「미결제」), 「미결제 숨기기」로 뺄 수 있음
-  const [showUnpaid, setShowUnpaid] = useState(true);
+  const [showUnpaid, setShowUnpaid] = useState(initialShowUnpaid);
   const [search, setSearch] = useState("");
   const [extraOrders, setExtraOrders] = useState<LiveOrder[]>([]);
   const [extraError, setExtraError] = useState("");
