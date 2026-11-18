@@ -11,7 +11,6 @@
 //   숫자: 챙길 개수 = 결제완료 기준(챙긴 n / 챙길 N). 미결제는 「미결제 N」으로 따로 보이고, 사장님 판단으로 챙길 수는 있다.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ordersForPeriod, periodAt, periodName, periodTimeLabel, type BroadcastWorkPeriod } from "@/lib/broadcastWorkPeriods";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
 import { colorNameSwatch, isLightSwatch } from "@/lib/colorNameSwatch";
 import { savePicking } from "@/lib/orderPicking";
@@ -28,7 +27,7 @@ import { pulledForOf, shortDateWithWeekday } from "@/lib/orderPickPull";
 import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
-type Props = { orders: LiveOrder[]; fullBroadcastOrders?: LiveOrder[]; broadcastId?: string | null; filterLabel: string; scopeTooWide?: boolean; selectedCount?: number; onClose: () => void };
+type Props = { orders: LiveOrder[]; fullBroadcastOrders?: LiveOrder[]; broadcastId?: string | null; filterLabel: string; scopeTooWide?: boolean; selectedCount?: number; scopeLocked?: boolean; onClose: () => void };
 
 /** 줄 종류 — normal(이 출고 주문) · past(지난 주문을 이 출고로 넘김) · late(범위 밖 늦은 입금) · repick(상품 변경 뒤 다시 챙기기) */
 export type PickKind = "normal" | "past" | "late" | "repick";
@@ -130,61 +129,11 @@ export function includedNote(rows: readonly PickRow[]): string {
 const productKey = (r: PickRow) => `${r.productId || ""}|${r.productName}`;
 const optionKey = (r: PickRow) => `${r.color}|${r.size}|${r.optionText}`;
 
-export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcastId, filterLabel, scopeTooWide = false, selectedCount = 0, onClose }: Props) {
+export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcastId, filterLabel, scopeTooWide = false, selectedCount = 0, scopeLocked = false, onClose }: Props) {
   // [2026-11-05] 선택 모드 = 주문서에서 체크한 주문만(필터·기간 무관). 서버 «오늘 추가 작업»(범위 밖 늦은 입금·다시 챙기기)은 안 붙인다 — 고른 주문만 보이게.
-  const selectionMode = selectedCount > 0;
-  const [periods, setPeriods] = useState<BroadcastWorkPeriod[]>([]);
-  const [periodLoading, setPeriodLoading] = useState(Boolean(broadcastId && !selectionMode));
-  const [periodError, setPeriodError] = useState("");
-  const [periodView, setPeriodView] = useState<"latest" | "previous" | "all">("all");
-  const [manualSplitOpen, setManualSplitOpen] = useState(false);
-  const [manualSplitAt, setManualSplitAt] = useState("");
-  const [manualSplitSaving, setManualSplitSaving] = useState(false);
-  const [manualSplitError, setManualSplitError] = useState("");
-  const saveManualSplit = async () => {
-    if (!broadcastId || manualSplitSaving) return;
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(manualSplitAt)) {
-      setManualSplitError("오전·저녁을 나눌 날짜와 시각을 입력해 주세요."); return;
-    }
-    const splitDate = new Date(`${manualSplitAt}:00+09:00`);
-    if (!Number.isFinite(splitDate.getTime()) || new Date(splitDate.getTime() + 9*60*60*1000).toISOString().slice(0,16) !== manualSplitAt) {
-      setManualSplitError("날짜와 시각을 다시 확인해 주세요."); return;
-    }
-    setManualSplitSaving(true); setManualSplitError("");
-    try {
-      const res = await fetch("/api/admin-live/broadcast-periods", {
-        method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",
-        body:JSON.stringify({action:"manualSplit",broadcastId,splitAt:splitDate.toISOString()})
-      });
-      const result = await res.json().catch(() => null);
-      if (!res.ok || !result?.ok) throw new Error(result?.message || "시각을 저장하지 못했어요.");
-      const read = await fetch(`/api/admin-live/broadcast-periods?${new URLSearchParams({broadcastId})}`,{cache:"no-store"});
-      const refreshed = await read.json().catch(() => null);
-      if (!read.ok || !refreshed?.ok || !Array.isArray(refreshed.periods) || refreshed.periods.length < 2)
-        throw new Error("구분은 저장됐지만 목록 갱신에 실패했어요. 창을 닫았다 다시 열어 주세요.");
-      setPeriods(refreshed.periods);
-      setPeriodView("latest"); setManualSplitOpen(false);
-      setPageIdx({product:0,customer:0}); setListOpen(false);
-    } catch (e) { setManualSplitError(e instanceof Error ? e.message : "저장에 실패했어요."); }
-    finally { setManualSplitSaving(false); }
-  };
-  useEffect(() => {
-    if (!broadcastId || selectionMode) { setPeriods([]); setPeriodView("all"); setPeriodLoading(false); return; }
-    let alive = true;
-    setPeriodLoading(true); setPeriodError(""); setPeriodView("all");
-    void fetch(`/api/admin-live/broadcast-periods?${new URLSearchParams({ broadcastId })}`, {cache:"no-store"})
-      .then(async r => { const j = await r.json(); if (!r.ok || !j?.ok) throw Error(j?.message || "구간 조회 실패"); return j.periods as BroadcastWorkPeriod[]; })
-      .then(rows => { if (alive) { setPeriods(rows); setPeriodView(rows.length > 1 ? "latest" : "all"); } })
-      .catch(() => { if (alive) setPeriodError("작업 구간 기록을 불러오지 못했어요. 방송 전체만 볼 수 있어요."); })
-      .finally(() => { if (alive) setPeriodLoading(false); });
-    return () => { alive = false; };
-  }, [broadcastId, selectionMode]);
-  const activePeriod = periodView === "latest" ? periods.at(-1) : periodView === "previous" ? periods.at(-2) : null;
-  const chosenOrders = useMemo(() => {
-    if (selectionMode) return orders;
-    if (!broadcastId || !fullBroadcastOrders || periodLoading || periodError) return orders;
-    return activePeriod ? ordersForPeriod(fullBroadcastOrders,activePeriod) : fullBroadcastOrders;
-  }, [selectionMode, orders, broadcastId, fullBroadcastOrders, periodLoading, periodError, activePeriod]);
+  const selectionMode = selectedCount > 0 || scopeLocked;
+  // Immutable explicit scope chosen before opening; no asynchronous period auto-switch.
+  const chosenOrders = orders;
   // [10-25 20:51 사장님 「응」 — 물건챙기기 한 번에 다시 설계]
   //   보기는 «상품별»(한 장 = 상품 하나 → 옵션 → 누구에게 몇 개) · «손님별»(한 장 = 손님 하나 → 그 손님 물건 전부) 두 개뿐.
   //   ‹ › 버튼·손가락 좌우 밀기·PC ← → 키로 넘김, 끝에서 처음으로 끝없이 돈다.
@@ -223,7 +172,7 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
 
   const scopeBuilt = useMemo(() => buildPickRows(scopeTooWide ? [] : chosenOrders, "scope"), [chosenOrders, scopeTooWide]);
   // Extras from unrelated broadcasts are shown in 'all' only, never mixed into a shift.
-  const extraBuilt = useMemo(() => buildPickRows(scopeTooWide || activePeriod ? [] : extraOrders, "extra"), [extraOrders, scopeTooWide, activePeriod]);
+  const extraBuilt = useMemo(() => buildPickRows(scopeTooWide || selectionMode ? [] : extraOrders, "extra"), [extraOrders, scopeTooWide, selectionMode]);
   const allRows = useMemo(() => mergePickRows(scopeBuilt.rows, extraBuilt.rows).filter((r) => !removedIds.has(r.id)), [scopeBuilt, extraBuilt, removedIds]);
   const movedAway = scopeBuilt.movedAway;
   // [14:57 사장님] 진행 중 교환 — 바꿀 상품을 줄에 크게(챙길 때 바뀐 걸로 챙기게)
@@ -485,10 +434,7 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
   };
 
   // ── 그리기 ──
-  const tagOf = (r: PickRow) => (<>{r.issue === "교환" ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] font-semibold text-warn-tx ring-1 ring-warn-tx/40">교환 이슈</span> : null}{kindTag(r)}{periods.length > 1 && r.kind === "normal" ? (() => {
-    const period = periodAt(r.when,periods);
-    return <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${period?.id === periods.at(-1)?.id ? "bg-sky-100 text-sky-900" : "bg-surface-2 text-ink-soft"}`}>{period ? periodName(period,periods) : "구간 외"}</span>;
-  })() : null}</>);
+  const tagOf = (r: PickRow) => (<>{r.issue === "교환" ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] font-semibold text-warn-tx ring-1 ring-warn-tx/40">교환 이슈</span> : null}{kindTag(r)}</>);
   const kindTag = (r: PickRow) => r.kind === "normal" ? null : (
     <span className={`shrink-0 rounded px-1.5 py-0.5 text-[12px] font-semibold ${r.kind === "repick" ? "bg-warn-bg text-warn-tx" : "bg-ink text-white"}`}>{r.tag}</span>
   );
@@ -595,44 +541,11 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
             <div className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:gap-2">
               <h2 className="shrink-0 text-[20px] font-bold text-ink max-sm:text-[18px]">물건챙기기</h2>
               {selectionMode
-                ? <p className="mt-0.5 truncate text-[13px] font-semibold text-ink max-sm:mt-0 max-sm:text-[12px]">선택한 주문 {selectedCount}건<span className="font-normal text-ink-soft"> · 주문서에서 체크한 주문만</span></p>
+                ? <p className="mt-0.5 truncate text-[13px] font-semibold text-ink max-sm:mt-0 max-sm:text-[12px]">{scopeLocked ? filterLabel : `선택한 주문 ${selectedCount}건`}<span className="font-normal text-ink-soft">{scopeLocked ? ' · 선택한 범위만 표시' : ' · 주문서에서 체크한 주문만'}</span></p>
                 : <p className="mt-0.5 truncate text-[13px] text-ink-soft max-sm:mt-0 max-sm:text-[12px]">{String(filterLabel || "").replace(/^방송:\s*/, "") || "주문서 범위"}</p>}
             </div>
             <button type="button" onClick={onClose} aria-label="닫기" className="h-10 w-10 shrink-0 rounded-lg text-[22px] text-ink-soft hover:bg-surface-2">×</button>
           </div>
-          {!selectionMode && broadcastId && !scopeTooWide ? <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="방송 작업 구간">
-            {(["latest","previous","all"] as const).filter(value => value === "all" || (value === "latest" ? periods.length > 1 : periods.length > 1)).map(value => (
-              <button key={value} type="button" disabled={periodLoading || !!periodError || (value === "previous" && periods.length < 2)}
-                aria-pressed={periodView === value}
-                onClick={() => { setPeriodView(value); setPageIdx({product:0,customer:0}); setListOpen(false); }}
-                className={`min-h-9 rounded-lg border px-3 text-[12px] font-bold ${periodView === value ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink"}`}>
-                {value === "latest" ? "이번 구간" : value === "previous" ? "이전 구간" : "방송 전체"}
-              </button>
-            ))}
-            {activePeriod ? <span className="text-[11px] text-ink-mute">{periodName(activePeriod,periods)} · {periodTimeLabel(activePeriod)}부터</span> : null}
-            {periodLoading ? <span className="text-[11px] text-ink-mute">구간 확인 중…</span> : null}
-            {periodError ? <span className="text-[11px] text-danger-tx">{periodError}</span> : null}
-            {!periodLoading && !periodError && periods.length === 0 ? <span className="text-[11px] text-ink-mute">재개 기록 없음 · 아래에서 구분 시각을 지정할 수 있어요</span> : null}
-            {activePeriod ? <span className="text-[11px] text-ink-mute">늦은 입금·재챙김은 방송 전체에서 확인</span> : null}
-          </div> : null}
-          {!selectionMode && broadcastId && !scopeTooWide && !periodLoading && !periodError && periods.length < 2 ? (
-            <div className="mt-2 rounded-lg border border-line bg-surface px-3 py-2">
-              {!manualSplitOpen ? (
-                <button type="button" onClick={() => {setManualSplitOpen(true);setManualSplitError("");}} className="min-h-10 text-[13px] font-bold text-ink underline underline-offset-2">기존 방송 오전·저녁 나누기 (구분 시각 지정)</button>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="manual-picking-split" className="text-[13px] font-bold text-ink">저녁 방송이 시작된 시각 · 한국시간</label>
-                  <input id="manual-picking-split" type="datetime-local" value={manualSplitAt} onChange={e=>setManualSplitAt(e.target.value)} className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 text-[16px] text-ink" />
-                  <p className="text-[12px] text-ink-soft">입력한 시각 전 주문은 1차, 이후 주문은 2차로 표시합니다. 주문·입금·챙김 기록은 변경되지 않아요.</p>
-                  {manualSplitError ? <p role="alert" className="text-[12px] font-semibold text-danger-tx">{manualSplitError}</p> : null}
-                  <div className="flex gap-2">
-                    <button type="button" disabled={manualSplitSaving || !manualSplitAt} onClick={() => void saveManualSplit()} className="min-h-10 rounded-lg bg-ink px-4 text-[13px] font-bold text-white disabled:opacity-40">{manualSplitSaving ? "저장 중…" : "구간 저장"}</button>
-                    <button type="button" disabled={manualSplitSaving} onClick={() => {setManualSplitOpen(false);setManualSplitError("");}} className="min-h-10 rounded-lg border border-line px-4 text-[13px] text-ink">취소</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : null}
           {!scopeTooWide ? (
             <div className="mt-3 flex flex-col max-sm:mt-1.5">
               {/* [2026-11-03 사장님 「18개가 미입금 포함이야?」] 숫자 3칸(결제완료·챙김·남은) + 미입금은 따로 한 줄 — 숫자 계산 무변경 */}

@@ -4,7 +4,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import LivePickingPanel from "./LivePickingPanel";
-import {periodAt, periodName, type BroadcastWorkPeriod} from "@/lib/broadcastWorkPeriods";
+import WorkScopePickerModal from "./WorkScopePickerModal";
+import type {WorkScopeChoice,WorkScopeKind} from "@/lib/adminWorkScope";
 import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import LiveCartHoldsModal from "./LiveCartHoldsModal";
 import { supabase } from "@/lib/supabase";
@@ -480,6 +481,7 @@ type Props = {
   pickingBaseOrders?: LiveOrder[];
   /** Full exact-broadcast range for packing, independent of selected calendar date. */
   allBroadcastPickingOrders?: LiveOrder[];
+  allWorkOrders?: LiveOrder[];
   selectedPickingBroadcastId?: string | null;
   allOrderCount: number;
   selectedOrderId: string;
@@ -505,6 +507,7 @@ export default function LiveOrderTable({
   countBaseOrders,
   pickingBaseOrders,
   allBroadcastPickingOrders,
+  allWorkOrders,
   selectedPickingBroadcastId,
   allOrderCount,
   selectedOrderId,
@@ -595,24 +598,22 @@ export default function LiveOrderTable({
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
   const [exportConfirm, setExportConfirm] = useState<"" | "rozen" | "picking">("");
   const [pickingOpen, setPickingOpen] = useState(false);
-  const [visibleWorkPeriods, setVisibleWorkPeriods] = useState<BroadcastWorkPeriod[]>([]);
-  useEffect(() => {
-    if (!selectedPickingBroadcastId) { setVisibleWorkPeriods([]); return; }
-    let alive = true;
-    const read = () => { void fetch(`/api/admin-live/broadcast-periods?${new URLSearchParams({broadcastId:selectedPickingBroadcastId})}`, {cache:"no-store"})
-      .then(async r => { const data = await r.json(); if (!r.ok || !data?.ok) throw Error("조회 실패"); return data.periods as BroadcastWorkPeriod[]; })
-      .then(rows => {if(alive) setVisibleWorkPeriods(rows);})
-      .catch(() => {if(alive) setVisibleWorkPeriods([]);}); };
-    read();
-    const timer = window.setInterval(() => {if(document.visibilityState === "visible") read();},30000);
-    return () => { alive=false; window.clearInterval(timer); };
-  },[selectedPickingBroadcastId]);
-  const workPeriodBadge = (order:LiveOrder) => {
-    if (visibleWorkPeriods.length < 2 || !selectedPickingBroadcastId || order.broadcastId !== selectedPickingBroadcastId) return null;
-    const period = periodAt(order.createdAt || order.submittedAt,visibleWorkPeriods);
-    if (!period) return null;
-    const last = visibleWorkPeriods.at(-1)?.id === period.id;
-    return <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-bold ${last ? "bg-sky-100 text-sky-900" : "bg-surface-2 text-ink-soft"}`} title="같은 방송 안의 작업 구간">{periodName(period,visibleWorkPeriods)}</span>;
+  const [workPickerKind,setWorkPickerKind] = useState<""|"invoice"|"picking">("");
+  const [pickingChosenLabel,setPickingChosenLabel] = useState("");
+  const [invoiceScopeOrders,setInvoiceScopeOrders] = useState<LiveOrder[]|null>(null);
+  const [invoiceScopeMeta,setInvoiceScopeMeta] = useState<{kind:WorkScopeKind;label:string}>({kind:'current',label:'현재 필터'});
+  type InvoiceHistory={id:string;created_at:string;scope_label:string;export_mode:string;order_count:number;line_count:number;order_snapshot:Array<{groupId:string;orderNo:string;items:Array<{product:string;option:string;qty:number}>}>};
+  const [invoiceHistory,setInvoiceHistory] = useState<InvoiceHistory[]>([]);
+  const [invoiceHistoryOpen,setInvoiceHistoryOpen]=useState(false);
+  const [invoiceHistoryError,setInvoiceHistoryError]=useState("");
+  const [invoiceHistoryBusy,setInvoiceHistoryBusy]=useState(false);
+  const readInvoiceHistory=async()=>{
+    setInvoiceHistoryBusy(true);setInvoiceHistoryError('');
+    try {const res=await fetch('/api/admin-live/invoice-export-history',{cache:'no-store'});
+      const j=await res.json();if(!res.ok||!j.ok)throw Error(j.message||'출력 이력 조회 실패');
+      setInvoiceHistory(Array.isArray(j.history)?j.history:[]);
+    }catch(e){setInvoiceHistoryError(e instanceof Error?e.message:'조회 실패');}
+    finally{setInvoiceHistoryBusy(false)}
   };
   // Keep the opened work batch visible even when a live completion changes workFilter.
   // Resolve current order data by ID, so cancellations/payment updates still apply.
@@ -836,7 +837,8 @@ export default function LiveOrderTable({
     () => workFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
     [workFilteredOrders]
   );
-  const paidOnlyExportOrders = exportableOrders.filter((order) =>
+  const invoiceCandidates = invoiceScopeOrders || exportableOrders;
+  const paidOnlyExportOrders = invoiceCandidates.filter((order) =>
     ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus ?? "")
   );
   // [㉕-C] 송장 «새로 출력» 대상 — 결제완료 중 아직 송장 안 뽑았고 출고완료도 아닌 것.
@@ -854,7 +856,7 @@ export default function LiveOrderTable({
   const toggleSelectOrder = (id: string) => {
     setSelectedOrderIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   };
-  const selectedExportOrders = orders.filter((o) => selectedOrderIds.has(String(o.id)) && o.paymentStatus !== "canceled");
+  const selectedExportOrders = invoiceCandidates.filter((o) => selectedOrderIds.has(String(o.id)) && o.paymentStatus !== "canceled");
   // 물건챙기기 «선택 모드» 대상 — 체크한 주문 그대로(취소 줄도 넘겨 창의 「취소/제외」 대조에 쓰고, 목록에선 창이 뺀다).
   const pickingSelectedFromTable = useMemo(() => orders.filter((o) => selectedOrderIds.has(String(o.id))), [orders, selectedOrderIds]);
 
@@ -1016,44 +1018,58 @@ export default function LiveOrderTable({
     .map(part => (part === '현재 방송' && pickingCurrentBroadcastLabel ? `방송: ${pickingCurrentBroadcastLabel}` : part))
     .join(' · ') + (filters.scope === 'shop' ? ' · 쇼핑몰 주문' : filters.scope === 'broadcast' ? ' · 방송 주문' : '');
 
-  const runExport = async (kind: "rozen" | "picking", orders: LiveOrder[], filterLabel: string) => {
-    if (orders.length === 0) {
-      showAdminToast("내보낼 주문이 없습니다. 필터를 확인해주세요.", "warning");
-      return;
-    }
+  const runExport = async (kind: "rozen" | "picking", selected: LiveOrder[], label: string, exportMode:'new'|'paid'|'selected'|'all'='paid') => {
+    const eligible=kind==='rozen'?selected.filter(o=>o.excludeFromShipping!==true):selected;
+    if(!eligible.length){showAdminToast('내보낼 주문이 없습니다.','warning');return;}
     setExporting(kind);
     try {
-      if (kind === "rozen") {
-        // [2026-10-23] 진행 중 교환은 송장 상품명에 「[교환: A XS → S]」 — 바뀐 걸 송장에서도 알아보게
-        const exchangeByItemId = await fetchExchangeMarks(orders.map((o) => String(o.orderNo || o.groupId || "")));
-        await exportLiveOrdersForRosen(orders, { filterLabel, exchangeByItemId });
-        // [㉕-C] 송장 출력 기록 — 송장제외 아닌 주문의 invoice_printed_at 을 «처음 출력 시각»으로만 채운다(재출력 막지 않음).
-        try {
-          const ids = orders.filter((o) => o.excludeFromShipping !== true).map((o) => Number(o.id)).filter((n) => Number.isFinite(n) && n > 0);
-          const now = new Date().toISOString();
-          for (let i = 0; i < ids.length; i += 500) {
-            const { error } = await supabase.from("orders").update({ invoice_printed_at: now }).is("invoice_printed_at", null).in("id", ids.slice(i, i + 500));
-            if (error) throw error;
-          }
-          if (ids.length > 0) void onRefresh?.();
-        } catch {
-          showAdminToast("송장은 받았는데 출력 기록 저장에 실패했어요.", "warning");
-        }
-      } else {
-        await exportLiveOrdersForPicking(orders, { filterLabel });
+      if(kind==='rozen'){
+        const exchangeByItemId=await fetchExchangeMarks(eligible.map(o=>String(o.orderNo||o.groupId||'')));
+        await exportLiveOrdersForRosen(eligible,{filterLabel:label,exchangeByItemId});
+        // This event is recorded only AFTER the Excel file was generated successfully.
+        const snapshot=eligible.map(o=>({groupId:String(o.groupId||o.id),orderNo:String(o.orderNo||o.groupId||o.id),
+          items:o.items.map(it=>({product:String(it.productName||'상품'),option:String(it.optionText||[it.color,it.size].filter(Boolean).join(' ')),qty:Number(it.qty)||1}))}));
+        try{
+          const resp=await fetch('/api/admin-live/invoice-export-history',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({scopeKind:invoiceScopeMeta.kind,scopeLabel:label||invoiceScopeMeta.label,exportMode,orders:snapshot})});
+          const audit=await resp.json().catch(()=>null);
+          if(!resp.ok||!audit?.ok)throw Error(audit?.message||'송장 출력 이력 저장 실패');
+          if(invoiceHistoryOpen)void readInvoiceHistory();
+        }catch(e){showAdminToast('송장 엑셀은 생성됐지만 출력 이력 저장에 실패했어요.\n'+(e instanceof Error?e.message:String(e)),'warning');}
+        const ids=[...new Set(eligible.flatMap(o=>o.rowIds).filter(n=>Number.isSafeInteger(n)&&n>0))];
+        try{
+          const now=new Date().toISOString();
+          for(let i=0;i<ids.length;i+=500){const {error}=await supabase.from('orders').update({invoice_printed_at:now}).is('invoice_printed_at',null).in('id',ids.slice(i,i+500));if(error)throw Error(error.message);}
+          if(ids.length)void onRefresh?.();
+        }catch(e){showAdminToast('송장은 생성됐지만 주문별 최초 출력 표시 저장에 실패했어요.','warning');}
+      }else{
+        await exportLiveOrdersForPicking(eligible,{filterLabel:label});
       }
-    } finally {
-      setExporting("");
-    }
+    }catch(e){showAdminToast('엑셀 생성 실패\n'+(e instanceof Error?e.message:String(e)),'error');}
+    finally{setExporting('');setInvoiceScopeOrders(null)}
   };
 
   return (
     <>
+    {workPickerKind ? <WorkScopePickerModal
+      work={workPickerKind} allOrders={allWorkOrders || pickingSourceOrders}
+      currentOrders={workPickerKind==='invoice'?exportableOrders:(pickingScopeTooWide?[]:pickingModalSourceOrders)}
+      selectedOrders={pickingSelectedFromTable} broadcasts={broadcastCalendar} shopDates={shopOrderCalendar}
+      onClose={()=>setWorkPickerKind('')}
+      onConfirm={(selection:WorkScopeChoice)=>{
+        const kind=workPickerKind;setWorkPickerKind('');
+        if(kind==='picking'){
+          setPickingChosenLabel(selection.label);setPickingSelectedOrders(selection.orders);setPickingOpen(true);
+        }else{
+          setInvoiceScopeOrders(selection.orders);setInvoiceScopeMeta({kind:selection.kind,label:selection.label});
+          setInvoiceHistoryOpen(false);setExportConfirm('rozen');
+        }
+      }}/>:null}
     {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => { setCartHoldsOpen(false); void refreshCartHoldSummary(); }} /> : null}
 
     {pickingOpen ? (
           pickingSelectedOrders ? (
-            <LivePickingPanel orders={pickingSelectedOrders} filterLabel={`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); void onRefresh?.(); }} />
+            <LivePickingPanel orders={pickingSelectedOrders} filterLabel={pickingChosenLabel||`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} scopeLocked onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); setPickingChosenLabel(""); void onRefresh?.(); }} />
           ) : (
             <LivePickingPanel
               orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))}
@@ -1070,7 +1086,7 @@ export default function LiveOrderTable({
             {exportConfirm === "rozen" ? "송장 출력" : "물건챙기기"}
           </div>
           <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginBottom: "20px", lineHeight: 1.8 }}>
-            <div>현재 필터 기준: <b>{exportableOrders.length.toLocaleString("ko-KR")}건</b></div>
+            <div>선택한 범위: <b>{invoiceScopeMeta.label}</b> · {invoiceCandidates.length.toLocaleString("ko-KR")}건</div>
             <div style={{ fontSize: "14px" }}>돈 받은 것(결제완료): <b style={{ color: "var(--color-ok-tx)", fontSize: "16px" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -1078,7 +1094,7 @@ export default function LiveOrderTable({
             {exportConfirm === "rozen" ? (
               <button type="button"
                 disabled={newInvoiceExportOrders.length === 0}
-                onClick={() => { setExportConfirm(""); void runExport("rozen", newInvoiceExportOrders, "새로 출력"); }}
+                onClick={() => { setExportConfirm(""); void runExport("rozen", newInvoiceExportOrders, invoiceScopeMeta.label+" · 새로 출력", "new"); }}
                 style={{ padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: newInvoiceExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: newInvoiceExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
                 새로 출력 (아직 안 뽑은 결제완료 {newInvoiceExportOrders.length.toLocaleString("ko-KR")}건)
                 <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력했거나 출고완료된 건은 빼요</div>
@@ -1088,7 +1104,7 @@ export default function LiveOrderTable({
             {/* 결제완료 전체 — rozen 에선 «다시 출력»(테두리), picking 에선 기본 추천(녹색/맨 위) */}
             <button type="button"
               disabled={paidOnlyExportOrders.length === 0}
-              onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, paidOnlyExportOrders, "결제완료"); }}
+              onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, paidOnlyExportOrders, invoiceScopeMeta.label+" · 결제완료", "paid"); }}
               style={exportConfirm === "rozen"
                 ? { padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }
                 : { padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
@@ -1101,7 +1117,7 @@ export default function LiveOrderTable({
 
             {selectedExportOrders.length > 0 ? (
               <button type="button"
-                onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, selectedExportOrders, `선택 ${selectedExportOrders.length}건`); }}
+                onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, selectedExportOrders, invoiceScopeMeta.label+` · 선택 ${selectedExportOrders.length}건`, "selected"); }}
                 style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: "14px", textAlign: "left" }}>
                 ✓ 선택한 {selectedExportOrders.length.toLocaleString("ko-KR")}건 출력
               </button>
@@ -1109,12 +1125,25 @@ export default function LiveOrderTable({
 
             {/* 미결제 포함 전체 — 작게/경고색/아래 */}
             <button type="button"
-              onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, exportableOrders, currentFilterLabel); }}
+              onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, invoiceCandidates, invoiceScopeMeta.label+" · 미결제 포함", "all"); }}
               style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-warn-tx)", background: "var(--color-warn-bg)", color: "var(--color-warn-tx)", fontWeight: 700, cursor: "pointer", fontSize: "12px", textAlign: "left" }}>
               ⚠️ 미결제 포함 전체 ({exportableOrders.length.toLocaleString("ko-KR")}건)
               <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.9, marginTop: "2px" }}>돈 안 들어온 주문도 포함됩니다</div>
             </button>
 
+            {exportConfirm==='rozen'?<div className="rounded-lg border border-line p-2 text-sm text-ink">
+              <button type="button" className="flex min-h-10 w-full items-center justify-between text-left font-bold" onClick={()=>{if(!invoiceHistoryOpen)void readInvoiceHistory();setInvoiceHistoryOpen(v=>!v)}}>
+                <span>최근 송장 엑셀 출력 이력</span><span>{invoiceHistoryOpen?'접기 −':'보기 +'}</span>
+              </button>
+              {invoiceHistoryOpen?<div className="max-h-48 space-y-2 overflow-y-auto border-t border-line pt-2 text-xs">
+                {invoiceHistoryBusy?<p>조회 중…</p>:invoiceHistoryError?<p className="text-danger-tx">{invoiceHistoryError}</p>:
+                invoiceHistory.length?invoiceHistory.map(h=><div key={h.id} className="rounded-lg bg-surface-2 p-2">
+                  <p className="font-bold">{new Date(h.created_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} · {h.order_count}건</p>
+                  <p className="mt-0.5 break-words">{h.scope_label} · {h.export_mode==='new'?'새로 출력':h.export_mode==='paid'?'결제완료':h.export_mode==='selected'?'선택 출력':'미결제 포함'}</p>
+                  <p className="mt-0.5 break-words text-ink-soft">{(h.order_snapshot||[]).slice(0,6).map(o=>`${o.orderNo}: ${o.items.map(it=>it.product).join('/')}`).join(' · ')}{h.order_count>6?' …':''}</p>
+                </div>):<p className="text-ink-mute">아직 출력 이력이 없어요.</p>}
+              </div>:null}
+            </div>:null}
             <button type="button" onClick={() => setExportConfirm("")}
               style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
               취소
@@ -1248,8 +1277,8 @@ export default function LiveOrderTable({
           )}
           <button
             type="button"
-            onClick={() => setExportConfirm("rozen")}
-            disabled={exporting !== "" || exportableOrders.length === 0}
+            onClick={() => setWorkPickerKind("invoice")}
+            disabled={exporting !== "" || (allWorkOrders||pickingSourceOrders).length === 0}
             className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
             title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
           >
@@ -1258,12 +1287,8 @@ export default function LiveOrderTable({
 
           <button
             type="button"
-            onClick={() => {
-              if (pickingSelectedFromTable.length > 0) { setPickingSelectedOrders(pickingSelectedFromTable); setPickingOpen(true); return; }
-              setPickingSelectedOrders(null);
-              setPickingOrderIds(new Set(pickingScopeTooWide ? [] : pickingModalSourceOrders.map(order => String(order.id)))); setPickingOpen(true);
-            }}
-            disabled={pickingSelectedFromTable.length === 0 && !pickingScopeTooWide && pickingScopeOrders.length === 0}
+            onClick={() => setWorkPickerKind("picking")}
+            disabled={(allWorkOrders||pickingSourceOrders).length===0}
             aria-label={pickingSelectedFromTable.length > 0 ? `물건챙기기 — 선택한 주문 ${pickingSelectedFromTable.length}건` : "물건챙기기 — 주문서 범위"}
             className={pickingSelectedFromTable.length > 0
               ? "rounded-xl border-2 border-ink bg-surface px-3 py-2 text-xs font-black text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1521,7 +1546,7 @@ export default function LiveOrderTable({
                           <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} className="h-5 w-5 shrink-0 accent-[var(--color-ink)]" />
                           <span className="min-w-0 truncate text-[14px] font-bold text-ink">{order.isTestOrder ? "[테스트]" : ""}{order.nickname}</span>
                           {order.name ? <span className="shrink-0 text-[13px] text-ink-soft">{order.name}</span> : null}
-                          <span className="ml-auto shrink-0 text-[12px] text-ink-mute tabular-nums">{when} {workPeriodBadge(order)}</span>
+                          <span className="ml-auto shrink-0 text-[12px] text-ink-mute tabular-nums">{when}</span>
                         </div>
                         <div className="mt-1 flex items-start gap-2">
                           <div className="min-w-0 flex-1 text-[14px] leading-snug text-ink [&_*]:!whitespace-normal line-clamp-2">{renderOrderSummary(order,true)}</div>
@@ -1583,7 +1608,7 @@ export default function LiveOrderTable({
                             const wd = ["일","월","화","수","목","금","토"][d.getDay()];
                             const hh = String(d.getHours()).padStart(2, "0");
                             const mi = String(d.getMinutes()).padStart(2, "0");
-                            return <><div>{yy}.{mm}.{dd}</div><div className="text-ink-mute">({wd}) {hh}:{mi}</div>{workPeriodBadge(order)}</>;
+                            return <><div>{yy}.{mm}.{dd}</div><div className="text-ink-mute">({wd}) {hh}:{mi}</div></>;
                           } catch { return <span className="text-[11px]">{src}</span>; }
                         })()}
                       </div>
