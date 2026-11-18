@@ -54,6 +54,12 @@ export function judgeTestChat(q:QualityInput):QualityResult {
  if(q.mode!=='live'&&intent==='size'&&!q.currentProductKey)return fail('off-size-talk');
  const recent=q.recent.filter(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-30*60_000);
  if(recent.some(r=>norm(r.text)===norm(text)))return fail('exact-repetition');
+ // Across TEST actors, repeating the same product's size question makes the
+ // room look automated even if height/weight or wording differs. This check
+ // never applies to real customer messages or payment/order notifications.
+ if(!q.priority&&intent==='size'&&q.currentProductKey&&recent.some(r=>
+   r.productKey===q.currentProductKey&&chatIntent(r.text)==='size'&&q.now-r.at<12*60_000
+ ))return fail('room-product-size-wave');
  if(!q.priority&&!q.replyingToHuman){
   if(isGenericRoomChatter(text)) {
    if(q.mode!=='live')return fail('off-air-generic-chatter');

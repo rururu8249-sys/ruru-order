@@ -21,6 +21,19 @@ export function parseDirectorChoice(raw:string|null, allowed:string[]):DirectorC
   return {speaker,text:body,replyTo:Number.isSafeInteger(id)&&id>0?id:0,reason:'ok'};
 }
 
+/** A chat turn may be labelled 'reply' only when the model names a real,
+ * recent target message ID. Never bind an unsolicited product question to the
+ * latest customer message just because both exist in the room. */
+export function resolveExplicitReplyTarget<T extends Record<string, unknown>>(
+  replyTo:number, messages:T[], now:number,
+):T|null {
+  if(!Number.isSafeInteger(replyTo)||replyTo<=0)return null;
+  return messages.find(m=>{
+    const age=now-Date.parse(String(m.created_at||''));
+    return Number(m.id)===replyTo&&m.badge!=='bot'&&Number.isFinite(age)&&age>=0&&age<150_000;
+  })||null;
+}
+
 export function shouldTryFocusedProductTurn(q:{
   now:number;mode:'live'|'paused'|'replay';hasProduct:boolean;hasPendingHuman:boolean;
   lastHumanAt:number;lastAiAt:number;lastFocusAt:number;
