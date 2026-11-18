@@ -1127,7 +1127,7 @@ export default function LiveOrderTable({
             <button type="button"
               onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, invoiceCandidates, invoiceScopeMeta.label+" · 미결제 포함", "all"); }}
               style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-warn-tx)", background: "var(--color-warn-bg)", color: "var(--color-warn-tx)", fontWeight: 700, cursor: "pointer", fontSize: "12px", textAlign: "left" }}>
-              ⚠️ 미결제 포함 전체 ({exportableOrders.length.toLocaleString("ko-KR")}건)
+              ⚠️ 미결제 포함 전체 ({invoiceCandidates.length.toLocaleString("ko-KR")}건)
               <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.9, marginTop: "2px" }}>돈 안 들어온 주문도 포함됩니다</div>
             </button>
 

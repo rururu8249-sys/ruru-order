@@ -14,6 +14,7 @@ assert.ok(!table.includes('broadcast-periods?'),'order table must not fetch peri
 assert.ok(table.includes('WorkScopePickerModal'),'both actions must select scope first');
 assert.ok(table.includes('setWorkPickerKind("invoice")')&&table.includes('setWorkPickerKind("picking")'),'button routes');
 assert.ok(table.includes('invoice-export-history'),'audit after success');
+assert.ok(table.includes('⚠️ 미결제 포함 전체 ({invoiceCandidates.length.toLocaleString("ko-KR")}건)'), 'invoice all-order button must count chosen scope, not stale table filter');
 assert.ok(dash.includes('쇼핑몰 주문 · ${count}건'),'shop date title');
 assert.ok(!periodApi.includes('.rpc("ruru_admin_split_broadcast_work_period"'),'no splitting RPC');
 assert.ok(periodApi.includes("'ruru_admin_set_broadcast_pause_period'"),'pause/resume unaffected');
