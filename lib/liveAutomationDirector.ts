@@ -5,6 +5,7 @@
 //   돈·주문·입금 무접촉 — 채팅 글 한 줄만(기존 /api/live-chat 경로 그대로).
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {callGeminiJson} from './geminiJson';
+import {parseDirectorChoice,shouldTryFocusedProductTurn,cardRemainsInRotation} from './liveAutomationFocus';
 import {readRoomSignals} from './liveAutomationRoomSignals';
 import {assessRoomTurn,type RoomTurnRow} from './liveAutomationTurnPolicy';
 import {duplicateLine,safeConversationLine} from './liveAutomationPersona';
@@ -19,6 +20,7 @@ import {falseExperience} from './liveAutomationDialogue';
 import {mentionsNickname} from './liveAutomationConversation';
 import {readEmojiSetting} from './liveChatEmojiServer';
 import {readDialogueCard} from './liveAutomationDialogueServer';
+import {computeWidgetFeatured} from './widgetFeaturedServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
 import {readLearning,refreshLearning} from './liveAutomationLearningServer';
@@ -738,7 +740,10 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const cardText=card?`${spokenCardName(card.name)} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
  // [2026-11-15 08:49] 최근 10분 걸러진 말(규칙 위반) — 같은 말을 계속 골라 30초마다 버려지며 조용해지던 것 막기
  const roomSignals=await readRoomSignals(db,c.broadcast_id,now).catch(()=>({style:'실제 채팅 표본을 못 읽음',realOrderProducts:[] as string[]}));
- const rejectedLines=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle().then(r=>{try{const v=JSON.parse(String((r.data as {value?:unknown}|null)?.value??'[]'));return Array.isArray(v)?v.filter((e:Row)=>e&&e.result==='rejected'&&Date.parse(String(e.at))>now-600000).map((e:Row)=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6):[];}catch{return [];}},()=>[] as string[]);
+ // Read recent decisions once, preserving an auditable cooldown for a focused retry.
+ const decisionLog:Row[]=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle().then(r=>{try{const v=JSON.parse(String((r.data as {value?:unknown}|null)?.value??'[]'));return Array.isArray(v)?v.filter((e:unknown):e is Row=>Boolean(e)&&typeof e==='object'&&!Array.isArray(e)):[];}catch{return [] as Row[];}},()=>[] as Row[]);
+ const rejectedLines=decisionLog.filter(e=>e.result==='rejected'&&Date.parse(String(e.at))>now-600000).map(e=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6);
+ const lastFocusAt=Math.max(0,...decisionLog.filter(e=>e.result==='focus-attempt').map(e=>Date.parse(String(e.at))||0));
  const prompt=[
   '너는 유튜브 라이브커머스 「루루동이」 사이트 채팅방에 있는 가상 손님들의 다음 한 마디를 정한다. 진짜 사람처럼 자연스러워야 한다.',
   '[할 일] 아래 대화 전체를 시간순으로 읽고, 가상 손님 목록 중 지금 말하는 게 자연스러운 한 명과 그 한 마디를 고른다. '+(newestHuman?'자연스러운 말이 정말 없을 때만 speaker를 빈 문자열로 둔다(침묵).':'발언은 선택이다. 방금 등록된 상품·진짜 질문·자기 주문 상태 중 맥락이 없거나 비슷한 말이 최근에 나오면 speaker를 빈 문자열로 두고 침묵한다. 이유 없이 말 수를 채우지 않는다.'),
@@ -774,8 +779,42 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   'JSON만 반환: {"speaker":"닉네임 또는 빈 문자열","replyTo":글번호 또는 0,"text":"한 마디"}',
  ].join('\n');
  const ans=await callGeminiJson(prompt,{timeoutMs:9000,maxTokens:300,maxAttempts:2,temperature:.9,priority:newestHuman?'interactive':'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
- let pick:Row={};
- try{const p=JSON.parse(ans.text||'{}');if(p&&typeof p==='object')pick=p as Row;}catch{/* 침묵 */}
+ const firstChoice=parseDirectorChoice(ans.text,roster.map(r=>String(r.actor.nickname)));
+ let pick:Row=firstChoice.reason==='ok'?{speaker:firstChoice.speaker,text:firstChoice.text,replyTo:firstChoice.replyTo}:{};
+ let lastModelNote=ans.note;
+ let choiceReason=firstChoice.reason;
+ let chosenPath='normal';
+ const lastHumanRow=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot');
+ const lastHumanAt=lastHumanRow?Date.parse(String(lastHumanRow.created_at))||0:0;
+ // A verified displayed product can merit a rare, grounded conversational turn.
+ // Retry once with a compact prompt if the full-context model returned no valid speaker.
+ // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
+ if(!firstChoice.speaker&&!/no_key|quota/.test(ans.note)&&shouldTryFocusedProductTurn({
+   now,mode,hasProduct:Boolean(card),hasPendingHuman:Boolean(newestHuman),
+   lastHumanAt,lastAiAt:lastAi,lastFocusAt
+ })){
+   await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:true,firstReason:firstChoice.reason,firstModel:ans.note.slice(0,85)});
+   const bucket=Math.floor(now/(10*60_000));
+   const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
+   const focusedPrompt=[
+    '너는 공개적으로 테스트 계정임이 표시되는 라이브커머스 채팅 시뮬레이션의 대화 생성기다.',
+    '이 방은 지금 잠시 조용하다. 한 번에 단 한 명이, 아래 확인된 상품카드에 관해 짧은 생각 또는 답변이 필요 없는 자연스러운 질문을 한 줄 작성한다. 인사를 채워 넣거나 남의 실제 구매·결제·경험을 자기 일로 말하지 않는다.',
+    '서로 다른 테스트 계정을 한꺼번에 등장시키거나 정해진 대화 순서를 만들지 않는다. 주어진 사실 외의 상품번호, 색, 소재, 재고, 가격을 만들어 내지 않는다.',
+    mode==='live'?'생방송 중이다.':'지금은 생방송 중이 아니다. 진행자에게 즉시 답하거나 입어달라는 요청은 금지한다.',
+    `[현재 검증된 상품] ${cardText}`,
+    `[최근 채팅] ${[...messages].reverse().filter(m=>m.badge!=='bot').slice(-5).map(m=>clean(m.body).slice(0,65)).join(' / ')||'없음'}`,
+    `[참여 가능한 테스트 닉네임] ${candidates.map(r=>r.actor.nickname).join(' / ')}`,
+    '단 한 개의 채팅만 선택하고 다른 사람 이름이나 주문 수를 지어내지 말 것. 상품 코드가 명시돼 있으면 질문에 그 코드를 쓰고, 조언보다는 의견이나 질문을 짧게 남긴다.',
+    'JSON만 반환: {"speaker":"위 목록에서 정확히 하나","replyTo":0,"text":"짧은 상품 관련 발언"}'
+   ].join('\n');
+   const focused=await callGeminiJson(focusedPrompt,{timeoutMs:12000,maxTokens:200,maxAttempts:2,temperature:.8,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
+   const retryChoice=parseDirectorChoice(focused.text,candidates.map(r=>String(r.actor.nickname)));
+   lastModelNote=focused.note;
+   choiceReason=retryChoice.reason;
+   chosenPath='focused';
+   if(retryChoice.reason==='ok')pick={speaker:retryChoice.speaker,text:retryChoice.text,replyTo:retryChoice.replyTo};
+   else await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-unsent',why:retryChoice.reason,model:focused.note.slice(0,85),cardPresent:Boolean(card)});
+ }
  const speaker=roster.find(r=>r.actor.nickname===String(pick.speaker||'').trim())||null;
  const replyId=Number(pick.replyTo)||0;
  const target0=replyId?messages.find(m=>Number(m.id)===replyId&&m.badge!=='bot'&&now-Date.parse(String(m.created_at))<150000)||null:null; // May be a real person OR another TEST actor.
@@ -830,7 +869,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  let text=typeof pick.text==='string'?clean(pick.text):'';
  const rawText=text;
  if(speaker&&text&&!acceptable(text,speaker,target))text='';
- void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent':text?'sent':'rejected'});
+ void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent:'+choiceReason:text?'sent':'rejected',model:lastModelNote.slice(0,85),path:chosenPath,cardPresent:Boolean(card)});
  if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor),speaker.own,speaker.paid.includes('card'))||'';
  if(speaker&&text&&(wrongPaymentTalk(text,speaker.cardOrder,speaker.bankOrder)||cardLinkTalkBlocked(text,speaker.cardOrder,speaker.paid.includes('card'))))text='';
  // [2026-11-15 07:40 사장님] 상품번호는 손님처럼 줄여 부름(프222·버58·몽319), 웃음·이모지 끝맺음은 최근 AI 글과 안 겹치게
@@ -842,7 +881,16 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    const latestMode=await streamModeOf(db,latestBroadcast.data);
    if(latestMode!==mode)return; // Broadcast changed while Gemini generated a message.
    const latestCard=await readDialogueCard(db,c.broadcast_id).catch(()=>null);
-   if(String(latestCard?.productId||'')!==String(card?.productId||'')||String(latestCard?.detailName||'')!==String(card?.detailName||''))return;
+   if(String(latestCard?.productId||'')!==String(card?.productId||'')||String(latestCard?.detailName||'')!==String(card?.detailName||'')){
+     // The public widget auto-rotates in 5-second steps, while an LLM response
+     // can take longer. Only reject if the ORIGINAL validated card disappeared
+     // from the active carousel; do not reject a routine next-frame rotation.
+     const freshRotation=await computeWidgetFeatured(c.broadcast_id).catch(()=>null);
+     if(!cardRemainsInRotation(card,freshRotation)){
+       void noteDecision(db,{at:new Date(now).toISOString(),result:'card-removed-or-unavailable',cardPresent:Boolean(card)});
+       return;
+     }
+   }
    const recentForGate:ChatObservation[]=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||'')}));
    const quality=judgeTestChat({text,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate});
    if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
@@ -860,10 +908,12 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    }
  }
  // 사람 글은 한 번만 판단 — 침묵이어도 그 글 번호를 남겨 같은 글로 Gemini 를 다시 부르지 않음
- const sourceId=target&&!target.automation_actor_id?Number(target.id):newestHuman?Number(newestHuman.id):null;
+ // A contextual reply to another TEST speaker is a reply too: treat it as such
+ // for DB admission instead of incorrectly applying proactive-chat throttles.
+ const sourceId=target?Number(target.id):newestHuman?Number(newestHuman.id):null;
  const who=speaker&&text?speaker:(sourceId?roster[0]:null);
  if(!who)return;
- const kind=speaker&&text&&target&&!target.automation_actor_id?'reply':'chat';
+ const kind=speaker&&text&&target?'reply':'chat';
  try{await automationRpc(db,'live_automation_ai_admission',{p_actor:who.actor.id,p_kind:kind})}catch(e){void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:'막힘 '+String((e as Error)?.message||e).slice(0,40),result:'blocked'});return}
  const action=await automationRpc<Action>(db,'live_automation_action',{p_session:who.session.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,mode,chatProductKey:card?`${card.productId}:${card.detailName}`:'',replyToAi:target?.automation_actor_id?Number(target.id):null},p_manual:false,p_source:sourceId,p_revision:c.revision});
  const claimed=await automationRpc<Action|null>(db,'live_automation_claim',{p_action:action.id,p_revision:c.revision});
