@@ -270,8 +270,14 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
   }, [photoIds]);
 
   // ── 숫자 ── (표시 전용) 총·챙김·남은 = 미결제 포함, 미결제 몫은 괄호로 따로
-  const liveRows = allRows.filter((r) => !r.skip);
+  // The packing screen counts pieces (qty), not order forms. A paid-only view
+  // must never include hidden unpaid pieces in its on-screen totals.
   const qtyOf = (rows: readonly PickRow[]) => rows.reduce((s, r) => s + r.qty, 0);
+  const eligibleRows = allRows.filter((r) => !r.skip);
+  const liveRows = eligibleRows.filter((r) => showUnpaid || r.paid);
+  const unpaidAll = qtyOf(eligibleRows.filter((r) => !r.paid));
+  const visibleUnpaid = showUnpaid ? unpaidAll : 0;
+  const visibleOrderCount = new Set(liveRows.map((r) => r.customerKey)).size;
   const totalAll = qtyOf(liveRows);
   const gotAll = qtyOf(liveRows.filter((r) => picked.has(r.id)));
   const remainAll = totalAll - gotAll;
@@ -480,7 +486,6 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
 
   const page = pageCount ? pages[curIdx] : null;
   const onPickPage = () => { if (page) void pickPage(page); };
-  const unpaidAll = allRows.filter((r) => !r.paid && !r.skip).reduce((sum, r) => sum + r.qty, 0);
 
   // 색 이름이면 실제 색 점(모르는 이름은 점 없이 글씨만)
   const swatchDot = (name: string) => {
@@ -552,16 +557,16 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
               {loading ? <div className="text-[16px] font-bold text-ink max-sm:hidden">확인 중…</div> : (
                 <div className="grid grid-cols-3 gap-2 tabular-nums max-sm:hidden">
                   <div className="rounded-lg bg-surface-2 px-3 py-2">
-                    <div className="text-[12px] font-semibold text-ink-soft">총 주문</div>
-                    <div className="text-[20px] font-bold text-ink">{totalAll}개</div>
-                    {unpaidAll > 0 ? <div className="text-[13px] font-semibold leading-snug"><span className="text-ink">결제완료 {totalAll - unpaidAll}</span><span className="text-ink-mute"> · </span><span className="text-danger-tx">미결제 {unpaidAll}</span></div> : null}
+                    <div className="text-[12px] font-semibold text-ink-soft">챙길 주문서</div>
+                    <div className="text-[20px] font-bold text-ink">{visibleOrderCount}건</div>
+                    <div className="text-[12px] font-semibold leading-snug text-ink-soft">상품 수량 {totalAll}개{visibleUnpaid>0?` · 미결제 ${visibleUnpaid}개 포함`:''}</div>
                   </div>
                   <div className="rounded-lg bg-surface-2 px-3 py-2">
                     <div className="text-[12px] font-semibold text-ink-soft">챙김</div>
                     <div className="text-[20px] font-bold text-ink">{gotAll}개</div>
                   </div>
                   <div className={`rounded-lg px-3 py-2 ${remainAll > 0 ? "bg-ink text-white" : "bg-ok-bg text-ok-tx"}`}>
-                    <div className={`text-[12px] font-semibold ${remainAll > 0 ? "text-white/80" : ""}`}>남은 것</div>
+                    <div className={`text-[12px] font-semibold ${remainAll > 0 ? "text-white/80" : ""}`}>남은 상품</div>
                     <div className="text-[20px] font-bold">{totalAll === 0 ? "없음" : remainAll > 0 ? `${remainAll}개` : "✓ 다 챙김"}</div>
                     {remainAll > 0 && unpaidLeftAll > 0 ? <div className="text-[13px] font-semibold leading-snug text-white/90">결제완료 {remainAll - unpaidLeftAll} · 미결제 {unpaidLeftAll}</div> : null}
                   </div>
@@ -575,11 +580,11 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
                     <>
                       <div className="truncate text-[16px] font-bold text-ink">
                         {totalAll === 0 ? "챙길 것 없음" : remainAll > 0 ? `남은 ${remainAll}개` : <span className="text-ok-tx">✓ 다 챙김</span>}
-                        <span className="text-[13px] font-semibold text-ink-soft"> · 챙김 {gotAll} / 총 {totalAll}</span>
+                        <span className="text-[13px] font-semibold text-ink-soft"> · 챙긴 상품 {gotAll}/{totalAll}개 · 주문서 {visibleOrderCount}건</span>
                       </div>
                       {unpaidAll > 0 ? (
                         <div className="truncate text-[12px] font-semibold text-ink-soft">
-                          {showUnpaid ? (remainAll > 0 ? <>남은 것 결제완료 {remainAll - unpaidLeftAll} · <span className="text-danger-tx">미결제 {unpaidLeftAll}</span></> : <>총 결제완료 {totalAll - unpaidAll} · <span className="text-danger-tx">미결제 {unpaidAll}</span></>) : `미결제 ${unpaidAll}개 숨김`}
+                          {showUnpaid ? (remainAll > 0 ? <>남은 상품 결제완료 {remainAll - unpaidLeftAll}개 · <span className="text-danger-tx">미결제 {unpaidLeftAll}개</span></> : <>상품 결제완료 {totalAll - visibleUnpaid}개 · <span className="text-danger-tx">미결제 {visibleUnpaid}개</span></>) : `미결제 상품 ${unpaidAll}개 숨김`}
                         </div>
                       ) : null}
                     </>

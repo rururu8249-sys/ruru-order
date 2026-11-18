@@ -57,14 +57,14 @@ export default function WorkScopePickerModal({work,currentLabel,allOrders,curren
     onConfirm({kind,label:label.trim()||'선택한 범위',orders:eligible,includeUnpaid:paymentView==='all'});
   };
   const labelCls='flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface px-3 py-3 text-[13px] font-semibold';
-  const stat=(s:WorkScopeSummary)=>`${scopeCountLabel(s)}${s.canceled?` · 취소 ${s.canceled}`:''}`;
+  const stat=(s:WorkScopeSummary)=>scopeCountLabel(s);
   return <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
     <div className="flex max-h-[94vh] w-full max-w-[600px] flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl"
       role="dialog" aria-modal="true" aria-label={`${work==='invoice'?'송장 출력':'물건챙기기'} 범위 선택`}
       onClick={(e:{stopPropagation:()=>void})=>e.stopPropagation()}>
       <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
         <div><h2 className="text-lg font-black text-ink">{work==='invoice'?'송장 출력':'물건챙기기'} · 범위 선택</h2>
-          <p className="mt-1 text-xs text-ink-soft">방송·날짜를 고른 뒤, 전체 주문과 실제 작업 대상 건수를 확인하세요.</p></div>
+          <p className="mt-1 text-xs text-ink-soft">방송·날짜를 고른 뒤, 취소를 제외한 주문서 수를 확인하세요.</p></div>
         <button type="button" className="h-11 w-11 shrink-0 rounded-xl text-2xl text-ink-soft" aria-label="닫기" onClick={onClose}>×</button>
       </div>
       <div className="min-h-0 space-y-3 overflow-y-auto p-4">
@@ -92,18 +92,18 @@ export default function WorkScopePickerModal({work,currentLabel,allOrders,curren
               <span className="shrink-0 text-[11px] text-ink-soft">{stat(shopStats.get(d.dateKey)!)}</span>
             </label>):<p className="p-3 text-xs text-ink-mute">쇼핑몰 주문이 있는 날짜가 없습니다.</p>}</div>:null}
         </div>
-        <section className="rounded-xl border border-line bg-surface-2/40 p-3" aria-label="선택 범위 주문 내역" aria-live="polite">
-          <div className="flex items-center justify-between gap-2 text-[13px] font-bold text-ink"><span>선택 범위 조회 주문</span><span className="tabular-nums">전체 {summary.total}건</span></div>
-          <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
-            <div><span className="block text-ink-mute">결제완료</span><strong className="text-[16px] tabular-nums text-ink">{summary.paid}건</strong></div>
-            <div><span className="block text-ink-mute">미결제·확인대기</span><strong className="text-[16px] tabular-nums text-ink">{summary.unpaid}건</strong></div>
-            <div><span className="block text-ink-mute">주문취소</span><strong className="text-[16px] tabular-nums text-ink">{summary.canceled}건</strong></div>
-            <div><span className="block text-ink-mute">기타 작업 제외</span><strong className="text-[16px] tabular-nums text-ink">{summary.excluded}건</strong></div>
+        <section className="rounded-xl border border-line bg-surface-2/40 p-3" aria-label="실제 작업할 주문서 수" aria-live="polite">
+          <div className="flex items-center justify-between gap-2 text-sm font-black text-ink">
+            <span>{work==='picking'?'챙길 주문서':'송장 출력할 주문서'}</span>
+            <strong className="text-[23px] tabular-nums">{summary.eligible}건</strong>
           </div>
-          <div className="mt-3 flex items-center justify-between border-t border-line pt-3 text-sm font-black text-ink">
-            <span>실제 {work==='picking'?'물건챙기기':'송장 출력'} 대상</span><span className="text-base tabular-nums">{summary.eligible}건</span>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[13px]">
+            <div className="rounded-lg bg-surface px-3 py-2"><span className="block text-ink-soft">결제완료</span><strong className="text-base text-ink tabular-nums">{summary.paid}건</strong></div>
+            <div className="rounded-lg bg-surface px-3 py-2"><span className="block text-ink-soft">미결제·확인대기</span><strong className="text-base text-ink tabular-nums">{summary.unpaid}건</strong></div>
           </div>
-          <p className="mt-1 text-[11px] text-ink-mute">조회 전체에는 취소·제외 주문도 들어갑니다. 실제 작업 대상에서는 빠지며, 주문·결제 기록은 변경되지 않습니다.</p>
+          {(summary.canceled>0||summary.excluded>0)?<p className="mt-2 text-[11px] leading-relaxed text-ink-mute">
+            제외: {summary.canceled>0?`주문취소 ${summary.canceled}건`:''}{summary.canceled>0&&summary.excluded>0?' · ':''}{summary.excluded>0?`기타 제외 ${summary.excluded}건`:''} — 위 주문서 수에는 포함하지 않습니다.
+          </p>:null}
         </section>
         {work==='picking'?<section className="rounded-xl border border-line p-3" aria-label="물건챙기기 결제 상태 표시">
           <p className="mb-2 text-[13px] font-bold text-ink">물건챙기기 표시 방식</p>

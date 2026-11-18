@@ -42,7 +42,7 @@ export function eligibleWorkScopeOrders(orders:readonly LiveOrder[],work:WorkKin
   });
 }
 export function scopeCountLabel(x:WorkScopeSummary){
-  return `전체 ${x.total}건 · 작업 ${x.eligible}건`;
+  return `정상 주문서 ${x.eligible}건`;
 }
 /** For the picker only: never silently drop unpaid from the order list.
  * The picking panel toggles visibility using its initialShowUnpaid prop.

@@ -98,7 +98,7 @@ const counter = () => nodeText(byLabel('전체 목록').children[1]).replace(' �
 const pagerTitle = () => nodeText(byLabel('전체 목록').children[0]);
 // 머리: 결제완료 3+1+1(지난)+1(블랙M 7) = 6, 미결제는 따로
 // 머리: 결제완료 6 + 미결제 2 = 총 8, 미결제 몫은 괄호
-assert.ok(text().includes('총 주문8개결제완료 6 · 미결제 2') && text().includes('챙김0개') && text().includes('남은 것8개결제완료 6 · 미결제 2'), '숫자 3칸 = 미결제 포함 + 괄호');
+assert.ok(text().includes('챙길 주문서5건상품 수량 8개 · 미결제 2개 포함') && text().includes('챙김0개') && text().includes('남은 상품8개결제완료 6 · 미결제 2'), '숫자 3칸 = 미결제 포함 + 괄호');
 assert.ok(text().includes('고객3'), '기본 = 미결제도 보임');
 assert.ok(!text().includes('요약') && !text().includes('안 챙긴 것만') && !text().includes('접기'), '옛 요약·안 챙긴 것만·접기 없음');
 assert.ok(text().includes('다른 출고로 넘긴 상품 1개는 여기서 뺐어요'));
@@ -106,7 +106,7 @@ assert.equal(counter(), '상품 1 / 1전체 목록', '상품별 한 장 = 상품
 assert.equal(pagerTitle(), '알로 부츠컷팬츠', '넘기기 줄에 지금 상품명');
 assert.ok(text().includes('총 8개 (결제완료 6 · 미결제 2)'), '장 머리 총 N개 (미결제 M)');
 await act(async () => byText('미결제 숨기기').props.onClick());
-assert.ok(!text().includes('고객3') && text().includes('미결제 2개는 목록에서 숨겼어요'), '숨기기 누르면 미결제 빠짐');
+assert.ok(!text().includes('고객3') && text().includes('미결제 2개는 목록에서 숨겼어요') && text().includes('챙길 주문서4건상품 수량 6개'), '숨기면 미결제 상품이 화면 합계에서도 제외');
 await act(async () => byText('미결제 보기').props.onClick());
 assert.ok(text().includes('고객3'));
 assert.ok(text().includes('미결제 2 · 지난 주문 1개 포함'), '같은 옵션 줄 안에 지난 주문 포함 표시');
