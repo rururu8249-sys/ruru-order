@@ -600,6 +600,7 @@ export default function LiveOrderTable({
   const [pickingOpen, setPickingOpen] = useState(false);
   const [workPickerKind,setWorkPickerKind] = useState<""|"invoice"|"picking">("");
   const [pickingChosenLabel,setPickingChosenLabel] = useState("");
+  const [pickingIncludeUnpaid,setPickingIncludeUnpaid] = useState(true);
   const [invoiceScopeOrders,setInvoiceScopeOrders] = useState<LiveOrder[]|null>(null);
   const [invoiceScopeMeta,setInvoiceScopeMeta] = useState<{kind:WorkScopeKind;label:string}>({kind:'current',label:'현재 필터'});
   type InvoiceHistory={id:string;created_at:string;scope_label:string;export_mode:string;order_count:number;line_count:number;order_snapshot:Array<{groupId:string;orderNo:string;items:Array<{product:string;option:string;qty:number}>}>};
@@ -1052,14 +1053,14 @@ export default function LiveOrderTable({
   return (
     <>
     {workPickerKind ? <WorkScopePickerModal
-      work={workPickerKind} allOrders={allWorkOrders || pickingSourceOrders}
-      currentOrders={workPickerKind==='invoice'?exportableOrders:(pickingScopeTooWide?[]:pickingModalSourceOrders)}
+      work={workPickerKind} currentLabel={workPickerKind==='picking'?pickingScopeLabel:currentFilterLabel} allOrders={allWorkOrders || pickingSourceOrders}
+      currentOrders={workPickerKind==='invoice'?workFilteredOrders:(pickingScopeTooWide?[]:pickingModalSourceOrders)}
       selectedOrders={pickingSelectedFromTable} broadcasts={broadcastCalendar} shopDates={shopOrderCalendar}
       onClose={()=>setWorkPickerKind('')}
       onConfirm={(selection:WorkScopeChoice)=>{
         const kind=workPickerKind;setWorkPickerKind('');
         if(kind==='picking'){
-          setPickingChosenLabel(selection.label);setPickingSelectedOrders(selection.orders);setPickingOpen(true);
+          setPickingChosenLabel(selection.label);setPickingIncludeUnpaid(selection.includeUnpaid!==false);setPickingSelectedOrders(selection.orders);setPickingOpen(true);
         }else{
           setInvoiceScopeOrders(selection.orders);setInvoiceScopeMeta({kind:selection.kind,label:selection.label});
           setInvoiceHistoryOpen(false);setExportConfirm('rozen');
@@ -1069,7 +1070,7 @@ export default function LiveOrderTable({
 
     {pickingOpen ? (
           pickingSelectedOrders ? (
-            <LivePickingPanel orders={pickingSelectedOrders} filterLabel={pickingChosenLabel||`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} scopeLocked onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); setPickingChosenLabel(""); void onRefresh?.(); }} />
+            <LivePickingPanel orders={pickingSelectedOrders} filterLabel={pickingChosenLabel||`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} scopeLocked initialShowUnpaid={pickingIncludeUnpaid} onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); setPickingChosenLabel(""); void onRefresh?.(); }} />
           ) : (
             <LivePickingPanel
               orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))}

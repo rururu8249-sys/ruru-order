@@ -4,7 +4,7 @@ import {getAlwaysOrderDateKey,isAlwaysOrderLike} from '../components/admin-live/
 import {pickPullMatchesView} from './orderPickPull';
 
 export type WorkScopeKind='current'|'selected'|'broadcast'|'shop';
-export type WorkScopeChoice={kind:WorkScopeKind;label:string;orders:LiveOrder[]};
+export type WorkScopeChoice={kind:WorkScopeKind;label:string;orders:LiveOrder[];includeUnpaid?:boolean};
 export type WorkBroadcast={id:string;dateKey:string;label:string};
 
 function workIdentity(o:LiveOrder):string {
