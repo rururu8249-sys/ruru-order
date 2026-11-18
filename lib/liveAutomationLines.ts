@@ -275,8 +275,9 @@ export function greetingPool(o:{live:boolean;sinceStartMs:number;kstHour:number;
 }
 /** 들어온 가상 손님이 인사할지 — 생방송 시작 45분 안 45%, 그 뒤 15%, 다시보기·쉬는 중 10% */
 export function greetChance(o:{live:boolean;sinceStartMs:number}):number{
-  if(!o.live)return 0.1;
-  return o.sinceStartMs>=0&&o.sinceStartMs<45*60000?0.45:0.15;
+  // Initial greetings are optional, never a chat-volume target. Off-air: silence.
+  if(!o.live)return 0;
+  return o.sinceStartMs>=0&&o.sinceStartMs<30*60000?0.08:0.015;
 }
 
 // ───────── ⑦ 다음 방송 예정(관리자 「잠시 쉬는 중 문구」) ─────────

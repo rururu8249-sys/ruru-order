@@ -34,6 +34,13 @@ export function timeAppropriateTestChat(text:string,now:number):boolean {
  return true;
 }
 
+// A short line may be harmless alone but unnatural when repeated by a roomful of actors.
+export function isGenericRoomChatter(text:string):boolean {
+ const t=String(text||'').trim();
+ return /^(?:안녕|하이|반가|ㅎㅇ|왔어요|들어왔어요|출석|좋은\s*(?:아침|저녁)|굿모닝)/.test(t)
+   || /(?:유튜브|인스타|릴스|쇼츠|알고리즘|구독|팔로우|소개|사이트).{0,24}(?:보고|타고|해서|하고|누르고|왔다|왔어요|들어왔어요|넘어왔어요)/.test(t)
+   || /(?:방송|라이브).{0,10}(?:기다릴게|보러\s*올게|또\s*올게|기대돼)/.test(t);
+}
 export function judgeTestChat(q:QualityInput):QualityResult {
  const text=String(q.text||'').trim(), intent=chatIntent(text);
  const fail=(reason:string):QualityResult=>({ok:false,reason,intent});
@@ -44,10 +51,14 @@ export function judgeTestChat(q:QualityInput):QualityResult {
  if(q.mode!=='live'&&/(입어\s*(봐|주|줘)|보여\s*(줘|주)|착용해|지금.{0,8}(입어|보여|설명))/.test(text))return fail('off-live-request');
  // Operationally paused can mean broadcast finished; only AI chat policy treats it as off-air.
  if(q.mode!=='live'&&/(잠시\s*쉬는|곧\s*재개|잠깐\s*쉬었다|다시\s*시작.{0,5}(하겠|하나))/.test(text))return fail('ended-as-paused');
- if(q.mode!=='live'&&intent==='size')return fail('off-size-talk');
+ if(q.mode!=='live'&&intent==='size'&&!q.currentProductKey)return fail('off-size-talk');
  const recent=q.recent.filter(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-30*60_000);
  if(recent.some(r=>norm(r.text)===norm(text)))return fail('exact-repetition');
  if(!q.priority&&!q.replyingToHuman){
+  if(isGenericRoomChatter(text)) {
+   if(q.mode!=='live')return fail('off-air-generic-chatter');
+   if(recent.some(r=>isGenericRoomChatter(r.text)&&q.now-r.at<20*60_000))return fail('room-generic-chatter-wave');
+  }
   const sameActor=recent.filter(r=>r.actorId===q.actorId);
   const topicIntent=['size','length','color','price','delivery','replay','pause','visit','memory'];
   if(topicIntent.includes(intent)&&sameActor.some(r=>chatIntent(r.text)===intent&&
