@@ -1370,7 +1370,7 @@ export default function AdminLiveDashboard() {
       if (!dateKey) continue;
       counts.set(dateKey, (counts.get(dateKey) || 0) + 1);
     }
-    return [...counts.entries()].sort(([a],[b]) => b.localeCompare(a)).map(([dateKey,count]) => ({ id: alwaysOrderFilterValue(dateKey), dateKey, label: `${dateKey.replace(/-/g,".")} · ${count}건`, count }));
+    return [...counts.entries()].sort(([a],[b]) => b.localeCompare(a)).map(([dateKey,count]) => ({ id: alwaysOrderFilterValue(dateKey), dateKey, label: `${dateKey.replace(/-/g,".")} 쇼핑몰 주문 · ${count}건`, count }));
   }, [orders]);
 
   // [㉕-B] 상태 칩 숫자용 — filteredOrders 와 같은 조건에서 matchesStatus 만 뺀 목록.
@@ -1937,6 +1937,7 @@ export default function AdminLiveDashboard() {
                       orders={filteredOrders}
                       countBaseOrders={filteredOrdersForCounts}
                       pickingBaseOrders={pickingBaseOrders}
+                      allWorkOrders={[...orders.filter(o=>!wholeMovedIds.has(String(o.id))),...pulledVirtualOrders]}
                       selectedPickingBroadcastId={filters.scope === "shop" ? null : filters.broadcast === "current" ? activeBroadcast?.id || null : broadcasts.find(b => b.id === filters.broadcast)?.id || null}
                       allBroadcastPickingOrders={(() => {
                         const bc = filters.broadcast === "current" ? activeBroadcast : broadcasts.find(b => b.id === filters.broadcast);
