@@ -11,7 +11,7 @@ const eleven=[
 const scope=summarizeWorkScope(eleven,'picking');
 assert.deepEqual(scope,{total:11,paid:8,unpaid:0,canceled:3,excluded:0,eligible:8});
 assert.deepEqual(summarizeWorkScope([...eleven], 'picking'),scope,'same broadcast and current filter must match');
-assert.equal(scopeCountLabel(scope),'전체 11건 · 작업 8건');
+assert.equal(scopeCountLabel(scope),'정상 주문서 8건');
 assert.equal(eligibleWorkScopeOrders(eleven,'picking').length,8);
 assert.equal(chosenPickingVisibleCount(scope,'paid'),8);
 assert.equal(chosenPickingVisibleCount(scope,'all'),8);
