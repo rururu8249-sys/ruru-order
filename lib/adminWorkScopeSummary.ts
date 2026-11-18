@@ -21,10 +21,11 @@ export function summarizeWorkScope(orders:readonly LiveOrder[],work:WorkKind):Wo
     const key=`${id}::${target}`;
     if(seen.has(key))continue;
     seen.add(key);
-    result.total++;
+    // Canceled/operationally-excluded forms are separate diagnostics, NEVER an active total.
     if(o.paymentStatus==='canceled'){result.canceled++;continue;}
     if(work==='picking'?o.excludeFromPicking===true:o.excludeFromShipping===true){result.excluded++;continue;}
     result.eligible++;
+    result.total++;
     if(PAID.has(o.paymentStatus))result.paid++;else result.unpaid++;
   }
   return result;

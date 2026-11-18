@@ -83,7 +83,7 @@ assert.equal(merged.find(r => r.id === '8').kind, 'late');
 
 // 화면
 let tree;
-await act(async () => { tree = Renderer.create(React.createElement(Panel, {orders, filterLabel: '방송: 10.22 남녀공용의류', onClose() {}})); });
+await act(async () => { tree = Renderer.create(React.createElement(Panel, {orders, filterLabel: '방송: 10.22 남녀공용의류', canceledCount:1, onClose() {}})); });
 await act(async () => { await new Promise(r => setTimeout(r, 0)); });
 const flat = (n) => n == null ? '' : typeof n === 'string' ? n : Array.isArray(n) ? n.map(flat).join('') : flat(n.children);
 const text = () => flat(tree.toJSON());
@@ -91,6 +91,7 @@ const tabs = tree.root.findAll(n => n.type === 'button' && n.props.role === 'tab
 assert.deepEqual(tabs.map(t => t.children.join('')), ['상품별', '손님별'], '보기는 상품별·손님별 두 개뿐');
 assert.equal(tabs[0].props['aria-selected'], true, '기본 = 상품별');
 const nodeText = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText).join('');
+const orderSummaryText = () => nodeText(tree.root.findByProps({'aria-label':'물건챙기기 주문서·상품 현황'})).replace(/\s+/g, '');
 const btn = (f) => tree.root.findAll(n => n.type === 'button' && f(n));
 const byText = (t) => btn(n => nodeText(n) === t)[0];
 const byLabel = (l) => btn(n => n.props['aria-label'] === l)[0];
@@ -98,7 +99,17 @@ const counter = () => nodeText(byLabel('전체 목록').children[1]).replace(' �
 const pagerTitle = () => nodeText(byLabel('전체 목록').children[0]);
 // 머리: 결제완료 3+1+1(지난)+1(블랙M 7) = 6, 미결제는 따로
 // 머리: 결제완료 6 + 미결제 2 = 총 8, 미결제 몫은 괄호
-assert.ok(text().includes('챙길 주문서5건상품 수량 8개 · 미결제 2개 포함') && text().includes('챙김0개') && text().includes('남은 상품8개결제완료 6 · 미결제 2'), '숫자 3칸 = 미결제 포함 + 괄호');
+assert.ok(
+  orderSummaryText().includes('미결제포함정상주문서5건') &&
+  orderSummaryText().includes('결제완료4건') &&
+  orderSummaryText().includes('미결제1건') &&
+  orderSummaryText().includes('남은주문서5건') &&
+  orderSummaryText().includes('상품수량8개') &&
+  orderSummaryText().includes('챙김0개') &&
+  orderSummaryText().includes('남은상품8개') &&
+  orderSummaryText().includes('주문서취소1건·별도'),
+  `정상 주문서 5건/상품 8개/취소 1건 분리 실패, 실제 렌더: ${orderSummaryText()}`
+);
 assert.ok(text().includes('고객3'), '기본 = 미결제도 보임');
 assert.ok(!text().includes('요약') && !text().includes('안 챙긴 것만') && !text().includes('접기'), '옛 요약·안 챙긴 것만·접기 없음');
 assert.ok(text().includes('다른 출고로 넘긴 상품 1개는 여기서 뺐어요'));
@@ -106,7 +117,15 @@ assert.equal(counter(), '상품 1 / 1전체 목록', '상품별 한 장 = 상품
 assert.equal(pagerTitle(), '알로 부츠컷팬츠', '넘기기 줄에 지금 상품명');
 assert.ok(text().includes('총 8개 (결제완료 6 · 미결제 2)'), '장 머리 총 N개 (미결제 M)');
 await act(async () => byText('미결제 숨기기').props.onClick());
-assert.ok(!text().includes('고객3') && text().includes('미결제 2개는 목록에서 숨겼어요') && text().includes('챙길 주문서4건상품 수량 6개'), '숨기면 미결제 상품이 화면 합계에서도 제외');
+assert.ok(
+  !text().includes('고객3') && text().includes('미결제 2개는 목록에서 숨겼어요') &&
+  orderSummaryText().includes('결제완료주문서4건') &&
+  orderSummaryText().includes('미결제1건(표시제외)') &&
+  orderSummaryText().includes('남은주문서4건') &&
+  orderSummaryText().includes('상품수량6개') &&
+  orderSummaryText().includes('주문서취소1건·별도'),
+  `미결제 숨김 집계 실패, 실제 렌더: ${orderSummaryText()}`
+);
 await act(async () => byText('미결제 보기').props.onClick());
 assert.ok(text().includes('고객3'));
 assert.ok(text().includes('미결제 2 · 지난 주문 1개 포함'), '같은 옵션 줄 안에 지난 주문 포함 표시');

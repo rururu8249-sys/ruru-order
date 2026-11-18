@@ -601,6 +601,7 @@ export default function LiveOrderTable({
   const [workPickerKind,setWorkPickerKind] = useState<""|"invoice"|"picking">("");
   const [pickingChosenLabel,setPickingChosenLabel] = useState("");
   const [pickingIncludeUnpaid,setPickingIncludeUnpaid] = useState(true);
+  const [pickingCanceledCount,setPickingCanceledCount] = useState(0);
   const [invoiceScopeOrders,setInvoiceScopeOrders] = useState<LiveOrder[]|null>(null);
   const [invoiceScopeMeta,setInvoiceScopeMeta] = useState<{kind:WorkScopeKind;label:string}>({kind:'current',label:'현재 필터'});
   type InvoiceHistory={id:string;created_at:string;scope_label:string;export_mode:string;order_count:number;line_count:number;order_snapshot:Array<{groupId:string;orderNo:string;items:Array<{product:string;option:string;qty:number}>}>};
@@ -760,12 +761,14 @@ export default function LiveOrderTable({
     const pureUnpaid = countSource.filter((order) => order.paymentStatus === "unpaid").length;
     const cardUnpaid = countSource.filter((order) => order.paymentStatus === "card_unpaid").length;
     const shipped = countSource.filter((order) => {
+      if (order.paymentStatus === "canceled") return false;
       const ship = String((order as { shippingStatus?: unknown }).shippingStatus || "").trim();
       return /출고|발송|배송/.test(ship) && !/대기/.test(ship);
     }).length;
 
     return {
-      total: countSource.length,
+      // 'Normal orders' never includes cancelled forms; the canceled chip is separate.
+      total: countSource.filter((order) => order.paymentStatus !== "canceled").length,
       paid,
       unpaid,
       manual,
@@ -796,7 +799,9 @@ export default function LiveOrderTable({
   }, [baseOrders, sortMode]);
 
   const cancelViewFilteredOrders = useMemo(() => {
-    if (cancelViewFilter === "active") {
+    // Status 'all' means all NORMAL orders. Canceled forms are available
+    // only through the independent '주문서취소' status filter.
+    if (filters.status === "all" || cancelViewFilter === "active") {
       return sortedOrders.filter((order) => order.paymentStatus !== "canceled");
     }
 
@@ -805,7 +810,7 @@ export default function LiveOrderTable({
     }
 
     return sortedOrders;
-  }, [sortedOrders, cancelViewFilter]);
+  }, [sortedOrders, cancelViewFilter, filters.status]);
 
   const cancelFilteredActiveCount = sortedOrders.filter((order) => order.paymentStatus !== "canceled").length;
 
@@ -1060,7 +1065,7 @@ export default function LiveOrderTable({
       onConfirm={(selection:WorkScopeChoice)=>{
         const kind=workPickerKind;setWorkPickerKind('');
         if(kind==='picking'){
-          setPickingChosenLabel(selection.label);setPickingIncludeUnpaid(selection.includeUnpaid!==false);setPickingSelectedOrders(selection.orders);setPickingOpen(true);
+          setPickingChosenLabel(selection.label);setPickingIncludeUnpaid(selection.includeUnpaid!==false);setPickingCanceledCount(selection.canceledCount||0);setPickingSelectedOrders(selection.orders);setPickingOpen(true);
         }else{
           setInvoiceScopeOrders(selection.orders);setInvoiceScopeMeta({kind:selection.kind,label:selection.label});
           setInvoiceHistoryOpen(false);setExportConfirm('rozen');
@@ -1070,7 +1075,7 @@ export default function LiveOrderTable({
 
     {pickingOpen ? (
           pickingSelectedOrders ? (
-            <LivePickingPanel orders={pickingSelectedOrders} filterLabel={pickingChosenLabel||`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} scopeLocked initialShowUnpaid={pickingIncludeUnpaid} onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); setPickingChosenLabel(""); void onRefresh?.(); }} />
+            <LivePickingPanel orders={pickingSelectedOrders} filterLabel={pickingChosenLabel||`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} scopeLocked initialShowUnpaid={pickingIncludeUnpaid} canceledCount={pickingCanceledCount} onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); setPickingChosenLabel(""); void onRefresh?.(); }} />
           ) : (
             <LivePickingPanel
               orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))}
@@ -1166,12 +1171,12 @@ export default function LiveOrderTable({
         {/* [2026-10-22 폰] 상태 칩은 한 줄 가로 스크롤(DESIGN-ADMIN §13). PC 는 줄바꿈 그대로 */}
         <div className="flex flex-wrap items-center gap-2 max-md:w-full max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>button]:whitespace-nowrap">
         {[
-          ["전체", counts.total, "all", "rose"],
+          ["정상 주문서", counts.total, "all", "rose"],
           ["결제완료", counts.paid, "paid", "green"],
           ["미결제", counts.unpaid, "unpaid", "red"],
           // [2026-08-31 사장님 지시] 매칭필요·입금확인 배지 삭제 — 입금대기가 매칭필요를 포함하고(보조텍스트로 표시),
           //   입금확인은 결제완료의 하위 단계라 배지가 겹쳤다. 상태 드롭다운에서는 여전히 고를 수 있다.
-          ["취소", counts.canceled, "canceled", "muted"],
+          ["주문서 취소", counts.canceled, "canceled", "muted"],
           ["택배출고", counts.shipped, "shipped", "blue"],
         ].map(([label, count, status, tone]) => {
           const active = filters.status === status;
@@ -1735,7 +1740,7 @@ export default function LiveOrderTable({
           size={pageSize}
           sizes={[10, 20, 50, 100]}
           unit="건"
-          extra={`전체 ${allOrderCount.toLocaleString("ko-KR")}건`}
+          extra={`주문서 취소 ${counts.canceled.toLocaleString("ko-KR")}건은 정상 주문서 수에서 제외`}
           label="주문 목록 페이지 이동"
           onPage={setPage}
           onSize={setPageSize}

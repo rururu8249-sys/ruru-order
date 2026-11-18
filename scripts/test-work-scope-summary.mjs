@@ -9,22 +9,22 @@ const eleven=[
  mk(9,'canceled'),mk(10,'canceled'),mk(11,'canceled')
 ];
 const scope=summarizeWorkScope(eleven,'picking');
-assert.deepEqual(scope,{total:11,paid:8,unpaid:0,canceled:3,excluded:0,eligible:8});
+assert.deepEqual(scope,{total:8,paid:8,unpaid:0,canceled:3,excluded:0,eligible:8});
 assert.deepEqual(summarizeWorkScope([...eleven], 'picking'),scope,'same broadcast and current filter must match');
 assert.equal(scopeCountLabel(scope),'정상 주문서 8건');
 assert.equal(eligibleWorkScopeOrders(eleven,'picking').length,8);
 assert.equal(chosenPickingVisibleCount(scope,'paid'),8);
 assert.equal(chosenPickingVisibleCount(scope,'all'),8);
-assert.equal(summarizeWorkScope([...eleven,...eleven],'picking').total,11,'duplicate records must not inflate labels');
+assert.equal(summarizeWorkScope([...eleven,...eleven],'picking').total,8,'duplicate canceled forms must never inflate normal totals');
 
 const mixed=[mk(1,'paid'),mk(2,'unpaid'),mk(3,'manual_match_needed'),mk(4,'card_unpaid'),mk(5,'canceled'),mk(6,'paid',{excludeFromPicking:true}),mk(7,'paid',{excludeFromShipping:true})];
 const pick=summarizeWorkScope(mixed,'picking');
-assert.deepEqual(pick,{total:7,paid:2,unpaid:3,canceled:1,excluded:1,eligible:5});
+assert.deepEqual(pick,{total:5,paid:2,unpaid:3,canceled:1,excluded:1,eligible:5});
 assert.equal(chosenPickingVisibleCount(pick,'paid'),2);
 assert.equal(chosenPickingVisibleCount(pick,'all'),5);
 assert.equal(eligibleWorkScopeOrders(mixed,'picking').length,5,'unpaid stays in picker data for in-panel toggle');
 assert.ok(eligibleWorkScopeOrders(mixed,'picking').some(o=>o.paymentStatus==='unpaid'));
-assert.deepEqual(summarizeWorkScope(mixed,'invoice'),{total:7,paid:2,unpaid:3,canceled:1,excluded:1,eligible:5});
+assert.deepEqual(summarizeWorkScope(mixed,'invoice'),{total:5,paid:2,unpaid:3,canceled:1,excluded:1,eligible:5});
 assert.equal(eligibleWorkScopeOrders(mixed,'invoice').some(o=>o.excludeFromShipping===true),false);
 assert.equal(eligibleWorkScopeOrders(mixed,'invoice').some(o=>o.excludeFromPicking===true),true);
 
