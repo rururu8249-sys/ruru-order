@@ -31,6 +31,7 @@ import { formatKoreanPhone } from "@/lib/order/phone";
 import { parseBlockReason, blockReasonSummary } from "@/lib/customerBlockReason";
 import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
 import { useAdminModalFocus } from "./useAdminModalFocus";
+import MemberFilterToolbar, { type MemberSortMode, type MemberStatusFilter } from "./MemberFilterToolbar";
 
 type Props = {
   orders: LiveOrder[];
@@ -129,8 +130,8 @@ const customerHistoryFieldLabel = (field: unknown) => {
   return CUSTOMER_HISTORY_FIELD_LABEL[key] || key || "변경";
 };
 
-type SortMode = "latest" | "amount" | "orders" | "nickname" | "joinedDesc" | "joinedAsc" | "lastLogin" | "oldLogin";
-type StatusFilter = "all" | "normal" | "blocked" | "attention" | "nokakao";
+type SortMode = MemberSortMode;
+type StatusFilter = MemberStatusFilter;
 
 type BlockOverride = {
   blocked: boolean;
@@ -518,6 +519,7 @@ function CustomerDetailDrawer({
   onEditBlockReason,
   blockedAt,
   blockSaving,
+  blockStatus,
   onSaved,
 }: {
   customer: CustomerSummary | null;
@@ -529,6 +531,7 @@ function CustomerDetailDrawer({
   onEditBlockReason?: (customer: CustomerSummary) => void;
   blockedAt?: string;
   blockSaving: boolean;
+  blockStatus: "loading" | "ready" | "error";
   onSaved?: (patch: Partial<CustomerProfile>) => void;
 }) {
   const [avatarZoom, setAvatarZoom] = useState(false);
@@ -805,16 +808,19 @@ function CustomerDetailDrawer({
           <button type="button" onClick={() => setAvatarZoom(false)} className="min-h-11 rounded-lg border border-white px-4 text-sm text-white">사진 닫기</button>
         </div>
       ) : null}
-      <div ref={detailRef} role="dialog" aria-modal="true" aria-label="회원 상세" tabIndex={-1}
+      <div ref={detailRef} data-member-detail role="dialog" aria-modal="true" aria-label="회원 상세" tabIndex={-1}
+        style={{ outline: "none" }}
         className="flex h-dvh w-full max-w-[720px] min-w-0 flex-col overflow-hidden border-l border-line bg-surface text-ink shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
-        <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-line px-4 sm:py-2">
-          <button type="button" aria-label="회원 상세 닫기" onClick={onClose} className="min-h-11 rounded-lg px-2 text-sm text-ink-soft hover:bg-surface-2">닫기</button>
+        <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-line px-4 pt-[env(safe-area-inset-top)] sm:py-2">
           <h2 className="text-base font-bold">회원 상세</h2>
           <button type="button" onClick={() => { setDetailTab("overview"); if (editOpen) setEditOpen(false); else openEdit(); }}
             className="ml-auto min-h-11 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2 sm:min-h-9">{editOpen ? "취소" : "정보 수정"}</button>
+          <button type="button" aria-label="회원 상세 닫기" title="닫기" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft hover:bg-surface-2">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          </button>
         </header>
 
-        <div data-member-detail-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 [overflow-wrap:anywhere]">
+        <div data-member-detail-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(16px,env(safe-area-inset-bottom))] [overflow-wrap:anywhere]">
           <div className="mb-4 flex items-start gap-3">
             {clean(profile?.kakao_profile_image) ? (
               <button type="button" aria-label="프로필 사진 확대" onClick={() => setAvatarZoom(true)} className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-surface-2">
@@ -827,6 +833,7 @@ function CustomerDetailDrawer({
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="min-w-0 break-words text-base font-bold">{customer.nickname}</h3>
                 {customer.blocked ? <span className="rounded-lg bg-danger-bg px-2 py-1 text-xs font-semibold text-danger-tx">차단</span> : null}
+                {blockStatus !== "ready" ? <span className="rounded-lg bg-surface-2 px-2 py-1 text-xs text-ink-mute">{blockStatus === "loading" ? "차단 확인 중" : "차단 확인 필요"}</span> : null}
                 {profile?.live_alert_optin ? <span title={profile.live_alert_optin_at ? `신청일 ${new Date(profile.live_alert_optin_at).toLocaleDateString("ko-KR")}` : "방송알림 신청"} className="rounded-lg bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-soft">방송알림</span> : null}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-ink-soft">
@@ -861,7 +868,7 @@ function CustomerDetailDrawer({
           <div role="tablist" aria-label="회원 상세 메뉴" className="sticky top-0 z-20 -mx-4 mb-4 flex gap-2 border-b border-line bg-surface px-4">
             {([["overview", "기본 정보"], ["orders", "주문 이력"], ["points", "포인트"], ["activity", "접속·변경 기록"]] as const).map(([value, label]) =>
               <button key={value} role="tab" aria-selected={detailTab === value} type="button" onClick={() => setDetailTab(value)}
-                className={`min-h-11 min-w-0 flex-1 border-b-2 px-1 text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink ${detailTab === value ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'}`}>{label}</button>)}
+                className={`min-h-11 min-w-0 flex-1 border-b-2 px-1 text-[13px] font-semibold ${detailTab === value ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'}`}>{label}</button>)}
           </div>
 
           {detailTab === "overview" && !editOpen ? <dl className="mb-4 grid grid-cols-[80px_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-line pb-4 text-[13px]">
@@ -870,7 +877,7 @@ function CustomerDetailDrawer({
             <dt className="text-ink-mute">기본 주소</dt><dd className="break-words">{customer.address || "주소 없음"}</dd>
           </dl> : null}
           {/* [2026-09-26] 차단 회원일 때만 — 차단 정보 상자(기존 BlockedCardBody 재사용). 새 차단/해제 로직 없음. */}
-          {detailTab === "overview" && customer.blocked ? (() => {
+          {detailTab === "overview" && !editOpen && customer.blocked ? (() => {
             const parts = parseBlockReason(customer.blockReason);
             return (
               <div className="mb-3 overflow-hidden rounded-xl border border-rose-line bg-danger-bg/40">
@@ -885,15 +892,16 @@ function CustomerDetailDrawer({
                   <button
                     type="button"
                     onClick={() => onEditBlockReason?.(customer)}
-                    className="rounded-lg border border-rose-line bg-surface px-3 py-1.5 text-[11px] font-black text-rose-deep hover:bg-rose-soft"
+                    disabled={blockSaving || blockStatus !== "ready"}
+                    className="min-h-11 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50 sm:min-h-9"
                   >
                     사유 수정
                   </button>
                   <button
                     type="button"
-                    disabled={blockSaving}
+                    disabled={blockSaving || blockStatus !== "ready"}
                     onClick={() => onBlockAction(customer)}
-                    className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+                    className="min-h-11 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:bg-surface-2 disabled:opacity-50 sm:min-h-9"
                   >
                     {blockSaving ? "처리 중…" : CUSTOMER_TERMS.unblock}
                   </button>
@@ -1055,6 +1063,19 @@ function CustomerDetailDrawer({
             </div>
           ) : null}
 
+          {detailTab === "overview" && !editOpen && !customer.blocked ? (
+            <section aria-label="회원 관리" className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+              <div>
+                <h3 className="text-sm font-semibold text-ink">회원 관리</h3>
+                <p className="mt-1 text-xs text-ink-mute">{blockStatus === "ready" ? "정상 회원" : blockStatus === "loading" ? "차단 상태 확인 중" : "차단 상태 확인 필요"}</p>
+              </div>
+              <button type="button" onClick={() => onBlockAction(customer)} disabled={blockSaving || blockStatus !== "ready"}
+                className="min-h-11 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50 sm:min-h-9">
+                {blockSaving ? "처리 중…" : CUSTOMER_TERMS.block}
+              </button>
+            </section>
+          ) : null}
+
           {/* 주문 이력 — [2026-09-05] 전 기간 DB 직접 조회(카카오ID 우선, 전화 폴백) + 정렬/필터/주문서 펼치기 */}
           <div className={detailTab === "orders" ? "" : "hidden"}>
             <CustomerFullOrderHistory
@@ -1118,15 +1139,11 @@ function CustomerDetailDrawer({
           ) : null}
 
         </div>
-        <footer className="flex min-h-[52px] shrink-0 items-center gap-2 border-t border-line bg-surface px-4 py-2 pb-[max(8px,env(safe-area-inset-bottom))]">
-          <button type="button" onClick={() => onBlockAction(customer)} disabled={blockSaving}
-            className="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50">
-            {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
-          </button>
-          {detailTab === "overview" && editOpen ? (
-            <button type="button" onClick={saveEdit} disabled={editSaving} className={`ml-auto min-h-11 rounded-lg px-4 text-sm font-semibold disabled:opacity-50 ${phoneEditOpen || noteOpen ? "border border-line bg-surface text-ink" : "bg-ink text-surface"}`}>{editSaving ? "저장 중…" : "저장"}</button>
-          ) : <button type="button" onClick={onClose} className="ml-auto min-h-11 rounded-lg border border-line px-4 text-sm text-ink hover:bg-surface-2">닫기</button>}
-        </footer>
+        {detailTab === "overview" && editOpen ? (
+          <footer className="flex shrink-0 items-center justify-end border-t border-line bg-surface px-4 py-2 pb-[max(8px,env(safe-area-inset-bottom))]">
+            <button type="button" onClick={saveEdit} disabled={editSaving} className={`min-h-[52px] w-full rounded-lg px-4 text-sm font-semibold disabled:opacity-50 sm:min-h-11 sm:w-auto ${phoneEditOpen || noteOpen ? "border border-line bg-surface text-ink" : "bg-ink text-surface"}`}>{editSaving ? "저장 중…" : "저장"}</button>
+          </footer>
+        ) : null}
       </div>
     </div>
   );
@@ -1195,7 +1212,16 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const [blockedCustomerKeyword, setBlockedCustomerKeyword] = useState("");
   const [blockedCustomerPageSize, setBlockedCustomerPageSize] = useState(10);
   const [blockedCustomerPage, setBlockedCustomerPage] = useState(1);
+  const blockedListRef = useRef<HTMLDivElement>(null);
+  const closeBlockedList = () => {
+    setShowBlockedCustomers(false);
+    setBlockedCustomerKeywordDraft("");
+    setBlockedCustomerKeyword("");
+    setBlockedCustomerPage(1);
+  };
+  useAdminModalFocus(blockedListRef, closeBlockedList, showBlockedCustomers);
   const [directPhoneBlocks, setDirectPhoneBlocks] = useState<DirectPhoneBlock[]>([]);
+  const [blockLoadStatus, setBlockLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
   const [profileLoadStatus,setProfileLoadStatus]=useState<"loading"|"ready"|"error">("loading");
   const [profileRowsLoaded,setProfileRowsLoaded]=useState<number|null>(null);
@@ -1218,6 +1244,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     let alive = true;
 
     const loadDirectPhoneBlocks = async () => {
+      setBlockLoadStatus("loading");
       try {
         const response = await fetch("/api/admin-live/customer-block", {
           method: "GET",
@@ -1226,7 +1253,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
         const payload = await response.json().catch(() => null);
 
-        if (!alive || !payload?.ok || !Array.isArray(payload.blocks)) return;
+        if (!alive) return;
+        if (!response.ok || !payload?.ok || payload.tableReady === false || !Array.isArray(payload.blocks)) throw new Error("차단 조회 실패");
 
         setDirectPhoneBlocks(
           payload.blocks
@@ -1238,8 +1266,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               updated_at: clean(block.updated_at),
             }))
         );
+        setBlockLoadStatus("ready");
       } catch {
-        if (alive) setDirectPhoneBlocks([]);
+        if (alive) setBlockLoadStatus("error");
       }
     };
 
@@ -1248,7 +1277,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     return () => {
       alive = false;
     };
-  }, []);
+  }, [reloadTick]);
 
   useEffect(() => {
     let alive = true;
@@ -1487,6 +1516,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   }, [blockOverrides, customerProfiles, directPhoneBlocks, orders,lifetimeById]);
 
   const filteredCustomers = useMemo(() => {
+    // Only filters that need block state wait for this independent read.
+    if ((statusFilter === "normal" || statusFilter === "blocked") && blockLoadStatus !== "ready") return [];
     const searchText = keyword.replace(/\s+/g, "").toLowerCase();
 
     return customers
@@ -1545,10 +1576,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         }
         return b.latestOrderAt.localeCompare(a.latestOrderAt);
       });
-  }, [customers, keyword, sortMode, statusFilter, buyersOnly, memberStatsReady]);
+  }, [customers, keyword, sortMode, statusFilter, buyersOnly, memberStatsReady, blockLoadStatus]);
 
   const filterNeedsStats = buyersOnly || statusFilter === "attention";
   const filterStatsPending = filterNeedsStats && !memberStatsReady;
+  const filterBlocksPending = (statusFilter === "normal" || statusFilter === "blocked") && blockLoadStatus !== "ready";
+  const filterDataPending = filterStatsPending || filterBlocksPending;
   const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / CUSTOMER_PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const visibleCustomers = filteredCustomers.slice((safePage - 1) * CUSTOMER_PAGE_SIZE, safePage * CUSTOMER_PAGE_SIZE);
@@ -1937,7 +1970,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   };
 
   return (
-    <div className={embedded ? "h-full w-full" : "fixed inset-0 z-40 flex items-center justify-center bg-[var(--color-ink-soft)]/40 p-4"} onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+    <div data-member-workspace className={embedded ? "h-full w-full" : "fixed inset-0 z-40 flex items-center justify-center bg-[var(--color-ink-soft)]/40 p-4"} onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose?.(); }}>
       <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface max-md:bg-transparent" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
         {embedded ? null : (
           <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
@@ -1978,49 +2011,6 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             })}
           </div>
 
-          {/* ── 2층: 회원 목록 탭에서만 보이는 «회원 전체» 요약과 차단 도구 ──
-              다른 탭(고객이슈·단골·계정잇기)에서는 상관없는 정보라 감춘다. */}
-          {custTab === "members" ? (
-            <>
-              {/* [2026-09-26] 요약(전체·정상·차단·관리필요) 한 줄 + 오른쪽 「전화번호 차단」 버튼(접이식 줄 대체) */}
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[13px] tabular-nums text-ink-soft">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <button type="button" aria-pressed={statusFilter === "all"} onClick={() => {setStatusFilter("all");setPage(1);}} className="min-h-11 hover:underline">전체 <span className="font-semibold text-ink">{profileLoadStatus === "ready" ? customers.length.toLocaleString("ko-KR") : "…"}</span></button>
-                  <span className="text-ink-mute">·</span>
-                  <button type="button" aria-pressed={statusFilter === "normal"} onClick={() => {setStatusFilter("normal");setPage(1);}} className="min-h-11 hover:underline">정상 <span className="font-semibold text-ink">{profileLoadStatus === "ready" ? normalCustomers.length.toLocaleString("ko-KR") : "…"}</span></button>
-                  <span className="text-ink-mute">·</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBlockedCustomerKeywordDraft("");
-                      setBlockedCustomerKeyword("");
-                      setBlockedCustomerPage(1);
-                      setShowBlockedCustomers(true);
-                    }}
-                    className="min-h-11 hover:underline"
-                  >
-                    차단 <span className="font-semibold text-danger-tx">{profileLoadStatus === "ready" ? blockedTotalCount.toLocaleString("ko-KR") : "…"}</span>
-                    {profileLoadStatus === "ready" && standalonePhoneBlocks.length > 0 ? <span className="ml-1 text-xs text-ink-mute">(번호 {standalonePhoneBlocks.length}건 포함)</span> : null}
-                  </button>
-                  <span className="text-ink-mute">·</span>
-                  <button type="button" disabled={!memberStatsReady} onClick={() => {setStatusFilter('attention');setPage(1);}} className="min-h-11 disabled:cursor-wait">관리필요 <span className="text-warn-tx">{memberStatsReady ? attentionCustomers.length.toLocaleString("ko-KR") : '…'}</span></button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPhoneBlockOpen((v) => !v)}
-                  className={`min-h-11 shrink-0 rounded-lg px-3 text-sm font-semibold transition ${phoneBlockOpen ? "bg-rose-deep text-white" : "border border-line bg-surface text-danger-tx hover:bg-surface-2"}`}
-                >
-                  전화번호 차단
-                </button>
-              </div>
-              {phoneBlockOpen ? (
-                <div className="rounded-xl border border-line bg-surface p-2">
-                  <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
-                </div>
-              ) : null}
-            </>
-          ) : null}
-
       {custTab === "ai-members" ? <AdminLiveAiMembersPanel /> : null}
       {custTab === "link" ? <AdminLiveLinkRequestsPanel /> : null}
 
@@ -2033,79 +2023,26 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       <div className={custTab === "members" ? "" : "hidden"}>
         <div className="min-w-0">
-          {/* [2026-09-25] 필터 한 줄 — 검색(넓게) · 고객상태 · 정렬 · 주문있는고객만 · 초기화(바뀌었을 때만). 좁으면 자연스럽게 줄바꿈. */}
-          {/* [2026-10-22 폰] 검색칸은 한 줄 전체, 나머지 컨트롤은 아래 한 줄 가로 스크롤(§13). PC 는 한 줄 그대로 */}
-          <input
-            value={keyword}
-            onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
-            placeholder="닉네임 / 이름 / 전화번호 검색"
-            inputMode="search"
-            aria-label="고객 검색"
-            className="mt-2 h-11 w-full rounded-lg border border-line bg-surface px-3 text-[16px] font-semibold text-ink outline-none focus-visible:border-ink md:hidden"
+          <MemberFilterToolbar
+            keyword={keyword} status={statusFilter} sort={sortMode} buyersOnly={buyersOnly}
+            profileReady={profileLoadStatus === "ready"} blockReady={blockLoadStatus === "ready"} statsReady={memberStatsReady}
+            counts={{ all: customers.length, normal: normalCustomers.length, blocked: blockedCustomers.length,
+              attention: attentionCustomers.length, blockedTotal: blockedTotalCount, standalone: standalonePhoneBlocks.length }}
+            onKeyword={value => { setKeyword(value); setPage(1); }}
+            onStatus={value => { setStatusFilter(value); setPage(1); }}
+            onSort={value => { setSortMode(value); setPage(1); }}
+            onBuyersOnly={value => { setBuyersOnly(value); setPage(1); }}
+            onReset={() => { setKeyword(""); setStatusFilter("all"); setSortMode("latest"); setBuyersOnly(false); setPage(1); }}
+            onBlockedList={() => { setBlockedCustomerKeywordDraft(""); setBlockedCustomerKeyword(""); setBlockedCustomerPage(1); setShowBlockedCustomers(true); }}
+            onPhoneBlock={() => setPhoneBlockOpen(value => !value)} phoneBlockOpen={phoneBlockOpen}
           />
-          <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>select]:shrink-0">
-            <input
-              value={keyword}
-              onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
-              placeholder="닉네임 / 이름 / 전화번호 검색"
-              inputMode="search"
-              aria-label="고객 검색"
-              className="h-11 min-w-[200px] flex-1 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink max-md:hidden"
-            />
-            <select
-              value={statusFilter}
-              aria-label="회원 상태"
-              onChange={(event) => { setStatusFilter(event.target.value as StatusFilter); setPage(1); }}
-              className="h-11 shrink-0 rounded-lg border border-line bg-surface px-3 text-base md:text-[13px] font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink"
-            >
-              <option value="all">고객상태: 전체</option>
-              <option value="normal">정상</option>
-              <option value="blocked">차단</option>
-              <option value="attention" disabled={!memberStatsReady}>관리필요</option>
-              <option value="nokakao">카카오 미연동</option>
-            </select>
-            <select
-              value={sortMode}
-              aria-label="회원 정렬"
-              onChange={(event) => { setSortMode(event.target.value as SortMode); setPage(1); }}
-              className="h-11 shrink-0 rounded-lg border border-line bg-surface px-3 text-base md:text-[13px] font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink"
-            >
-              <option value="latest">최근주문순</option>
-              <option value="lastLogin">최근 로그인순</option>
-              <option value="oldLogin">과거접속순 (오래 안 온 순)</option>
-              <option value="joinedDesc">최근가입순</option>
-              <option value="joinedAsc">과거가입순</option>
-              <option value="amount">누적 결제순</option>
-              <option value="orders">주문수순</option>
-              <option value="nickname">닉네임순</option>
-            </select>
-            <button
-              type="button"
-              disabled={!memberStatsReady}
-              aria-pressed={buyersOnly}
-              onClick={() => { setBuyersOnly((v) => !v); setPage(1); }}
-              className={`h-11 shrink-0 rounded-lg px-3 text-[12px] font-semibold transition disabled:opacity-50 ${buyersOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
-            >
-              {buyersOnly ? "주문 있는 고객만 ✓" : "주문 있는 고객만"}
-            </button>
-            {(keyword.trim() || statusFilter !== "all" || sortMode !== "latest" || buyersOnly) ? (
-              <button
-                type="button"
-                onClick={() => { setKeyword(""); setStatusFilter("all"); setSortMode("latest"); setBuyersOnly(false); setPage(1); }}
-                className="h-11 shrink-0 rounded-lg border border-line bg-surface px-3 text-base md:text-[13px] font-semibold text-ink-soft hover:bg-surface-2"
-              >
-                초기화
-              </button>
-            ) : null}
-          </div>
-
-
+          {phoneBlockOpen ? <fieldset disabled={blockLoadStatus !== "ready"} aria-label="전화번호 차단 입력" className="mt-3 min-w-0 border-0 border-t border-line p-0 pt-3 disabled:opacity-50"><AdminLivePhoneBlockPanel onSaved={applyBlockResult} /></fieldset> : null}
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-mute">
-            <span role="status" className={lifetimeStatus === 'error' || profileLoadStatus === 'error' ? 'text-danger-tx' : ''}>
-              {lifetimeStatus === 'loading' || profileLoadStatus === 'loading' ? '전체 기간 실적을 확인하는 중…' : memberStatsReady ? `전체 기간 · 검색결과 ${filteredCustomers.length.toLocaleString('ko-KR')}명` : '실적을 확인하지 못했습니다. 다시 조회해 주세요.'}
+            <span role="status" className={lifetimeStatus === 'error' || profileLoadStatus === 'error' || blockLoadStatus === 'error' ? 'text-danger-tx' : ''}>
+              {blockLoadStatus === 'error' ? '차단 정보를 확인하지 못했습니다. 다시 조회해 주세요.' : blockLoadStatus === 'loading' ? '차단 정보를 확인하는 중…' : lifetimeStatus === 'loading' || profileLoadStatus === 'loading' ? '전체 기간 실적을 확인하는 중…' : memberStatsReady ? `전체 기간 · 검색결과 ${filteredCustomers.length.toLocaleString('ko-KR')}명` : '실적을 확인하지 못했습니다. 다시 조회해 주세요.'}
             </span>
-            <button type="button" disabled={lifetimeStatus === 'loading' || profileLoadStatus === 'loading'} onClick={() => setReloadTick(value => value + 1)} className="min-h-11 rounded-lg border border-line bg-surface px-3 text-sm text-ink disabled:opacity-40 sm:min-h-9">{memberStatsReady ? "새로고침" : "다시 조회"}</button>
+            <button type="button" disabled={lifetimeStatus === 'loading' || profileLoadStatus === 'loading' || blockLoadStatus === 'loading'} onClick={() => setReloadTick(value => value + 1)} className="min-h-11 rounded-lg border border-line bg-surface px-3 text-sm text-ink disabled:opacity-40 sm:min-h-9">{memberStatsReady && blockLoadStatus === 'ready' ? "새로고침" : "다시 조회"}</button>
           </div>
 
           {/* [2026-09-26] 선택했을 때만 뜨는 작업 바(고객이슈 작업 바와 같은 모양). 전체선택은 표 머리글 체크박스로. */}
@@ -2125,7 +2062,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
             {/* [2026-09-25] PC(넓을 때)=고객이슈 탭과 같은 표 · 좁은 화면=카드(지금 모양 유지) */}
             {visibleCustomers.length === 0 ? (
-              <div className="mt-3 ru-empty"><div className="ru-empty-title">{profileLoadStatus === "loading" || (filterStatsPending && lifetimeStatus === "loading") ? "회원 목록을 불러오는 중…" : profileLoadStatus === "error" || filterStatsPending ? "필터 결과를 확인하지 못했습니다." : "이 조건에 맞는 고객이 없습니다."}</div><div className="ru-empty-hint">{profileLoadStatus === "loading" || (filterStatsPending && lifetimeStatus === "loading") ? "잠시만 기다려 주세요." : profileLoadStatus === "error" || filterStatsPending ? "다시 조회해 주세요." : "검색어와 필터를 확인해 주세요."}</div></div>
+              <div className="mt-3 ru-empty"><div className="ru-empty-title">{profileLoadStatus === "loading" || (filterBlocksPending && blockLoadStatus === "loading") || (filterStatsPending && lifetimeStatus === "loading") ? "회원 목록을 불러오는 중…" : profileLoadStatus === "error" || filterDataPending ? "필터 결과를 확인하지 못했습니다." : "이 조건에 맞는 고객이 없습니다."}</div><div className="ru-empty-hint">{profileLoadStatus === "loading" || (filterBlocksPending && blockLoadStatus === "loading") || (filterStatsPending && lifetimeStatus === "loading") ? "잠시만 기다려 주세요." : profileLoadStatus === "error" || filterDataPending ? "다시 조회해 주세요." : "검색어와 필터를 확인해 주세요."}</div></div>
             ) : (
               <>
                 {/* ── PC: 표 (xl 이상) — 머리글·모든 줄이 MEMBER_GRID 하나를 공유(칸 어긋남 0) · 숫자칸 오른쪽정렬 · 차단은 absolute 빨간 막대(칸폭 영향 없음) ── */}
@@ -2133,7 +2070,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                   <div className="min-w-[1180px]">
                     <div className={`sticky top-0 z-10 grid ${MEMBER_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-xs font-semibold text-ink-mute`}>
                       <label className="flex items-center justify-center" title={allPageSelected ? "이 페이지 전체 선택 해제" : "이 페이지 전체 선택"}>
-                        <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} className="h-4 w-4 accent-rose-deep outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" aria-label="이 페이지 전체 선택" />
+                        <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} className="h-4 w-4 accent-rose-deep" aria-label="이 페이지 전체 선택" />
                       </label>
                       <span>사진</span>
                       <span>닉네임 / 이름</span>
@@ -2161,8 +2098,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                           ) : (
                             <button type="button" onClick={() => openDetail(customer)} className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}>{d.initial}</button>
                           )}
-                          {/* 닉네임·이름 (두 줄 · 포커스 로즈) */}
-                          <button type="button" onClick={() => openDetail(customer)} className="min-w-0 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-rose-deep">
+                          {/* 닉네임·이름 (두 줄) */}
+                          <button type="button" onClick={() => openDetail(customer)} className="min-w-0 rounded text-left">
                             <div className="flex items-center gap-1.5">
                               <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                               {!customer.kakaoId ? <span className="shrink-0 rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만)">미연동</span> : null}
@@ -2176,6 +2113,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                           </div>
                           {/* 상태 (가장 넓게 · 여러 배지 줄바꿈 허용 · 차단은 사유 요약+hover 전체) */}
                           <div className="flex min-w-0 flex-wrap items-center gap-1">
+                            {blockLoadStatus !== "ready" ? <span className="rounded bg-surface-2 px-1 py-0.5 text-xs text-ink-mute">{blockLoadStatus === "loading" ? "차단 확인 중" : "차단 확인 필요"}</span> : null}
                             {customer.blocked ? (
                               <div className="min-w-0" title={d.blockTitle || "차단됨"}>
                                 <div className="flex items-center gap-1">
@@ -2190,7 +2128,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                                 {d.openIssues > 0 ? <span className="rounded bg-danger-bg px-1 py-0.5 text-[11px] font-black text-danger-tx" title="미해결 고객이슈">이슈 {d.openIssues}</span> : null}
                                 {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-xs font-semibold text-ink-mute" title="방송 알림 미신청">알림OFF</span> : null}
                               </>
-                            ) : <span className="text-[11px] text-ink-mute">-</span>}
+                            ) : blockLoadStatus === "ready" ? <span className="text-[11px] text-ink-mute">-</span> : null}
                           </div>
                           {/* 누적 주문 (오른쪽) */}
                           <span className="text-right font-semibold tabular-nums text-ink">{memberStatsReady ? `${customer.orderCount}건` : "…"}</span>
@@ -2205,7 +2143,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                           <span className="text-right font-semibold tabular-nums text-rose-deep">{d.pts != null ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
                           {/* 처리 (오른쪽) */}
                           <div className="flex items-center justify-end gap-1.5">
-                            <button type="button" onClick={() => handleCustomerBlockButton(customer)} className={`min-h-9 shrink-0 rounded-lg px-2 text-xs font-semibold transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
+                            <button type="button" onClick={() => handleCustomerBlockButton(customer)} disabled={blockSaving || blockLoadStatus !== "ready"} className={`min-h-9 shrink-0 rounded-lg px-2 text-xs font-semibold transition-colors disabled:opacity-40 ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
                             <button type="button" onClick={() => openDetail(customer)} className="min-h-9 shrink-0 rounded-lg px-2 text-[13px] font-semibold text-ink hover:bg-surface-2">열기</button>
                           </div>
                         </div>
@@ -2221,7 +2159,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                     const d = memberRowInfo(customer);
                     return (
                       <div key={customer.key} role="button" tabIndex={0} onClick={() => openDetail(customer)} onKeyDown={(e) => { if (e.target !== e.currentTarget) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(customer); } }}
-                        className={`relative min-h-11 rounded-xl border px-3 py-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ink ${customer.blocked ? "border-line bg-danger-bg/40" : "border-line bg-surface active:bg-surface-2"}`}>
+                        className={`relative min-h-11 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-line bg-danger-bg/40" : "border-line bg-surface active:bg-surface-2"}`}>
                         {customer.blocked ? <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-danger-tx" /> : null}
                         <div className="flex items-center gap-2">
                           {d.phoneDigits ? (
@@ -2240,6 +2178,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               <span className="min-w-0 break-words text-[14px] font-bold text-ink">{customer.nickname || "—"}</span>
                               {customer.name ? <span className="text-[13px] text-ink-soft">{customer.name}</span> : null}
                               {customer.blocked ? <span className="rounded bg-[var(--color-danger-tx)] px-1.5 py-0.5 text-[11px] font-bold text-white" title={d.blockTitle || "차단됨"}>차단{d.blockParts?.label ? ` · ${d.blockParts.label}` : ""}</span> : null}
+                              {blockLoadStatus !== "ready" ? <span className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] text-ink-mute">{blockLoadStatus === "loading" ? "차단 확인 중" : "차단 확인 필요"}</span> : null}
                               {memberStatsReady && customer.unpaidCount > 0 ? <span className="rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-bold text-warn-tx">미입금 {customer.unpaidCount}</span> : null}
                               {d.openIssues > 0 ? <span className="rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-bold text-danger-tx">이슈 {d.openIssues}</span> : null}
                               {customer.liveAlertOptin === false ? <span className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-mute">알림OFF</span> : null}
@@ -2279,7 +2218,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs font-black text-ink-soft">
-              총 {profileLoadStatus === "ready" && !filterStatsPending ? filteredCustomers.length.toLocaleString("ko-KR") : "…"}명
+              총 {profileLoadStatus === "ready" && !filterDataPending ? filteredCustomers.length.toLocaleString("ko-KR") : "…"}명
             </div>
 
             <div className="flex items-center gap-2">
@@ -2403,7 +2342,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       {showBlockedCustomers && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">
-          <div className="max-h-[84vh] w-full max-w-[720px] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div ref={blockedListRef} role="dialog" aria-modal="true" aria-label="차단 목록" tabIndex={-1} style={{ outline: "none" }} className="max-h-[84dvh] w-full max-w-[720px] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-line pb-4">
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-danger-tx">BLOCKED CUSTOMERS</div>
@@ -2417,13 +2356,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowBlockedCustomers(false);
-                  setBlockedCustomerKeywordDraft("");
-                  setBlockedCustomerKeyword("");
-                  setBlockedCustomerPage(1);
-                }}
-                className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-black text-ink-soft hover:bg-surface-2"
+                onClick={closeBlockedList}
+                aria-label="차단 목록 닫기"
+                className="min-h-11 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-black text-ink-soft hover:bg-surface-2"
               >
                 닫기
               </button>
@@ -2637,8 +2572,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         onClose={() => { setSelectedCustomer(null); setSelectedProfile(null); }}
         onBlockAction={handleCustomerBlockButton}
         onEditBlockReason={(c) => setBlockModalTarget(c)}
-        blockedAt={selectedCustomer && selectedCustomer.blocked ? (blockedAtByPhone.get(digitsOnly(selectedCustomer.phone)) || "") : ""}
+        blockedAt={selectedCustomer ? (blockedAtByPhone.get(digitsOnly(selectedCustomer.phone)) || "") : ""}
         blockSaving={blockSaving}
+        blockStatus={blockLoadStatus}
         onSaved={() => { setReloadTick((tick) => tick + 1); }}
       />
 

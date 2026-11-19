@@ -51,12 +51,16 @@ const fixtures = {
 function installDom() {
   const handlers = new Map();
   class Element {
+    constructor(props = {}) { this.props = props; }
     isConnected = true;
     style = {};
     focus() { document.activeElement = this; }
     getClientRects() { return [{}]; }
     closest() { return null; }
     querySelectorAll() { return []; }
+    querySelector() { return null; }
+    contains(node) { return node === this; }
+    getBoundingClientRect() { return {left:100,right:320,top:100,bottom:144,width:220,height:44}; }
     scrollIntoView() {}
   }
   globalThis.HTMLElement = Element;
@@ -66,13 +70,20 @@ function installDom() {
     removeEventListener(key, fn) { handlers.get(key)?.delete(fn); },
   };
   globalThis.window = {
+    innerWidth: 1280, innerHeight: 800,
     addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout,
     requestAnimationFrame: fn => setTimeout(fn, 0), cancelAnimationFrame: clearTimeout,
   };
-  return { createNodeMock: () => new Element() };
+  return {
+    createNodeMock: node => new Element(node.props),
+    async dispatchKey(key) {
+      const event = { key, preventDefault() {}, stopPropagation() {} };
+      await act(async () => { for (const handler of [...(handlers.get('keydown') || [])]) handler(event); });
+    },
+  };
 }
 
-function makeEnvironment({ profiles = [fixtures.a, fixtures.b], blocks = [], byProfile, historyError = '', modules = {} } = {}) {
+function makeEnvironment({ profiles = [fixtures.a, fixtures.b], blocks = [], blockError = false, blockWait, tableReady = true, byProfile, historyError = '', modules = {} } = {}) {
   const calls = [];
   const rendererOptions = installDom();
   const lifetime = byProfile || Object.fromEntries(profiles.map(p => [String(p.id), { ...zeroStats }]));
@@ -109,7 +120,8 @@ function makeEnvironment({ profiles = [fixtures.a, fixtures.b], blocks = [], byP
         unmatchedRows: 0, ambiguousRows: 0, byProfile: lifetime,
       };
     } else if (url === '/api/admin-live/customer-block' && method === 'GET') {
-      payload = { ok: true, blocks };
+      if (blockWait) await blockWait;
+      payload = (typeof blockError === 'function' ? blockError() : blockError) ? { ok: false, message: 'fixture block read failure' } : { ok: true, blocks, tableReady };
     } else if (url === '/api/admin-live/customer-list-extra' && method === 'POST') {
       // This POST only reads batched display data; it is not a write endpoint.
       payload = { ok: true, points: {}, openIssues: {} };
@@ -159,6 +171,140 @@ async function withTree(environment, run) {
 }
 
 const cases = {
+  async block_failure() {
+    let failed=true;
+    const env = makeEnvironment({blockError:()=>failed});
+    await withTree(env, async tree => {
+      assert.ok(textOf(tree.root).includes('차단 정보를 확인하지 못했습니다.'), 'Block read failure must not be rendered as a successful empty block list');
+      assert.ok(buttonText(tree, '다시 조회'), 'Block failure has a usable retry');
+      await openMember(tree, fixtures.a.youtube_nickname);
+      assert.ok(textOf(memberDialog(tree)).includes('차단 상태 확인 필요'), 'Unknown block state is not described as normal');
+      assert.equal(memberDialog(tree).findAllByType('button').find(n => textOf(n) === '차단').props.disabled, true, 'Unknown state cannot trigger a block action');
+      await click(memberDialog(tree).findAllByProps({ role: 'tab' }).find(n => textOf(n) === '주문 이력'), '주문 이력');
+      assert.ok(textOf(memberDialog(tree)).includes('등록된 주문 이력이 없습니다.'), 'Independent order history remains readable when block state fails');
+      await closeMember(tree);
+      const search = tree.root.findAllByType('input').find(n => n.props['aria-label'] === '고객 검색');
+      await act(async () => search.props.onChange({ target: { value: '검증회원B' } }));
+      assert.ok(textOf(tree.root).includes('검증회원B') && !textOf(tree.root).includes('검증회원A'), 'Search remains usable during a block read failure');
+      await act(async () => search.props.onChange({ target: { value: '' } }));
+      failed=false;
+      await click(buttonText(tree, '다시 조회'), '차단 조회 재시도');
+      assert.ok(textOf(tree.root).includes('검색결과 2명'), 'Retry actually re-reads block state and restores the member list');
+    });
+    await withTree(makeEnvironment({tableReady:false}), async tree=>{
+      assert.ok(textOf(tree.root).includes('차단 정보를 확인하지 못했습니다.'),'HTTP 200 tableReady=false is not a successful zero');
+    });
+  },
+  async filter_contracts() {
+    let release;
+    const blockWait=new Promise(resolve=>{release=resolve;});
+    const env=makeEnvironment({profiles:[{...fixtures.a,is_blocked:true},fixtures.b],blocks:[
+      // Existing successful API writes both profile A and its phone-block entry.
+      // A profile flag alone is not a new source of truth for this UI test.
+      {phone:fixtures.a.customer_phone,reason:'직접 입력'},
+      {phone:fixtures.b.customer_phone,reason:'직접 입력'}, {phone:'01099990000',reason:'직접 입력'},
+    ],blockWait});
+    await withTree(env,async tree=>{
+      assert.ok(textOf(tree.root).includes('차단 정보를 확인하는 중…'));
+      const blockList=()=>tree.root.findAllByType('button').find(n=>textOf(n).startsWith('차단 목록'));
+      assert.equal(blockList().props.disabled,true,'Incomplete block read cannot open an empty successful block list');
+      assert.ok(textOf(blockList()).includes('…'));
+      const statusGroup=()=>tree.root.findByProps({role:'group','aria-label':'회원 상태'});
+      assert.equal(statusGroup().findAllByType('button').find(n=>textOf(n).startsWith('정상')).props.disabled,true);
+      await openMember(tree, fixtures.a.youtube_nickname);
+      assert.ok(textOf(memberDialog(tree)).includes('차단 상태 확인 중'), 'Details can open while an independent block read is pending');
+      await act(async()=>release());
+      assert.equal(memberDialog(tree).findAllByType('button').filter(n=>textOf(n)==='차단해제').length,1,'An already open detail receives the completed block state');
+      assert.ok(!textOf(memberDialog(tree)).includes('정상 회원'),'A late blocked result never leaves a false normal label in the drawer');
+      await closeMember(tree);
+      const blockedChip=statusGroup().findAllByType('button').find(n=>textOf(n).startsWith('차단'));
+      assert.equal(textOf(blockedChip),'차단2','Profile and phone-blocked members belong in the member count');
+      assert.equal(blockedChip.props['aria-label'],undefined,'Visible count remains part of the accessible button name');
+      assert.ok(textOf(blockList()).endsWith('3'),'Standalone phone belongs only in the management count');
+      const selectAll=tree.root.findAllByType('input').find(n=>n.props['aria-label']==='이 페이지 전체 선택');
+      await act(async()=>selectAll.props.onChange());
+      assert.ok(textOf(tree.root).includes('2명 선택'));
+      await click(statusGroup().findAllByType('button').find(n=>textOf(n).startsWith('정상')),'정상 필터');
+      await click(buttonText(tree,'초기화'),'필터 초기화');
+      assert.ok(textOf(tree.root).includes('2명 선택'),'Reset preserves selected members for bulk actions');
+      await click(blockList(),'차단 목록');
+      assert.ok(textOf(tree.root).includes('010-9999-0000'),'Standalone phone remains accessible in management');
+    });
+  },
+  async mobile_management() {
+    const env=makeEnvironment({blocks:[{phone:fixtures.b.customer_phone,reason:'직접 입력'}]});
+    await withTree(env,async tree=>{
+      const filterButton=tree.root.findAllByType('button').find(n=>n.props['aria-haspopup']==='dialog');
+      const filterTrigger=filterButton.instance;
+      filterTrigger.focus();
+      await click(filterButton,'모바일 필터');
+      const sheet=()=>tree.root.findAllByProps({role:'dialog','aria-label':'회원 필터'})[0];
+      const blockList=()=>tree.root.findAllByProps({role:'dialog','aria-label':'차단 목록'})[0];
+      const management=()=>sheet().findAllByType('button').find(n=>textOf(n).startsWith('차단 목록'));
+      const managementTrigger=management().instance;
+      managementTrigger.focus();
+      await click(management(),'모바일 차단 목록');
+      assert.ok(sheet() && blockList(),'Management stacks above the filter sheet so its return target stays mounted');
+      assert.equal(document.activeElement.props['aria-label'],'차단 목록','New modal takes focus');
+      assert.equal(document.body.style.overflow,'hidden','Nested management keeps the background locked');
+      await env.rendererOptions.dispatchKey('Escape');
+      assert.ok(sheet() && !blockList(),'Escape closes only the topmost management dialog');
+      assert.equal(document.activeElement,managementTrigger,'Management close restores its sheet trigger');
+      assert.equal(document.body.style.overflow,'hidden');
+      await click(management(),'차단 목록 다시 열기');
+      await click(blockList().findAllByType('button').find(n=>n.props['aria-expanded']===false && textOf(n).includes(fixtures.b.youtube_nickname)),'차단 회원 펼치기');
+      await click(buttonText(tree,'회원 상세'),'차단 목록에서 회원 상세');
+      assert.ok(memberDialog(tree) && sheet() && !blockList());
+      assert.equal(document.activeElement.props['aria-label'],'회원 상세');
+      await closeMember(tree);
+      assert.equal(document.body.style.overflow,'hidden','Closing the member detail retains its underlying sheet lock');
+      await env.rendererOptions.dispatchKey('Escape');
+      assert.ok(!sheet());
+      assert.equal(document.body.style.overflow,'auto','The final sheet close restores background scrolling');
+      assert.equal(document.activeElement,filterTrigger,'The final close returns to the original filter button');
+    });
+  },
+  async block_form_error() {
+    let failed=false;
+    const env=makeEnvironment({blockError:()=>failed});
+    await withTree(env,async tree=>{
+      await click(buttonText(tree,'전화번호 차단'),'전화번호 차단 폼 열기');
+      const form=()=>tree.root.findByProps({'aria-label':'전화번호 차단 입력'});
+      assert.equal(form().type,'fieldset','Native fieldset disables all nested input and button controls together');
+      assert.equal(form().props.disabled,false);
+      await act(async()=>form().findAllByType('input').find(n=>n.props.inputMode==='numeric').props.onChange({target:{value:'01055556666'}}));
+      failed=true;
+      await click(buttonText(tree,'새로고침'),'차단 정보 새로고침');
+      assert.equal(form().props.disabled,true,'An already open form inherits the unavailable block state');
+      assert.ok(form().findAllByType('input').some(n=>n.props.value==='01055556666'),'Temporarily disabling does not discard the operator draft');
+      failed=false;
+      await click(buttonText(tree,'다시 조회'),'차단 정보 재조회');
+      assert.equal(form().props.disabled,false,'A successful retry restores the existing form');
+      assert.equal(env.calls.filter(call=>call.url==='/api/admin-live/customer-block' && call.method==='POST').length,0,'No real or fixture block mutation is needed to check this state');
+    });
+  },
+  async layout() {
+    const env = makeEnvironment({ blocks: [{ phone: fixtures.b.customer_phone, reason: '직접 입력', updated_at: '2026-11-01T00:00:00Z' }] });
+    await withTree(env, async tree => {
+      await openMember(tree, fixtures.a.youtube_nickname);
+      const closes = memberDialog(tree).findAllByType('button').filter(n => n.props['aria-label'] === '회원 상세 닫기' || textOf(n) === '닫기');
+      assert.equal(closes.length, 1, 'Member detail has one close control, including on mobile');
+      assert.equal(memberDialog(tree).findAllByType('footer').length, 0, 'Read-only member detail has no duplicate action footer');
+      assert.equal(memberDialog(tree).findAllByType('button').filter(n => textOf(n) === '차단').length, 1, 'Overview has one block entry');
+      for (const label of ['주문 이력', '접속·변경 기록']) {
+        await click(memberDialog(tree).findAllByProps({ role: 'tab' }).find(n => textOf(n) === label), label);
+        assert.equal(memberDialog(tree).findAllByType('button').filter(n => textOf(n) === '차단').length, 0, 'Read-only tabs do not pin a block action');
+      }
+      await click(buttonText(tree, '정보 수정'), '정보 수정');
+      assert.equal(memberDialog(tree).findAllByType('footer').length, 1, 'Editing retains the fixed save footer');
+      assert.ok(memberDialog(tree).findAllByType('button').some(n => textOf(n) === '저장'), 'Editing retains save');
+      await click(buttonText(tree, '취소'), '수정 취소');
+      assert.equal(memberDialog(tree).findAllByType('footer').length, 0, 'Cancel removes the edit footer');
+      await closeMember(tree);
+      await openMember(tree, fixtures.b.youtube_nickname);
+      assert.equal(memberDialog(tree).findAllByType('button').filter(n => textOf(n) === '차단해제').length, 1, 'Blocked member has one unblock entry with its reason');
+    });
+  },
   async blocked() {
     const env = makeEnvironment({ blocks: [{ phone: fixtures.b.customer_phone, reason: '직접 입력', updated_at: '2026-11-01T00:00:00Z' }] });
     await withTree(env, async tree => {
@@ -166,7 +312,7 @@ const cases = {
       assert.ok(textOf(memberDialog(tree)).includes('검증프로필B'), 'Fixture control: direct detail contains B profile');
       assert.ok(textOf(memberDialog(tree)).includes('검증배송지B'), 'Fixture control: direct detail contains B addresses');
       await closeMember(tree);
-      await click(tree.root.findAllByType('button').find(n => /^차단\s*\d/.test(textOf(n))), '차단 목록');
+      await click(tree.root.findAllByType('button').find(n => textOf(n).startsWith('차단 목록')), '차단 목록');
       await click(tree.root.findAllByType('button').find(n => n.props['aria-expanded'] === false && textOf(n).includes('검증회원B')), '차단 회원 펼치기');
       await click(buttonText(tree, '회원 상세'), '차단 목록 회원 상세');
       const details = textOf(memberDialog(tree));
@@ -210,10 +356,11 @@ const cases = {
     const c = {...fixtures.empty, youtube_nickname: '검증회원C'};
     const env = makeEnvironment({profiles: [fixtures.a, fixtures.b, c]});
     await withTree(env, async tree => {
-      const select = tree.root.findAllByType('select').find(n => n.props.value === 'latest');
-      assert.ok(select, 'recent order remains default');
-      assert.equal(select.findAllByType('option').length, 8, 'all existing sort choices remain');
-      await act(async () => select.props.onChange({target: {value: 'oldLogin'}}));
+      const select = tree.root.findAllByProps({role:'combobox'}).find(n => n.props['aria-label'] === '회원 정렬');
+      assert.ok(textOf(select).includes('최근주문순'), 'recent order remains default');
+      await click(select, '회원 정렬');
+      assert.equal(tree.root.findAllByProps({role:'option'}).length, 8, 'all existing sort choices remain');
+      await click(tree.root.findAllByProps({role:'option'}).find(n=>textOf(n)==='과거접속순 (오래 안 온 순)'), '과거접속순');
       const names = [...new Set(tree.root.findAllByType('button').map(textOf).map(n => n.match(/^검증회원[ABC]/)?.[0]).filter(Boolean))];
       assert.deepEqual(names, ['검증회원A', '검증회원C', '검증회원B'], 'missing login first, tied missing logins keep original order');
     });

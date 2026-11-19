@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8');
 const list=read('components/admin-live/AdminLiveCustomersPanel.tsx');
 const detail=read('components/admin-live/CustomerFullOrderHistory.tsx');
+const filters=read('components/admin-live/MemberFilterToolbar.tsx');
 const api=read('app/api/admin-live/customer-lifetime/route.ts');
 const access=read('app/api/admin-live/customer-access/route.ts');
 const geo=read('lib/presenceWrite.ts');
@@ -15,7 +16,7 @@ assert.match(list,/memberStatsReady && customer\.orderCount <= 0/,'buyer-only mu
 assert.match(list,/회원 상세 메뉴/,'accessible concise member detail tabs');
 assert.match(list,/memberStatsReady \? b\.paidAmount/,'paid amount sorting is gated until full snapshot verified');
 assert.match(list,/memberStatsReady \? b\.orderCount/,'order count sorting is gated until full snapshot verified');
-assert.match(list,/MOVED mobile search before status\/sort filters|aria-label="고객 검색"/,'mobile search remains accessible');
+assert.match(filters,/aria-label="고객 검색"/,'mobile search remains accessible in the shared member filter toolbar');
 assert.match(list,/MemberAccessHistory/,'existing IP history accessible in member drawer');
 assert.match(detail,/calculateLifetimeStats\(rows \|\| \[\]\)/,'detail uses same grouped full-history classifier');
 assert.match(api,/verifyAdminSessionFromRequest/,'PII summary must require admin session');
