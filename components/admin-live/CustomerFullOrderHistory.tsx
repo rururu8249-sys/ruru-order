@@ -7,10 +7,11 @@
 //   전화번호는 kakao_id 가 안 찍힌 옛 주문을 찾을 때만 폴백. 다른 카카오 계정 주문은 전화가 같아도 제외.
 //   읽기 전용 — DB에 아무것도 쓰지 않는다. 주문/입금/정산/포인트 로직 무접촉.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import {classifyLifetimeOrder,lifetimeLineAmount,lifetimeGroupKey,calculateLifetimeStats} from "@/lib/customerLifetimeStats";
+import AdminSelect from "./AdminSelect";
 
 type Row = Record<string, any>;
 type Kind = "paid" | "unpaid" | "canceled";
@@ -67,6 +68,7 @@ function badgeStyle(kind: Kind): React.CSSProperties {
 export type CustomerFullOrderStats = { all: number; paid: number; unpaid: number; canceled: number; paidAmount: number; latestOrderAt?: string };
 
 export default function CustomerFullOrderHistory({ kakaoId, phone, onStats, onLoadState, refreshKey = 0 }: { kakaoId: string; phone: string; onStats?: (stats: CustomerFullOrderStats | null) => void; onLoadState?: (state: 'loading' | 'ready' | 'error') => void; refreshKey?: number }) {
+  const historyId = useId();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -209,13 +211,9 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats, onLo
           <h3 className="text-base font-bold text-ink">주문 이력</h3>
           <span className="text-xs text-ink-mute">전체 기간</span>
         </div>
-        <select value={sort} aria-label="주문 이력 정렬" disabled={!ready}
-          onChange={(event) => { setSort(event.target.value as Sort); setPage(1); }}
-          className="min-h-11 rounded-lg border border-line bg-surface px-3 text-base text-ink sm:min-h-9 sm:text-sm">
-          <option value="latest">최신순</option>
-          <option value="oldest">오래된순</option>
-          <option value="amount">금액순</option>
-        </select>
+        <AdminSelect label="주문 이력 정렬" value={sort} disabled={!ready}
+          options={[{ value: "latest", label: "최신순" }, { value: "oldest", label: "오래된순" }, { value: "amount", label: "금액순" }]}
+          onChange={value => { setSort(value); setPage(1); }} className="w-[128px]" />
       </div>
       <div className="mb-3 flex flex-wrap gap-2">
         {chip("all", "전체", counts.all)}
@@ -234,38 +232,49 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats, onLo
       ) : visible.length === 0 ? (
         <p className="py-6 text-center text-[13px] text-ink-mute">{filter === "all" ? "등록된 주문 이력이 없습니다." : "해당 주문이 없습니다. 전체 필터를 확인해 주세요."}</p>
       ) : (
-        <div className="divide-y divide-line border-y border-line">
+        <div className="space-y-4">
           {visible.map(group => {
             const open = openKey === group.key;
-            return <div key={group.key}>
-              <button type="button" aria-expanded={open} onClick={() => setOpenKey(open ? "" : group.key)}
-                className="grid min-h-11 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-3 text-left hover:bg-surface-2">
-                <span className="flex min-w-0 flex-wrap items-center gap-2 text-xs tabular-nums text-ink-mute">
-                  <time>{fmtDate(group.createdAt)}</time>
-                  {!group.kakaoLinked ? <span title="카카오 ID가 없는 과거 주문을 전화번호로 연결했습니다." className="text-warn-tx">전화 연결</span> : null}
+            const contentId = `${historyId}-${encodeURIComponent(group.key)}`;
+            return <article key={group.key} aria-label={group.code ? `주문 ${group.code}` : `${fmtDate(group.createdAt)} 주문`}
+              className="rounded-xl border border-line bg-surface">
+              <button type="button" aria-expanded={open} aria-controls={open ? contentId : undefined} onClick={() => setOpenKey(open ? "" : group.key)}
+                className={`block min-h-11 w-full min-w-0 bg-surface-2 p-3 text-left hover:opacity-80 ${open ? "rounded-t-xl" : "rounded-xl"}`}>
+                <span className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{group.code ? `주문 ${group.code}` : "주문번호 없는 과거 주문"}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-2 text-xs tabular-nums text-ink-mute">
+                      <time>{fmtDate(group.createdAt)}</time>
+                      <span>상품 {group.rows.length}줄</span>
+                      {!group.kakaoLinked ? <span title="카카오 ID가 없는 과거 주문을 전화번호로 연결했습니다." className="text-warn-tx">전화 연결</span> : null}
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-lg px-2 py-1 text-right text-xs font-semibold" style={badgeStyle(group.kind)}>{group.statusLabel}</span>
                 </span>
-                <span className="rounded-lg px-2 py-1 text-right text-xs font-semibold" style={badgeStyle(group.kind)}>{group.statusLabel}</span>
-                <span className="min-w-0 break-words text-[13px] text-ink-soft [overflow-wrap:anywhere]">{group.summary}</span>
-                <span className="flex items-center justify-end gap-2 text-right text-[13px] font-semibold tabular-nums text-ink">
-                  {money(group.amount)}
-                  <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" className={`shrink-0 ${open ? "rotate-180" : ""}`}><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                {!open ? <span className="mt-3 line-clamp-2 break-words text-[13px] text-ink-soft [overflow-wrap:anywhere]">{group.summary}</span> : null}
+                <span className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-1 text-xs text-ink-mute">{open ? "접기" : "상품 내역"}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" className={`shrink-0 ${open ? "rotate-180" : ""}`}><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                  <span className="text-right text-base font-bold tabular-nums text-ink">{money(group.amount)}</span>
                 </span>
               </button>
-              {open ? <div className="mb-3 space-y-2 border-t border-dashed border-line pt-3 text-xs leading-5 text-ink-soft">
-                {group.rows.map(row => <div key={row.id} className="flex items-start justify-between gap-3">
-                  <span className="min-w-0 break-words">{rowItemLabel(row)}</span>
-                  <span className="shrink-0 text-right font-semibold tabular-nums text-ink">{money(num(row.adjusted_product_price ?? (num(row.product_price) * (num(row.qty) || 1))))}</span>
-                </div>)}
-                <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 border-t border-line pt-2 text-right tabular-nums">
+              {open ? <div id={contentId} className="space-y-3 border-t border-line p-3 text-[13px] leading-5 text-ink-soft">
+                <div className="flex items-center justify-between gap-3 text-xs font-semibold text-ink-mute"><span>상품</span><span>금액</span></div>
+                <ul aria-label="주문 상품" className="divide-y divide-line">
+                  {group.rows.map(row => <li key={row.id} className="flex items-start justify-between gap-3 py-3 first:pt-0">
+                    <span className="min-w-0 break-words [overflow-wrap:anywhere]">{rowItemLabel(row)}</span>
+                    <span className="shrink-0 text-right font-semibold tabular-nums text-ink">{money(num(row.adjusted_product_price ?? (num(row.product_price) * (num(row.qty) || 1))))}</span>
+                  </li>)}
+                </ul>
+                <div className="flex flex-wrap justify-end gap-x-3 gap-y-2 border-t border-line pt-3 text-right text-xs tabular-nums">
                   <span>배송비 {money(group.shipping)}</span>
                   {group.points > 0 ? <span>포인트 사용 {Math.round(group.points).toLocaleString("ko-KR")}P</span> : null}
                   {group.paymentMethod ? <span>{group.paymentMethod}</span> : null}
                   <strong className="font-semibold text-ink">최종 {money(group.amount)}</strong>
                 </div>
-                {group.address ? <p className="break-words">{group.address}</p> : null}
-                <p className="break-words text-ink-mute">{group.broadcast ? `${group.broadcast} · ` : ""}{group.code ? `주문번호 ${group.code} · ` : ""}{group.rows.length}줄{group.kakaoLinked ? "" : " · 카카오 미연동"}</p>
+                {group.address ? <div className="border-t border-line pt-3"><p className="text-xs font-semibold text-ink-mute">배송지</p><p className="mt-1 break-words [overflow-wrap:anywhere]">{group.address}</p></div> : null}
+                {group.broadcast ? <p className="break-words text-xs text-ink-mute">{group.broadcast}</p> : null}
               </div> : null}
-            </div>;
+            </article>;
           })}
         </div>
       )}
