@@ -91,7 +91,7 @@ const tabs = tree.root.findAll(n => n.type === 'button' && n.props.role === 'tab
 assert.deepEqual(tabs.map(t => t.children.join('')), ['상품별', '손님별'], '보기는 상품별·손님별 두 개뿐');
 assert.equal(tabs[0].props['aria-selected'], true, '기본 = 상품별');
 const nodeText = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText).join('');
-const orderSummaryText = () => nodeText(tree.root.findByProps({'aria-label':'물건챙기기 주문서 현황'})).replace(/\s+/g, '');
+const orderSummaryText = () => nodeText(tree.root.findByProps({'aria-label':'물건챙기기 상품 수량 현황'})).replace(/\s+/g, '');
 const btn = (f) => tree.root.findAll(n => n.type === 'button' && f(n));
 const byText = (t) => btn(n => nodeText(n) === t)[0];
 const byLabel = (l) => btn(n => n.props['aria-label'] === l)[0];
@@ -100,15 +100,13 @@ const pagerTitle = () => nodeText(byLabel('전체 목록').children[0]);
 // 머리: 결제완료 3+1+1(지난)+1(블랙M 7) = 6, 미결제는 따로
 // 머리: 결제완료 6 + 미결제 2 = 총 8, 미결제 몫은 괄호
 assert.ok(
-  orderSummaryText().includes('미결제포함정상주문서5건') &&
-  orderSummaryText().includes('결제완료4건') &&
-  orderSummaryText().includes('미결제1건') &&
-  orderSummaryText().includes('남은주문서5건') &&
-  orderSummaryText().includes('챙김완료0건') &&
-  !orderSummaryText().includes('상품수량') &&
-  !orderSummaryText().includes('남은상품') &&
-  orderSummaryText().includes('주문서취소1건·별도'),
-  `정상 주문서 5건/취소 1건 별도 표시 및 총 상품수량 상단 제거 실패, 실제 렌더: ${orderSummaryText()}`
+  orderSummaryText().includes('총챙길물건8개') &&
+  orderSummaryText().includes('결제완료6개') &&
+  orderSummaryText().includes('미결제2개') &&
+  orderSummaryText().includes('남은물건8개') &&
+  orderSummaryText().includes('챙긴물건0개') &&
+  !orderSummaryText().includes('주문서'),
+  `실제 상품 8개=결제완료 6개+미결제 2개, 취소 주문 제외 실패: ${orderSummaryText()}`
 );
 assert.ok(text().includes('고객3'), '기본 = 미결제도 보임');
 assert.ok(!text().includes('요약') && !text().includes('안 챙긴 것만') && !text().includes('접기'), '옛 요약·안 챙긴 것만·접기 없음');
@@ -119,13 +117,12 @@ assert.ok(text().includes('총 8개 (결제완료 6 · 미결제 2)'), '장 머�
 await act(async () => byText('미결제 숨기기').props.onClick());
 assert.ok(
   !text().includes('고객3') && text().includes('미결제 2개는 목록에서 숨겼어요') &&
-  orderSummaryText().includes('결제완료주문서4건') &&
-  orderSummaryText().includes('미결제1건(표시제외)') &&
-  orderSummaryText().includes('남은주문서4건') &&
-  !orderSummaryText().includes('상품수량') &&
-  !orderSummaryText().includes('남은상품') &&
-  orderSummaryText().includes('주문서취소1건·별도'),
-  `미결제 숨김 집계 실패, 실제 렌더: ${orderSummaryText()}`
+  orderSummaryText().includes('총챙길물건8개') &&
+  orderSummaryText().includes('결제완료6개') &&
+  orderSummaryText().includes('미결제2개(목록숨김)') &&
+  orderSummaryText().includes('남은물건8개') &&
+  !orderSummaryText().includes('주문서'),
+  `미결제 숨김은 목록만 바꾸며 총 상품수량을 변경하면 안 됨: ${orderSummaryText()}`
 );
 await act(async () => byText('미결제 보기').props.onClick());
 assert.ok(text().includes('고객3'));
@@ -137,9 +134,10 @@ assert.equal(rowBtn('고객1').parent.props.onClick, undefined);
 await act(async () => { await rowBtn('고객1').props.onClick(); });
 assert.equal(writes.at(-1).ids.map(String).join(), '1', 'picked_at 저장은 그 줄만');
 assert.equal(rowBtn('고객1').props['aria-pressed'], true);
-assert.ok(orderSummaryText().includes('남은주문서4건'), '챙김 후 주문서가 5건에서 4건으로 감소해야 함');
+assert.ok(orderSummaryText().includes('남은물건5개') && orderSummaryText().includes('챙긴물건3개'), '상품 3개를 챙기면 실제 남은 수량 8→5개');
 await act(async () => { await rowBtn('고객3').props.onClick(); });
 assert.equal(writes.at(-1).ids.map(String).join(), '3', '미결제 줄도 사장님 판단으로 직접 체크 가능');
+assert.ok(orderSummaryText().includes('남은물건3개') && orderSummaryText().includes('챙긴물건5개'), '미결제 상품 2개를 직접 체크했을 때 실제 남은 수량 8→3개');
 // 큰 버튼 = 이 상품의 결제완료·안 챙긴 것만(미결제·이미 챙긴 것 제외)
 const pageBtn = () => btn(n => /^이 (상품|손님) 남은 \d+개 다 챙김$/.test(nodeText(n)))[0];
 assert.equal(nodeText(pageBtn()), '이 상품 남은 3개 다 챙김');
@@ -197,6 +195,8 @@ assert.equal(mod.includedNote(issueRows.filter(r => r.color === '블랙')), '환
   const txt = flat(t2.toJSON());
   assert.equal(calls, 0, '선택 모드는 서버 추가 작업을 안 부른다');
   assert.ok(txt.includes('선택한 주문 1건') && txt.includes('주문서에서 체크한 주문만'), '머리 = 선택한 주문 N건');
+  const titleRow = t2.root.findByProps({'aria-label':'물건챙기기 제목줄'});
+  assert.ok(titleRow.findAll(n => n.type === 'h2').length === 1 && titleRow.findAll(n => n.type === 'p').length === 0, '물건챙기기 제목과 필터 설명은 같은 줄이어야 함');
   assert.ok(txt.includes('총 2개') && !txt.includes('고객8'), '체크한 주문만 보이고 범위 밖 늦은 입금은 안 붙음');
   globalThis.fetch = prevFetch; exportAdditional = [];
   // 범위가 너무 넓고 선택도 없으면 = 안내

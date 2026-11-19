@@ -129,7 +129,7 @@ export function includedNote(rows: readonly PickRow[]): string {
 const productKey = (r: PickRow) => `${r.productId || ""}|${r.productName}`;
 const optionKey = (r: PickRow) => `${r.color}|${r.size}|${r.optionText}`;
 
-export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcastId, filterLabel, scopeTooWide = false, selectedCount = 0, scopeLocked = false, initialShowUnpaid = true, canceledCount = 0, onClose }: Props) {
+export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcastId, filterLabel, scopeTooWide = false, selectedCount = 0, scopeLocked = false, initialShowUnpaid = true, onClose }: Props) {
   // [2026-11-05] 선택 모드 = 주문서에서 체크한 주문만(필터·기간 무관). 서버 «오늘 추가 작업»(범위 밖 늦은 입금·다시 챙기기)은 안 붙인다 — 고른 주문만 보이게.
   const selectionMode = selectedCount > 0 || scopeLocked;
   // Immutable explicit scope chosen before opening; no asynchronous period auto-switch.
@@ -269,22 +269,16 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoIds]);
 
-  // ── 숫자 ── (표시 전용) 총·챙김·남은 = 미결제 포함, 미결제 몫은 괄호로 따로
-  // The packing screen counts pieces (qty), not order forms. A paid-only view
-  // must never include hidden unpaid pieces in its on-screen totals.
+  // Compact picking header: PHYSICAL ITEM QUANTITIES, never order-form counts.
+  // Cancellation and refund/return exclusions have already been removed from eligibleRows.
+  // Keep the headline total stable when the unpaid rows are visually hidden.
   const qtyOf = (rows: readonly PickRow[]) => rows.reduce((s, r) => s + r.qty, 0);
   const eligibleRows = allRows.filter((r) => !r.skip);
-  const liveRows = eligibleRows.filter((r) => showUnpaid || r.paid);
   const unpaidAll = qtyOf(eligibleRows.filter((r) => !r.paid));
-  const visibleUnpaid = showUnpaid ? unpaidAll : 0;
-  const visibleOrderCount = new Set(liveRows.map((r) => r.customerKey)).size;
-  const paidOrderCount = new Set(liveRows.filter((r) => r.paid).map((r) => r.customerKey)).size;
-  const unpaidOrderCount = new Set(eligibleRows.filter((r) => !r.paid).map((r) => r.customerKey)).size;
-  const remainingOrderCount = new Set(liveRows.filter((r) => !picked.has(r.id)).map((r) => r.customerKey)).size;
-  const totalAll = qtyOf(liveRows);
-  const gotAll = qtyOf(liveRows.filter((r) => picked.has(r.id)));
+  const totalAll = qtyOf(eligibleRows);
+  const paidAll = totalAll - unpaidAll;
+  const gotAll = qtyOf(eligibleRows.filter((r) => picked.has(r.id)));
   const remainAll = totalAll - gotAll;
-  const unpaidLeftAll = qtyOf(liveRows.filter((r) => !r.paid && !picked.has(r.id)));
   const pct = totalAll > 0 ? Math.round((gotAll / totalAll) * 100) : 0;
 
   const q = search.trim();
@@ -431,7 +425,7 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
       });
       const extraIds = new Set(allRows.filter((r) => r.kind === "late" || r.kind === "repick").map((r) => r.id));
       await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${String(filterLabel || "").replace(/^방송:\s*/, "")} · 물건챙기기`, rowOrder: view === "product" ? "product" : "nickname", visibleItemIds: [...visible], attentionItemIds: [...extraIds], exceptions: p.exceptions, cancellations: p.cancellations }, new Set(picked));
-      const printed = liveRows.filter((r) => r.paid).map((r) => Number(r.id));
+      const printed = eligibleRows.filter((r) => r.paid).map((r) => Number(r.id));
       const now = new Date().toISOString();
       for (let i = 0; i < printed.length; i += 500) {
         const { error } = await supabase.from("orders").update({ picking_list_printed_at: now }).is("picking_list_printed_at", null).in("id", printed.slice(i, i + 500));
@@ -545,35 +539,34 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
       <aside className="relative flex h-full w-full max-w-[600px] flex-col bg-surface" style={{ boxShadow: "-8px 0 24px rgba(0,0,0,.08)" }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="물건챙기기">
         {/* 머리 — 남은 개수 · 보기 두 개 */}
         <div className="border-b border-line px-4 pt-3 pb-3 max-sm:px-3 max-sm:pt-2 max-sm:pb-2">
-          <div className="flex items-start justify-between gap-2 max-sm:items-center">
-            <div className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:gap-2">
+          <div className="flex items-center justify-between gap-2" aria-label="물건챙기기 제목줄">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <h2 className="shrink-0 text-[20px] font-bold text-ink max-sm:text-[18px]">물건챙기기</h2>
               {selectionMode
-                ? <p className="mt-0.5 truncate text-[13px] font-semibold text-ink max-sm:mt-0 max-sm:text-[12px]">{scopeLocked ? filterLabel : `선택한 주문 ${selectedCount}건`}<span className="font-normal text-ink-soft">{scopeLocked ? ' · 선택한 범위만 표시' : ' · 주문서에서 체크한 주문만'}</span></p>
-                : <p className="mt-0.5 truncate text-[13px] text-ink-soft max-sm:mt-0 max-sm:text-[12px]">{String(filterLabel || "").replace(/^방송:\s*/, "") || "주문서 범위"}</p>}
+                ? <span className="min-w-0 truncate whitespace-nowrap text-[12px] font-semibold text-ink-soft">{scopeLocked ? filterLabel : `선택한 주문 ${selectedCount}건`}{scopeLocked ? ' · 선택한 범위만 표시' : ' · 주문서에서 체크한 주문만'}</span>
+                : <span className="min-w-0 truncate whitespace-nowrap text-[12px] text-ink-soft">{String(filterLabel || "").replace(/^방송:\s*/, "") || "주문서 범위"}</span>}
             </div>
             <button type="button" onClick={onClose} aria-label="닫기" className="h-10 w-10 shrink-0 rounded-lg text-[22px] text-ink-soft hover:bg-surface-2">×</button>
           </div>
           {!scopeTooWide ? (
             <div className="mt-1.5 space-y-1.5">
               {loading ? <p className="text-[13px] font-semibold text-ink">챙김 상태 확인 중…</p> : (
-                <section aria-label="물건챙기기 주문서 현황" className="rounded-lg border border-line bg-surface-2 px-2.5 py-1.5">
+                <section aria-label="물건챙기기 상품 수량 현황" className="rounded-lg border border-line bg-surface-2 px-2.5 py-1.5">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px] text-ink tabular-nums">
-                    <strong className="text-[14px] font-black">{showUnpaid?'미결제 포함 정상 주문서':'결제완료 주문서'} {visibleOrderCount}건</strong>
-                    <span>결제완료 <b className="font-black">{paidOrderCount}건</b></span>
-                    <span className={unpaidOrderCount>0?'font-semibold text-danger-tx':'text-ink-soft'}>미결제 {unpaidOrderCount}건{!showUnpaid?' (표시 제외)':''}</span>
+                    <strong className="text-[15px] font-black">총 챙길 물건 {totalAll}개</strong>
+                    <span>결제완료 <b className="font-black">{paidAll}개</b></span>
+                    <span className={unpaidAll>0?'font-bold text-danger-tx':'text-ink-soft'}>미결제 <b>{unpaidAll}개</b>{!showUnpaid?' (목록 숨김)':''}</span>
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px] text-ink-soft tabular-nums">
-                    <span className="font-black text-ink">남은 주문서 {remainingOrderCount}건</span>
-                    <span>챙김 완료 {visibleOrderCount-remainingOrderCount}건</span>
-                    {canceledCount>0?<span className="text-ink-mute">주문서 취소 {canceledCount}건 · 별도</span>:null}
+                    <strong className="text-[13px] font-black text-ink">남은 물건 {remainAll}개</strong>
+                    <span>챙긴 물건 {gotAll}개</span>
                   </div>
                   <div className="mt-1 h-1 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width]" style={{width:`${pct}%`}} /></div>
                 </section>
               )}
               {unpaidAll>0?<div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-ink-soft">
                 <span className="min-w-0">
-                  {showUnpaid?`미결제 포함 · 미결제 주문서 ${unpaidOrderCount}건 / 상품 ${unpaidAll}개`:`미결제 ${unpaidAll}개는 목록에서 숨겼어요 · 주문서 ${unpaidOrderCount}건`}
+                  {showUnpaid?`미결제 상품 ${unpaidAll}개 포함`:`미결제 ${unpaidAll}개는 목록에서 숨겼어요`}
                 </span>
                 <button type="button" aria-pressed={!showUnpaid} onClick={() => setShowUnpaid((v) => !v)} className="h-8 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink">
                   {showUnpaid?'미결제 숨기기':'미결제 보기'}
