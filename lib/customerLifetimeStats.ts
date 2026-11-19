@@ -33,10 +33,13 @@ export function classifyLifetimeOrder(text: string): { kind: LifetimeOrderKind; 
   if (/주문서취소|주문취소|취소|환불|cancel|refund/.test(s)) return { kind: 'canceled', label: '주문서취소' };
   if (/manual_match_needed|입금확인 필요|입금매칭 필요|수동확인/.test(s)) return { kind: 'unpaid', label: '매칭필요' };
   if (/card_unpaid|카드 미결제|카드미결제/.test(s)) return { kind: 'unpaid', label: '카드미결제' };
+  // Keep the existing member-list payment contract: explicit unpaid wins.
+  // "unpaid" contains "paid", and shipping wait is not payment completion.
+  if (/unpaid|미입금|입금대기|결제대기/.test(s)) return { kind: 'unpaid', label: '미입금' };
   if (/카드결제완료|card_paid/.test(s)) return { kind: 'paid', label: '카드결제완료' };
   if (/자동입금확인|auto_paid/.test(s)) return { kind: 'paid', label: '자동입금확인' };
   if (/수동입금확인|manual_paid/.test(s)) return { kind: 'paid', label: '수동입금확인' };
-  if (/입금확인|결제완료|출고|paid/.test(s)) return { kind: 'paid', label: '입금확인' };
+  if (/입금확인|결제완료|출고완료|택배출고|paid/.test(s)) return { kind: 'paid', label: '입금확인' };
   return { kind: 'unpaid', label: '미입금' };
 }
 export function lifetimeLineAmount(row: LifetimeOrderRow): number {

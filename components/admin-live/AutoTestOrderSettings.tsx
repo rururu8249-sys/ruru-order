@@ -111,7 +111,7 @@ export default function AutoTestOrderSettings(){
  return <section className="mt-2 shrink-0 rounded-2xl border border-line bg-surface p-3" aria-label="자동 실행" data-ruru-automation-workspace="v2">
    <div className="mb-3 flex items-center justify-between gap-2">
      <div className="min-w-0">
-       <h2 className="text-[15px] font-black text-ink">자동 실행</h2>
+       <h2 className="text-[16px] font-black text-ink">자동 실행</h2>
        <p className="mt-0.5 text-[11px] text-ink-mute">주문 · AI 채팅 · 시청자</p>
      </div>
      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${active?'bg-ink text-white':'bg-surface-2 text-ink-soft'}`} role="status">{!state?'확인 중':error?'확인 필요':active?'실행 중':'중지됨'}</span>
@@ -122,7 +122,7 @@ export default function AutoTestOrderSettings(){
    </div>
    <div className="mt-3 space-y-4 rounded-xl border border-line bg-surface-2/40 p-3">
      <div role="group" aria-label="주문 양">
-       <div className="mb-2 flex items-center justify-between"><label htmlFor="ruru-order-rate" className="text-[12px] font-bold text-ink">주문 양</label><output htmlFor="ruru-order-rate" className="text-[15px] font-black tabular-nums text-ink">{orderRate}%</output></div>
+       <div className="mb-2 flex items-center justify-between"><label htmlFor="ruru-order-rate" className="text-[12px] font-bold text-ink">주문 양</label><output htmlFor="ruru-order-rate" className="text-[16px] font-black tabular-nums text-ink">{orderRate}%</output></div>
        <input id="ruru-order-rate" type="range" min="0" max="100" step="1" value={orderRate} disabled={!state?.ready||busy} aria-label="주문량 1퍼센트 단위 조절"
          onChange={e=>setOrderRate(Number(e.currentTarget.value))} onPointerDown={()=>{rateDragging.current=true}}
          onPointerUp={e=>{rateDragging.current=false;void saveRate('order',Number(e.currentTarget.value))}}
@@ -130,10 +130,10 @@ export default function AutoTestOrderSettings(){
          onKeyUp={e=>void saveRate('order',Number(e.currentTarget.value))}
          onBlur={e=>{rateDragging.current=false;void saveRate('order',Number(e.currentTarget.value))}}
          className="h-8 w-full cursor-pointer accent-ink" />
-       <div className="flex justify-between text-[10px] text-ink-mute"><span>0% · 새 테스트 주문 중지</span><span>100% · 최대</span></div>
+       <div className="flex justify-between text-[12px] text-ink-mute"><span>0% · 새 테스트 주문 중지</span><span>100% · 최대</span></div>
      </div>
      <div role="group" aria-label="채팅 양">
-       <div className="mb-2 flex items-center justify-between"><label htmlFor="ruru-chat-rate" className="text-[12px] font-bold text-ink">채팅 양</label><output htmlFor="ruru-chat-rate" className="text-[15px] font-black tabular-nums text-ink">{chatRate}%</output></div>
+       <div className="mb-2 flex items-center justify-between"><label htmlFor="ruru-chat-rate" className="text-[12px] font-bold text-ink">채팅 양</label><output htmlFor="ruru-chat-rate" className="text-[16px] font-black tabular-nums text-ink">{chatRate}%</output></div>
        <input id="ruru-chat-rate" type="range" min="0" max="100" step="1" value={chatRate} disabled={!state?.ready||busy} aria-label="채팅량 1퍼센트 단위 조절"
          onChange={e=>setChatRate(Number(e.currentTarget.value))} onPointerDown={()=>{rateDragging.current=true}}
          onPointerUp={e=>{rateDragging.current=false;void saveRate('chat',Number(e.currentTarget.value))}}
@@ -141,7 +141,7 @@ export default function AutoTestOrderSettings(){
          onKeyUp={e=>void saveRate('chat',Number(e.currentTarget.value))}
          onBlur={e=>{rateDragging.current=false;void saveRate('chat',Number(e.currentTarget.value))}}
          className="h-8 w-full cursor-pointer accent-ink" />
-       <div className="flex justify-between text-[10px] text-ink-mute"><span>0% · AI 채팅 중지</span><span>100% · 최대</span></div>
+       <div className="flex justify-between text-[12px] text-ink-mute"><span>0% · AI 채팅 중지</span><span>100% · 최대</span></div>
      </div>
      <p className="text-[11px] leading-relaxed text-ink-mute">손을 떼거나 방향키로 조절하면 저장돼요. 비율은 테스트 자동화 강도이며 시간당 건수를 보장하지 않아요. 기존 안전 제한과 실제 주문은 그대로 유지돼요.</p>
    </div>

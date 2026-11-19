@@ -1,5 +1,6 @@
 import type { BotCandidate } from "./liveChatBot";
 import { detailCode } from "./productDetailModel";
+import { splitOptionText, toOptionList } from "./optionSplit";
 
 export type OperatorBatchResult = { codes: string[]; matched: BotCandidate[]; invalid: string[]; ambiguous: string[] };
 export function operatorProductCode(item: BotCandidate): string {
@@ -20,14 +21,18 @@ export function resolveOperatorCodes(input: string, catalog: BotCandidate[]): Op
 function facts(item: BotCandidate) {
   const line = String(item.line || "");
   const price = line.match(/(?:^|\/)\s*([\d,]+)\s*원/);
-  const size = line.match(/사이즈\s*[:：]?\s*([^/|]+)/);
-  return { price: price?.[1].replace(/,/g, "") || "", sizes: size?.[1].split(/[\s,，·]+/).filter(Boolean) || [] };
+  // The server supplies registered options, including an intentional empty list.
+  // Only legacy candidates without that array need the explicit final size field.
+  // /, |, · and spaces belong to names (2026-09-08 shared option rule).
+  const size = line.match(/(?:^| \/ )사이즈\s*[:：]\s*(.+)$/);
+  const sizes = Array.isArray(item.sizes) ? toOptionList(item.sizes) : splitOptionText(size?.[1]);
+  return { price: price?.[1].replace(/,/g, "") || "", sizes };
 }
 export function buildBatchAnnouncement(items: BotCandidate[]): string {
   if (!items.length) return "";
   const rows = items.map(item => ({ item, ...facts(item), code: operatorProductCode(item) }));
   const samePrice = rows.every(row => row.price && row.price === rows[0].price);
-  const sameSize = rows.every(row => row.sizes.length && row.sizes.join("|") === rows[0].sizes.join("|"));
+  const sameSize = rows.every(row => row.sizes.length > 0 && row.sizes.length === rows[0].sizes.length && row.sizes.every((size, i) => size === rows[0].sizes[i]));
   const labels = rows.map(row => {
     const title = String(row.item.texts?.[0] || row.item.detailName || row.item.line);
     const color = title.replace(/^\S+\s*/, "").trim();

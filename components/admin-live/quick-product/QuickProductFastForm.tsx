@@ -2511,7 +2511,7 @@ export default function QuickProductFastForm({
                   저장되는 형태는 창에서 고칠 때와 완전히 동일하다. */}
               {/* 독립된 고객 직접입력 설정. 기존 custom_input_label/color 저장 경로는 주문 호환성을 위해 유지한다. */}
               {!brandGroupActive && realColors.length === 0 ? (
-                <div style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "10px", padding: "12px", marginTop: "12px" }}>
+                <div style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "12px", padding: "12px", marginTop: "12px" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 800, fontSize: "13px" }}>
                     <input type="checkbox" aria-label="고객 직접입력 사용" checked={customInputEnabled} onChange={(e) => {
                       setFormTouched(true);
@@ -2522,7 +2522,7 @@ export default function QuickProductFastForm({
                     고객 직접입력
                   </label>
                   <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginTop: "6px", lineHeight: 1.6 }}>상품번호와 옵션을 고객이 한 칸에 적습니다. 색상 선택칸과는 별도입니다.</div>
-                  {customInputEnabled ? <div style={{ display: "grid", gap: "6px", marginTop: "10px" }}>
+                  {customInputEnabled ? <div style={{ display: "grid", gap: "6px", marginTop: "8px" }}>
                     <label htmlFor="product-custom-input-label" style={{ fontSize: "12px", fontWeight: 700 }}>입력칸 제목</label>
                     <input id="product-custom-input-label" aria-label="직접입력 칸 제목" style={optInput} type="text" placeholder="상품번호 · 옵션(색상·사이즈)" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
                     <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>고객 입력 예: BB-60 / 베이지 / M · 입력 내용은 주문서에 저장됩니다.</span>

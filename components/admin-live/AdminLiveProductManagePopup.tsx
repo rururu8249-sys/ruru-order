@@ -2114,7 +2114,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: bcSelId && bcProducts.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 담기</button>
               </div>
               {selectedBroadcastForEdit ? (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "10px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
                   <div style={{ flex: 1, minWidth: "160px" }}>
                     <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", fontWeight: 700 }}>현재 선택한 방송 · {selectedBroadcastForEdit.status === "ON" ? "진행 중" : selectedBroadcastForEdit.started_at ? "종료됨" : "시작 전"}</div>
                     <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>{selectedBroadcastForEdit.title}</div>

@@ -17,6 +17,7 @@
  */
 const fs = require("fs");
 const path = require("path");
+const {findDeadHoverLines, emptyStateHasHint} = require("./admin-ui-guard-rules.cjs");
 
 const ROOT = path.join(__dirname, "..", "components", "admin-live");
 const files = [];
@@ -70,13 +71,13 @@ const HEIGHT_MIN = 300; // 이보다 작으면 «화면»이 아니다
 // ── 규칙 3. 비율(aspect-*)과 고정 높이를 «같이» 걸지 말 것 (둘이 싸워 비율이 깨진다) ──
 const ASPECT_CONFLICT = /aspect-\[[^\]]+\]|aspect-video/;
 
-// ── 규칙 4. 두 번째 브랜드색 금지 (주버튼은 로즈 하나) ──
+// ── 규칙 4. 지정된 ink 토큰을 사용 (DESIGN-ADMIN.md, 2026-10-20) ──
 const SECOND_BRAND = /bg-slate-900|bg-black\b(?!\/)/;
 
 // ── 규칙 5. «눌러도 변화 없는» hover 금지 ──
 //    hover:bg-X 인데 같은 줄에 bg-X 가 이미 있으면 마우스를 올려도 아무 일이 없다.
 //    (설정 저장 버튼이 실제로 이 상태였다 — 사장님이 「반응 없다」고 느낀 원인)
-const DEAD_HOVER = /hover:bg-([\w[\]()#,.%/-]+)/;
+
 
 // ── 규칙 6. 글씨 크기 — Shopify Polaris font-size 스케일만 ──
 //    font-size-275~600 = 11·12·13·14·16·18·20·22·24, 큰 숫자용 30·32·36·40
@@ -125,20 +126,6 @@ const EMPTY_WORD = /없습니다|없어요/;
 const EMPTY_GOOD = /🎉|👍|✅|다 챙|모두 |없어요!/;
 // 그 줄에 «화면에 보이는 글자»를 전부 모아, 「없다」는 말 뒤에 안내가 10글자 이상 있는지 본다.
 //   (안내를 형제 <div>에 따로 쓴 경우도 잡아야 하므로 줄 전체의 텍스트를 합친다)
-function emptyStateHasHint(raw) {
-  const parts = [];
-  for (const m of raw.matchAll(/>([^<>{}]+)</g)) parts.push(m[1]);          // JSX 텍스트 노드
-  for (const m of raw.matchAll(/"([^"]{2,})"/g)) {                            // 문자열 리터럴
-    const t = m[1];
-    if (!/[:;{}]|^[a-z-]+$|px|rem|var\(|#[0-9a-f]{3}/i.test(t)) parts.push(t); // CSS 값 제외
-  }
-  const text = parts.join(" ");
-  const i = Math.max(text.lastIndexOf("없습니다"), text.lastIndexOf("없어요"));
-  if (i < 0) return true;
-  const after = text.slice(i).replace(/없습니다|없어요/g, "").replace(/[.\s·]/g, "");
-  return after.length >= 10;
-}
-
 // ── 규칙 7. 모서리 — Polaris border-radius 스케일만 (4·8·12·16·20·full) ──
 //    rounded-md(6)·3xl(24) 는 스케일에 없다. Tailwind sm=2 md=6 lg=8 xl=12 2xl=16 3xl=24
 const RADIUS_BAD = /\brounded-(?:md|3xl)\b/;
@@ -159,7 +146,9 @@ const ALIGN_RIGHT = /text-right\b|textAlign:\s*"right"/;
 const TABULAR = /tabular-nums|fontVariantNumeric:\s*"tabular-nums"/;
 
 for (const file of files) {
-  const lines = fs.readFileSync(file, "utf8").split("\n");
+  const source = fs.readFileSync(file, "utf8");
+  const lines = source.split("\n");
+  const deadHoverLines = findDeadHoverLines(source);
   lines.forEach((raw, idx) => {
     const line = idx + 1;
     const t = raw.trim();
@@ -178,19 +167,13 @@ for (const file of files) {
       add(file, line, "비율(aspect)과 높이를 같이 걸면 비율이 깨진다", raw);
     }
     const m4 = raw.match(SECOND_BRAND);
-    if (m4) add(file, line, "두 번째 브랜드색 금지 (주버튼은 로즈)", m4[0] + "  ⟵ " + raw);
+    if (m4) add(file, line, "지정 색 토큰 사용 (주버튼은 ink)", m4[0] + "  ⟵ " + raw);
 
-    const mh2 = raw.match(DEAD_HOVER);
-    if (mh2) {
-      const bg = mh2[1];
-      // 같은 줄에 bg-<같은값> 이 이미 있으면 hover가 죽어 있다
-      const re = new RegExp("(?<!hover:)\\bbg-" + bg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b");
-      if (re.test(raw)) add(file, line, "눌러도 변화 없는 hover (배경과 같은 색)", `hover:bg-${bg}`);
-    }
+    if (deadHoverLines.has(line)) add(file, line, "눌러도 변화 없는 hover (배경과 같은 색)", deadHoverLines.get(line));
 
     for (const m of raw.matchAll(FONT_PX)) {
       const px = Number(m[1]);
-      if (!FONT_OK.has(px)) add(file, line, "글씨 크기 5단계 밖 (11/12/13/15/20)", `text-[${m[1]}px]`);
+      if (!FONT_OK.has(px)) add(file, line, "허용 글씨 크기 밖 (DESIGN-ADMIN 기준)", `text-[${m[1]}px]`);
     }
 
     for (const v of offGrid(raw, INLINE_RADIUS, GRID_RADIUS))

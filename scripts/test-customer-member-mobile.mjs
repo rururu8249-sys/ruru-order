@@ -8,7 +8,9 @@ const html=renderToStaticMarkup(React.createElement(Panel,{embedded:true,orders:
   id:1,nickname:'검증고객',name:'가상고객',phone:'01000000000',
   totalAmount:119000,paymentStatus:'paid',created_at:'2026-10-10T00:00:00Z',
 }]}));
-const mobile=html.slice(html.indexOf('mt-3 flex flex-col gap-1.5 xl:hidden'));
+const mobileStart=html.indexOf('data-member-cards');
+assert.ok(mobileStart>=0,'mobile member list exists');
+const mobile=html.slice(mobileStart);
 assert.ok(mobile.includes('검증고객'));
 // Regression: the complete financial/contact summary used to share a clipped line.
 assert.doesNotMatch(mobile,/<div class="[^"]*truncate[^"]*">[^<]*누적 결제/,'mobile payment/contact summary must not be ellipsized');

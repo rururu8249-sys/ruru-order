@@ -195,7 +195,7 @@ function PeopleDrawer({ b, onClose }: { b: Bucket; onClose: () => void }) {
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${p.live ? "bg-danger-tx" : "bg-line"}`} title={p.live ? "방송 중 접속" : "쇼핑몰 접속"} />
                           <span className={`truncate font-semibold ${p.member ? "text-ink" : "text-ink-mute"}`}>{p.name}</span>
-                          {p.isNew ? <span className="inline-flex h-5 items-center rounded-md bg-info-bg px-1.5 text-[11px] font-semibold text-info-tx">처음</span> : null}
+                          {p.isNew ? <span className="inline-flex h-5 items-center rounded-lg bg-info-bg px-1.5 text-[11px] font-semibold text-info-tx">처음</span> : null}
                         </div>
                         {ip ? (
                           <div className={`truncate text-[12px] ${same.length ? "text-warn-tx" : "text-ink-mute"}`} title={same.length ? `같은 IP: ${same.join(", ")}` : ip}>
@@ -294,7 +294,7 @@ function ExcludeModal({ onClose, onChanged }: { onClose: () => void; onChanged: 
           {list === null ? (
             <div className="py-6 text-center text-[13px] text-ink-mute">불러오는 중…</div>
           ) : list.length === 0 ? (
-            <div className="py-6 text-center text-[13px] text-ink-mute">빼는 계정이 없어요.</div>
+            <div className="py-6 text-center text-[13px] text-ink-mute">빼는 계정이 없어요. 아래에서 계정을 찾아 추가하세요.</div>
           ) : (
             <ul className="divide-y divide-line">
               {list.map((c) => (

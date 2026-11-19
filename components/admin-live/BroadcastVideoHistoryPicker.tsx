@@ -37,7 +37,7 @@ export default function BroadcastVideoHistoryPicker({disabled, selectedVideoId, 
           {found.map(item=><li key={item.videoId} className="flex items-center gap-3 rounded-lg bg-surface-2 p-2">
             {/* YouTube thumbnails are remote; no image proxy or video playback is needed here. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`https://i.ytimg.com/vi/${item.videoId}/default.jpg`} alt="" width={80} height={60} loading="lazy" className="h-14 w-20 shrink-0 rounded-md object-cover" />
+            <img src={`https://i.ytimg.com/vi/${item.videoId}/default.jpg`} alt="" width={80} height={60} loading="lazy" className="h-14 w-20 shrink-0 rounded-lg object-cover" />
             <div className="min-w-0 flex-1">
               <div className="text-[11px] text-ink-mute">{dateLabel(item.date)} · 저장된 상품 연결 {item.introCount}개</div>
               <div className="line-clamp-2 break-words text-[13px] font-bold text-ink">{item.title}</div>

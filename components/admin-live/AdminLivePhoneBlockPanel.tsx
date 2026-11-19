@@ -157,7 +157,7 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           type="button"
           disabled={saving}
           onClick={() => submit(true)}
-          className="h-11 shrink-0 rounded-xl bg-[var(--color-danger-tx)] px-4 text-[13px] font-black text-white hover:bg-[var(--color-danger-tx)] disabled:cursor-not-allowed disabled:bg-danger-bg"
+          className="h-11 shrink-0 rounded-xl bg-[var(--color-danger-tx)] px-4 text-[13px] font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:bg-danger-bg"
         >
           차단
         </button>

@@ -553,7 +553,7 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
               {loading ? <p className="text-[13px] font-semibold text-ink">챙김 상태 확인 중…</p> : (
                 <section aria-label="물건챙기기 상품 수량 현황" className="rounded-lg border border-line bg-surface-2 px-2.5 py-1.5">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px] text-ink tabular-nums">
-                    <strong className="text-[15px] font-black">총 챙길 물건 {totalAll}개</strong>
+                    <strong className="text-[20px] font-black">총 챙길 물건 {totalAll}개</strong>
                     <span>결제완료 <b className="font-black">{paidAll}개</b></span>
                     <span className={unpaidAll>0?'font-bold text-danger-tx':'text-ink-soft'}>미결제 <b>{unpaidAll}개</b>{!showUnpaid?' (목록 숨김)':''}</span>
                   </div>
