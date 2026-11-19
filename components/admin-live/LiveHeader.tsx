@@ -1070,7 +1070,7 @@ function Segmented<T extends string>({ value, options, onChange, disabled }: { v
     <div role="radiogroup" className="inline-flex rounded-lg bg-surface-2 p-1">
       {options.map(([v, label]) => (
         <button key={v} type="button" role="radio" aria-checked={value === v} disabled={disabled} onClick={() => value !== v && onChange(v)}
-          className={`h-8 rounded-md px-3 text-[13px] font-bold transition disabled:opacity-50 ${value === v ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-mute hover:text-ink"}`}>{label}</button>
+          className={`h-8 rounded-lg px-3 text-[13px] font-bold transition disabled:opacity-50 ${value === v ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-mute hover:text-ink"}`}>{label}</button>
       ))}
     </div>
   );

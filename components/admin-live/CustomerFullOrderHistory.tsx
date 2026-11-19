@@ -64,15 +64,16 @@ function badgeStyle(kind: Kind): React.CSSProperties {
   return { background: "var(--color-warn-bg)", color: "var(--color-warn-tx)" };
 }
 
-export type CustomerFullOrderStats = { all: number; paid: number; unpaid: number; canceled: number; paidAmount: number };
+export type CustomerFullOrderStats = { all: number; paid: number; unpaid: number; canceled: number; paidAmount: number; latestOrderAt?: string };
 
-export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { kakaoId: string; phone: string; onStats?: (stats: CustomerFullOrderStats | null) => void }) {
+export default function CustomerFullOrderHistory({ kakaoId, phone, onStats, onLoadState, refreshKey = 0 }: { kakaoId: string; phone: string; onStats?: (stats: CustomerFullOrderStats | null) => void; onLoadState?: (state: 'loading' | 'ready' | 'error') => void; refreshKey?: number }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("latest");
   const [page, setPage] = useState(1);
   const [openKey, setOpenKey] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
 
   const safeKakao = String(kakaoId || "").trim().replace(/[^0-9A-Za-z_-]/g, "");
   const phoneDigits = String(phone || "").replace(/[^0-9]/g, "");
@@ -103,15 +104,17 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { 
       // Paginate the entire member history. A hard 2,000-row cap silently lied about lifetime totals.
       const allRows: Row[] = [];
       let fetchError = '';
+      let complete = false;
+      q = q.order("created_at", { ascending: false }).order("id", { ascending: false });
       for(let from=0;from<100000;from+=1000){
-        const page=await q.order("created_at", { ascending: false }).range(from,from+999);
+        const page=await q.range(from,from+999);
         if(page.error){fetchError=page.error.message;break;}
         const chunk=(page.data||[]) as Row[];
         allRows.push(...chunk);
-        if(chunk.length<1000)break;
+        if(chunk.length<1000){complete=true;break;}
       }
       if (!alive) return;
-      if (fetchError) { setError(fetchError); setRows([]); return; }
+      if (fetchError || !complete) { setError(fetchError || '전체 이력을 읽지 못했습니다.'); setRows([]); return; }
 
       const list = allRows.filter((r: Row) => {
         if (r.is_deleted === true) return false;
@@ -126,7 +129,7 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { 
     };
     run().catch((e) => { if (alive) { setError(e instanceof Error ? e.message : String(e)); setRows([]); } });
     return () => { alive = false; };
-  }, [safeKakao, phoneDigits]);
+  }, [safeKakao, phoneDigits, retryKey, refreshKey]);
 
   const groups = useMemo<OrderGroup[]>(() => {
     if (!rows) return [];
@@ -178,103 +181,100 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { 
   //   → 여기서 «전 기간 DB 조회»로 이미 센 값을 부모에게 그대로 올려준다. 아래 「주문 이력」과 항상 같은 숫자가 된다.
   const onStatsRef = useRef(onStats);
   onStatsRef.current = onStats;
+  const onLoadStateRef = useRef(onLoadState);
+  onLoadStateRef.current = onLoadState;
   useEffect(() => {
-    if (rows === null) { onStatsRef.current?.(null); return; } // 아직 불러오는 중
+    onLoadStateRef.current?.(error ? 'error' : rows === null ? 'loading' : 'ready');
+    if (rows === null || error) { onStatsRef.current?.(null); return; }
     onStatsRef.current?.(counts);
-  }, [rows, counts]);
+  }, [rows, counts, error]);
+  const ready = rows !== null && !error;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const chip = (value: Filter, label: string, n: number) => (
-    <button
-      type="button"
-      key={value}
+  const chip = (value: Filter, label: string, count: number) => (
+    <button type="button" key={value} disabled={!ready} aria-pressed={filter === value}
       onClick={() => { setFilter(value); setPage(1); }}
-      style={{ border: "1px solid", borderColor: filter === value ? "var(--color-rose-deep)" : "var(--color-line)", background: filter === value ? "var(--color-rose-deep)" : "var(--color-surface)", color: filter === value ? "#fff" : "var(--color-ink-soft)", borderRadius: "999px", padding: "4px 8px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
-    >
-      {label} {n}
+      className={`min-h-11 rounded-full border px-3 text-[13px] tabular-nums disabled:opacity-50 sm:min-h-9 ${filter === value ? "border-ink bg-ink text-surface" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>
+      {label} {ready ? count : '…'}
     </button>
   );
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px", gap: "8px" }}>
-        <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>
-          주문 이력 <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>· 전 기간 {counts.all}건 · 입금완료 {money(counts.paidAmount)}</span>
-        </span>
-        <select
-          value={sort}
-          onChange={(e) => { setSort(e.target.value as Sort); setPage(1); }}
-          style={{ height: "26px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 6px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink)" }}
-        >
+    <section aria-label="회원 주문 이력" className="min-w-0">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-2">
+          <h3 className="text-base font-bold text-ink">주문 이력</h3>
+          <span className="text-xs text-ink-mute">전체 기간</span>
+        </div>
+        <select value={sort} aria-label="주문 이력 정렬" disabled={!ready}
+          onChange={(event) => { setSort(event.target.value as Sort); setPage(1); }}
+          className="min-h-11 rounded-lg border border-line bg-surface px-3 text-base text-ink sm:min-h-9 sm:text-sm">
           <option value="latest">최신순</option>
           <option value="oldest">오래된순</option>
           <option value="amount">금액순</option>
         </select>
       </div>
-      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "8px" }}>
+      <div className="mb-3 flex flex-wrap gap-2">
         {chip("all", "전체", counts.all)}
-        {chip("paid", "입금확인", counts.paid)}
+        {chip("paid", "결제완료", counts.paid)}
         {chip("unpaid", "미입금", counts.unpaid)}
         {chip("canceled", "취소", counts.canceled)}
       </div>
 
       {rows === null ? (
-        <div style={{ textAlign: "center", padding: "16px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 이력 불러오는 중…</div>
+        <p role="status" className="py-6 text-center text-[13px] text-ink-mute">주문 이력 불러오는 중…</p>
       ) : error ? (
-        <div style={{ textAlign: "center", padding: "16px 0", fontSize: "12px", color: "var(--color-danger-tx)" }}>주문 이력 조회 실패: {error}</div>
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 py-4 text-[13px] text-danger-tx">
+          <span>주문 이력을 불러오지 못했습니다.</span>
+          <button type="button" onClick={() => setRetryKey(value => value + 1)} className="min-h-11 rounded-lg border border-line bg-surface px-3 text-ink">다시 조회</button>
+        </div>
       ) : visible.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "16px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 내역이 없습니다. 위 필터를 「전체」로 바꿔보세요.</div>
+        <p className="py-6 text-center text-[13px] text-ink-mute">{filter === "all" ? "등록된 주문 이력이 없습니다." : "해당 주문이 없습니다. 전체 필터를 확인해 주세요."}</p>
       ) : (
-        visible.map((g) => {
-          const open = openKey === g.key;
-          return (
-            <div key={g.key} style={{ borderBottom: "1px solid var(--color-surface-2)" }}>
-              <button
-                type="button"
-                onClick={() => setOpenKey(open ? "" : g.key)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}
-              >
-                <span style={{ width: "86px", flexShrink: 0, fontSize: "11px", color: "var(--color-ink-mute)" }}>{fmtDate(g.createdAt)}</span>
-                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", color: "var(--color-ink-soft)" }} title={g.summary}>
-                  {g.summary}
-                  {!g.kakaoLinked ? <span style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)" }}>전화만</span> : null}
+        <div className="divide-y divide-line border-y border-line">
+          {visible.map(group => {
+            const open = openKey === group.key;
+            return <div key={group.key}>
+              <button type="button" aria-expanded={open} onClick={() => setOpenKey(open ? "" : group.key)}
+                className="grid min-h-11 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-3 text-left hover:bg-surface-2">
+                <span className="flex min-w-0 flex-wrap items-center gap-2 text-xs tabular-nums text-ink-mute">
+                  <time>{fmtDate(group.createdAt)}</time>
+                  {!group.kakaoLinked ? <span title="카카오 ID가 없는 과거 주문을 전화번호로 연결했습니다." className="text-warn-tx">전화 연결</span> : null}
                 </span>
-                <b style={{ fontSize: "12px", color: "var(--color-ink)", flexShrink: 0 }}>{money(g.amount)}</b>
-                <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 8px", ...badgeStyle(g.kind) }}>{g.statusLabel}</span>
-                <span style={{ flexShrink: 0, fontSize: "11px", color: "var(--color-ink-mute)" }}>{open ? "▲" : "▼"}</span>
+                <span className="rounded-lg px-2 py-1 text-right text-xs font-semibold" style={badgeStyle(group.kind)}>{group.statusLabel}</span>
+                <span className="min-w-0 break-words text-[13px] text-ink-soft [overflow-wrap:anywhere]">{group.summary}</span>
+                <span className="flex items-center justify-end gap-2 text-right text-[13px] font-semibold tabular-nums text-ink">
+                  {money(group.amount)}
+                  <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" className={`shrink-0 ${open ? "rotate-180" : ""}`}><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </span>
               </button>
-              {open ? (
-                <div style={{ margin: "0 0 8px 0", padding: "8px 8px", borderRadius: "8px", background: "var(--color-surface-2)", fontSize: "11px", color: "var(--color-ink-soft)", lineHeight: 1.6 }}>
-                  {g.rows.map((r) => (
-                    <div key={r.id} style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
-                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{rowItemLabel(r)}</span>
-                      <span style={{ flexShrink: 0, fontWeight: 700, color: "var(--color-ink)" }}>{money(num(r.adjusted_product_price ?? (num(r.product_price) * (num(r.qty) || 1))))}</span>
-                    </div>
-                  ))}
-                  <div style={{ marginTop: "4px", paddingTop: "4px", borderTop: "1px dashed var(--color-line)" }}>
-                    배송비 {money(g.shipping)}{g.points > 0 ? ` · 포인트 사용 ${money(g.points)}` : ""}{g.paymentMethod ? ` · ${g.paymentMethod}` : ""} · <b style={{ color: "var(--color-ink)" }}>최종 {money(g.amount)}</b>
-                  </div>
-                  {g.address ? <div>{g.address}</div> : null}
-                  <div style={{ color: "var(--color-ink-mute)" }}>
-                    {g.broadcast ? `${g.broadcast} · ` : ""}{g.code ? `주문번호 ${g.code} · ` : ""}{g.rows.length}줄{g.kakaoLinked ? "" : " · 카카오 미연동(전화번호로 찾음)"}
-                  </div>
+              {open ? <div className="mb-3 space-y-2 border-t border-dashed border-line pt-3 text-xs leading-5 text-ink-soft">
+                {group.rows.map(row => <div key={row.id} className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 break-words">{rowItemLabel(row)}</span>
+                  <span className="shrink-0 text-right font-semibold tabular-nums text-ink">{money(num(row.adjusted_product_price ?? (num(row.product_price) * (num(row.qty) || 1))))}</span>
+                </div>)}
+                <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 border-t border-line pt-2 text-right tabular-nums">
+                  <span>배송비 {money(group.shipping)}</span>
+                  {group.points > 0 ? <span>포인트 사용 {Math.round(group.points).toLocaleString("ko-KR")}P</span> : null}
+                  {group.paymentMethod ? <span>{group.paymentMethod}</span> : null}
+                  <strong className="font-semibold text-ink">최종 {money(group.amount)}</strong>
                 </div>
-              ) : null}
-            </div>
-          );
-        })
+                {group.address ? <p className="break-words">{group.address}</p> : null}
+                <p className="break-words text-ink-mute">{group.broadcast ? `${group.broadcast} · ` : ""}{group.code ? `주문번호 ${group.code} · ` : ""}{group.rows.length}줄{group.kakaoLinked ? "" : " · 카카오 미연동"}</p>
+              </div> : null}
+            </div>;
+          })}
+        </div>
       )}
 
-      {totalPages > 1 ? (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", marginTop: "12px" }}>
-          <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "4px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>이전</button>
-          <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{safePage} / {totalPages}</span>
-          <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "4px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>다음</button>
-        </div>
-      ) : null}
-    </div>
+      {totalPages > 1 ? <nav aria-label="주문 이력 페이지" className="mt-4 flex items-center justify-between gap-2">
+        <button type="button" disabled={safePage <= 1} onClick={() => setPage(Math.max(1, safePage - 1))} className="min-h-11 rounded-lg border border-line px-3 text-sm text-ink-soft disabled:opacity-40">이전</button>
+        <span className="text-xs tabular-nums text-ink-mute">{safePage} / {totalPages}</span>
+        <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(Math.min(totalPages, safePage + 1))} className="min-h-11 rounded-lg border border-line px-3 text-sm text-ink-soft disabled:opacity-40">다음</button>
+      </nav> : null}
+    </section>
   );
 }

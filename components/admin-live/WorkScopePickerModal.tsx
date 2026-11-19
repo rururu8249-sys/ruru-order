@@ -115,7 +115,7 @@ export default function WorkScopePickerModal({
       className="flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl"
       onClick={(e:{stopPropagation:()=>void})=>e.stopPropagation()}>
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2.5">
-        <h2 className="text-[17px] font-black text-ink">{work==='picking'?'물건챙기기':'송장 출력'} <span className="font-semibold text-ink-soft">· 범위 선택</span></h2>
+        <h2 className="text-[16px] font-black text-ink">{work==='picking'?'물건챙기기':'송장 출력'} <span className="font-semibold text-ink-soft">· 범위 선택</span></h2>
         <button type="button" aria-label="닫기" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-2xl text-ink-soft hover:bg-surface-2">×</button>
       </header>
 
@@ -132,7 +132,7 @@ export default function WorkScopePickerModal({
         {kind === 'selected' ? <p className="mt-2 text-[12px] text-ink-mute">체크한 주문서의 상품만 선택합니다.</p> : null}
 
         {kind === 'broadcast' ? <div className="mt-2 max-h-44 space-y-0.5 overflow-y-auto rounded-lg border border-line p-1.5" aria-label="방송 선택 목록">
-          {broadcastChoices.length ? broadcastChoices.map((b) => <label key={b.id} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-surface-2">
+          {broadcastChoices.length ? broadcastChoices.map((b) => <label key={b.id} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] hover:bg-surface-2">
             <input type="checkbox" checked={bcIds.has(b.id)} onChange={()=>toggle(b.id,bcIds,setBcIds)} className="h-4 w-4 shrink-0 accent-ink" />
             <span className="min-w-0 flex-1 break-words font-semibold text-ink">{b.label}</span>
             <span className="shrink-0 font-bold text-ink tabular-nums">{b.quantity}{unit}</span>
@@ -140,7 +140,7 @@ export default function WorkScopePickerModal({
         </div> : null}
 
         {kind === 'shop' ? <div className="mt-2 max-h-44 space-y-0.5 overflow-y-auto rounded-lg border border-line p-1.5" aria-label="쇼핑몰 날짜 선택 목록">
-          {shopChoices.length ? shopChoices.map((d) => <label key={d.dateKey} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-surface-2">
+          {shopChoices.length ? shopChoices.map((d) => <label key={d.dateKey} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] hover:bg-surface-2">
             <input type="checkbox" checked={shopDays.has(d.dateKey)} onChange={()=>toggle(d.dateKey,shopDays,setShopDays)} className="h-4 w-4 shrink-0 accent-ink" />
             <span className="min-w-0 flex-1 break-words font-semibold text-ink">{d.label}</span>
             <span className="shrink-0 font-bold text-ink tabular-nums">{d.quantity}{unit}</span>
@@ -156,7 +156,7 @@ export default function WorkScopePickerModal({
           </div>
           {(summary.canceled>0 || summary.excluded>0) ? <p className="mt-0.5 text-[11px] text-ink-mute">{summary.canceled>0?`취소 주문서 ${summary.canceled}건 별도 제외`:''}{summary.canceled>0&&summary.excluded>0?' · ':''}{summary.excluded>0?`작업 제외 ${summary.excluded}건`:''}</p> : null}
         </section> : <section aria-label="송장 출력 범위 요약" aria-live="polite" className="rounded-lg bg-surface-2 px-3 py-2">
-          <strong className="text-[15px] font-black text-ink">송장 대상 {summary.eligible}건</strong>
+          <strong className="text-[20px] font-black text-ink">송장 대상 {summary.eligible}건</strong>
           <span className="ml-3 text-[12px] text-ink-soft">결제완료 {summary.paid}건 · 미결제 {summary.unpaid}건</span>
           {(summary.canceled>0||summary.excluded>0)?<p className="mt-0.5 text-[11px] text-ink-mute">취소/제외 주문서는 포함하지 않습니다.</p>:null}
         </section>}

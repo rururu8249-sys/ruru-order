@@ -13,7 +13,8 @@
 // ⚠ 브라우저 alert/confirm/prompt 사용 금지.
 // ⚠ 누르는 칸은 44px 이상 — 물건챙기기와 같은 기준(Apple HIG 44pt · WCAG 2.2 AAA).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 import { formatKoreanPhone, koreanPhoneVariants } from "@/lib/order/phone";
 import { supabase } from "@/lib/supabase";
 import {
@@ -97,6 +98,8 @@ export default function AdminLiveCustomerBlockReasonModal({
   const [dealDate, setDealDate] = useState("");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useAdminModalFocus(panelRef, () => { if (!saving) onClose(); }, open);
 
   const safeKakao = clean(kakaoId).replace(/[^0-9A-Za-z_-]/g, "");
   const phoneDigits = digitsOnly(phone);
@@ -234,7 +237,7 @@ export default function AdminLiveCustomerBlockReasonModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--color-ink-soft)]/35 p-4">
-      <section className="flex max-h-[92vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl border-2 border-danger-tx bg-surface shadow-2xl">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="차단 사유" tabIndex={-1} className="flex max-h-[92vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl border-2 border-danger-tx bg-surface shadow-2xl">
         {/* 머리 */}
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0">
@@ -387,7 +390,7 @@ export default function AdminLiveCustomerBlockReasonModal({
             {saving ? "저장중…" : "차단 저장"}
           </button>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

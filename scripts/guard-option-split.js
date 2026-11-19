@@ -19,11 +19,18 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..");
 const SCAN = ["app", "components", "lib"];
 // 옵션을 나누는 split 인데 쉼표·줄바꿈 말고 다른 문자가 들어간 것
-const BAD_SPLIT = /\.split\(\s*\/\[[^\]]*[/|·][^\]]*\][^)]*\)/;
+const BAD_SPLIT = /\.split\(\s*\/\[[^\]]*[/|·][^\]]*\][^)]*\)/g;
 
 // 옵션이 «아닌» 것을 나누는 곳은 정상 — 이유와 함께 등록한다
 const ALLOW = [
   // (2026-10-21 a2-1) 엑셀 대량등록 삭제로 엑셀 배지 칸 예외 항목도 뺌
+  // 알림 문장 금지어 추출. 상품 옵션 목록은 읽거나 변경하지 않는다.
+  { file: "lib/liveAutomationDirector.ts", expression: String.raw`n.replace(/[A-Za-z]{1,4}-?\d+/g,' ').split(/[\s·()（）,/\[\]!~]+/)` },
+  // 상품명에서 품목명만 추출. color/size 값은 아래 cleanOpt에서 원문 보존.
+  { file: "lib/liveAutomationLines.ts", expression: String.raw`p.replace(hit[0],' ').replace(/[A-Za-z]{1,4}\s*-?\s*\d+/g,' ').replace(/\([^)]*\)/g,' ').split(/[\s/·,]+/)` },
+  // 손님 채팅의 상품 검색 낱말 추출. BotCandidate.sizes를 나누지 않는다.
+  { file: "lib/liveChatBot.ts", expression: String.raw`String(body || "")
+    .split(/[\s,.!?~·/]+/)` },
 ];
 
 const files = [];
@@ -42,14 +49,19 @@ const hits = [];
 for (const file of files) {
   const rel = path.relative(ROOT, file);
   if (!SCAN.some((d) => rel.startsWith(d + path.sep))) continue;
-  const lines = fs.readFileSync(file, "utf8").split("\n");
-  lines.forEach((raw, i) => {
-    if (!BAD_SPLIT.test(raw)) return;
-    // 앞뒤 12줄 안에 허용 사유가 있으면 통과
-    const ctx = lines.slice(Math.max(0, i - 12), i + 3).join("\n");
-    if (ALLOW.some((a) => rel === a.file && ctx.includes(a.near))) return;
-    hits.push({ rel, line: i + 1, text: raw.trim().slice(0, 120) });
+  const source = fs.readFileSync(file, "utf8");
+  const lines = source.split("\n");
+  // 예외는 수신자까지 확인한 정확한 표현식의 범위에만 적용한다.
+  // 주변 코드나 같은 줄의 다른 split은 각각 검사한다.
+  const allowedRanges = ALLOW.filter(a => a.file === rel).flatMap(a => {
+    const start = source.indexOf(a.expression);
+    return start < 0 ? [] : [[start, start + a.expression.length]];
   });
+  for (const match of source.matchAll(BAD_SPLIT)) {
+    if (allowedRanges.some(([start, end]) => match.index >= start && match.index + match[0].length <= end)) continue;
+    const line = source.slice(0, match.index).split("\n").length;
+    hits.push({ rel, line, text: lines[line - 1].trim().slice(0, 120) });
+  }
 }
 
 if (hits.length === 0) {

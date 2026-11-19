@@ -30,6 +30,7 @@ import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
 import { parseBlockReason, blockReasonSummary } from "@/lib/customerBlockReason";
 import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 
 type Props = {
   orders: LiveOrder[];
@@ -535,6 +536,8 @@ function CustomerDetailDrawer({
   // [2026-09-09] 위 3칸(누적 주문·누적 결제·미입금)에 쓸 «전 기간» 집계.
   //   아래 CustomerFullOrderHistory 가 DB를 전 기간 조회한 결과를 그대로 받아 쓴다. null = 아직 불러오는 중.
   const [fullStats, setFullStats] = useState<CustomerFullOrderStats | null>(null);
+  const [historyState,setHistoryState]=useState<'loading'|'ready'|'error'>('loading');
+  const [historyRefreshKey,setHistoryRefreshKey]=useState(0);
   const [detailTab,setDetailTab]=useState<'overview'|'orders'|'points'|'activity'>('overview');
   useEffect(()=>{setDetailTab('overview');setFullStats(null);},[customer?.key]);
   const [editSaving, setEditSaving] = useState(false);
@@ -583,6 +586,17 @@ function CustomerDetailDrawer({
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [noteSending, setNoteSending] = useState(false);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const avatarRef = useRef<HTMLDivElement>(null);
+  const openedAtRef = useRef(Date.now());
+  const backdropDownRef = useRef(false);
+  const activeDetailRef = useRef(true);
+  useEffect(() => {
+    activeDetailRef.current = true;
+    return () => { activeDetailRef.current = false; };
+  }, []);
+  useAdminModalFocus(detailRef, onClose, !!customer);
+  useAdminModalFocus(avatarRef, () => setAvatarZoom(false), avatarZoom);
 
   if (!customer) return null;
 
@@ -675,7 +689,7 @@ function CustomerDetailDrawer({
       setPhoneEditOpen(false);
       setEditOpen(false);
       onSaved?.({ customer_phone: nextPhone });
-      onClose();
+      if (activeDetailRef.current) onClose();
     } catch (e) {
       showAdminToast("전화번호 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
@@ -766,7 +780,7 @@ function CustomerDetailDrawer({
       });
       // 드로어의 customer(CustomerSummary)는 별도 state라 즉시 갱신이 어려움 → 저장 후 닫아 stale 표시 방지.
       //   목록은 onSaved의 reloadTick으로 새로고침되고, 다시 열면 새 값으로 보인다.
-      onClose();
+      if (activeDetailRef.current) onClose();
     } catch (e) {
       showAdminToast("수정 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
@@ -778,112 +792,83 @@ function CustomerDetailDrawer({
 
   return (
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "24px 16px" }}
+      onMouseDown={(event) => { backdropDownRef.current = event.target === event.currentTarget; }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && backdropDownRef.current && Date.now() - openedAtRef.current > 600) onClose();
+        backdropDownRef.current = false;
+      }}
+      className="fixed inset-0 z-50 flex justify-end bg-black/40"
     >
       {avatarZoom && clean(profile?.kakao_profile_image) ? (
-        <div
-          onClick={() => setAvatarZoom(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.78)", padding: "24px", cursor: "zoom-out" }}
-        >
-          <img
-            src={clean(profile?.kakao_profile_image)}
-            alt={customer.nickname || customer.name || "프로필"}
-            style={{ maxWidth: "min(440px, 90vw)", maxHeight: "80vh", borderRadius: "16px", objectFit: "contain", boxShadow: "0 24px 70px rgba(0,0,0,0.5)" }}
-          />
+        <div ref={avatarRef} onClick={event => { if (event.target === event.currentTarget) setAvatarZoom(false); }} role="dialog" aria-modal="true" aria-label="프로필 사진" tabIndex={-1} className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-black/80 p-4">
+          <img src={clean(profile?.kakao_profile_image)} alt={customer.nickname || customer.name || "프로필"} className="max-h-[75dvh] max-w-full rounded-xl object-contain" />
+          <button type="button" onClick={() => setAvatarZoom(false)} className="min-h-11 rounded-lg border border-white px-4 text-sm text-white">사진 닫기</button>
         </div>
       ) : null}
-      <section
-        role="dialog"
-        aria-modal="true"
-        style={{ width: "100%", maxWidth: "700px", maxHeight: "94dvh", overflowY: "auto", borderRadius: "20px", border: "1px solid var(--color-line)", background: "var(--color-surface)", boxShadow: "0 18px 64px rgba(15,23,42,0.18)" }}
-      >
-        {/* 헤더 */}
-        <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "12px 16px" }}>
-          <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>회원 상세</span>
-          <button type="button" onClick={() => { setDetailTab("overview"); if(editOpen) setEditOpen(false); else openEdit(); }} style={{ marginLeft: "auto", marginRight: "8px", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: editOpen ? "var(--color-surface-2)" : "var(--color-rose-deep)", color: editOpen ? "var(--color-ink-soft)" : "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{editOpen ? "취소" : "정보 수정"}</button>
-          <button type="button" onClick={onClose} style={{ width: "27px", height: "27px", border: "none", background: "none", color: "var(--color-ink-mute)", fontSize: "18px", cursor: "pointer" }}>✕</button>
-        </div>
+      <div ref={detailRef} role="dialog" aria-modal="true" aria-label="회원 상세" tabIndex={-1}
+        className="flex h-dvh w-full max-w-[720px] min-w-0 flex-col overflow-hidden border-l border-line bg-surface text-ink shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+        <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-line px-4 sm:py-2">
+          <button type="button" aria-label="회원 상세 닫기" onClick={onClose} className="min-h-11 rounded-lg px-2 text-sm text-ink-soft hover:bg-surface-2">닫기</button>
+          <h2 className="text-base font-bold">회원 상세</h2>
+          <button type="button" onClick={() => { setDetailTab("overview"); if (editOpen) setEditOpen(false); else openEdit(); }}
+            className="ml-auto min-h-11 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2 sm:min-h-9">{editOpen ? "취소" : "정보 수정"}</button>
+        </header>
 
-        <div style={{ padding: "16px 16px 16px" }}>
-          {/* 프로필 */}
-          <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+        <div data-member-detail-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 [overflow-wrap:anywhere]">
+          <div className="mb-4 flex items-start gap-3">
             {clean(profile?.kakao_profile_image) ? (
-              <img
-                src={clean(profile?.kakao_profile_image)}
-                alt={customer.nickname || customer.name || "프로필"}
-                onClick={() => setAvatarZoom(true)}
-                style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", objectFit: "cover", background: "var(--color-rose-soft)", cursor: "zoom-in" }}
-              />
+              <button type="button" aria-label="프로필 사진 확대" onClick={() => setAvatarZoom(true)} className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-surface-2">
+                <img src={clean(profile?.kakao_profile_image)} alt="" className="h-full w-full object-cover" />
+              </button>
             ) : (
-              <span style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>{avatarChar}</span>
+              <span aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xl font-bold text-ink-soft">{avatarChar}</span>
             )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                {customer.nickname}
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>· {customer.name || "-"}</span>
-                {customer.blocked ? (
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "8px", padding: "2px 8px" }}>차단</span>
-                ) : null}
-                {profile?.live_alert_optin ? (
-                  <span
-                    title={profile.live_alert_optin_at ? `신청일 ${new Date(profile.live_alert_optin_at).toLocaleDateString("ko-KR")}` : "방송알림 신청"}
-                    style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 9999, fontSize: 12, fontWeight: 600, background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", marginLeft: 6 }}
-                  >방송알림</span>
-                ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="min-w-0 break-words text-base font-bold">{customer.nickname}</h3>
+                {customer.blocked ? <span className="rounded-lg bg-danger-bg px-2 py-1 text-xs font-semibold text-danger-tx">차단</span> : null}
+                {profile?.live_alert_optin ? <span title={profile.live_alert_optin_at ? `신청일 ${new Date(profile.live_alert_optin_at).toLocaleDateString("ko-KR")}` : "방송알림 신청"} className="rounded-lg bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-soft">방송알림</span> : null}
               </div>
-              <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", lineHeight: 1.8 }}>
-                {formatPhone(customer.phone) || "-"}<br />
-                {customer.address || "주소 없음"}<br />
-                마지막 주문 {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "없음"}
-                {profile?.kakao_nickname ? <><br />카카오 {profile.kakao_nickname}</> : null}
-                {detailTab === "activity" && kakaoRaw ? (
-                  <>
-                    <br />
-                    <span title={kakaoRaw.syncedAt ? `카카오 로그인 때 받은 원본 · ${formatOrderDateTime(kakaoRaw.syncedAt)}` : "카카오 로그인 때 받은 원본"} style={{ color: "var(--color-rose-deep)", fontWeight: 800 }}>
-                      카카오 원본 {[kakaoRaw.accountName, kakaoRaw.accountPhone ? formatPhone(kakaoRaw.accountPhone) : ""].filter(Boolean).join(" · ") || "-"}
-                      {kakaoRaw.shippingName || kakaoRaw.shippingPhone ? ` / 배송지 ${[kakaoRaw.shippingName, kakaoRaw.shippingPhone ? formatPhone(kakaoRaw.shippingPhone) : ""].filter(Boolean).join(" · ")}` : ""}
-                    </span>
-                    {kakaoRaw.accountName && customer.name && kakaoRaw.accountName !== clean(customer.name) ? (
-                      <span style={{ marginLeft: "6px", fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "8px", padding: "1px 6px" }}>이름 다름</span>
-                    ) : null}
-                    {kakaoRaw.accountPhone && digitsOnly(customer.phone) && kakaoRaw.accountPhone !== digitsOnly(customer.phone) ? (
-                      <span style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "8px", padding: "1px 6px" }}>번호 다름</span>
-                    ) : null}
-                  </>
-                ) : null}
-                {detailTab === "activity" && profile?.first_login_at ? <><br />첫 로그인 {formatOrderDateTime(profile.first_login_at)}</> : null}
-                {profile?.last_login_at ? <><br />최근 로그인 {formatOrderDateTime(profile.last_login_at)}</> : null}
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-ink-soft">
+                <span>{customer.name || "이름 없음"}</span>
+                <span aria-hidden="true">·</span>
+                {customer.phone ? <a href={`tel:${digitsOnly(customer.phone)}`} className="inline-flex min-h-11 items-center tabular-nums sm:min-h-0">{formatPhone(customer.phone)}</a> : <span>전화번호 없음</span>}
               </div>
+              <p className="mt-1 text-xs tabular-nums text-ink-mute">최근 로그인 {profile?.last_login_at ? formatOrderDateTime(profile.last_login_at) : "기록 없음"}</p>
             </div>
           </div>
 
-          {/* 3 스탯 — [2026-09-09] «전 기간 DB 조회» 값으로 표시.
-                예전엔 «주문서 화면에 로드된 주문»만 세서, 옛 주문뿐인 손님이 0건/0원으로 보였다
-                (사장님 지적: 용서린 — 아래 「주문 이력」은 5건인데 위는 0건).
-                아래 CustomerFullOrderHistory 가 이미 전 기간을 조회하므로 그 값을 그대로 쓴다.
-                아직 불러오는 중이면 «…» 을 보여준다(0 으로 오해하지 않게). */}
-          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 주문</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{fullStats ? `${fullStats.all.toLocaleString("ko-KR")}건` : "…"}</div>
+          {/* All three values come from the same successful full-history read. */}
+          <dl className="mb-4 grid grid-cols-[1fr_1.6fr_1fr] divide-x divide-line rounded-xl bg-surface-2 py-3 text-right tabular-nums">
+            <div className="min-w-0 px-3">
+              <dt className="text-xs text-ink-mute">누적 주문</dt>
+              <dd className="mt-1 break-words text-base font-bold sm:text-xl">{fullStats ? `${fullStats.all.toLocaleString("ko-KR")}건` : historyState === "error" ? "—" : "…"}</dd>
             </div>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 결제</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{fullStats ? money(fullStats.paidAmount) : "…"}</div>
+            <div className="min-w-0 px-3">
+              <dt className="text-xs text-ink-mute">누적 결제</dt>
+              <dd className="mt-1 break-words text-base font-bold sm:text-xl">{fullStats ? money(fullStats.paidAmount) : historyState === "error" ? "—" : "…"}</dd>
             </div>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>미입금</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: fullStats && fullStats.unpaid > 0 ? "var(--color-warn-tx)" : "var(--color-ink)" }}>{fullStats ? `${fullStats.unpaid.toLocaleString("ko-KR")}건` : "…"}</div>
+            <div className="min-w-0 px-3">
+              <dt className="text-xs text-ink-mute">미입금</dt>
+              <dd className={`mt-1 break-words text-base font-bold sm:text-xl ${fullStats && fullStats.unpaid > 0 ? "text-warn-tx" : "text-ink"}`}>{fullStats ? `${fullStats.unpaid.toLocaleString("ko-KR")}건` : historyState === "error" ? "—" : "…"}</dd>
             </div>
+          </dl>
+
+          {historyState === 'error' && detailTab !== 'orders' ? <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[13px] text-danger-tx">
+            <span>주문 실적을 불러오지 못했습니다.</span>
+            <button type="button" onClick={() => setHistoryRefreshKey(value => value + 1)} className="min-h-11 rounded-lg border border-line px-3 text-ink">다시 조회</button>
+          </div> : null}
+          <div role="tablist" aria-label="회원 상세 메뉴" className="sticky top-0 z-20 -mx-4 mb-4 flex gap-2 border-b border-line bg-surface px-4">
+            {([["overview", "기본 정보"], ["orders", "주문 이력"], ["points", "포인트"], ["activity", "접속·변경 기록"]] as const).map(([value, label]) =>
+              <button key={value} role="tab" aria-selected={detailTab === value} type="button" onClick={() => setDetailTab(value)}
+                className={`min-h-11 min-w-0 flex-1 border-b-2 px-1 text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink ${detailTab === value ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'}`}>{label}</button>)}
           </div>
 
-          {/* 한 화면의 한 작업만: 기본정보/주문/포인트/접속기록. 탭마다 기존 작업 버튼은 그대로. */}
-          <div role="tablist" aria-label="회원 상세 메뉴" className="sticky top-0 z-20 mb-4 flex gap-1 overflow-x-auto border-b border-line bg-surface pt-1 [scrollbar-width:none]">
-            {([["overview","기본 정보"],["orders","주문 이력"],["points","포인트"],["activity","접속·변경 기록"]] as const).map(([value,label])=>
-              <button key={value} role="tab" aria-selected={detailTab===value} type="button" onClick={()=>setDetailTab(value)}
-                className={`min-h-11 shrink-0 border-b-2 px-3 text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${detailTab===value?'border-ink text-ink':'border-transparent text-ink-soft hover:text-ink'}`}>{label}</button>)}
-          </div>
+          {detailTab === "overview" && !editOpen ? <dl className="mb-4 grid grid-cols-[80px_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-line pb-4 text-[13px]">
+            <dt className="text-ink-mute">카카오</dt><dd className="break-words">{profile?.kakao_nickname || "닉네임 기록 없음"}</dd>
+            <dt className="text-ink-mute">마지막 주문</dt><dd className="tabular-nums">{fullStats ? fullStats.latestOrderAt ? formatOrderDateTime(fullStats.latestOrderAt) : "없음" : historyState === "error" ? "조회 실패" : "…"}</dd>
+            <dt className="text-ink-mute">기본 주소</dt><dd className="break-words">{customer.address || "주소 없음"}</dd>
+          </dl> : null}
           {/* [2026-09-26] 차단 회원일 때만 — 차단 정보 상자(기존 BlockedCardBody 재사용). 새 차단/해제 로직 없음. */}
           {detailTab === "overview" && customer.blocked ? (() => {
             const parts = parseBlockReason(customer.blockReason);
@@ -919,141 +904,134 @@ function CustomerDetailDrawer({
 
           {/* 정보 수정 폼 (닉네임/이름/주소 교정 + [📞 번호 변경] 전용 블록) */}
           {detailTab === "overview" && editOpen ? (
-            <div style={{ marginBottom: "12px", border: "1px solid var(--color-rose-line)", borderRadius: "12px", background: "var(--color-surface-2)", padding: "12px 12px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
+            <div className="mb-4">
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink)", marginBottom: "8px" }}>회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
               {([
                 { label: "닉네임(유튜브 핸들명)", val: fNick, set: setFNick, ph: "예: @rur8249" },
                 { label: "이름", val: fName, set: setFName, ph: "주문자 이름" },
               ] as const).map((f) => (
                 <label key={f.label} style={{ display: "block", marginBottom: "8px" }}>
-                  <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "4px" }}>{f.label}</span>
+                  <span style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "4px" }}>{f.label}</span>
                   <input value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.ph}
-                    style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+                    style={{ width: "100%", height: "44px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "16px", fontWeight: 700, color: "var(--color-ink)" }} />
                 </label>
               ))}
 
               {/* 주소: 우편번호 검색으로 채움(읽기전용) + 상세주소 직접 입력 */}
               <div style={{ marginBottom: "8px" }}>
-                <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "4px" }}>주소 (기본배송지)</span>
-                <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
-                  <input value={fZip} readOnly placeholder="우편번호"
-                    style={{ width: "110px", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+                <span style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "4px" }}>주소 (기본배송지)</span>
+                <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                  <input aria-label="우편번호" value={fZip} readOnly placeholder="우편번호"
+                    style={{ width: "112px", height: "44px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 12px", fontSize: "16px", fontWeight: 700, color: "var(--color-ink)" }} />
                   <button type="button" onClick={searchEditAddress}
-                    style={{ flex: 1, height: "38px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>주소 검색</button>
+                    style={{ flex: 1, height: "44px", borderRadius: "8px", border: "none", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>주소 검색</button>
                 </div>
-                <input value={fAddr} readOnly placeholder="주소 검색을 눌러 선택하세요"
-                  style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", marginBottom: "6px" }} />
-                <input value={fDetail} onChange={(e) => setFDetail(e.target.value)} placeholder="상세주소 (동/호수 등 직접 입력)"
-                  style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+                <input aria-label="기본 주소" value={fAddr} readOnly placeholder="주소 검색을 눌러 선택하세요"
+                  style={{ width: "100%", height: "44px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 12px", fontSize: "16px", fontWeight: 700, color: "var(--color-ink)", marginBottom: "8px" }} />
+                <input aria-label="상세 주소" value={fDetail} onChange={(e) => setFDetail(e.target.value)} placeholder="상세주소 (동/호수 등 직접 입력)"
+                  style={{ width: "100%", height: "44px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "16px", fontWeight: 700, color: "var(--color-ink)" }} />
               </div>
 
               {/* [2026-08-30] 전화번호 변경 — 식별키라 전용 API 로만 처리한다.
                   손님이 번호를 잘못 넣은 경우가 실제로 반복돼서(루루짱929, 히무0) 화면에서 바로 고치게 한다. */}
-              <div style={{ margin: "8px 0", border: "1px solid var(--color-rose-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "8px 12px" }}>
+              <div className="my-4 border-t border-line pt-3">
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>전화번호</span>
-                  <span style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)" }}>{formatPhone(customer.phone) || "-"}</span>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink-soft)" }}>전화번호</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-ink)" }}>{formatPhone(customer.phone) || "-"}</span>
                   <button
                     type="button"
-                    onClick={() => { setPhoneEditOpen((v) => !v); setFNewPhone(""); }}
-                    style={{ marginLeft: "auto", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: phoneEditOpen ? "var(--color-surface-2)" : "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}
+                    onClick={() => { setPhoneEditOpen((v) => !v); setNoteOpen(false); setFNewPhone(""); }}
+                    style={{ marginLeft: "auto", height: "44px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: phoneEditOpen ? "var(--color-surface-2)" : "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                   >{phoneEditOpen ? "취소" : "번호 변경"}</button>
                 </div>
 
                 {phoneEditOpen ? (
                   <div style={{ marginTop: "8px" }}>
                     <input
+                      aria-label="새 전화번호"
                       value={fNewPhone}
                       onChange={(e) => setFNewPhone(e.target.value)}
                       inputMode="numeric"
-                      placeholder="새 전화번호 (숫자만, 예: 01083834389)"
-                      style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box" }}
+                      placeholder="새 전화번호 (숫자만, 예: 01000000000)"
+                      style={{ width: "100%", height: "44px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "16px", fontWeight: 700, color: "var(--color-ink)", boxSizing: "border-box" }}
                     />
-                    <label style={{ display: "flex", alignItems: "center", gap: "6px", margin: "8px 0", cursor: "pointer", userSelect: "none" }}>
+                    <label style={{ display: "flex", minHeight: "44px", alignItems: "center", gap: "8px", margin: "8px 0", cursor: "pointer", userSelect: "none" }}>
                       <input
                         type="checkbox"
                         checked={fUnifyOrders}
                         onChange={(e) => setFUnifyOrders(e.target.checked)}
-                        style={{ width: "15px", height: "15px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }}
+                        style={{ width: "16px", height: "16px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }}
                       />
-                      <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>지난 주문도 같이 바꾸기 <b style={{ color: "var(--color-rose-deep)" }}>(권장)</b></span>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink)" }}>지난 주문도 같이 바꾸기 <b style={{ color: "var(--color-rose-deep)" }}>(권장)</b></span>
                     </label>
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8, marginBottom: "8px" }}>
-                      · 포인트도 새 번호로 따라옵니다<br />
-                      · 다른 사람이 쓰는 번호면 안 바뀝니다<br />
-                      · 지난 주문도 같이 바꿔야 택배비가 또 안 붙습니다
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8, marginBottom: "8px" }}>
+                      포인트가 따라가며, 다른 회원의 번호는 사용할 수 없습니다.
                     </div>
                     <button
                       type="button"
                       onClick={savePhoneChange}
                       disabled={phoneSaving}
-                      style={{ width: "100%", height: "40px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: phoneSaving ? "not-allowed" : "pointer", opacity: phoneSaving ? 0.6 : 1 }}
+                      style={{ width: "100%", height: "44px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 600, cursor: phoneSaving ? "not-allowed" : "pointer", opacity: phoneSaving ? 0.6 : 1 }}
                     >{phoneSaving ? "변경 중…" : "전화번호 변경"}</button>
                   </div>
                 ) : null}
               </div>
 
               {/* 쪽지 보내기 — 사이트 안 알림. 접속만 하면 카톡 인앱브라우저·아이폰 모두 보인다. */}
-              <div style={{ margin: "8px 0", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "8px 12px" }}>
+              <div className="my-4 border-t border-line pt-3">
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>쪽지 보내기</span>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink-soft)" }}>쪽지 보내기</span>
                   <button
                     type="button"
-                    onClick={() => { setNoteOpen((v) => !v); setNoteText(""); }}
-                    style={{ marginLeft: "auto", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-line)", background: noteOpen ? "var(--color-surface-2)" : "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}
+                    onClick={() => { setNoteOpen((v) => !v); setPhoneEditOpen(false); setNoteText(""); }}
+                    style={{ marginLeft: "auto", height: "44px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-line)", background: noteOpen ? "var(--color-surface-2)" : "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                   >{noteOpen ? "취소" : "쓰기"}</button>
                 </div>
                 {noteOpen ? (
                   <div style={{ marginTop: "8px" }}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
                       {NOTE_PRESETS.map((pre) => (
                         <button
                           key={pre.label}
                           type="button"
                           onClick={() => setNoteText(pre.text)}
                           title={pre.text}
-                          style={{ border: "1px solid var(--color-rose-line)", borderRadius: "999px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", padding: "4px 8px", fontSize: "11px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
+                          style={{ minHeight: "44px", border: "1px solid var(--color-line)", borderRadius: "999px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", padding: "4px 8px", fontSize: "12px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
                         >{pre.label}</button>
                       ))}
                     </div>
                     <textarea
+                      aria-label="쪽지 내용"
                       value={noteText}
                       onChange={(e) => setNoteText(e.target.value)}
                       placeholder="예) 주문서 제출만 하시면 됩니다"
                       rows={3}
-                      style={{ width: "100%", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "8px 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box", resize: "none", lineHeight: 1.6 }}
+                      style={{ width: "100%", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "8px 12px", fontSize: "16px", fontWeight: 700, color: "var(--color-ink)", boxSizing: "border-box", resize: "none", lineHeight: 1.6 }}
                     />
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.7, margin: "6px 0 8px" }}>
-                      · 손님이 사이트에 들어오면 팝업으로 뜹니다<br />
-                      · 이미 보고 있으면 15초 안에 뜹니다<br />
-                      · 손님 쪽지함에 12시간 남습니다<br />
-                      · 위 버튼은 문구만 채웁니다 — 고쳐 쓰셔도 되고, [보내기]를 눌러야 나갑니다
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.7, margin: "6px 0 8px" }}>
+                      접속 시 표시되고 쪽지함에 12시간 보관됩니다.
                     </div>
                     <button
                       type="button"
                       onClick={sendCustomerNote}
                       disabled={noteSending || !clean(noteText)}
-                      style={{ width: "100%", height: "40px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: noteSending ? "not-allowed" : "pointer", opacity: noteSending || !clean(noteText) ? 0.5 : 1 }}
+                      style={{ width: "100%", height: "44px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 600, cursor: noteSending ? "not-allowed" : "pointer", opacity: noteSending || !clean(noteText) ? 0.5 : 1 }}
                     >{noteSending ? "보내는 중…" : "쪽지 보내기"}</button>
                   </div>
                 ) : null}
               </div>
 
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", lineHeight: 1.6, margin: "4px 0 8px" }}>
-                ※ 닉네임/이름은 이 회원의 주문서 표시에도 반영됩니다.<br />※ 주소는 회원의 <b>기본배송지</b>를 바꿉니다(손님 화면·다음 주문에 반영, 기존 주문 송장은 유지).<br />※ 미입금 주문은 입금 자동매칭 기준(입금자명)도 새 닉네임으로 바뀝니다.<br />※ 전화번호는 안전을 위해 수정하지 않습니다.
+              <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-warn-tx)", lineHeight: 1.6, margin: "4px 0 8px" }}>
+                닉네임·이름은 주문서에도 반영됩니다. 변경 범위는 저장 전 확인하세요.
               </div>
-              <button type="button" onClick={saveEdit} disabled={editSaving}
-                style={{ width: "100%", height: "42px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.6 : 1 }}>
-                {editSaving ? "저장 중…" : "저장 (customers + 주문서 반영)"}
-              </button>
             </div>
           ) : null}
 
           {/* 등록 배송지 (고객이 등록한 customers.shipping_addresses 배열 — 읽기 전용) */}
           {detailTab === "overview" && Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
             <div style={{ marginBottom: "12px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>등록 배송지 ({profile.shipping_addresses.length}건)</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink)", marginBottom: "8px" }}>등록 배송지 ({profile.shipping_addresses.length}건)</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {[...profile.shipping_addresses]
                   .sort((a, b) => (b?.isDefault ? 1 : 0) - (a?.isDefault ? 1 : 0))
                   .map((addr, index) => {
@@ -1063,13 +1041,13 @@ function CustomerDetailDrawer({
                       clean(addr?.detailAddress),
                     ].filter(Boolean).join(" ");
                     return (
-                      <div key={`${clean(addr?.name)}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", padding: "8px 12px", background: addr?.isDefault ? "var(--color-surface-2)" : "#fff" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>{clean(addr?.name) || "이름 없음"}</span>
-                          {clean(addr?.phone) ? <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{formatPhone(clean(addr?.phone))}</span> : null}
-                          {addr?.isDefault ? <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", borderRadius: "8px", padding: "2px 8px" }}>기본</span> : null}
+                      <div key={`${clean(addr?.name)}-${index}`} className="border-b border-line py-3">
+                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink)" }}>{clean(addr?.name) || "이름 없음"}</span>
+                          {clean(addr?.phone) ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>{formatPhone(clean(addr?.phone))}</span> : null}
+                          {addr?.isDefault ? <span style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 600, color: "#fff", background: "var(--color-rose-deep)", borderRadius: "8px", padding: "2px 8px" }}>기본</span> : null}
                         </div>
-                        <div style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{fullAddr || "주소 없음"}</div>
+                        <div style={{ fontSize: "12px", color: "var(--color-ink-soft)" }}>{fullAddr || "주소 없음"}</div>
                       </div>
                     );
                   })}
@@ -1083,6 +1061,8 @@ function CustomerDetailDrawer({
               kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)}
               phone={customer.phone}
               onStats={setFullStats}
+              onLoadState={setHistoryState}
+              refreshKey={historyRefreshKey}
             />
           </div>
 
@@ -1093,30 +1073,43 @@ function CustomerDetailDrawer({
             </div>
           ) : null}
 
-          {detailTab === "activity" ? (
+          {detailTab === "activity" ? <>
+            <dl className="mb-4 grid grid-cols-[80px_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-line pb-4 text-[13px]">
+              <dt className="text-ink-mute">첫 로그인</dt><dd className="tabular-nums">{profile?.first_login_at ? formatOrderDateTime(profile.first_login_at) : "기록 없음"}</dd>
+              {kakaoRaw ? <>
+                <dt className="text-ink-mute">카카오 원본</dt>
+                <dd className="break-words">
+                  {[kakaoRaw.accountName, kakaoRaw.accountPhone ? formatPhone(kakaoRaw.accountPhone) : ""].filter(Boolean).join(" · ") || "기록 없음"}
+                  {kakaoRaw.accountName && customer.name && kakaoRaw.accountName !== clean(customer.name) ? <span className="ml-2 rounded-lg bg-warn-bg px-2 py-1 text-xs text-warn-tx">이름 다름</span> : null}
+                  {kakaoRaw.accountPhone && digitsOnly(customer.phone) && kakaoRaw.accountPhone !== digitsOnly(customer.phone) ? <span className="ml-2 rounded-lg bg-warn-bg px-2 py-1 text-xs text-warn-tx">번호 다름</span> : null}
+                </dd>
+                {kakaoRaw.shippingName || kakaoRaw.shippingPhone ? <><dt className="text-ink-mute">원본 배송지</dt><dd className="break-words">{[kakaoRaw.shippingName, kakaoRaw.shippingPhone ? formatPhone(kakaoRaw.shippingPhone) : ""].filter(Boolean).join(" · ")}</dd></> : null}
+                {kakaoRaw.syncedAt ? <><dt className="text-ink-mute">원본 수신</dt><dd className="tabular-nums">{formatOrderDateTime(kakaoRaw.syncedAt)}</dd></> : null}
+              </> : null}
+            </dl>
             <MemberAccessHistory kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)} />
-          ) : null}
+          </> : null}
 
           {/* 정보 변경 이력 */}
           {detailTab === "activity" && profile?.customer_history && profile.customer_history.length > 0 ? (
             <div style={{ marginTop: "16px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>정보 변경 이력</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink)", marginBottom: "8px" }}>정보 변경 이력</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {[...profile.customer_history]
                   .sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)))
                   .map((h, index) => (
-                    <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", padding: "8px 12px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>{customerHistoryFieldLabel(h.field)}</span>
-                        <span style={{ marginLeft: "auto", fontSize: "11px", color: "var(--color-ink-mute)" }}>{formatOrderDateTime(h.changed_at)}</span>
+                    <div key={`${h.field}-${h.changed_at}-${index}`} className="border-b border-line py-3">
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink-soft)" }}>{customerHistoryFieldLabel(h.field)}</span>
+                        <span style={{ marginLeft: "auto", fontSize: "12px", color: "var(--color-ink-mute)" }}>{formatOrderDateTime(h.changed_at)}</span>
                       </div>
-                      <div style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>
+                      <div style={{ fontSize: "12px", color: "var(--color-ink-soft)" }}>
                         <span style={{ color: "var(--color-ink-mute)" }}>{h.old_value || "(없음)"}</span>
-                        <span style={{ margin: "0 4px", color: "var(--color-ink-mute)", fontWeight: 800 }}>→</span>
+                        <span style={{ margin: "0 4px", color: "var(--color-ink-mute)", fontWeight: 600 }}>→</span>
                         <span style={{ color: "var(--color-ink)", fontWeight: 700 }}>{h.new_value || "(없음)"}</span>
                       </div>
                       {h.note ? (
-                        <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)" }}>{h.note}</div>
+                        <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "var(--color-danger-tx)" }}>{h.note}</div>
                       ) : null}
                     </div>
                   ))}
@@ -1124,26 +1117,17 @@ function CustomerDetailDrawer({
             </div>
           ) : null}
 
-          {/* 푸터: 차단 / 닫기 */}
-          <div style={{ display: "flex", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--color-line)" }}>
-            <button
-              type="button"
-              onClick={() => onBlockAction(customer)}
-              disabled={blockSaving}
-              style={{ border: "1px solid", borderColor: customer.blocked ? "var(--color-rose-line)" : "var(--color-rose-line)", borderRadius: "8px", background: customer.blocked ? "#fff" : "var(--color-danger-bg)", padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: customer.blocked ? "var(--color-ink-soft)" : "var(--color-danger-tx)", cursor: blockSaving ? "wait" : "pointer", opacity: blockSaving ? 0.5 : 1 }}
-            >
-              {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ marginLeft: "auto", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", padding: "8px 16px", fontSize: "12px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
-            >
-              닫기
-            </button>
-          </div>
         </div>
-      </section>
+        <footer className="flex min-h-[52px] shrink-0 items-center gap-2 border-t border-line bg-surface px-4 py-2 pb-[max(8px,env(safe-area-inset-bottom))]">
+          <button type="button" onClick={() => onBlockAction(customer)} disabled={blockSaving}
+            className="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50">
+            {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
+          </button>
+          {detailTab === "overview" && editOpen ? (
+            <button type="button" onClick={saveEdit} disabled={editSaving} className={`ml-auto min-h-11 rounded-lg px-4 text-sm font-semibold disabled:opacity-50 ${phoneEditOpen || noteOpen ? "border border-line bg-surface text-ink" : "bg-ink text-surface"}`}>{editSaving ? "저장 중…" : "저장"}</button>
+          ) : <button type="button" onClick={onClose} className="ml-auto min-h-11 rounded-lg border border-line px-4 text-sm text-ink hover:bg-surface-2">닫기</button>}
+        </footer>
+      </div>
     </div>
   );
 }
@@ -1214,6 +1198,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const [directPhoneBlocks, setDirectPhoneBlocks] = useState<DirectPhoneBlock[]>([]);
   const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
   const [profileLoadStatus,setProfileLoadStatus]=useState<"loading"|"ready"|"error">("loading");
+  const [profileRowsLoaded,setProfileRowsLoaded]=useState<number|null>(null);
 
   // 주문 있는 고객만 — 기본 OFF(모든 고객 표시: 아직 주문 안 한 가망고객도 보임). 구매자만 보고 싶을 때만 켜는 선택 토글.
   const [buyersOnly, setBuyersOnly] = useState(false);
@@ -1270,11 +1255,13 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
     const loadCustomerProfiles = async () => {
       setProfileLoadStatus("loading");
+      setProfileRowsLoaded(null);
       // [2026-08-12] 회원이 1,000명을 넘으면 옛 회원이 목록·검색에서 통째로 누락되던 문제 수정.
       //   Supabase는 한 번에 최대 1,000행만 돌려주므로 1,000명씩 나눠 전부 받아온다.
       //   표시 전용(SELECT만) — 주문/입금/정산/배송/포인트 로직과 무관.
       const PAGE_SIZE = 1000;
       const collected: CustomerProfile[] = [];
+      let complete = false;
 
       for (let from = 0; from < 50000; from += PAGE_SIZE) {
         const { data, error } = await supabase
@@ -1283,6 +1270,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, shipping_addresses, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history, live_alert_optin, live_alert_optin_at"
           )
           .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
           .range(from, from + PAGE_SIZE - 1);
 
         if (!alive) return;
@@ -1296,16 +1284,20 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
         const chunk = (data || []) as CustomerProfile[];
         collected.push(...chunk);
-        if (chunk.length < PAGE_SIZE) break;
+        if (chunk.length < PAGE_SIZE) { complete = true; break; }
       }
 
       if (!alive) return;
+      if (!complete) { setProfileLoadStatus("error"); return; }
 
+      setProfileRowsLoaded(collected.length);
       setCustomerProfiles(collected.filter((profile) => digitsOnly(profile.customer_phone) || clean(profile.customer_name) || clean(profile.youtube_nickname)));
       setProfileLoadStatus("ready");
     };
 
-    void loadCustomerProfiles();
+    void loadCustomerProfiles().catch(() => {
+      if (alive) { setProfileLoadStatus("error"); setProfileRowsLoaded(null); }
+    });
 
     return () => {
       alive = false;
@@ -1329,7 +1321,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     })().catch(()=>{if(alive){setLifetimeStatus('error');setLifetimeById(null);}});
     return()=>{alive=false;};
   },[reloadTick]);
-  const memberStatsReady=lifetimeStatus==='ready' && lifetimeById!==null && profileLoadStatus==='ready' && lifetimeAudit?.profiles===customerProfiles.length;
+  const memberStatsReady=lifetimeStatus==='ready' && lifetimeById!==null && profileLoadStatus==='ready' && lifetimeAudit?.profiles===profileRowsLoaded;
 
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
@@ -1511,11 +1503,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           .toLowerCase();
 
         if (searchText && !haystack.includes(searchText)) return false;
-        // 주문 있는 고객만(기본 ON) — 테스트·0건 계정 숨김. 검색에도 적용(끄면 0건/테스트도 보임).
+        // 주문 있는 고객만(기본 OFF) — 검증된 전 기간 주문 수로만 필터링한다.
+        if (buyersOnly && !memberStatsReady) return false;
         if (buyersOnly && memberStatsReady && customer.orderCount <= 0) return false;
         if (statusFilter === "normal") return !customer.blocked;
         if (statusFilter === "blocked") return customer.blocked;
-        if (statusFilter === "attention") return !memberStatsReady || customer.manualNeededCount > 0 || customer.unpaidCount > 0;
+        if (statusFilter === "attention") return memberStatsReady && (customer.manualNeededCount > 0 || customer.unpaidCount > 0);
         if (statusFilter === "nokakao") return !customer.kakaoId;
 
         return true;
@@ -1526,22 +1519,26 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         if (sortMode === "nickname") return a.nickname.localeCompare(b.nickname, "ko");
         // 가입일/최근접속: 값이 없는 회원(옛 데이터)은 항상 뒤로 보낸다.
         if (sortMode === "joinedDesc") {
+          if (!a.joinedAt && !b.joinedAt) return 0;
           if (!a.joinedAt) return 1;
           if (!b.joinedAt) return -1;
           return b.joinedAt.localeCompare(a.joinedAt);
         }
         if (sortMode === "joinedAsc") {
+          if (!a.joinedAt && !b.joinedAt) return 0;
           if (!a.joinedAt) return 1;
           if (!b.joinedAt) return -1;
           return a.joinedAt.localeCompare(b.joinedAt);
         }
         if (sortMode === "lastLogin") {
+          if (!a.lastLoginAt && !b.lastLoginAt) return 0;
           if (!a.lastLoginAt) return 1;
           if (!b.lastLoginAt) return -1;
           return b.lastLoginAt.localeCompare(a.lastLoginAt);
         }
         if (sortMode === "oldLogin") {
           // [2026-09-05 사장님 요청] 과거접속순 — 오래 안 들어온 손님부터 (접속 기록 없는 손님이 맨 위)
+          if (!a.lastLoginAt && !b.lastLoginAt) return 0;
           if (!a.lastLoginAt) return -1;
           if (!b.lastLoginAt) return 1;
           return a.lastLoginAt.localeCompare(b.lastLoginAt);
@@ -1550,6 +1547,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       });
   }, [customers, keyword, sortMode, statusFilter, buyersOnly, memberStatsReady]);
 
+  const filterNeedsStats = buyersOnly || statusFilter === "attention";
+  const filterStatsPending = filterNeedsStats && !memberStatsReady;
   const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / CUSTOMER_PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const visibleCustomers = filteredCustomers.slice((safePage - 1) * CUSTOMER_PAGE_SIZE, safePage * CUSTOMER_PAGE_SIZE);
@@ -1946,7 +1945,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             <button type="button" onClick={() => onClose?.()} className="text-ink-mute hover:text-ink text-lg leading-none">✕</button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-3 max-md:p-0">
+        <div className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4 max-md:p-0">
           {/* [2026-09-21 사장님] 「고객 메뉴 레이아웃이 너무 별로」 — 순서를 바로잡았다.
               예전: 통계요약 → ⛔전화번호 차단 → 탭바 → 내용
                 회원 목록 보러 들어왔는데 «빨간 차단 상자»가 탭보다 먼저 눈에 들어왔다.
@@ -1984,11 +1983,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           {custTab === "members" ? (
             <>
               {/* [2026-09-26] 요약(전체·정상·차단·관리필요) 한 줄 + 오른쪽 「전화번호 차단」 버튼(접이식 줄 대체) */}
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 max-md:bg-transparent max-md:px-0 max-md:py-1 text-[12px] font-black text-ink-soft">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[13px] tabular-nums text-ink-soft">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span>전체 <span className="text-ink">{customers.length.toLocaleString("ko-KR")}</span></span>
+                  <button type="button" aria-pressed={statusFilter === "all"} onClick={() => {setStatusFilter("all");setPage(1);}} className="min-h-11 hover:underline">전체 <span className="font-semibold text-ink">{profileLoadStatus === "ready" ? customers.length.toLocaleString("ko-KR") : "…"}</span></button>
                   <span className="text-ink-mute">·</span>
-                  <span>정상 <span className="text-ok-tx">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
+                  <button type="button" aria-pressed={statusFilter === "normal"} onClick={() => {setStatusFilter("normal");setPage(1);}} className="min-h-11 hover:underline">정상 <span className="font-semibold text-ink">{profileLoadStatus === "ready" ? normalCustomers.length.toLocaleString("ko-KR") : "…"}</span></button>
                   <span className="text-ink-mute">·</span>
                   <button
                     type="button"
@@ -1998,17 +1997,18 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                       setBlockedCustomerPage(1);
                       setShowBlockedCustomers(true);
                     }}
-                    className="hover:underline"
+                    className="min-h-11 hover:underline"
                   >
-                    차단 <span className="text-danger-tx">{blockedTotalCount.toLocaleString("ko-KR")}</span>
+                    차단 <span className="font-semibold text-danger-tx">{profileLoadStatus === "ready" ? blockedTotalCount.toLocaleString("ko-KR") : "…"}</span>
+                    {profileLoadStatus === "ready" && standalonePhoneBlocks.length > 0 ? <span className="ml-1 text-xs text-ink-mute">(번호 {standalonePhoneBlocks.length}건 포함)</span> : null}
                   </button>
                   <span className="text-ink-mute">·</span>
-                  <span>관리필요 <span className="text-warn-tx">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
+                  <button type="button" disabled={!memberStatsReady} onClick={() => {setStatusFilter('attention');setPage(1);}} className="min-h-11 disabled:cursor-wait">관리필요 <span className="text-warn-tx">{memberStatsReady ? attentionCustomers.length.toLocaleString("ko-KR") : '…'}</span></button>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPhoneBlockOpen((v) => !v)}
-                  className={`shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-black transition ${phoneBlockOpen ? "bg-rose-deep text-white" : "border border-danger-tx/40 bg-surface text-danger-tx hover:bg-danger-bg"}`}
+                  className={`min-h-11 shrink-0 rounded-lg px-3 text-sm font-semibold transition ${phoneBlockOpen ? "bg-rose-deep text-white" : "border border-line bg-surface text-danger-tx hover:bg-surface-2"}`}
                 >
                   전화번호 차단
                 </button>
@@ -2032,7 +2032,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       ) : null}
 
       <div className={custTab === "members" ? "" : "hidden"}>
-        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none">
+        <div className="min-w-0">
           {/* [2026-09-25] 필터 한 줄 — 검색(넓게) · 고객상태 · 정렬 · 주문있는고객만 · 초기화(바뀌었을 때만). 좁으면 자연스럽게 줄바꿈. */}
           {/* [2026-10-22 폰] 검색칸은 한 줄 전체, 나머지 컨트롤은 아래 한 줄 가로 스크롤(§13). PC 는 한 줄 그대로 */}
           <input
@@ -2041,7 +2041,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             placeholder="닉네임 / 이름 / 전화번호 검색"
             inputMode="search"
             aria-label="고객 검색"
-            className="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[16px] font-semibold text-ink outline-none focus-visible:border-ink md:hidden"
+            className="mt-2 h-11 w-full rounded-lg border border-line bg-surface px-3 text-[16px] font-semibold text-ink outline-none focus-visible:border-ink md:hidden"
           />
           <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>select]:shrink-0">
             <input
@@ -2049,23 +2049,26 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
               placeholder="닉네임 / 이름 / 전화번호 검색"
               inputMode="search"
-              className="h-11 min-w-[200px] flex-1 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:border-rose-deep focus-visible:ring-2 focus-visible:ring-rose-deep max-md:hidden"
+              aria-label="고객 검색"
+              className="h-11 min-w-[200px] flex-1 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink max-md:hidden"
             />
             <select
               value={statusFilter}
+              aria-label="회원 상태"
               onChange={(event) => { setStatusFilter(event.target.value as StatusFilter); setPage(1); }}
-              className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
+              className="h-11 shrink-0 rounded-lg border border-line bg-surface px-3 text-base md:text-[13px] font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink"
             >
               <option value="all">고객상태: 전체</option>
               <option value="normal">정상</option>
               <option value="blocked">차단</option>
-              <option value="attention">관리필요</option>
+              <option value="attention" disabled={!memberStatsReady}>관리필요</option>
               <option value="nokakao">카카오 미연동</option>
             </select>
             <select
               value={sortMode}
+              aria-label="회원 정렬"
               onChange={(event) => { setSortMode(event.target.value as SortMode); setPage(1); }}
-              className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
+              className="h-11 shrink-0 rounded-lg border border-line bg-surface px-3 text-base md:text-[13px] font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink"
             >
               <option value="latest">최근주문순</option>
               <option value="lastLogin">최근 로그인순</option>
@@ -2079,8 +2082,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             <button
               type="button"
               disabled={!memberStatsReady}
+              aria-pressed={buyersOnly}
               onClick={() => { setBuyersOnly((v) => !v); setPage(1); }}
-              className={`h-11 shrink-0 rounded-xl px-3 text-[12px] font-black transition disabled:opacity-50 ${buyersOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
+              className={`h-11 shrink-0 rounded-lg px-3 text-[12px] font-semibold transition disabled:opacity-50 ${buyersOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
             >
               {buyersOnly ? "주문 있는 고객만 ✓" : "주문 있는 고객만"}
             </button>
@@ -2088,7 +2092,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               <button
                 type="button"
                 onClick={() => { setKeyword(""); setStatusFilter("all"); setSortMode("latest"); setBuyersOnly(false); setPage(1); }}
-                className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink-soft hover:bg-surface-2"
+                className="h-11 shrink-0 rounded-lg border border-line bg-surface px-3 text-base md:text-[13px] font-semibold text-ink-soft hover:bg-surface-2"
               >
                 초기화
               </button>
@@ -2097,15 +2101,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
 
 
-          <div role="status" className={`mt-3 flex min-h-7 flex-wrap items-center gap-2 rounded-lg px-2 py-1 text-[12px] ${lifetimeStatus==='error'?'bg-danger-bg text-danger-tx':'bg-surface-2 text-ink-soft'}`}>
-            <span>{(lifetimeStatus==='loading'||profileLoadStatus==='loading')?'전 기간 회원·주문 실적 확인 중…':memberStatsReady?`전 기간 집계 완료 · 주문 상품 ${lifetimeAudit?.rows.toLocaleString('ko-KR')||0}행`:'전체 회원 집계가 불완전하여 실적 숫자를 숨겼습니다. 다시 조회해 주세요.'}</span>
-            {(!memberStatsReady&&lifetimeStatus!=='loading'&&profileLoadStatus!=='loading')?<button type="button" onClick={()=>setReloadTick(x=>x+1)} className="min-h-9 rounded-lg border border-line bg-surface px-3 font-semibold">다시 조회</button>:null}
-          </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-black text-ink max-md:hidden">고객 목록</h2>
-            <div className="text-xs font-black text-ink-mute">
-              표시 {visibleCustomers.length.toLocaleString("ko-KR")}명 / 검색결과 {filteredCustomers.length.toLocaleString("ko-KR")}명
-            </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-mute">
+            <span role="status" className={lifetimeStatus === 'error' || profileLoadStatus === 'error' ? 'text-danger-tx' : ''}>
+              {lifetimeStatus === 'loading' || profileLoadStatus === 'loading' ? '전체 기간 실적을 확인하는 중…' : memberStatsReady ? `전체 기간 · 검색결과 ${filteredCustomers.length.toLocaleString('ko-KR')}명` : '실적을 확인하지 못했습니다. 다시 조회해 주세요.'}
+            </span>
+            <button type="button" disabled={lifetimeStatus === 'loading' || profileLoadStatus === 'loading'} onClick={() => setReloadTick(value => value + 1)} className="min-h-11 rounded-lg border border-line bg-surface px-3 text-sm text-ink disabled:opacity-40 sm:min-h-9">{memberStatsReady ? "새로고침" : "다시 조회"}</button>
           </div>
 
           {/* [2026-09-26] 선택했을 때만 뜨는 작업 바(고객이슈 작업 바와 같은 모양). 전체선택은 표 머리글 체크박스로. */}
@@ -2125,13 +2125,13 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
             {/* [2026-09-25] PC(넓을 때)=고객이슈 탭과 같은 표 · 좁은 화면=카드(지금 모양 유지) */}
             {visibleCustomers.length === 0 ? (
-              <div className="mt-3 ru-empty"><div className="ru-empty-title">이 조건에 맞는 고객이 없습니다.</div><div className="ru-empty-hint">검색어를 지우거나 「주문 있는 고객만」 필터를 꺼보세요.</div></div>
+              <div className="mt-3 ru-empty"><div className="ru-empty-title">{profileLoadStatus === "loading" || (filterStatsPending && lifetimeStatus === "loading") ? "회원 목록을 불러오는 중…" : profileLoadStatus === "error" || filterStatsPending ? "필터 결과를 확인하지 못했습니다." : "이 조건에 맞는 고객이 없습니다."}</div><div className="ru-empty-hint">{profileLoadStatus === "loading" || (filterStatsPending && lifetimeStatus === "loading") ? "잠시만 기다려 주세요." : profileLoadStatus === "error" || filterStatsPending ? "다시 조회해 주세요." : "검색어와 필터를 확인해 주세요."}</div></div>
             ) : (
               <>
                 {/* ── PC: 표 (xl 이상) — 머리글·모든 줄이 MEMBER_GRID 하나를 공유(칸 어긋남 0) · 숫자칸 오른쪽정렬 · 차단은 absolute 빨간 막대(칸폭 영향 없음) ── */}
                 <div className="mt-3 hidden overflow-x-auto rounded-xl border border-line xl:block">
                   <div className="min-w-[1180px]">
-                    <div className={`sticky top-0 z-10 grid ${MEMBER_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute`}>
+                    <div className={`sticky top-0 z-10 grid ${MEMBER_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-xs font-semibold text-ink-mute`}>
                       <label className="flex items-center justify-center" title={allPageSelected ? "이 페이지 전체 선택 해제" : "이 페이지 전체 선택"}>
                         <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} className="h-4 w-4 accent-rose-deep outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" aria-label="이 페이지 전체 선택" />
                       </label>
@@ -2148,7 +2148,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                     {visibleCustomers.map((customer) => {
                       const d = memberRowInfo(customer);
                       return (
-                        <div key={customer.key} className={`relative grid ${MEMBER_GRID} items-center gap-x-3 border-b border-line px-3 py-2.5 text-[12px] transition-colors ${customer.blocked ? "bg-danger-bg/40" : "bg-surface hover:bg-rose-soft/30"}`}>
+                        <div key={customer.key} className={`relative grid ${MEMBER_GRID} items-center gap-x-3 border-b border-line px-3 py-2.5 text-[13px] transition-colors ${customer.blocked ? "bg-danger-bg/40" : "bg-surface hover:bg-rose-soft/30"}`}>
                           {customer.blocked ? <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[var(--color-danger-tx)]" aria-hidden /> : null}
                           {d.phoneDigits ? (
                             <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} className="h-4 w-4 accent-rose-deep" title="일괄지급 선택" />
@@ -2170,7 +2170,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                             {customer.name ? <div className="truncate text-[11px] text-ink-mute">{customer.name}</div> : null}
                           </button>
                           {/* 연락처 / 로그인 (두 줄) */}
-                          <div className="min-w-0 text-[11px] leading-tight">
+                          <div className="min-w-0 text-xs leading-tight">
                             <div className="truncate text-ink-soft">{customer.phone ? formatPhone(customer.phone) : "-"}</div>
                             <div className="truncate text-ink-mute">{d.loginShort ? `로그인 ${d.loginShort}` : "로그인 -"}</div>
                           </div>
@@ -2186,27 +2186,27 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               </div>
                             ) : (customer.unpaidCount > 0 || d.openIssues > 0 || customer.liveAlertOptin === false) ? (
                               <>
-                                {customer.unpaidCount > 0 ? <span className="rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
+                                {memberStatsReady && customer.unpaidCount > 0 ? <span className="rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
                                 {d.openIssues > 0 ? <span className="rounded bg-danger-bg px-1 py-0.5 text-[11px] font-black text-danger-tx" title="미해결 고객이슈">이슈 {d.openIssues}</span> : null}
-                                {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-[11px] font-black text-ink-mute" title="방송 알림 미신청">알림OFF</span> : null}
+                                {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-xs font-semibold text-ink-mute" title="방송 알림 미신청">알림OFF</span> : null}
                               </>
                             ) : <span className="text-[11px] text-ink-mute">-</span>}
                           </div>
                           {/* 누적 주문 (오른쪽) */}
-                          <span className="text-right font-black text-ink">{memberStatsReady ? `${customer.orderCount}건` : "…"}</span>
+                          <span className="text-right font-semibold tabular-nums text-ink">{memberStatsReady ? `${customer.orderCount}건` : "…"}</span>
                           {/* 누적 결제(결제완료만, 오른쪽) */}
-                          <span className="text-right font-black text-ink">{memberStatsReady ? money(customer.paidAmount) : "…"}</span>
+                          <span className="text-right font-semibold tabular-nums text-ink">{memberStatsReady ? money(customer.paidAmount) : "…"}</span>
                           {/* 마지막 주문 (두 줄 · 없으면 -) */}
-                          <div className="text-[11px] leading-tight text-ink-soft">
-                            <div className="truncate">{d.orderTwo.line1}</div>
-                            {d.orderTwo.line2 ? <div className="truncate text-ink-mute">{d.orderTwo.line2}</div> : null}
+                          <div className="text-xs leading-tight text-ink-soft">
+                            <div className="truncate">{memberStatsReady ? d.orderTwo.line1 : '…'}</div>
+                            {memberStatsReady && d.orderTwo.line2 ? <div className="truncate text-ink-mute">{d.orderTwo.line2}</div> : null}
                           </div>
                           {/* 포인트 (오른쪽) */}
-                          <span className="text-right font-black text-rose-deep">{d.pts != null ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
+                          <span className="text-right font-semibold tabular-nums text-rose-deep">{d.pts != null ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
                           {/* 처리 (오른쪽) */}
                           <div className="flex items-center justify-end gap-1.5">
-                            <button type="button" onClick={() => handleCustomerBlockButton(customer)} className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
-                            <button type="button" onClick={() => openDetail(customer)} className="shrink-0 text-[11px] font-black text-rose-deep">상세 ›</button>
+                            <button type="button" onClick={() => handleCustomerBlockButton(customer)} className={`min-h-9 shrink-0 rounded-lg px-2 text-xs font-semibold transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
+                            <button type="button" onClick={() => openDetail(customer)} className="min-h-9 shrink-0 rounded-lg px-2 text-[13px] font-semibold text-ink hover:bg-surface-2">열기</button>
                           </div>
                         </div>
                       );
@@ -2216,11 +2216,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
                 {/* ── 좁은 화면: 카드(지금 모양 유지) ── */}
                 {/* [2026-10-22 폰] 카드 2줄 고정(DESIGN-ADMIN §13): [체크·사진·닉네임 이름·배지 ·›] / [전화 · 마지막 주문 · 누적 결제 · 주문 수 · 포인트]. 카드 탭=상세. 차단/해제는 상세 창(차단 정보 상자)에서 */}
-                <div className="mt-3 flex flex-col gap-1.5 xl:hidden">
+                <div data-member-cards className="mt-3 flex flex-col gap-2 xl:hidden">
                   {visibleCustomers.map((customer) => {
                     const d = memberRowInfo(customer);
                     return (
-                      <div key={customer.key} role="button" tabIndex={0} onClick={() => openDetail(customer)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(customer); } }}
+                      <div key={customer.key} role="button" tabIndex={0} onClick={() => openDetail(customer)} onKeyDown={(e) => { if (e.target !== e.currentTarget) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(customer); } }}
                         className={`relative min-h-11 rounded-xl border px-3 py-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ink ${customer.blocked ? "border-line bg-danger-bg/40" : "border-line bg-surface active:bg-surface-2"}`}>
                         {customer.blocked ? <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-danger-tx" /> : null}
                         <div className="flex items-center gap-2">
@@ -2228,25 +2228,25 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                             <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} onClick={(e) => e.stopPropagation()} className="h-5 w-5 shrink-0 accent-ink" title="일괄지급 선택" />
                           ) : <span className="w-5 shrink-0" />}
                           {d.hasPhoto ? (
-                            <button type="button" onClick={(e) => { e.stopPropagation(); setPhotoZoom(customer.kakaoProfileImage); }} className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line" title="사진 크게 보기">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setPhotoZoom(customer.kakaoProfileImage); }} className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-line" title="사진 크게 보기">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={customer.kakaoProfileImage} alt="" className="h-full w-full object-cover" loading="lazy" />
                             </button>
                           ) : (
-                            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-surface-2 text-ink"}`}>{d.initial}</span>
+                            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-surface-2 text-ink"}`}>{d.initial}</span>
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                              <span className="min-w-0 truncate text-[14px] font-bold text-ink">{customer.nickname || "—"}</span>
+                              <span className="min-w-0 break-words text-[14px] font-bold text-ink">{customer.nickname || "—"}</span>
                               {customer.name ? <span className="text-[13px] text-ink-soft">{customer.name}</span> : null}
                               {customer.blocked ? <span className="rounded bg-[var(--color-danger-tx)] px-1.5 py-0.5 text-[11px] font-bold text-white" title={d.blockTitle || "차단됨"}>차단{d.blockParts?.label ? ` · ${d.blockParts.label}` : ""}</span> : null}
-                              {customer.unpaidCount > 0 ? <span className="rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-bold text-warn-tx">미입금 {customer.unpaidCount}</span> : null}
+                              {memberStatsReady && customer.unpaidCount > 0 ? <span className="rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-bold text-warn-tx">미입금 {customer.unpaidCount}</span> : null}
                               {d.openIssues > 0 ? <span className="rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-bold text-danger-tx">이슈 {d.openIssues}</span> : null}
                               {customer.liveAlertOptin === false ? <span className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-mute">알림OFF</span> : null}
                               {!customer.kakaoId ? <span className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-mute">카카오 미연동</span> : null}
                             </div>
                             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[12px] text-ink-soft tabular-nums">
-                              <span><span className="text-ink-mute">연락처 </span>{customer.phone ? formatPhone(customer.phone) : "-"}</span>
+                              <span><span className="text-ink-mute">연락처 </span>{customer.phone ? <a href={`tel:${d.phoneDigits}`} onClick={event => event.stopPropagation()} className="inline-flex min-h-11 items-center">{formatPhone(customer.phone)}</a> : "-"}</span>
                               <span className="text-ink-mute">·</span>
                               <span><span className="text-ink-mute">마지막 주문 </span>{memberStatsReady ? d.orderTwo.line1 : "…"}</span>
                               <span className="text-ink-mute">·</span>
@@ -2279,24 +2279,26 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs font-black text-ink-soft">
-              총 {filteredCustomers.length.toLocaleString("ko-KR")}명
+              총 {profileLoadStatus === "ready" && !filterStatsPending ? filteredCustomers.length.toLocaleString("ko-KR") : "…"}명
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                disabled={safePage <= 1}
                 onClick={() => setPage(Math.max(1, safePage - 1))}
-                className="rounded-xl border border-line px-3 py-2 text-sm font-black text-ink-soft"
+                className="min-h-11 rounded-lg border border-line px-3 text-sm text-ink-soft disabled:opacity-40"
               >
                 이전
               </button>
-              <div className="rounded-xl bg-rose-deep px-3 py-2 text-sm font-black text-white">
+              <div className="px-2 text-sm tabular-nums text-ink-soft">
                 {safePage} / {totalPages}
               </div>
               <button
                 type="button"
+                disabled={safePage >= totalPages}
                 onClick={() => setPage(Math.min(totalPages, safePage + 1))}
-                className="rounded-xl border border-line px-3 py-2 text-sm font-black text-ink-soft"
+                className="min-h-11 rounded-lg border border-line px-3 text-sm text-ink-soft disabled:opacity-40"
               >
                 다음
               </button>
@@ -2599,8 +2601,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                             <button
                               type="button"
                               onClick={() => {
-                                setSelectedCustomer(customer);
-                                setDetailPage(1);
+                                openDetail(customer);
                                 setShowBlockedCustomers(false);
                               }}
                               className="h-10 rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink hover:bg-surface-2"
@@ -2628,6 +2629,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       )}
 
       <CustomerDetailDrawer
+        key={selectedCustomer?.key || "closed"}
         customer={selectedCustomer ? (customers.find(c=>c.key===selectedCustomer.key)||selectedCustomer) : null}
         profile={selectedProfile}
         page={detailPage}
@@ -2637,7 +2639,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         onEditBlockReason={(c) => setBlockModalTarget(c)}
         blockedAt={selectedCustomer && selectedCustomer.blocked ? (blockedAtByPhone.get(digitsOnly(selectedCustomer.phone)) || "") : ""}
         blockSaving={blockSaving}
-        onSaved={(patch) => { setReloadTick((t) => t + 1); setSelectedProfile((p) => (p ? { ...p, ...patch } : p)); }}
+        onSaved={() => { setReloadTick((tick) => tick + 1); }}
       />
 
       <AdminLiveCustomerBlockReasonModal

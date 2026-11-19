@@ -585,7 +585,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             type="button"
             disabled={saving}
             onClick={handleComplete}
-            className="mt-2.5 w-full rounded-2xl bg-[var(--color-ok-tx)] px-4 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-[var(--color-ok-tx)] disabled:bg-surface-3"
+            className="mt-2.5 w-full rounded-2xl bg-[var(--color-ok-tx)] px-4 py-3.5 text-sm font-black text-white shadow-md transition hover:opacity-90 disabled:bg-surface-3"
           >
             {saving ? "처리 중…" : "카드결제완료 처리"}
           </button>
