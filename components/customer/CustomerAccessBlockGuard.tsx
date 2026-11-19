@@ -93,12 +93,12 @@ export default function CustomerAccessBlockGuard(){
             현재 사이트 이용이 제한되어 있습니다
           </h1>
           <p id="customer-block-description" className="mt-3 break-keep text-center text-[14px] leading-[1.7] text-[#6E6E73]">
-            이용과 관련해 확인이 필요한 내역이 있습니다.<br/>아래 내용을 확인하시고 카카오톡 채널로 문의해 주세요.
+            {isDeal ? (<>주문 후 거래가 완료되지 않은 내역이 확인되어 거래파기로 등록되었습니다.<br/>아래 거래 내역을 확인해 주세요.</>) : (<>운영 정책에 따라 사이트 이용이 제한된 상태입니다.<br/>자세한 확인은 카카오톡 채널로 문의해 주세요.</>)}
           </p>
 
           <div className="mt-6 rounded-[18px] border border-[#E8E8ED] bg-[#FAFAFC] px-4 py-4 sm:px-5">
-            <p className="text-[12px] font-medium text-[#86868B]">이용 제한 사유</p>
-            <p className="mt-1 break-keep text-[16px] font-semibold leading-6 text-[#1D1D1F]">{d?.category||'운영 확인 필요'}</p>
+            <p className="text-[12px] font-medium text-[#86868B]">{isDeal?'이용 제한 사유':'이용 안내'}</p>
+            <p className="mt-1 break-keep text-[16px] font-semibold leading-6 text-[#1D1D1F]">{isDeal?'거래파기(거파)':'서비스 이용이 제한되어 있습니다.'}</p>
             {isDeal && d ? (
               <div className="mt-4 border-t border-[#E5E5EA] pt-4">
                 <div className="flex items-center justify-between gap-3 text-[13px]">
@@ -122,13 +122,13 @@ export default function CustomerAccessBlockGuard(){
                 ) : <p className="mt-3 text-[12px] leading-5 text-[#6E6E73]">상품과 금액의 상세 내역은 카카오톡 채널에서 확인해 드리겠습니다.</p>}
               </div>
             ):null}
-            {d?.registeredDate ? (
+            {isDeal && d?.registeredDate ? (
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E5E5EA] pt-3 text-[12px]">
                 <span className="text-[#86868B]">차단 등록일</span>
                 <span className="font-medium tabular-nums text-[#6E6E73]">{d.registeredDate}</span>
               </div>
             ):null}
-            {!d?<p className="mt-3 text-[12px] leading-5 text-[#86868B]">상세 사유는 본인 확인 후 채널에서 안내드립니다.</p>:null}
+            {/* Non-deal block reasons and admin-only memos never appear here. */}
           </div>
 
           <p className="mt-5 break-keep text-center text-[13px] leading-[1.7] text-[#6E6E73]">

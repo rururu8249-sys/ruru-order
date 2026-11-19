@@ -8,6 +8,7 @@ const reason=read('lib/customerBlockReason.ts');
 assert.match(route,/verifyChatIdentity\(request\.cookies\.get\(CHAT_SESSION_COOKIE\)/,'signed HttpOnly Kakao cookie verified server-side');
 assert.match(route,/canExposeBlockDetails\(phone,verified,rows\)/,'server-verified phone ownership checked');
 assert.match(route,/details=mayView\?publicBlockDetails\(reason,registeredAt\):null/,'private details gated');
+assert.match(route,/visibleDetails=details\?\.kind==='deal_break'\?details:null/,'non-deal details always redacted');
 assert.doesNotMatch(route,/reason:\s*reason\b/,'never return raw reason');
 assert.match(route,/Cache-Control.?:.?'private, no-store'/,'no caching private block metadata');
 assert.match(guard,/role="alertdialog" aria-modal="true"/,'accessible focused notice');

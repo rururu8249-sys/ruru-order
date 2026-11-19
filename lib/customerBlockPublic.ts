@@ -15,23 +15,19 @@ export type PublicBlockDetails = {
   moreItems: number;
 };
 
-const CATEGORIES: Partial<Record<BlockReasonType, string>> = {
-  deal_break: '거래파기(거파)',
-  unpaid: '반복 미입금',
-  refund_abuse: '반품·환불 관련 이용 제한',
-  harassment: '이용 중 부적절한 언행',
-  fake_info: '주문정보 확인 필요',
-};
-
-function categoryOf(raw: string, known: BlockReasonType | null): {kind:PublicBlockDetails['kind'];category:string} {
-  if (known && CATEGORIES[known]) return { kind: known, category: CATEGORIES[known]! };
-  // Backward compatibility: historical free text. Never send the original text.
-  if (/거파|거래\s*파기|거래\s*취소\s*반복/i.test(raw)) return {kind:'deal_break',category:'거래파기(거파)'};
-  if (/미입금|입금\s*지연\s*반복|미결제\s*반복/i.test(raw)) return {kind:'unpaid',category:'반복 미입금'};
-  if (/반품|환불/.test(raw)) return {kind:'refund_abuse',category:'반품·환불 관련 이용 제한'};
-  if (/욕설|폭언|악성|진상|비방/.test(raw)) return {kind:'harassment',category:'이용 중 부적절한 언행'};
-  if (/허위|가짜\s*(번호|주소)/.test(raw)) return {kind:'fake_info',category:'주문정보 확인 필요'};
-  return {kind:'other',category:'이용 제한 사유 확인 필요'};
+/** Only an explicit deal-break record (or a positively identified legacy deal-break)
+ * may be described to the customer. All other administrator types and notes
+ * produce one identical generic public view; do not classify private memos. */
+const GENERIC_CATEGORY = '사이트 이용 제한';
+function categoryOf(raw:string,known:BlockReasonType|null):{kind:PublicBlockDetails['kind'];category:string}{
+  if(known==='deal_break')return {kind:'deal_break',category:'거래파기(거파)'};
+  // An explicit non-deal classification always wins over incidental words in memo.
+  if(known!==null)return {kind:'other',category:GENERIC_CATEGORY};
+  // Backward compatibility for older unstructured entries clearly saying 거파.
+  // A note saying "거파 아님" is not a deal-break record.
+  const denied=/(?:거파|거래\s*파기)\s*(?:아님|아니|아닌|해당\s*없|없음)/i.test(raw);
+  const positive=/(?:거래\s*파기|(?:^|[\s,;:()[\]\/])거파(?:$|[\s,;:()[\]\/]))/i.test(raw);
+  return positive&&!denied ? {kind:'deal_break',category:'거래파기(거파)'} : {kind:'other',category:GENERIC_CATEGORY};
 }
 
 function koreanDate(value: unknown): string {
@@ -81,6 +77,9 @@ export function publicBlockDetails(reason: unknown, registeredAt: unknown): Publ
   const raw = String(reason??'').slice(0,12000);
   const parsed = parseBlockReason(raw);
   const {kind,category}=categoryOf(raw,parsed.type);
+  // SECURITY: even a future caller of this helper cannot recover a non-deal
+  // reason, date, item or amount from the public projection.
+  if(kind!=='deal_break')return {kind:'other',category:GENERIC_CATEGORY,dealDate:'',registeredDate:'',items:[],totalAmount:null,moreItems:0};
   const items = parsed.items.slice(0,16).map(publicItem).filter((item):item is PublicBlockItem=>item!==null);
   const complete = items.length>0 && items.length===parsed.items.length && items.every(x=>x.amount!==null);
   return {
