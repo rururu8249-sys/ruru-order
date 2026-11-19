@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(p,'utf8');
+const api=read('app/api/customer-block-check/route.ts');
+const ui=read('components/customer/CustomerAccessBlockGuard.tsx');
+const lib=read('lib/customerBlockPublic.ts');
+assert.match(api,/visibleDetails=details\?\.kind==='deal_break'\?details:null/,'do not return any non-deal private details');
+assert.match(api,/reason:visibleDetails\?\.category\|\|''/,'non-deal API reason must be empty');
+assert.match(api,/details:visibleDetails/);
+assert.match(ui,/isDeal\?'이용 제한 사유':'이용 안내'/);
+assert.match(ui,/isDeal\?'거래파기\(거파\)':'서비스 이용이 제한되어 있습니다\.'/);
+assert.match(ui,/isDeal && d\?\.registeredDate/,'non-deal block dates should not vary between users');
+assert.doesNotMatch(ui,/\{d\?\.category/,'never render internal category directly');
+assert.doesNotMatch(ui,/\bd\.memo\b/,'private memo never rendered');
+assert.doesNotMatch(ui,/자동\s*(차단|제한)/,'all blocks are manual');
+assert.match(ui,/ShopContactLink/,'keep configured Kakao inquiry');
+assert.match(lib,/if\(kind!=='deal_break'\)return \{kind:'other',category:GENERIC_CATEGORY,dealDate:'',registeredDate:'',items:\[\],totalAmount:null,moreItems:0\}/);
+console.log('PASS: public API and UI present identical generic notice to ALL non-deal blocks');

@@ -24,8 +24,8 @@ const freeText=publicBlockDetails('뉴발샌들 2개 거파 모욕적인 메모'
 assert.equal(freeText.category,'거래파기(거파)');
 assert.equal(freeText.items.length,0,'관리자 자유 메모는 상품 정보인 척 공개하지 않기');
 assert.ok(!JSON.stringify(freeText).includes('모욕적인 메모'));
-assert.equal(publicBlockDetails('[악성문의·진상]\n메모: 내부내용','').category,'이용 중 부적절한 언행');
-assert.equal(publicBlockDetails('[내가 만든 유형]\n메모: 별도비밀','').category,'이용 제한 사유 확인 필요');
+assert.equal(publicBlockDetails('[악성문의·진상]\n메모: 내부내용','').category,'사이트 이용 제한');
+assert.equal(publicBlockDetails('[내가 만든 유형]\n메모: 별도비밀','').category,'사이트 이용 제한');
 assert.deepEqual(parseBlockReason(''),{type:null,label:'',items:[],memo:''});
 
 // Date must be explicitly recorded and valid; 2026-02-30 must be rejected.

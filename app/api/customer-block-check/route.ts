@@ -65,11 +65,14 @@ export async function GET(request:NextRequest){
   const reason=clean(directBlock?.reason)||clean(customerBlock?.block_reason);
   const registeredAt=directBlock?.created_at||customerBlock?.blocked_at||'';
   const details=mayView?publicBlockDetails(reason,registeredAt):null;
+  // Only verified deal-break records may have any public detail. A non-deal
+  // restriction returns no label, date, item or memo even to the account owner.
+  const visibleDetails=details?.kind==='deal_break'?details:null;
   // Never echo raw administrator notes, even to a verified customer.
   return respond({
     ok:true,blocked:true,
-    reason:details?.category||'',
-    details,
+    reason:visibleDetails?.category||'',
+    details:visibleDetails,
     source:directBlock?'phone_block':'customer',
     message:'현재 사이트 이용이 제한되어 있습니다.',
   });
