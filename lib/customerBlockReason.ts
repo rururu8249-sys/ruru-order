@@ -60,6 +60,8 @@ export type BlockReasonParts = {
   items: string[];
   /** 한 줄 메모(옛 자유 텍스트는 통째로 여기로 들어온다) */
   memo: string;
+  /** 실제 거래파기 발생 날짜(명시적으로 입력한 기록만). 없으면 생략. */
+  dealDate?: string;
 };
 
 const ITEM_PREFIX = "· ";
@@ -69,15 +71,25 @@ function clean(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+function validDealDate(value: unknown): string {
+  const day = clean(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return "";
+  const parsed = new Date(`${day}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === day ? day : "";
+}
+
 /** 저장할 문자열을 만든다. 형식이 깨지지 않게 품목·메모의 줄바꿈은 지운다. */
 export function buildBlockReason(input: {
   type: BlockReasonType | null;
   items?: string[];
   memo?: string;
+  dealDate?: string;
 }): string {
   const lines: string[] = [];
 
   if (input.type) lines.push(`[${blockReasonTypeLabel(input.type)}]`);
+  const incidentDay = input.type === "deal_break" ? validDealDate(input.dealDate) : "";
+  if (incidentDay) lines.push(`거파 날짜: ${incidentDay}`);
 
   for (const raw of input.items || []) {
     const item = clean(raw).replace(/[\r\n]+/g, " ");
@@ -110,6 +122,7 @@ export function parseBlockReason(raw: unknown): BlockReasonParts {
   let label = "";
   const items: string[] = [];
   const memoLines: string[] = [];
+  let dealDate = "";
 
   // 1) 맨 앞 [유형] — 같은 줄에 품목이 붙어 한 줄로 저장된 경우도 인식한다.
   //    단, 메모가 우연히 [..] 로 시작하는 것과 구분: 아는 유형이거나, 대괄호 뒤가 끝/개행/불릿일 때만 유형으로 본다.
@@ -132,6 +145,11 @@ export function parseBlockReason(raw: unknown): BlockReasonParts {
     const line = rawLine.trim();
     if (!line) continue;
 
+    const recordedDay = /^거파\s*날짜\s*[:：]\s*(\d{4}-\d{2}-\d{2})$/.exec(line);
+    if (recordedDay && validDealDate(recordedDay[1])) {
+      dealDate = recordedDay[1];
+      continue;
+    }
     if (/^메모\s*[:：]/.test(line)) {
       const memo = line.replace(/^메모\s*[:：]\s*/, "").trim();
       if (memo) memoLines.push(memo);
@@ -150,7 +168,7 @@ export function parseBlockReason(raw: unknown): BlockReasonParts {
     memoLines.push(line);
   }
 
-  return { type, label, items, memo: memoLines.join(" ") };
+  return { type, label, items, memo: memoLines.join(" "), ...(dealDate ? { dealDate } : {}) };
 }
 
 /** 차단목록 접힌 줄에 쓸 한 줄 요약 — 품목이 있으면 첫 품목 + 「외 N개」 */
