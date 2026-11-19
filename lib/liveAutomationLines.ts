@@ -209,9 +209,15 @@ export function personaVoice(text: string, actorSeed: number, msgSeed: number): 
   const r = rng(hashOf(text) + msgSeed * 31 + actorSeed);
   let s = String(text || '').trim();
   if (!s) return s;
-  // 띄어쓰기 — 한글 사이만
-  if (v.spacing === 'tight' && r() < 0.85) s = s.replace(/([가-힣])\s+([가-힣])/g, '$1$2');
-  else if (v.spacing === 'loose' && r() < 0.5) { let done = false; s = s.replace(/([가-힣])\s+([가-힣])/g, (m, a, b) => (done ? m : ((done = true), a + b))); }
+  // Allow occasional ONE omitted space, never delete all spaces in a long line.
+  // A Korean test viewer may type "예쁜옷", not a 30-character solid wall of text.
+  const gapMatches = [...s.matchAll(/([가-힣])\s+([가-힣])/g)];
+  const spacingChance = v.spacing === 'tight' ? 0.45 : v.spacing === 'loose' ? 0.22 : 0;
+  if (gapMatches.length > 0 && (gapMatches.length > 1 || s.length < 16) && r() < spacingChance) {
+    const gap = gapMatches[Math.floor(r() * gapMatches.length)];
+    const pos = gap.index ?? -1;
+    if (pos >= 0) s = s.slice(0, pos) + gap[1] + gap[2] + s.slice(pos + gap[0].length);
+  }
   // 오타 한 군데
   if (r() < v.typo) {
     const hits = TYPOS.filter(([re]) => re.test(s));
