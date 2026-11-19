@@ -178,7 +178,7 @@ export default function PrivacyPage() {
               </tr>
               <tr>
                 <td style={S.td}>자동 생성</td>
-                <td style={S.td}>접속 일시, 접속 IP주소, 서비스 이용 기록</td>
+                <td style={S.td}>접속 일시, 접속 IP주소, IP 기반 추정 지역(제공되는 경우), 서비스 이용 기록</td>
               </tr>
             </tbody>
           </table>
@@ -276,7 +276,7 @@ export default function PrivacyPage() {
                 <td style={S.td}>전자상거래법</td>
               </tr>
               <tr>
-                <td style={S.td}>접속 기록(접속 IP주소 포함)</td>
+                <td style={S.td}>접속 기록(접속 IP주소 및 추정 지역 포함)</td>
                 <td style={S.td}>90일</td>
                 <td style={S.td}>부정 이용 방지·보안(내부 방침)</td>
               </tr>
@@ -511,7 +511,7 @@ export default function PrivacyPage() {
           <ul style={S.ul}>
             <li>회사는 광고·행태정보 수집 목적의 쿠키를 사용하지 않습니다.</li>
             <li>주문서 작성 편의를 위해 로그인 정보와 주문서 입력값(이름, 연락처, 배송지, 유튜브 닉네임 등)을 이용자 기기의 브라우저 저장소(localStorage)에 저장합니다. 이 정보는 이용자 기기에만 저장되며, 브라우저의 사이트 데이터 삭제 기능으로 언제든지 지울 수 있습니다. 삭제하면 다음 로그인 때 다시 입력해야 할 수 있습니다.</li>
-            <li>서비스 안정성과 부정 이용 방지를 위해 접속 일시·IP주소·이용 기록을 서버에 자동으로 기록하며, 3번 항목에 따라 90일이 지나면 자동 파기합니다.</li>
+            <li>서비스 안정성과 부정 이용 방지를 위해 접속 일시·IP주소·IP 기반 추정 지역(제공 시)·이용 기록을 서버에 자동으로 기록하며, 3번 항목에 따라 90일이 지나면 자동 파기합니다.</li>
           </ul>
         </section>
 

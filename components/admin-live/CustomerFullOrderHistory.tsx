@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { koreanPhoneVariants } from "@/lib/order/phone";
+import {classifyLifetimeOrder,lifetimeLineAmount,lifetimeGroupKey,calculateLifetimeStats} from "@/lib/customerLifetimeStats";
 
 type Row = Record<string, any>;
 type Kind = "paid" | "unpaid" | "canceled";
@@ -39,19 +40,8 @@ const clean = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim();
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const money = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}원`;
 
-// 입금상태 분류 — AdminLiveCustomersPanel.isPaid/isUnpaid 와 같은 낱말 기준(표시 전용)
-function classify(text: string): { kind: Kind; label: string } {
-  const t = text.toLowerCase();
-  if (/주문서취소|주문취소|취소|환불|cancel|refund/.test(t)) return { kind: "canceled", label: "주문서취소" };
-  if (/manual_match_needed|입금확인 필요|입금매칭 필요|수동확인/.test(t)) return { kind: "unpaid", label: "매칭필요" };
-  if (/card_unpaid|카드 미결제|카드미결제/.test(t)) return { kind: "unpaid", label: "카드미결제" };
-  if (/카드결제완료|card_paid/.test(t)) return { kind: "paid", label: "카드결제완료" };
-  // [2026-09-09 사장님 요청] 자동/수동 구분 복원 — kind(=결제완료 판정)는 그대로 "paid"
-  if (/자동입금확인|auto_paid/.test(t)) return { kind: "paid", label: "자동입금확인" };
-  if (/수동입금확인|manual_paid/.test(t)) return { kind: "paid", label: "수동입금확인" };
-  if (/입금확인|결제완료|출고|paid/.test(t)) return { kind: "paid", label: "입금확인" };
-  return { kind: "unpaid", label: "미입금" };
-}
+// 회원 목록·상세가 공통으로 사용하는 상태 분류(취소 > 미결제 > 결제완료).
+const classify=classifyLifetimeOrder;
 
 export function fmtDate(v: unknown) {
   const d = new Date(String(v || ""));
@@ -60,11 +50,7 @@ export function fmtDate(v: unknown) {
   return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function rowAmount(r: Row) {
-  const f = r.final_amount;
-  if (f !== null && f !== undefined && Number.isFinite(Number(f))) return num(f);
-  return num(r.adjusted_total_price ?? r.total_price ?? 0);
-}
+function rowAmount(r: Row) { return lifetimeLineAmount(r); }
 
 export function rowItemLabel(r: Row) {
   const opt = [clean(r.color), clean(r.size)].filter(Boolean).join("/");
@@ -114,11 +100,20 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { 
       } else {
         q = q.in("customer_phone", phoneValues);
       }
-      const { data, error: qError } = await q.order("created_at", { ascending: false }).limit(2000);
+      // Paginate the entire member history. A hard 2,000-row cap silently lied about lifetime totals.
+      const allRows: Row[] = [];
+      let fetchError = '';
+      for(let from=0;from<100000;from+=1000){
+        const page=await q.order("created_at", { ascending: false }).range(from,from+999);
+        if(page.error){fetchError=page.error.message;break;}
+        const chunk=(page.data||[]) as Row[];
+        allRows.push(...chunk);
+        if(chunk.length<1000)break;
+      }
       if (!alive) return;
-      if (qError) { setError(qError.message); setRows([]); return; }
+      if (fetchError) { setError(fetchError); setRows([]); return; }
 
-      const list = (data || []).filter((r: Row) => {
+      const list = allRows.filter((r: Row) => {
         if (r.is_deleted === true) return false;
         // 카카오 손님: 내 kakao_id 주문 또는 kakao_id 없는(옛) 주문만. 다른 카카오 계정 주문은 제외.
         if (safeKakao) {
@@ -137,7 +132,7 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { 
     if (!rows) return [];
     const map = new Map<string, Row[]>();
     for (const r of rows) {
-      const key = clean(r.order_group_id) || `id:${r.id}`;
+      const key = lifetimeGroupKey(r);
       const arr = map.get(key);
       if (arr) arr.push(r); else map.set(key, [r]);
     }
@@ -176,13 +171,7 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { 
     return list;
   }, [groups, filter, sort]);
 
-  const counts = useMemo(() => ({
-    all: groups.length,
-    paid: groups.filter((g) => g.kind === "paid").length,
-    unpaid: groups.filter((g) => g.kind === "unpaid").length,
-    canceled: groups.filter((g) => g.kind === "canceled").length,
-    paidAmount: groups.filter((g) => g.kind === "paid").reduce((s, g) => s + g.amount, 0),
-  }), [groups]);
+  const counts = useMemo(() => calculateLifetimeStats(rows || []), [rows]);
 
   // [2026-09-09 사장님 지적] 회원 상세 위쪽 「누적 주문·누적 결제」가 0으로 보였다.
   //   원인: 그 3칸은 «주문서 화면에 로드된 주문»만 세는데, 옛 주문(예: 5~7월)은 거기 없다.

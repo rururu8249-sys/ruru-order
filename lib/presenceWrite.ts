@@ -14,6 +14,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { normalizePresenceActivity, normalizePresenceEvents } from "@/lib/presenceActivity";
 import { isLiveWatchPath } from "@/lib/presenceActivity";
+import {regionFromVercelHeaders} from "@/lib/visitRegion";
 import { readAutomationRequest, AutomationError } from "@/lib/liveAutomationAuth";
 
 export function getPresenceSupabase() {
@@ -105,7 +106,7 @@ function isMissingColumnError(message: unknown): boolean {
 
 async function recordVisit(
   supabase: Supa,
-  params: { visitorKey: string; nickname: string; pageType: string; path: string; nowIso: string; ip: string },
+  params: { visitorKey: string; nickname: string; pageType: string; path: string; nowIso: string; ip: string; regionLabel: string },
 ) {
   try {
     const broadcastId = await currentBroadcastId(supabase);
@@ -136,9 +137,13 @@ async function recordVisit(
         started_at: params.nowIso,
         last_seen_at: params.nowIso,
       };
-      const { error: insErr } = await supabase.from("visitor_visits").insert({ ...insertRow, ip: params.ip || null });
-      if (insErr && isMissingColumnError(insErr.message)) {
-        await supabase.from("visitor_visits").insert(insertRow); // ip 칸 없음 → 빼고 저장
+      const withIp = { ...insertRow, ip: params.ip || null };
+      const first = await supabase.from("visitor_visits").insert({ ...withIp, ...(params.regionLabel ? {region_label:params.regionLabel}: {}) });
+      if (first.error && isMissingColumnError(first.error.message)) {
+        const fallback = await supabase.from("visitor_visits").insert(withIp); // 지역 칸 미설치
+        if (fallback.error && isMissingColumnError(fallback.error.message)) {
+          await supabase.from("visitor_visits").insert(insertRow); // 과거 ip 칸 미설치
+        }
       }
       return;
     }
@@ -164,12 +169,14 @@ async function recordVisit(
         ...(params.nickname ? { nickname: params.nickname } : {}),
         ...(pageMoved ? { page_type: params.pageType, path: params.path || null } : {}),
       };
-      const { error: updErr } = await supabase
-        .from("visitor_visits")
-        .update({ ...updateRow, ...(params.ip ? { ip: params.ip } : {}) })
-        .eq("id", last.id);
-      if (updErr && isMissingColumnError(updErr.message)) {
-        await supabase.from("visitor_visits").update(updateRow).eq("id", last.id); // ip 칸 없음 → 빼고
+      const withIp = { ...updateRow, ...(params.ip ? { ip: params.ip } : {}) };
+      const first = await supabase.from("visitor_visits")
+        .update({ ...withIp, ...(params.regionLabel ? {region_label:params.regionLabel}: {}) }).eq("id", last.id);
+      if (first.error && isMissingColumnError(first.error.message)) {
+        const fallback = await supabase.from("visitor_visits").update(withIp).eq("id", last.id);
+        if (fallback.error && isMissingColumnError(fallback.error.message)) {
+          await supabase.from("visitor_visits").update(updateRow).eq("id", last.id);
+        }
       }
     }
   } catch {
@@ -187,6 +194,7 @@ export async function writePresence(
 > {
   const input = normalizePresenceInput(body);
   const cleanIp = String(ip || "").trim().slice(0, 60);
+  const regionLabel = regionFromVercelHeaders(request?.headers);
   if (!input.visitorKey) return { ok: false, status: 400, message: "visitorKey가 없습니다." };
   if (!input.valid) return { ok: false, status: 400, message: "visitorKey 형식이 올바르지 않습니다." };
 
@@ -246,6 +254,7 @@ export async function writePresence(
     path: input.path,
     nowIso,
     ip: cleanIp,
+    regionLabel,
   });
 
   // 보존기간(90일) 지난 접속기록 자동 파기 — 처리방침과 일치. 낮은 확률로만 실행.

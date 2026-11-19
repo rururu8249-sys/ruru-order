@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+
+const path='app/api/admin-live/customer-lifetime/route.ts';
+const source=fs.readFileSync(path,'utf8');
+const syntax=ts.createSourceFile(path,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
+assert.equal(syntax.parseDiagnostics.length,0,'route must parse as TypeScript without diagnostics');
+const get=syntax.statements.find(st=>ts.isFunctionDeclaration(st)&&st.name?.text==='GET');
+assert.ok(get?.body,'admin GET handler exists');
+const tryBlock=get.body.statements.find(st=>ts.isTryStatement(st))?.tryBlock;
+const scopedReader=tryBlock?.statements.find(st=>ts.isFunctionDeclaration(st)&&st.name?.text==='allRows');
+assert.ok(scopedReader,'paginated Supabase reader must be inside GET try block to inherit the actual client type');
+assert.ok(!syntax.statements.some(st=>ts.isFunctionDeclaration(st)&&st.name?.text==='allRows'),'do not reintroduce a top-level reader with erased createClient generics');
+const read=source.slice(scopedReader.getStart(syntax),scopedReader.getEnd());
+assert.doesNotMatch(read,/ReturnType\s*<\s*typeof\s+createClient\s*>/,'do not erase the specific Supabase schema with ReturnType');
+assert.match(read,/sb\.from\(table\)/,'reader captures request-scoped Supabase client');
+assert.match(source,/allRows<LifetimeMemberRef>\('customers'/);
+assert.match(source,/allRows<LifetimeOrderRow>\('orders'/);
+assert.match(source,/verifyAdminSessionFromRequest\(request\)/,'sensitive summary stays behind admin auth');
+console.log('PASS admin lifetime route: request-scoped typed Supabase client, no erased generic signature, secure paginated reader');
