@@ -300,7 +300,9 @@ async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:strin
  if(latestMode!==x.mode)return false;
  const latestCard=await readDialogueCard(x.db,x.c.broadcast_id).catch(()=>null);
  const recentForGate:ChatObservation[]=x.messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||'')}));
- const quality=judgeTestChat({text,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:(kind==='reply'&&source!==null)||linkedFollowUp||linkedThread,recent:recentForGate});
+ const quality=judgeTestChat({text,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:(kind==='reply'&&source!==null)||linkedFollowUp||linkedThread,recent:recentForGate,
+  offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
+  replySourceText:String(x.messages.find(m=>Number(m.id)===Number(plan.replyToAi||source||0))?.body||'')});
  if(!quality.ok)return false;
  try{await automationRpc(x.db,'live_automation_ai_admission',{p_actor:actor.id,p_kind:kind});}catch{return false;}
  const action=await automationRpc<Action>(x.db,'live_automation_action',{p_session:s.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,...plan},p_manual:false,p_source:source,p_revision:x.c.revision});
@@ -665,12 +667,17 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const sessions=await rows<Session>(db.from('live_automation_sessions').select('*').eq('campaign_id',c.id).is('stopped_at',null).gt('leave_at',new Date(now+30000).toISOString()));
  if(!sessions.length)return;
  const ids=sessions.map(s=>s.actor_id);
- const [actors,holds,orders,actions,messages,bc,payments,spokeRows,paceRow,chatRateRow]=await Promise.all([
+ const [actors,holds,orders,actions,messages,previousTestChat,bc,payments,spokeRows,paceRow,chatRateRow]=await Promise.all([
   rows<Actor>(db.from('live_automation_actors').select('*').in('id',ids).is('retired_at',null)),
   rows<Row>(db.from('live_automation_cart_holds').select('session_id,items').in('session_id',sessions.map(s=>s.id)).gt('expires_at',new Date(now).toISOString())),
   rows<Row>(db.from('orders').select('automation_actor_id,product_name,color,size,payment_method,order_group_id,created_at').in('automation_actor_id',ids).eq('broadcast_id',c.broadcast_id).neq('is_deleted',true)),
   rows<Action>(db.from('live_automation_actions').select('*').eq('campaign_id',c.id).gte('created_at',new Date(now-3600000).toISOString()).limit(500)),
   rows<Row>(db.from('live_chat_messages').select('id,nickname,body,created_at,badge,bot_ref,automation_actor_id,automation_action_id').eq('broadcast_id',c.broadcast_id).is('hidden_at',null).order('id',{ascending:false}).limit(40)),
+  // Read-only quality memory: screen-clear hides messages in UI but should NOT reset anti-repeat checks.
+  // Never use these hidden rows as reply targets, sales evidence, or public chat context.
+  rows<Row>(db.from('live_chat_messages').select('id,body,created_at,automation_actor_id,automation_action_id').eq('broadcast_id',c.broadcast_id)
+    .not('automation_actor_id','is',null).gte('created_at',new Date(now-2*60*60_000).toISOString())
+    .order('id',{ascending:false}).limit(120)),
   db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle(),
   rows<Row>(db.from('live_automation_payment_events').select('actor_id,kind').eq('campaign_id',c.id).eq('status','sent').limit(500)),
   rows<Row>(db.from('live_chat_messages').select('automation_actor_id').eq('broadcast_id',c.broadcast_id).in('automation_actor_id',ids).limit(2000)),
@@ -894,11 +901,14 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    // Associate each previous TEST chat with the product actually discussed.
    // Do not confuse the 5-second rotating card with a new conversation topic.
    const actionById=new Map(actions.map(a=>[String(a.id),a]));
-   const recentForGate:ChatObservation[]=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({
+   const recentForGate:ChatObservation[]=[...new Map([...messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'),...previousTestChat]
+     .map(m=>[String(m.id),m] as const)).values()].map(m=>({
      text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||''),
      productKey:String(actionById.get(String(m.automation_action_id||''))?.plan?.chatProductKey||'')
    }));
-   const quality=judgeTestChat({text,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:card?`${card.productId}:${card.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate});
+   const quality=judgeTestChat({text,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:card?`${card.productId}:${card.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate,
+    offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
+    replySourceText:String(target?.body||'')});
    if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
    if(text){
     // Identify whether previous AI messages were genuine replies to customers.

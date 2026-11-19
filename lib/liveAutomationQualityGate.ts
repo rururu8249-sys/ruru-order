@@ -6,6 +6,7 @@ export type QualityInput = {
   text:string; mode:StreamPhase; now:number; actorId:string;
   currentProductKey?:string|null; currentProductName?:string|null;
   priority?:boolean; replyingToHuman?:boolean; recent:ChatObservation[];
+  offAirSince?:string|null; replySourceText?:string|null;
 };
 export type QualityResult = {ok:true;intent:ChatIntent}|{ok:false;reason:string;intent:ChatIntent};
 const norm=(t:string)=>t.toLowerCase().replace(/[\s!?.,~ㅋㅎㅠㅜ♡♥\p{Extended_Pictographic}]/gu,'');
@@ -41,10 +42,55 @@ export function isGenericRoomChatter(text:string):boolean {
    || /(?:유튜브|인스타|릴스|쇼츠|알고리즘|구독|팔로우|소개|사이트).{0,24}(?:보고|타고|해서|하고|누르고|왔다|왔어요|들어왔어요|넘어왔어요)/.test(t)
    || /(?:방송|라이브).{0,10}(?:기다릴게|보러\s*올게|또\s*올게|기대돼)/.test(t);
 }
+/** Human-like spacing: one missing space is okay; a long, unbroken line isn't. */
+export function hasRunOnKoreanSpacing(text:string):boolean {
+ const s=String(text||'').replace(/\uE000[^\uE001]*\uE001/g,'').replace(/\p{Extended_Pictographic}/gu,'').trim();
+ if(/[가-힣]{18,}/.test(s))return true;
+ const hangul=(s.match(/[가-힣]/g)||[]).length;
+ return hangul>=17&&!/\s/.test(s);
+}
+/** Test actors must not assert that a specific item does not exist without stock/catalog evidence. */
+export function inventedProductAbsence(text:string):boolean {
+ const s=String(text||'').replace(/\s+/g,'');
+ if(/[?？]$/.test(s))return false; // Genuine customer questions remain questions.
+ return /(?:\d{2,4}|제품|상품|재고|색상|컬러)/.test(s) &&
+   /(?:없는(?:것|거)?같|없는듯|없나봐|없어요|없네|없대요|품절이|품절됐|품절같)/.test(s);
+}
+/** Detect *repeated conversational formulas*, not merely identical sentences. */
+export function reactionFamily(text:string):string {
+ const s=String(text||'').replace(/\s+/g,'');
+ if(/고민(?:되네|되나|돼|중이|중인데)/.test(s))return 'dilemma';
+ if(/깔끔하네요|깔끔하네용|깔끔하네여/.test(s))return 'tidy';
+ if(/궁금하네요|궁금하네용|궁금해요|궁금해용/.test(s))return 'curious';
+ return '';
+}
+/** No ending-of-show farewell for an emoji-only message or an old pause.
+ * An existing paused broadcast is not evidence the stream ended just now.
+ * Only affects explicitly marked TEST automation, never live customer messages. */
+export function misplacedTestFarewell(text:string,context:{
+ mode:StreamPhase;now:number;offAirSince?:string|null;replySourceText?:string|null;
+}):boolean {
+ const t=String(text||'').replace(/\s+/g,'').trim();
+ if(!/(?:고생하셨|고생많으|수고하셨|수고많으|안녕히|굿밤|잘자요|잘주무|푹쉬세요)/.test(t))return false;
+ const source=String(context.replySourceText||'').trim();
+ const emojiOnly=Boolean(source)&&
+   /[\p{Extended_Pictographic}\uE000]/u.test(source)&&
+   source.replace(/\uE000[^\uE001]*\uE001/g,'')
+     .replace(/[\p{Extended_Pictographic}\uFE0F\u200D\s]/gu,'').length===0;
+ if(emojiOnly)return true; // Waving 👋 is not explicit proof of a farewell.
+ if(context.mode==='live')return false;
+ const paused=Date.parse(String(context.offAirSince||''));
+ if(!Number.isFinite(paused)||context.now-paused<45*60_000)return false;
+ const directFarewell=/(고생|수고|안녕히|굿밤|잘\s*자|잘\s*주무|방송.{0,8}(종료|끝))/u.test(source);
+ return !directFarewell;
+}
 export function judgeTestChat(q:QualityInput):QualityResult {
  const text=String(q.text||'').trim(), intent=chatIntent(text);
  const fail=(reason:string):QualityResult=>({ok:false,reason,intent});
  if(!text||text.length>100)return fail('invalid-length');
+ if(misplacedTestFarewell(text,{mode:q.mode,now:q.now,offAirSince:q.offAirSince,replySourceText:q.replySourceText}))return fail('out-of-context-farewell');
+ if(hasRunOnKoreanSpacing(text))return fail('run-on-korean-spacing');
+ if(inventedProductAbsence(text))return fail('unverified-product-absence');
  if(!timeAppropriateTestChat(text,q.now))return fail('wrong-kst-greeting');
  if(/밴드/.test(text))return fail('band-forbidden');
  if(q.mode!=='live'&&/(?:지금|방금|막)\s*(?:유튜브|라이브)|유튜브\s*(?:라이브|생방송|방송)\s*(?:보면서|보다가)\s*(?:바로\s*)?(?:넘어|들어|왔)/.test(text))return fail('off-live-current-stream-claim');
@@ -53,6 +99,10 @@ export function judgeTestChat(q:QualityInput):QualityResult {
  if(q.mode!=='live'&&/(잠시\s*쉬는|곧\s*재개|잠깐\s*쉬었다|다시\s*시작.{0,5}(하겠|하나))/.test(text))return fail('ended-as-paused');
  if(q.mode!=='live'&&intent==='size'&&!q.currentProductKey)return fail('off-size-talk');
  const recent=q.recent.filter(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-30*60_000);
+ // Preserve a longer read-only memory of overused reactions, including screen-cleared TEST chat.
+ const family=reactionFamily(text);
+ if(family && q.recent.some(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-90*60_000&&
+   r.actorId!==q.actorId&&reactionFamily(r.text)===family))return fail('room-repeated-reaction-template');
  if(recent.some(r=>norm(r.text)===norm(text)))return fail('exact-repetition');
  // Across TEST actors, repeating the same product's size question makes the
  // room look automated even if height/weight or wording differs. This check

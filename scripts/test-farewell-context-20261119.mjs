@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {judgeTestChat} from '../lib/liveAutomationQualityGate.ts';
+const now=Date.parse('2026-11-19T16:04:20+09:00');
+const pausedAt='2026-11-18T23:42:00+09:00';
+const ctx={now,mode:'paused',actorId:'test-plant',currentProductKey:'818:MX-135 연그레이',
+  offAirSince:pausedAt,replySourceText:'👋',replyingToHuman:true,recent:[]};
+const check=(text,extra={})=>judgeTestChat({...ctx,...extra,text});
+assert.equal(check('고생하셨어요').ok,false,'실제 식물집사-루루실장 👋 사례 차단');
+assert.equal(check('수고 많으셨어요').ok,false,'다른 종료 인사 표현 차단');
+assert.equal(check('반가워요').ok,true,'입장 인사로 쓰인 👋에는 일반 인사를 허용');
+assert.equal(check('안녕하세요~').ok,true,'오래된 paused 상태여도 가벼운 인사 자체는 금지하지 않는다');
+assert.equal(check('아쉽네용').ok,true,'마무리 인사 아닌 짧은 공감은 허용');
+assert.equal(check('그 이모티콘 귀엽네요').ok,true,'사소한 의견은 허용');
+assert.equal(check('고생하셨어요',{replySourceText:'지금 뭐하세요?'}).ok,false,'오래된 일시정지 상태에서 뜬금없는 수고 인사 차단');
+assert.equal(check('고생하셨어요',{replySourceText:'오늘 고생하셨어요'}).ok,true,'실제 수고 인사에 대한 답은 보존');
+assert.equal(check('고생하셨어요',{replySourceText:'방송 종료됐네요 수고하셨어요'}).ok,true,'명시적 마무리 맥락은 보존');
+assert.equal(check('고생하셨어요',{mode:'live',replySourceText:'오늘 수고하셨어요'}).ok,true,'라이브 중 명시적 인사는 보존');
+assert.equal(check('고생하셨어요',{mode:'paused',offAirSince:new Date(now-60_000).toISOString(),replySourceText:'오늘 정말 고생하셨어요'}).ok,true,'막 끝난 상황 인사는 보존');
+const director=readFileSync('lib/liveAutomationDirector.ts','utf8');
+assert.equal((director.match(/offAirSince:String\(latestBroadcast\.data\.paused_at/g)||[]).length,2,'generated and code-triggered TEST messages both have stale-farewell checks');
+assert.equal((director.match(/replySourceText:String\(/g)||[]).length,2,'both paths identify their precise reply source');
+console.log('PASS farewell context: old paused broadcast + emoji-only wave cannot trigger a closing greeting');
