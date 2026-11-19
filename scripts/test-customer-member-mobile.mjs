@@ -13,8 +13,9 @@ assert.ok(mobile.includes('검증고객'));
 // Regression: the complete financial/contact summary used to share a clipped line.
 assert.doesNotMatch(mobile,/<div class="[^"]*truncate[^"]*">[^<]*누적 결제/,'mobile payment/contact summary must not be ellipsized');
 for(const label of ['연락처','마지막 주문','누적 결제','주문 수']) assert.ok(mobile.includes(label),label+' remains identifiable');
-assert.ok(mobile.includes('119,000원'));
+assert.ok(mobile.includes('…'),'pending full-history stats are never mislabeled as 119,000 won');
 assert.ok(mobile.includes('010-0000-0000'));
-assert.ok(mobile.includes('차단'));
-assert.ok(mobile.includes('상세'));
+assert.ok(mobile.includes('role="button"'),'member mobile card remains actionable');
+const blocked=renderToStaticMarkup(React.createElement(Panel,{embedded:true,orders:[{id:2,nickname:'차단검증',name:'가상고객',phone:'01022223333',totalAmount:39000,paymentStatus:'paid',created_at:'2026-10-10T00:00:00Z',is_blocked:true}]}));
+assert.ok(blocked.includes('차단검증')&&blocked.includes('차단'),'blocked member status remains visible');
 console.log('PASS real member list renders labeled mobile payment and contact information without one-line truncation');

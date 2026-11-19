@@ -24,6 +24,8 @@ import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
 import CustomerFullOrderHistory, { type CustomerFullOrderStats } from "./CustomerFullOrderHistory";
+import MemberAccessHistory from "./MemberAccessHistory";
+import {EMPTY_LIFETIME_STATS,type LifetimeStats} from "@/lib/customerLifetimeStats";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
 import { parseBlockReason, blockReasonSummary } from "@/lib/customerBlockReason";
@@ -60,6 +62,7 @@ type LooseLiveOrder = LiveOrder & Record<string, any>;
 
 type CustomerSummary = {
   key: string;
+  profileId?: string;
   nickname: string;
   name: string;
   phone: string;
@@ -532,6 +535,8 @@ function CustomerDetailDrawer({
   // [2026-09-09] 위 3칸(누적 주문·누적 결제·미입금)에 쓸 «전 기간» 집계.
   //   아래 CustomerFullOrderHistory 가 DB를 전 기간 조회한 결과를 그대로 받아 쓴다. null = 아직 불러오는 중.
   const [fullStats, setFullStats] = useState<CustomerFullOrderStats | null>(null);
+  const [detailTab,setDetailTab]=useState<'overview'|'orders'|'points'|'activity'>('overview');
+  useEffect(()=>{setDetailTab('overview');setFullStats(null);},[customer?.key]);
   const [editSaving, setEditSaving] = useState(false);
   // [2026-09-05 사장님 요청 · 카카오 원본] 로그인 때 카카오가 준 진짜 이름/번호(customers.kakao_account_* / kakao_shipping_*).
   //   손님이 우리 화면에서 바꿔도 여기서 원본 확인. 별도 조회 — 칸이 아직 없으면(SQL 전) 조용히 숨김.
@@ -791,12 +796,12 @@ function CustomerDetailDrawer({
       <section
         role="dialog"
         aria-modal="true"
-        style={{ width: "100%", maxWidth: "540px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px", border: "1px solid var(--color-rose-line)", background: "var(--color-surface)", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
+        style={{ width: "100%", maxWidth: "700px", maxHeight: "94dvh", overflowY: "auto", borderRadius: "20px", border: "1px solid var(--color-line)", background: "var(--color-surface)", boxShadow: "0 18px 64px rgba(15,23,42,0.18)" }}
       >
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "12px 16px" }}>
           <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>회원 상세</span>
-          <button type="button" onClick={editOpen ? () => setEditOpen(false) : openEdit} style={{ marginLeft: "auto", marginRight: "8px", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: editOpen ? "var(--color-surface-2)" : "var(--color-rose-deep)", color: editOpen ? "var(--color-ink-soft)" : "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{editOpen ? "취소" : "정보 수정"}</button>
+          <button type="button" onClick={() => { setDetailTab("overview"); if(editOpen) setEditOpen(false); else openEdit(); }} style={{ marginLeft: "auto", marginRight: "8px", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: editOpen ? "var(--color-surface-2)" : "var(--color-rose-deep)", color: editOpen ? "var(--color-ink-soft)" : "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{editOpen ? "취소" : "정보 수정"}</button>
           <button type="button" onClick={onClose} style={{ width: "27px", height: "27px", border: "none", background: "none", color: "var(--color-ink-mute)", fontSize: "18px", cursor: "pointer" }}>✕</button>
         </div>
 
@@ -832,7 +837,7 @@ function CustomerDetailDrawer({
                 {customer.address || "주소 없음"}<br />
                 마지막 주문 {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "없음"}
                 {profile?.kakao_nickname ? <><br />카카오 {profile.kakao_nickname}</> : null}
-                {kakaoRaw ? (
+                {detailTab === "activity" && kakaoRaw ? (
                   <>
                     <br />
                     <span title={kakaoRaw.syncedAt ? `카카오 로그인 때 받은 원본 · ${formatOrderDateTime(kakaoRaw.syncedAt)}` : "카카오 로그인 때 받은 원본"} style={{ color: "var(--color-rose-deep)", fontWeight: 800 }}>
@@ -847,14 +852,40 @@ function CustomerDetailDrawer({
                     ) : null}
                   </>
                 ) : null}
-                {profile?.first_login_at ? <><br />첫 로그인 {formatOrderDateTime(profile.first_login_at)}</> : null}
+                {detailTab === "activity" && profile?.first_login_at ? <><br />첫 로그인 {formatOrderDateTime(profile.first_login_at)}</> : null}
                 {profile?.last_login_at ? <><br />최근 로그인 {formatOrderDateTime(profile.last_login_at)}</> : null}
               </div>
             </div>
           </div>
 
+          {/* 3 스탯 — [2026-09-09] «전 기간 DB 조회» 값으로 표시.
+                예전엔 «주문서 화면에 로드된 주문»만 세서, 옛 주문뿐인 손님이 0건/0원으로 보였다
+                (사장님 지적: 용서린 — 아래 「주문 이력」은 5건인데 위는 0건).
+                아래 CustomerFullOrderHistory 가 이미 전 기간을 조회하므로 그 값을 그대로 쓴다.
+                아직 불러오는 중이면 «…» 을 보여준다(0 으로 오해하지 않게). */}
+          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 주문</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{fullStats ? `${fullStats.all.toLocaleString("ko-KR")}건` : "…"}</div>
+            </div>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 결제</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{fullStats ? money(fullStats.paidAmount) : "…"}</div>
+            </div>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>미입금</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: fullStats && fullStats.unpaid > 0 ? "var(--color-warn-tx)" : "var(--color-ink)" }}>{fullStats ? `${fullStats.unpaid.toLocaleString("ko-KR")}건` : "…"}</div>
+            </div>
+          </div>
+
+          {/* 한 화면의 한 작업만: 기본정보/주문/포인트/접속기록. 탭마다 기존 작업 버튼은 그대로. */}
+          <div role="tablist" aria-label="회원 상세 메뉴" className="sticky top-0 z-20 mb-4 flex gap-1 overflow-x-auto border-b border-line bg-surface pt-1 [scrollbar-width:none]">
+            {([["overview","기본 정보"],["orders","주문 이력"],["points","포인트"],["activity","접속·변경 기록"]] as const).map(([value,label])=>
+              <button key={value} role="tab" aria-selected={detailTab===value} type="button" onClick={()=>setDetailTab(value)}
+                className={`min-h-11 shrink-0 border-b-2 px-3 text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${detailTab===value?'border-ink text-ink':'border-transparent text-ink-soft hover:text-ink'}`}>{label}</button>)}
+          </div>
           {/* [2026-09-26] 차단 회원일 때만 — 차단 정보 상자(기존 BlockedCardBody 재사용). 새 차단/해제 로직 없음. */}
-          {customer.blocked ? (() => {
+          {detailTab === "overview" && customer.blocked ? (() => {
             const parts = parseBlockReason(customer.blockReason);
             return (
               <div className="mb-3 overflow-hidden rounded-xl border border-rose-line bg-danger-bg/40">
@@ -887,7 +918,7 @@ function CustomerDetailDrawer({
           })() : null}
 
           {/* 정보 수정 폼 (닉네임/이름/주소 교정 + [📞 번호 변경] 전용 블록) */}
-          {editOpen ? (
+          {detailTab === "overview" && editOpen ? (
             <div style={{ marginBottom: "12px", border: "1px solid var(--color-rose-line)", borderRadius: "12px", background: "var(--color-surface-2)", padding: "12px 12px" }}>
               <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
               {([
@@ -1019,7 +1050,7 @@ function CustomerDetailDrawer({
           ) : null}
 
           {/* 등록 배송지 (고객이 등록한 customers.shipping_addresses 배열 — 읽기 전용) */}
-          {Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
+          {detailTab === "overview" && Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
             <div style={{ marginBottom: "12px" }}>
               <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>등록 배송지 ({profile.shipping_addresses.length}건)</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -1046,40 +1077,28 @@ function CustomerDetailDrawer({
             </div>
           ) : null}
 
-          {/* 3 스탯 — [2026-09-09] «전 기간 DB 조회» 값으로 표시.
-                예전엔 «주문서 화면에 로드된 주문»만 세서, 옛 주문뿐인 손님이 0건/0원으로 보였다
-                (사장님 지적: 용서린 — 아래 「주문 이력」은 5건인데 위는 0건).
-                아래 CustomerFullOrderHistory 가 이미 전 기간을 조회하므로 그 값을 그대로 쓴다.
-                아직 불러오는 중이면 «…» 을 보여준다(0 으로 오해하지 않게). */}
-          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 주문</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{fullStats ? `${fullStats.all.toLocaleString("ko-KR")}건` : "…"}</div>
-            </div>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 결제</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{fullStats ? money(fullStats.paidAmount) : "…"}</div>
-            </div>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>미입금</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: fullStats && fullStats.unpaid > 0 ? "var(--color-warn-tx)" : "var(--color-ink)" }}>{fullStats ? `${fullStats.unpaid.toLocaleString("ko-KR")}건` : "…"}</div>
-            </div>
-          </div>
-
           {/* 주문 이력 — [2026-09-05] 전 기간 DB 직접 조회(카카오ID 우선, 전화 폴백) + 정렬/필터/주문서 펼치기 */}
-          <CustomerFullOrderHistory
-            kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)}
-            phone={customer.phone}
-            onStats={setFullStats}
-          />
+          <div className={detailTab === "orders" ? "" : "hidden"}>
+            <CustomerFullOrderHistory
+              kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)}
+              phone={customer.phone}
+              onStats={setFullStats}
+            />
+          </div>
 
           {/* 포인트 (기존 패널 유지 — 보유포인트 표시 + 🪙 지급) */}
-          <div style={{ marginTop: "12px" }}>
-            <AdminLiveCustomerPointPanel customer={customer} />
-          </div>
+          {detailTab === "points" ? (
+            <div style={{ marginTop: "12px" }}>
+              <AdminLiveCustomerPointPanel customer={customer} />
+            </div>
+          ) : null}
+
+          {detailTab === "activity" ? (
+            <MemberAccessHistory kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)} />
+          ) : null}
 
           {/* 정보 변경 이력 */}
-          {profile?.customer_history && profile.customer_history.length > 0 ? (
+          {detailTab === "activity" && profile?.customer_history && profile.customer_history.length > 0 ? (
             <div style={{ marginTop: "16px" }}>
               <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>정보 변경 이력</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -1194,6 +1213,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const [blockedCustomerPage, setBlockedCustomerPage] = useState(1);
   const [directPhoneBlocks, setDirectPhoneBlocks] = useState<DirectPhoneBlock[]>([]);
   const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
+  const [profileLoadStatus,setProfileLoadStatus]=useState<"loading"|"ready"|"error">("loading");
 
   // 주문 있는 고객만 — 기본 OFF(모든 고객 표시: 아직 주문 안 한 가망고객도 보임). 구매자만 보고 싶을 때만 켜는 선택 토글.
   const [buyersOnly, setBuyersOnly] = useState(false);
@@ -1249,6 +1269,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     let alive = true;
 
     const loadCustomerProfiles = async () => {
+      setProfileLoadStatus("loading");
       // [2026-08-12] 회원이 1,000명을 넘으면 옛 회원이 목록·검색에서 통째로 누락되던 문제 수정.
       //   Supabase는 한 번에 최대 1,000행만 돌려주므로 1,000명씩 나눠 전부 받아온다.
       //   표시 전용(SELECT만) — 주문/입금/정산/배송/포인트 로직과 무관.
@@ -1268,11 +1289,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
         if (error) {
           console.warn("[admin-live] customers 테이블 불러오기 실패", error.message);
-          if (collected.length === 0) {
-            setCustomerProfiles([]);
-            return;
-          }
-          break; // 일부라도 받아온 건 그대로 보여준다(빈 목록으로 날리지 않음)
+          setCustomerProfiles([]);
+          setProfileLoadStatus("error");
+          return; // 일부만 읽었을 때 전 회원 조회 완료로 표시하지 않음
         }
 
         const chunk = (data || []) as CustomerProfile[];
@@ -1283,6 +1302,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       if (!alive) return;
 
       setCustomerProfiles(collected.filter((profile) => digitsOnly(profile.customer_phone) || clean(profile.customer_name) || clean(profile.youtube_nickname)));
+      setProfileLoadStatus("ready");
     };
 
     void loadCustomerProfiles();
@@ -1292,6 +1312,25 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     };
   }, [reloadTick]);
 
+  const [lifetimeById,setLifetimeById]=useState<Record<string,LifetimeStats>|null>(null);
+  const [lifetimeStatus,setLifetimeStatus]=useState<'loading'|'ready'|'error'>('loading');
+  const [lifetimeAudit,setLifetimeAudit]=useState<{rows:number;profiles:number;unmatched:number;ambiguous:number}|null>(null);
+  useEffect(()=>{
+    let alive=true;
+    setLifetimeStatus('loading');setLifetimeById(null);
+    (async()=>{
+      const response=await fetch('/api/admin-live/customer-lifetime',{cache:'no-store'});
+      const payload=await response.json().catch(()=>null);
+      if(!response.ok||!payload?.ok||payload.version!=='full-history-v1')throw new Error(payload?.message||'전체 실적 조회 실패');
+      if(!alive)return;
+      setLifetimeById(payload.byProfile||{});
+      setLifetimeAudit({rows:Number(payload.orderRows)||0,profiles:Number(payload.profileCount)||0,unmatched:Number(payload.unmatchedRows)||0,ambiguous:Number(payload.ambiguousRows)||0});
+      setLifetimeStatus('ready');
+    })().catch(()=>{if(alive){setLifetimeStatus('error');setLifetimeById(null);}});
+    return()=>{alive=false;};
+  },[reloadTick]);
+  const memberStatsReady=lifetimeStatus==='ready' && lifetimeById!==null && profileLoadStatus==='ready' && lifetimeAudit?.profiles===customerProfiles.length;
+
   const customers = useMemo<CustomerSummary[]>(() => {
     const map = new Map<string, CustomerSummary>();
     const directPhoneBlockMap = new Map(
@@ -1300,16 +1339,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
     // [2026-08-29] 주문과 회원 프로필에 들어 있는 카카오ID·전화번호를 모두 모아
     //   "이어지는 것끼리 한 사람"으로 묶는 식별자를 만든다. 묶기만 하므로 고객 수가 늘지 않는다.
-    const resolveIdentity = buildCustomerIdentityResolver([
-      ...(orders as LooseLiveOrder[]).map((order) => ({
-        kakaoId: orderKakaoId(order),
-        phone: orderPhone(order),
-      })),
-      ...customerProfiles.map((profile) => ({
-        kakaoId: profile.kakao_id,
-        phone: profile.customer_phone,
-      })),
-    ]);
+    // Profiles define identity. Orders may have another Kakao account's reused phone:
+    // never union two accounts merely because an order contained the same phone.
+    const resolveIdentity = buildCustomerIdentityResolver(
+      customerProfiles.map((profile) => ({kakaoId:profile.kakao_id,phone:profile.customer_phone})),
+    );
 
     (orders as LooseLiveOrder[]).forEach((order) => {
       const key = buildCustomerKey(order, resolveIdentity);
@@ -1325,6 +1359,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       if (!current) {
         map.set(key, {
           key,
+          profileId: "",
           nickname: orderNickname(order),
           name: orderName(order),
           phone: orderPhone(order),
@@ -1409,6 +1444,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         }
 
         current.joinedAt = clean(profile.created_at) || current.joinedAt;
+        current.profileId = clean(profile.id) || current.profileId;
         current.lastLoginAt = clean(profile.last_login_at) || current.lastLoginAt;
         if (!current.kakaoId) current.kakaoId = clean(profile.kakao_id);
         current.kakaoProfileImage = clean(profile.kakao_profile_image) || current.kakaoProfileImage;
@@ -1419,6 +1455,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       map.set(key, {
         key,
+        profileId: clean(profile.id),
         nickname: clean(profile.youtube_nickname) || "닉네임 미입력",
         name: clean(profile.customer_name) || "이름 없음",
         phone: clean(profile.customer_phone),
@@ -1441,8 +1478,21 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       });
     });
 
+    if (lifetimeById) {
+      for (const c of map.values()) {
+        if (!c.profileId) continue; // profile-less legacy rows are a separate audit concern
+        const summary = lifetimeById[c.profileId] || EMPTY_LIFETIME_STATS;
+        c.orderCount=summary.all;
+        c.totalAmount=summary.totalAmount;
+        c.paidAmount=summary.paidAmount;
+        c.paidCount=summary.paid;
+        c.unpaidCount=summary.unpaid;
+        c.manualNeededCount=summary.manualNeededCount;
+        c.latestOrderAt=summary.latestOrderAt;
+      }
+    }
     return Array.from(map.values());
-  }, [blockOverrides, customerProfiles, directPhoneBlocks, orders]);
+  }, [blockOverrides, customerProfiles, directPhoneBlocks, orders,lifetimeById]);
 
   const filteredCustomers = useMemo(() => {
     const searchText = keyword.replace(/\s+/g, "").toLowerCase();
@@ -1462,17 +1512,17 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
         if (searchText && !haystack.includes(searchText)) return false;
         // 주문 있는 고객만(기본 ON) — 테스트·0건 계정 숨김. 검색에도 적용(끄면 0건/테스트도 보임).
-        if (buyersOnly && customer.orderCount <= 0) return false;
+        if (buyersOnly && memberStatsReady && customer.orderCount <= 0) return false;
         if (statusFilter === "normal") return !customer.blocked;
         if (statusFilter === "blocked") return customer.blocked;
-        if (statusFilter === "attention") return customer.manualNeededCount > 0 || customer.unpaidCount > 0;
+        if (statusFilter === "attention") return !memberStatsReady || customer.manualNeededCount > 0 || customer.unpaidCount > 0;
         if (statusFilter === "nokakao") return !customer.kakaoId;
 
         return true;
       })
       .sort((a, b) => {
-        if (sortMode === "amount") return b.paidAmount - a.paidAmount;
-        if (sortMode === "orders") return b.orderCount - a.orderCount;
+        if (sortMode === "amount") return memberStatsReady ? b.paidAmount - a.paidAmount : b.latestOrderAt.localeCompare(a.latestOrderAt);
+        if (sortMode === "orders") return memberStatsReady ? b.orderCount - a.orderCount : b.latestOrderAt.localeCompare(a.latestOrderAt);
         if (sortMode === "nickname") return a.nickname.localeCompare(b.nickname, "ko");
         // 가입일/최근접속: 값이 없는 회원(옛 데이터)은 항상 뒤로 보낸다.
         if (sortMode === "joinedDesc") {
@@ -1498,7 +1548,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         }
         return b.latestOrderAt.localeCompare(a.latestOrderAt);
       });
-  }, [customers, keyword, sortMode, statusFilter, buyersOnly]);
+  }, [customers, keyword, sortMode, statusFilter, buyersOnly, memberStatsReady]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / CUSTOMER_PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
@@ -1985,6 +2035,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none">
           {/* [2026-09-25] 필터 한 줄 — 검색(넓게) · 고객상태 · 정렬 · 주문있는고객만 · 초기화(바뀌었을 때만). 좁으면 자연스럽게 줄바꿈. */}
           {/* [2026-10-22 폰] 검색칸은 한 줄 전체, 나머지 컨트롤은 아래 한 줄 가로 스크롤(§13). PC 는 한 줄 그대로 */}
+          <input
+            value={keyword}
+            onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
+            placeholder="닉네임 / 이름 / 전화번호 검색"
+            inputMode="search"
+            aria-label="고객 검색"
+            className="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[16px] font-semibold text-ink outline-none focus-visible:border-ink md:hidden"
+          />
           <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>select]:shrink-0">
             <input
               value={keyword}
@@ -2020,8 +2078,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             </select>
             <button
               type="button"
+              disabled={!memberStatsReady}
               onClick={() => { setBuyersOnly((v) => !v); setPage(1); }}
-              className={`h-11 shrink-0 rounded-xl px-3 text-[12px] font-black transition ${buyersOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
+              className={`h-11 shrink-0 rounded-xl px-3 text-[12px] font-black transition disabled:opacity-50 ${buyersOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
             >
               {buyersOnly ? "주문 있는 고객만 ✓" : "주문 있는 고객만"}
             </button>
@@ -2036,15 +2095,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             ) : null}
           </div>
 
-          <input
-            value={keyword}
-            onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
-            placeholder="닉네임 / 이름 / 전화번호 검색"
-            inputMode="search"
-            aria-label="고객 검색"
-            className="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[16px] font-semibold text-ink outline-none focus-visible:border-ink md:hidden"
-          />
 
+
+          <div role="status" className={`mt-3 flex min-h-7 flex-wrap items-center gap-2 rounded-lg px-2 py-1 text-[12px] ${lifetimeStatus==='error'?'bg-danger-bg text-danger-tx':'bg-surface-2 text-ink-soft'}`}>
+            <span>{(lifetimeStatus==='loading'||profileLoadStatus==='loading')?'전 기간 회원·주문 실적 확인 중…':memberStatsReady?`전 기간 집계 완료 · 주문 상품 ${lifetimeAudit?.rows.toLocaleString('ko-KR')||0}행`:'전체 회원 집계가 불완전하여 실적 숫자를 숨겼습니다. 다시 조회해 주세요.'}</span>
+            {(!memberStatsReady&&lifetimeStatus!=='loading'&&profileLoadStatus!=='loading')?<button type="button" onClick={()=>setReloadTick(x=>x+1)} className="min-h-9 rounded-lg border border-line bg-surface px-3 font-semibold">다시 조회</button>:null}
+          </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-black text-ink max-md:hidden">고객 목록</h2>
             <div className="text-xs font-black text-ink-mute">
@@ -2137,9 +2193,9 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                             ) : <span className="text-[11px] text-ink-mute">-</span>}
                           </div>
                           {/* 누적 주문 (오른쪽) */}
-                          <span className="text-right font-black text-ink">{customer.orderCount}건</span>
+                          <span className="text-right font-black text-ink">{memberStatsReady ? `${customer.orderCount}건` : "…"}</span>
                           {/* 누적 결제(결제완료만, 오른쪽) */}
-                          <span className="text-right font-black text-ink">{money(customer.paidAmount)}</span>
+                          <span className="text-right font-black text-ink">{memberStatsReady ? money(customer.paidAmount) : "…"}</span>
                           {/* 마지막 주문 (두 줄 · 없으면 -) */}
                           <div className="text-[11px] leading-tight text-ink-soft">
                             <div className="truncate">{d.orderTwo.line1}</div>
@@ -2190,12 +2246,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               {!customer.kakaoId ? <span className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-mute">카카오 미연동</span> : null}
                             </div>
                             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[12px] text-ink-soft tabular-nums">
-                              <span>{customer.phone ? formatPhone(customer.phone) : "-"}</span>
+                              <span><span className="text-ink-mute">연락처 </span>{customer.phone ? formatPhone(customer.phone) : "-"}</span>
                               <span className="text-ink-mute">·</span>
-                              <span>주문 {d.orderTwo.line1}</span>
+                              <span><span className="text-ink-mute">마지막 주문 </span>{memberStatsReady ? d.orderTwo.line1 : "…"}</span>
                               <span className="text-ink-mute">·</span>
-                              <span className="font-bold text-ink">{money(customer.paidAmount)}</span>
-                              <span>{customer.orderCount}건</span>
+                              <span><span className="text-ink-mute">누적 결제 </span><strong className="font-bold text-ink tabular-nums">{memberStatsReady ? money(customer.paidAmount) : "…"}</strong></span>
+                              <span><span className="text-ink-mute">주문 수 </span>{memberStatsReady ? `${customer.orderCount}건` : "…"}</span>
                               {d.pts != null ? <span className="font-bold text-ink">{d.pts.toLocaleString("ko-KR")}P</span> : null}
                             </div>
                             {customer.blocked && d.blockLine2 ? <div className="mt-0.5 truncate text-[12px] text-ink-soft">{d.blockLine2}</div> : null}
@@ -2572,7 +2628,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       )}
 
       <CustomerDetailDrawer
-        customer={selectedCustomer}
+        customer={selectedCustomer ? (customers.find(c=>c.key===selectedCustomer.key)||selectedCustomer) : null}
         profile={selectedProfile}
         page={detailPage}
         setPage={setDetailPage}
