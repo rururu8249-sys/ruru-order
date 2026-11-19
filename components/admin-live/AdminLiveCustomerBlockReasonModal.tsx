@@ -94,6 +94,7 @@ export default function AdminLiveCustomerBlockReasonModal({
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [keptItems, setKeptItems] = useState<string[]>([]);
   const [memo, setMemo] = useState("");
+  const [dealDate, setDealDate] = useState("");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [openGroups, setOpenGroups] = useState<string[]>([]);
 
@@ -107,6 +108,7 @@ export default function AdminLiveCustomerBlockReasonModal({
     // [2026-10-21 사장님] 차단 1순위는 거파 → 새로 차단할 땐 거파가 미리 골라져 있게(옛 사유가 있으면 그 유형 그대로)
     setReasonType(parts.type ?? (clean(defaultReason) ? null : "deal_break"));
     setMemo(parts.memo);
+    setDealDate(parts.dealDate || "");
     setKeptItems(parts.items);
     setCheckedIds([]);
     setRows(null);
@@ -209,6 +211,7 @@ export default function AdminLiveCustomerBlockReasonModal({
 
   const finalReason = buildBlockReason({
     type: reasonType,
+    dealDate: reasonType === "deal_break" ? dealDate : undefined,
     items: picksItems ? [...keptItems, ...pickedLabels] : keptItems,
     memo,
   });
@@ -265,6 +268,17 @@ export default function AdminLiveCustomerBlockReasonModal({
               );
             })}
           </div>
+
+          {reasonType === "deal_break" ? (
+            <div className="mt-4">
+              <label htmlFor="deal-break-date" className="block text-[13px] font-black text-ink">
+                거래파기 발생일 <span className="font-normal text-ink-mute">(정확한 날짜만 입력 · 선택)</span>
+              </label>
+              <input id="deal-break-date" type="date" value={dealDate} onChange={(event) => setDealDate(event.target.value)}
+                className="mt-2 min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-[14px] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink" />
+              <p className="mt-1 text-[11px] leading-5 text-ink-mute">차단 등록일이나 주문일과 다를 수 있으므로, 확인된 거파 발생일만 기입해 주세요.</p>
+            </div>
+          ) : null}
 
           {/* ② 품목 고르기 — 거파 계열에서만 */}
           {picksItems ? (
