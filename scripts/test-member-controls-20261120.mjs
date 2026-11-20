@@ -7,6 +7,23 @@ import { createUiLoader } from './admin-ui-test-loader.mjs';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { act } = Renderer;
 const listeners = new Map();
+// Next hydrates at document. React's delegated key handler and the modal hook
+// are listeners on the same native target; stopPropagation does not skip the
+// next listener on that target. Keep the real EventTarget dispatch semantics.
+const documentEvents = new EventTarget();
+let reactKeyHandler;
+documentEvents.addEventListener('keydown', event => reactKeyHandler?.({
+  key: event.key, shiftKey: event.shiftKey, nativeEvent: event,
+  altKey: false, ctrlKey: false, metaKey: false,
+  preventDefault: () => event.preventDefault(),
+  stopPropagation: () => event.stopPropagation(),
+}));
+const dispatchKey = async (key, shiftKey = false) => {
+  const event = new Event('keydown', {bubbles:true, cancelable:true});
+  Object.defineProperties(event, {key:{value:key}, shiftKey:{value:shiftKey}});
+  await act(async () => documentEvents.dispatchEvent(event));
+  return event;
+};
 class Element {
   style = {}; isConnected = true;
   focus() { document.activeElement = this; }
@@ -21,8 +38,8 @@ class Element {
 globalThis.HTMLElement = Element;
 globalThis.document = {
   body: {style:{overflow:''}}, activeElement:new Element(),
-  addEventListener(type, fn) { const set=listeners.get(type)||new Set();set.add(fn);listeners.set(type,set); },
-  removeEventListener(type, fn) { listeners.get(type)?.delete(fn); },
+  addEventListener(type, fn) { const set=listeners.get(type)||new Set();set.add(fn);listeners.set(type,set);documentEvents.addEventListener(type,fn); },
+  removeEventListener(type, fn) { listeners.get(type)?.delete(fn);documentEvents.removeEventListener(type,fn); },
 };
 globalThis.window = {innerWidth:390,innerHeight:800,addEventListener(){},removeEventListener(){},setTimeout,clearTimeout};
 const options = [
@@ -78,13 +95,8 @@ await act(async()=>{tree=Renderer.create(React.createElement(ToolbarHarness),{cr
 const filterButton=()=>tree.root.findAllByType('button').find(n=>n.props['aria-haspopup']==='dialog');
 const sheet=()=>tree.root.findAllByProps({role:'dialog','aria-label':'회원 필터'})[0];
 const sheetCombo=()=>sheet().findByProps({role:'combobox'});
-const dispatchSheetKey=async value=>{
-  const event={key:value,preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;}};
-  await act(async()=>{
-    sheetCombo().props.onKeyDown(event);
-    if(!event.stopped) for(const fn of [...(listeners.get('keydown')||[])]) fn(event);
-  });
-};
+reactKeyHandler = event => sheetCombo().props.onKeyDown(event);
+const dispatchSheetKey = dispatchKey;
 try {
   await act(async()=>filterButton().props.onClick());
   assert.ok(sheet()); assert.equal(document.body.style.overflow,'hidden');
@@ -105,3 +117,35 @@ try {
   assert.equal(document.body.style.overflow,'','Sheet restores document scrolling');
   console.log('PASS mobile filter sheet, nested Escape, unchanged cancel, preserved filters and scroll restoration');
 } finally {await act(async()=>tree.unmount());}
+
+const Drawer=load('components/admin-live/AdminLiveSideDrawer.tsx').default;
+const drawerChanges=[];
+let drawerCloses=0;
+const opener=new Element();
+opener.focus();
+function DrawerHarness() {
+  const [visible,setVisible]=React.useState(true);
+  const [value,setValue]=React.useState('latest');
+  return visible ? React.createElement(Drawer,{title:'정렬 검증',width:560,onClose:()=>{drawerCloses++;setVisible(false);}},
+    React.createElement(Select,{label:'주문 이력 정렬',value,options,onChange:next=>{drawerChanges.push(next);setValue(next);}})) : null;
+}
+await act(async()=>{tree=Renderer.create(React.createElement(DrawerHarness),{createNodeMock:()=>new Element()});});
+reactKeyHandler=event=>tree.root.findByProps({role:'combobox'}).props.onKeyDown(event);
+try {
+  await dispatchKey('Enter'); await dispatchKey('End');
+  assert.equal(tree.root.findAllByProps({role:'listbox'}).length,1);
+  const canceled=await dispatchKey('Escape');
+  assert.equal(canceled.defaultPrevented,true,'The select cancels the native Escape event');
+  assert.equal(tree.root.findAllByProps({role:'listbox'}).length,0);
+  assert.equal(tree.root.findAllByProps({role:'dialog'}).length,1,'First Escape leaves the containing drawer open');
+  assert.equal(drawerCloses,0);
+  assert.deepEqual(drawerChanges,[],'Canceled navigation does not change sorting');
+  assert.equal(document.body.style.overflow,'hidden','The remaining drawer keeps its scroll lock');
+  await dispatchKey('Escape');
+  assert.equal(tree.root.findAllByProps({role:'dialog'}).length,0,'Second Escape closes the drawer');
+  assert.equal(drawerCloses,1);
+  assert.equal(document.activeElement,opener,'Closing the drawer restores the opener');
+  assert.equal(document.body.style.overflow,'','Closing the drawer restores scrolling');
+  console.log('PASS document-root event dispatch: popup Escape, subsequent drawer Escape, sorting, focus and scrolling');
+} finally {reactKeyHandler=undefined;await act(async()=>tree.unmount());}
+assert.equal([...listeners.values()].some(set=>set.size>0),false,'Native handlers clean up after nested controls');

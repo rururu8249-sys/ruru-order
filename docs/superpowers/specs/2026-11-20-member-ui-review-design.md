@@ -50,5 +50,16 @@ Git 커밋 `e9d5a551035e13a90ad483d2608c69a34d0d9535`(2026-06-01)은 회원 UI�
 - 전체 guard 통과(관리자 123파일·0위반), TypeScript 및 production build 정적 58/58 통과. prebuild의 입금매칭 비교 528건도 통과했다.
 - 독립 리뷰의 기존 mobile list 회귀·중첩 차단 목록 포커스·상품 줄 수·접근성 이름·열린 전화번호 폼 상태 누락을 수정하고 재검증했다. 회원 식별·집계·정렬 비교·차단/포인트 저장 함수의 AST는 기준 버전과 동일하다.
 - React 품질 검토: 새 컨트롤은 controlled 값, useId/ref, 이벤트 등록/정리, 모달 키 입력 분리, 상태 변화에 따른 disabled 처리를 사용한다. 신규 의존성/DB 호출 없음. 기존 전체 회원 계산을 다시 설계하지 않았다.
-- 새 버전 실제 브라우저 화면·실폰 터치·한글 입력기는 미검증. Vercel 정식 읽기 도구가 재인증 필요를 반환해 이 연결로 새 preview 권한을 확인할 수 없다. GitHub 쓰기403도 우회하지 않는다. 사용자 CLI 적용/배포 후 실제 화면 검수를 이어간다.
+- v6는 아래 PR #50 배포 후 실제 브라우저 확인을 진행했다. 실폰 터치·한글 입력기는 미검증이다. GitHub 앱 쓰기403/Vercel 앱 재인증 제한은 우회하지 않고 사용자 CLI 적용 및 GitHub 상태 읽기로 배포 결과를 확인한다.
 - 운영 DB·회원·주문·포인트·차단 데이터 쓰기 시험 0건. 테스트는 메모리 fixture, 지급 RPC만 기존 메모리 PGlite 환경이다.
+
+## PR #50 배포 후 확인과 Esc 후속 수정
+
+- 2026-11-20 04:08:00 KST PR #50 병합. main `7565e5f817942bb59ab59c9a497b4b8871aa40ed`, Vercel success, 전체 tree `a2d6815ce98ff2a5964dce631f71e601f335852a`가 로컬 검증본과 같음을 확인했다.
+- 운영 Chrome에서 X 한 개/읽기 푸터 제거/편집 시 저장·취소/4개 상세 탭/기본 정보 안 차단 관리/주문별 카드·다품목 펼침/회원 8개 정렬 옵션을 확인했다. 첨부와 같은 미연동 회원의 과거 주문 4건·351,000원은 유지됐다.
+- PC 1710px와 360·375·390·430px 반응형에서 상세와 카드 넘침이 없고 X는 44×44였다. 모바일 필터 검색·정렬·구매자 선택은 닫은 뒤 유지됐고, 필터→차단 목록→필터 버튼으로의 포커스 복귀와 스크롤 복원을 확인했다.
+- 별도 실제 결함: 주문 정렬을 열어 End→Esc를 누르면 메뉴와 상세가 함께 닫혔다. 새 탭 PC에서도 재현했다. 기존 규칙 7의 첫 Esc는 메뉴만 닫는 동작과 다르므로 후속 수정한다.
+- 원인: 설치 Next의 `app-index.js`가 `document`를 hydrateRoot 대상으로 사용한다. React 위임과 모달의 native keydown 리스너가 같은 target에 있다. `stopPropagation()`은 같은 target의 다음 리스너를 막지 않으며, 모달이 이미 `defaultPrevented=true`인 Esc를 다시 처리했다. 근거: [DOM 이벤트 규격](https://dom.spec.whatwg.org/#dom-event-stoppropagation), [React 이벤트 객체](https://react.dev/reference/react-dom/components/common#react-event-object), 설치 Next/React 소스.
+- 수정: `useAdminModalFocus`의 Escape 분기에서 이미 처리된 이벤트는 반환한다. Tab 처리·모달 스택·포커스 복귀 코드는 그대로다. 선택 메뉴나 회원/주문 데이터 처리 코드는 변경하지 않는다.
+- 테스트 보완: 이전 fixture는 `stopPropagation` 후 같은 document의 모달 리스너까지 생략했다. Node 표준 EventTarget의 같은-target 실제 전달을 사용하도록 바꾸고, 기존 첫 Esc/다음 Esc 기대값은 그대로 유지했다. v6에서 실패, v7에서 메뉴만 닫힘→다음 Esc로 창 닫힘·정렬 취소·포커스·스크롤 복원 통과. 모바일 시트와 실제 공용 드로어에 각각 적용했다.
+- v7 로컬 34종 회귀·전체 guard·TypeScript·production build(58/58)·독립 리뷰 통과. 금융 확인창의 Esc 취소와 중첩 차단 목록 기존 테스트도 통과했다. **v7 운영 배포 및 실제 브라우저 재검증은 아직 대기 중**이다.
