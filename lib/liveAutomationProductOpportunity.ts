@@ -38,11 +38,15 @@ export function buildFocusedProductPrompt(q:{
   mode?:'live'|'paused'|'replay';product?:ChatProductFacts|null;
   productName:string;colors:readonly string[];candidates:readonly string[];
   recentAi:readonly string[]; questionMemory?:readonly string[]; questionPending?:boolean;
+  conversationContext?:string;
 }):string {
   const names=q.candidates.slice(0,6).map(s=>compact(s,32)).filter(Boolean);
   const product=compact(q.productName,110);
   const colors=[...new Set(q.colors.map(s=>compact(s,18)).filter(Boolean))].slice(0,8);
   if(!product||!names.length)return '';
+  if(q.conversationContext)return [q.conversationContext,
+    '조용한 방에서 드물게 발언할 기회를 다시 검토한다. 위의 같은 대화와 계정 기록을 유지한다. 상품 설명 한 줄로 맥락을 초기화하지 않는다. 앞선 색감 질문을 색감 감탄으로 바꾸는 것은 새 화제가 아니다. 현재 대화에 보탤 자연스러운 말이 있으면 작성하고, 없으면 그대로 침묵한다.',
+  ].join('\n');
   return [
     '너는 공개적으로 [테스트] 표시되는 라이브커머스 채팅 시뮬레이션의 문장 작성자다.',
     '현재 대화가 잠시 조용하고 실제로 등록된 상품이 있다. 한 명의 테스트 손님이 그 상품에 관해 남길 법한 새로운 한 줄을 작성한다.',

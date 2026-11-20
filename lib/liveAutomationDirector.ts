@@ -779,12 +779,13 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  // Rotate the small candidate set; prioritize a recently addressed TEST identity.
  const sortedRoster=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+selectionBucket)-hashOf(String(b.actor.id)+':'+selectionBucket));
  const modelRoster=[...called,...sortedRoster.filter(r=>!called.includes(r))].slice(0,8);
- const prompt=buildCompactConversationPrompt({
-   mode,cardText,product:card,messages,pendingHumanId:newestHuman?Number(newestHuman.id):null,
+ const roomContext={
+   now,mode,cardText,product:card,messages,pendingHumanId:newestHuman?Number(newestHuman.id):null,
    styleSummary:roomSignals.style,realOrderProducts:roomSignals.realOrderProducts,rejectedLines,questionMemory,questionPending,
    nextShow:nextShow?nextShow.when:null,
    actors:modelRoster.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))
- });
+ };
+ const prompt=buildCompactConversationPrompt(roomContext);
  const priority=newestHuman?'interactive':'background';
  // A timeout is a service failure, not a decision to stay silent. Retry ONCE with a
  // different permitted model and the same grounded, short context. No extra turns.
@@ -819,7 +820,9 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
    const focusedPrompt=buildFocusedProductPrompt({
      mode,product:card,productName:card?.name||'',colors:card?.colors||[],
-     candidates:candidates.map(r=>String(r.actor.nickname)),recentAi,questionMemory,questionPending
+     candidates:candidates.map(r=>String(r.actor.nickname)),recentAi,questionMemory,questionPending,
+     conversationContext:buildCompactConversationPrompt({...roomContext,
+       actors:candidates.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))})
    });
    if(!focusedPrompt)return;
    const focused=await callGeminiJson(focusedPrompt,{timeoutMs:12000,maxTokens:200,maxAttempts:2,temperature:.8,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
@@ -835,6 +838,10 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  // Reply to a specific recent human or TEST message only. A new human
  // message by itself is not proof that an unrelated AI product question answers it.
  const target=resolveExplicitReplyTarget(replyId,messages.filter(m=>!m.bot_ref),now);
+ if(replyId&&!target){
+   void noteDecision(db,{at:new Date(now).toISOString(),result:'invalid-reply-target',path:chosenPath});
+   return; // Never reinterpret a rejected reply as a new unsolicited message.
+ }
  const acceptable=(t:string,r:(typeof roster)[number],tgt:Row|null)=>{
   if(t.length<1||t.length>70)return false;
   if(/밴드/.test(t))return false;
