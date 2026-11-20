@@ -1,3 +1,4 @@
+import {productFactsPrompt,type ChatProductFacts} from './liveAutomationProductFacts';
 /** A limited, grounded opportunity for a TEST-labelled shopper to speak.
  * Does not create any chat, order, or payment action. Existing DB admission
  * and room-level repetition checks remain the final authority.
@@ -34,6 +35,7 @@ const compact=(x:unknown,n:number)=>String(x??'').replace(/[\r\n\t]+/g,' ').repl
  * Do not suggest arbitrary size numbers or speculate about shipping/stock.
  */
 export function buildFocusedProductPrompt(q:{
+  mode?:'live'|'paused'|'replay';product?:ChatProductFacts|null;
   productName:string;colors:readonly string[];candidates:readonly string[];
   recentAi:readonly string[];
 }):string {
@@ -45,6 +47,8 @@ export function buildFocusedProductPrompt(q:{
     '너는 공개적으로 [테스트] 표시되는 라이브커머스 채팅 시뮬레이션의 문장 작성자다.',
     '현재 대화가 잠시 조용하고 실제로 등록된 상품이 있다. 한 명의 테스트 손님이 그 상품에 관해 남길 법한 새로운 한 줄을 작성한다.',
     `확인된 상품: ${product}`,
+    `방송 상태: ${q.mode||'live'}. ${q.mode&&q.mode!=='live'?'실시간 시연·즉시 응답을 요구하거나 방송 재개를 추측하지 않는다.':'영상이나 음성을 직접 보고 들었다고 주장하지 않는다.'}`,
+    ...(q.product?[productFactsPrompt(q.product)]:[]),
     `확인된 색상: ${colors.join(', ')||'별도 없음'}`,
     `사용 가능한 테스트 닉네임: ${names.join(' / ')}`,
     `최근 AI 발언(뜻이나 문장 모양 반복 금지): ${q.recentAi.slice(0,6).map(s=>compact(s,55)).join(' / ')||'없음'}`,

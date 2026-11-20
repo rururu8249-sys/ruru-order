@@ -1,7 +1,7 @@
 import {BRAND_SPEECH_ALIASES} from './liveAutomationSpeech';
 import type {FeaturedSnapshot} from './liveAutomationFeatured';
 export type DialogueScope='general'|'product'|'history';
-export type DialogueCard=FeaturedSnapshot&{name:string;colors:string[];sizes:string[];overseas?:boolean;shippingInfo?:string[]};
+export type DialogueCard=FeaturedSnapshot&{name:string;parentName?:string;colors:string[];sizes:string[];overseas?:boolean;shippingInfo?:string[]};
 export const HISTORICAL_TOPICS={alo:['알로 부츠컷','알로 가방','알로 에코백','알로 밴딩바지','알로 반팔','알로 나시'],lulu:['룰루레몬'],burberry:['버버리 트렌치코트','버버리 코트','버버 코트','버코트','전지현 버버코트','전지현 버버리코트','버버리 트렌치','버버리 바바리','버버리 바바리코트']};
 const BRANDS={...BRAND_SPEECH_ALIASES,ALO:['알로','alo'],LULU:['룰루레몬','lululemon'],DYSON:['다이슨','dyson'],HERMES:['에르메스'],LV:['루이비통'],CELINE:['셀린느']};
 const flat=(s:string)=>s.toLowerCase().replace(/[\s-]/g,'');
