@@ -1,3 +1,4 @@
+import {productFactsPrompt,type ChatProductFacts} from './liveAutomationProductFacts';
 /** Only retry transport/service failures once, never a deliberate model silence. */
 export function shouldFallbackModel(r:{text:string|null;note:string}):boolean {
  return !r.text?.trim() && /(?:timeout|fetch_error|http_5\d\d|empty_|:quota)/.test(r.note);
@@ -18,7 +19,7 @@ export type CompactRoomActor = {
   nickname: string; own?: string[]; cart?: string[]; ordered?: string[]; paid?: string[];
 };
 export type CompactRoomContext = {
-  mode: 'live' | 'paused' | 'replay'; cardText: string; actors: CompactRoomActor[];
+  mode: 'live' | 'paused' | 'replay'; cardText: string; product?: ChatProductFacts | null; actors: CompactRoomActor[];
   messages: CompactRoomMessage[]; pendingHumanId?: number | null;
   styleSummary?: string; realOrderProducts?: string[];
   rejectedLines?: string[]; nextShow?: string | null;
@@ -53,6 +54,7 @@ export function buildCompactConversationPrompt(c: CompactRoomContext): string {
     '너는 [테스트] 표시가 있는 쇼핑몰 채팅 시뮬레이션에서 다음 메시지 하나를 작성하는 AI다.',
     `상황: ${mode}. 실시간 영상을 보거나 음성을 들었다고 주장하지 마라.`,
     `지금 실제 위젯이 보여주는 상품: ${clean(c.cardText, 240)}. 검증된 상품 외 번호·색상·사이즈·가격을 지어내지 마라.`,
+    ...(c.product ? [productFactsPrompt(c.product)] : []),
     `실제 고객의 최근 발언 가운데 응답 판단 대상: ${c.pendingHumanId ? '#' + c.pendingHumanId : '없음'}. 실제 질문이나 닉네임 호출에만 필요할 때 답한다.`,
     '인사/질문/감탄/대답/침묵 모두 가능하다. 인사나 상품 질문을 의무적으로 만들지 않는다. 다른 사람의 질문에 답하되 모르는 사실·사이즈 추천·입금 정보를 꾸며내지 않는다.',
     '다른 메시지에 답할 때만 그 메시지의 정확한 #번호를 replyTo에 적는다. 관련 없는 새 상품 이야기에는 replyTo:0. 혼잣말로 "네", "그쵸", "생각보다 빠르네" 같은 맥락 없는 반응을 하지 마라.',

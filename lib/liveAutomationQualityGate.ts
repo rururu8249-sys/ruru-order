@@ -1,10 +1,11 @@
+import {productMeaningMismatch,type ChatProductFacts} from './liveAutomationProductFacts';
 /** Pure fail-closed policy for TEST-chat composition. No DB writes or network calls. */
 export type StreamPhase = 'live'|'paused'|'replay';
 export type ChatIntent = 'size'|'length'|'color'|'price'|'delivery'|'order'|'visit'|'pause'|'replay'|'live-action'|'memory'|'other';
 export type ChatObservation = {text:string; at:number; actorId?:string|null; productKey?:string|null};
 export type QualityInput = {
   text:string; mode:StreamPhase; now:number; actorId:string;
-  currentProductKey?:string|null; currentProductName?:string|null;
+  currentProductKey?:string|null; currentProductName?:string|null; currentProduct?:ChatProductFacts|null;
   priority?:boolean; replyingToHuman?:boolean; recent:ChatObservation[];
   offAirSince?:string|null; replySourceText?:string|null;
 };
@@ -88,6 +89,7 @@ export function judgeTestChat(q:QualityInput):QualityResult {
  const text=String(q.text||'').trim(), intent=chatIntent(text);
  const fail=(reason:string):QualityResult=>({ok:false,reason,intent});
  if(!text||text.length>100)return fail('invalid-length');
+ if(q.currentProduct&&productMeaningMismatch(text,q.currentProduct,q.replySourceText||''))return fail('product-meaning-mismatch');
  if(misplacedTestFarewell(text,{mode:q.mode,now:q.now,offAirSince:q.offAirSince,replySourceText:q.replySourceText}))return fail('out-of-context-farewell');
  if(hasRunOnKoreanSpacing(text))return fail('run-on-korean-spacing');
  if(inventedProductAbsence(text))return fail('unverified-product-absence');

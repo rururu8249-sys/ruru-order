@@ -225,6 +225,9 @@ export function stockQuestionBlocked(t:string):boolean{
  const ask=/\?|나요|까요|가요|가용|나용|인가|있어요|있죠|요\s*$/.test(t);
  if(!ask)return false;
  if(/품절|재고|매진|솔드\s*아웃|sold\s*out|남았|남아\s*있|몇\s*개\s*(남|있)|구할\s*수/i.test(t))return true;
+ if(/어울리|어울릴|코디|조합/.test(t))return false; // Preference, not catalog availability.
+ // Negative/intervening-word variants of the same displayed-option question.
+ if(/(?:색상|컬러|사이즈|색)\s*(?:은|는|도|이|가)?\s*(?:따로\s*|더\s*|또\s*)*(?:없(?:나요|나용|나여|는\s*건가)|있(?:나요|나용|나여|어요|을까))/.test(t))return true;
  // «36호 있나요?·L 되나요?·블랙 있어요?» — 옵션(사이즈·색) 있는지 묻기도 상품에 표시됨
  return /(\d{2,3}\s*호?|\b(xs|s|m|l|xl|xxl|2xl|free)\b|사이즈|색|컬러|블랙|화이트|베이지|그레이|네이비|브라운|아이보리|카멜)\s*(은|는|도|이|가)?\s*(있|되|돼)(나요|어요|을까|죠|나|요|냐)/i.test(t);
 }
@@ -300,7 +303,7 @@ async function postCodeLine(x:CodeCtx,actor:Actor,kind:'chat'|'reply',text:strin
  if(latestMode!==x.mode)return false;
  const latestCard=await readDialogueCard(x.db,x.c.broadcast_id).catch(()=>null);
  const recentForGate:ChatObservation[]=x.messages.filter(m=>m.automation_actor_id&&m.badge!=='bot').map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||'')}));
- const quality=judgeTestChat({text,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:(kind==='reply'&&source!==null)||linkedFollowUp||linkedThread,recent:recentForGate,
+ const quality=judgeTestChat({text,currentProduct:latestCard,mode:latestMode,now:x.now,actorId:String(actor.id),currentProductKey:latestCard?`${latestCard.productId}:${latestCard.detailName}`:null,priority,replyingToHuman:(kind==='reply'&&source!==null)||linkedFollowUp||linkedThread,recent:recentForGate,
   offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
   replySourceText:String(x.messages.find(m=>Number(m.id)===Number(plan.replyToAi||source||0))?.body||'')});
  if(!quality.ok)return false;
@@ -770,7 +773,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const sortedRoster=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+selectionBucket)-hashOf(String(b.actor.id)+':'+selectionBucket));
  const modelRoster=[...called,...sortedRoster.filter(r=>!called.includes(r))].slice(0,8);
  const prompt=buildCompactConversationPrompt({
-   mode,cardText,messages,pendingHumanId:newestHuman?Number(newestHuman.id):null,
+   mode,cardText,product:card,messages,pendingHumanId:newestHuman?Number(newestHuman.id):null,
    styleSummary:roomSignals.style,realOrderProducts:roomSignals.realOrderProducts,rejectedLines,
    nextShow:nextShow?nextShow.when:null,
    actors:modelRoster.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))
@@ -810,7 +813,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    const bucket=Math.floor(now/(10*60_000));
    const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
    const focusedPrompt=buildFocusedProductPrompt({
-     productName:card?.name||'',colors:card?.colors||[],
+     mode,product:card,productName:card?.name||'',colors:card?.colors||[],
      candidates:candidates.map(r=>String(r.actor.nickname)),recentAi
    });
    if(!focusedPrompt)return;
@@ -906,7 +909,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
      text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||''),
      productKey:String(actionById.get(String(m.automation_action_id||''))?.plan?.chatProductKey||'')
    }));
-   const quality=judgeTestChat({text,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:card?`${card.productId}:${card.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate,
+   const quality=judgeTestChat({text,currentProduct:card,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:card?`${card.productId}:${card.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate,
     offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
     replySourceText:String(target?.body||'')});
    if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}

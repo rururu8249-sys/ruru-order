@@ -13,7 +13,7 @@ export async function readDialogueCard(db:SupabaseClient,bc:string):Promise<Dial
   db.from('products').select('*').eq('id',card.productId).maybeSingle(),
  ]);
  if(linked.error||!linked.data?.length||product.error||!product.data||!isExposedProductRow(product.data))return null;
- const p=product.data,metadata={overseas:hasOverseasBadge(product.data),shippingInfo:selectedDetailInfo(product.data,card.detailName).chips},details=detailProducts(p,{includeHidden:false});
+ const p=product.data,metadata={parentName:String(p.product_name||''),overseas:hasOverseasBadge(product.data),shippingInfo:selectedDetailInfo(product.data,card.detailName).chips},details=detailProducts(p,{includeHidden:false});
  if(card.detailName){const d=details.find(d=>d.detailName===card.detailName);if(!d||d.stockManaged&&d.stock!==null&&d.stock<=0)return null;return {...card,...metadata,name:d.detailName,colors:d.colors,sizes:d.sizes};}
  if(details.length)return null;
  return {...card,...metadata,name:String(p.product_name||''),colors:cleanOptionValues(p.color_options),sizes:cleanOptionValues(p.size_options)};
