@@ -15,7 +15,7 @@
 //   Next 16 app-router 가 pushState 를 패치해 자기 내부 상태(__NA·tree)를 같이 복사하므로 popstate 로 reload 되지 않는다
 //   (node_modules/next/dist/client/components/app-router.js copyNextJsInternalHistoryState 확인, 09-20).
 
-import { useEffect, useId, useRef, type CSSProperties, type ReactNode, type Ref, type UIEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, type CSSProperties, type ReactNode, type Ref, type UIEvent } from "react";
 import SheetGrabber from "./SheetGrabber";
 
 export const CS_SHEET_Z = 100;
@@ -83,6 +83,10 @@ type Props = {
   closeDisabled?: boolean;
   /** 헤더 왼쪽 「‹」 같은 뒤로 버튼(배송지 관리 → 정보수정). 있으면 제목 앞에 놓인다. */
   headerLeft?: ReactNode;
+  /** 스크롤에 따라 헤더 내용이 바뀌는 시트만: 열린 동안 측정한 높이를 줄이지 않는다. */
+  stabilizeHeaderHeight?: boolean;
+  /** 같은 시트에서 상품이 바뀌면 높이만 초기화한다(닫기/history는 유지). */
+  headerHeightKey?: string | number;
   /** 본문 스크롤 영역 ref / onScroll (주문조회 무한 스크롤 등) */
   bodyRef?: Ref<HTMLDivElement>;
   onBodyScroll?: (event: UIEvent<HTMLDivElement>) => void;
@@ -232,6 +236,8 @@ export default function CustomerBottomSheet({
   closeGuard,
   closeDisabled = false,
   headerLeft,
+  stabilizeHeaderHeight = false,
+  headerHeightKey,
   bodyRef,
   onBodyScroll,
   size = "full",
@@ -239,6 +245,34 @@ export default function CustomerBottomSheet({
   tone,
 }: Props) {
   const { key, requestClose } = useCustomerOverlayClose({ open, onClose, closeGuard, closeDisabled });
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!open || !stabilizeHeaderHeight || !header) return;
+
+    // [2026-11-20] 옵션 헤더 축소로 본문이 커지면 끝 스크롤이 200px 아래로
+    // 보정되어 펼침/접힘이 반복됐다. 전환 기준은 유지하고 높이 감소를 막는다.
+    // border-box 측정값을 같은 boxSizing의 minHeight에 사용해 패딩 중복을 피한다.
+    let minimumHeight = 0;
+    let active = true;
+    const preserveHeight = () => {
+      if (!active) return;
+      const height = header.getBoundingClientRect().height;
+      if (height > minimumHeight) {
+        minimumHeight = height;
+        header.style.minHeight = `${height}px`;
+      }
+    };
+    preserveHeight();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(preserveHeight);
+    observer?.observe(header);
+    return () => {
+      active = false;
+      observer?.disconnect();
+      header.style.minHeight = "";
+    };
+  }, [open, stabilizeHeaderHeight, headerHeightKey]);
 
   if (!open) return null;
 
@@ -276,7 +310,7 @@ export default function CustomerBottomSheet({
       >
         <SheetGrabber onClose={() => { requestClose(); }} style={{ paddingTop: "8px", paddingBottom: "6px", minHeight: "24px" }} />
 
-        <div style={tone === "v2" ? { flexShrink: 0, display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 12px", borderBottom: "1px solid #E5E5E5" } : { flexShrink: 0, display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 12px", borderBottom: "1px solid #F0EAE0" }}>
+        <div ref={stabilizeHeaderHeight ? headerRef : undefined} style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 12px", borderBottom: tone === "v2" ? "1px solid #E5E5E5" : "1px solid #F0EAE0", boxSizing: stabilizeHeaderHeight ? "border-box" : undefined }}>
           {headerLeft ? <div style={{ flexShrink: 0 }}>{headerLeft}</div> : null}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div id={key} style={tone === "v2" ? { fontSize: "17px", fontWeight: 800, color: "#111111", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : { fontSize: "17px", fontWeight: 800, color: "#151923", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>

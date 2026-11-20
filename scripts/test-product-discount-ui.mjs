@@ -12,16 +12,19 @@ assert.equal(view.toJSON(), null);
 await act(async () => { view.update(React.createElement(Label, {note:{discount_display:{enabled:true,original_price:219000}},actualPrice:129000})); });
 assert.deepEqual(view.root.findByType('del').children, ['219,000', '원']);
 assert.equal(JSON.stringify(view.toJSON()).includes('41'), true);
+let emittedDiscount;
 function Form() {
   const [value, setValue] = React.useState({enabled:false,original_price:0});
-  return React.createElement(Editor, {value,onChange:setValue,actualPrice:129000});
+  return React.createElement(Editor, {value,onChange:next=>{emittedDiscount=next;setValue(next);},actualPrice:129000});
 }
 await act(async () => { view.update(React.createElement(Form)); });
 assert.equal(view.root.findByProps({type:'checkbox'}).props.checked, false);
 await act(async () => { view.root.findByProps({type:'checkbox'}).props.onChange({target:{checked:true}}); });
 assert.equal(view.root.findByProps({type:'checkbox'}).props.checked, true);
 await act(async () => { view.root.findByProps({'aria-label':'원래 판매가'}).props.onChange({target:{value:'219,000'}}); });
-assert.equal(view.root.findByProps({'aria-label':'원래 판매가'}).props.value, 219000);
+// 2026-10-29, 37def1eba3230633800f1972b19eaa618ba4e774: display commas, retain numeric storage.
+assert.equal(view.root.findByProps({'aria-label':'원래 판매가'}).props.value, '219,000');
+assert.deepEqual(emittedDiscount, {enabled:true,original_price:219000});
 assert.equal(JSON.stringify(view.toJSON()).includes('큰 금액'), false);
 await act(async () => { view.root.findByProps({type:'checkbox'}).props.onChange({target:{checked:false}}); });
 assert.equal(view.root.findAllByProps({'aria-label':'원래 판매가'}).length, 0);
