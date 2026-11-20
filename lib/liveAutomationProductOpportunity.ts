@@ -37,7 +37,7 @@ const compact=(x:unknown,n:number)=>String(x??'').replace(/[\r\n\t]+/g,' ').repl
 export function buildFocusedProductPrompt(q:{
   mode?:'live'|'paused'|'replay';product?:ChatProductFacts|null;
   productName:string;colors:readonly string[];candidates:readonly string[];
-  recentAi:readonly string[];
+  recentAi:readonly string[]; questionMemory?:readonly string[];
 }):string {
   const names=q.candidates.slice(0,6).map(s=>compact(s,32)).filter(Boolean);
   const product=compact(q.productName,110);
@@ -52,6 +52,7 @@ export function buildFocusedProductPrompt(q:{
     `확인된 색상: ${colors.join(', ')||'별도 없음'}`,
     `사용 가능한 테스트 닉네임: ${names.join(' / ')}`,
     `최근 AI 발언(뜻이나 문장 모양 반복 금지): ${q.recentAi.slice(0,6).map(s=>compact(s,55)).join(' / ')||'없음'}`,
+    `최근 테스트 대화에서 이미 나온 질문 유형(답장 대상 아님): ${(q.questionMemory||[]).map(s=>compact(s,40)).join(' / ')||'없음'}. 상품명·색상·닉네임이 달라도 이 질문을 다시 만들지 않는다.`,
     '상품코드나 정확한 상품명을 문장에 포함하고, 실제 확인된 색상이나 디자인에 관한 짧은 관심·취향·확인 질문만 작성한다.',
     '구체적 사이즈 번호, 키·몸무게, 배송 기간이나 방식, 재고, 소재 성능, 실제 착용·구매·결제 경험, 방송 음성을 추측해서 말하지 않는다.',
     '근거 없는 감탄, 기계적인 인사, 반복 맞장구, 다른 손님의 말을 빌려온 답변, 대상이 없는 "넵"이나 "빠르네요"는 쓰지 않는다.',

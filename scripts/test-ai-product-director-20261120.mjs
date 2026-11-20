@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 const now=Date.parse('2026-11-20T14:50:24+09:00');
 const card={productId:'818',detailName:'MX-107 와인',name:'MX-107 와인',parentName:'막스마라',colors:[],sizes:['36','38','40']};
-async function run({mode='paused',focused=false,text='mx107 와인 병 디자인이 독특하네요~',rate=80,rotate=false,removed=false,transition=false,hidden=[]}={}){
+async function run({mode='paused',focused=false,text='mx107 와인 병 디자인이 독특하네요~',rate=80,rotate=false,removed=false,transition=false,hidden=[],visible=[],replyTo=0}={}){
  const sent=[],prompts=[],actions=[];let reads=0,modes=0;
  const actor={id:'actor-a',nickname:'봄이',profile:{seed:17}},session={id:'session-a',actor_id:'actor-a',watching:true,last_ack_at:new Date(now-1000).toISOString()};
- const db={from(table){let key='',hiddenMemory=false;const q={select(){return q},eq(k,v){if(k==='key')key=v;return q},is(){return q},neq(){return q},not(){hiddenMemory=true;return q},gt(){return q},gte(){return q},in(){return q},order(){return q},limit(){return q},upsert(){return Promise.resolve({error:null})},maybeSingle:async()=>({data:table==='broadcasts'?{id:'bc',status:'ON',paused_at:'2026-11-19T18:00:00Z'}:{value:key==='live_automation_chat_rate_pct'?String(rate):key==='live_automation_director_log'?'[]':''}}),then(resolve,reject){const data=table==='live_automation_sessions'?[session]:table==='live_automation_actors'?[actor]:table==='visitor_presence'?[{automation_session_id:session.id}]:table==='live_chat_messages'&&hiddenMemory?hidden:[];return Promise.resolve({data,error:null}).then(resolve,reject)}};return q;}};
+ const db={from(table){let key='',hiddenMemory=false;const q={select(){return q},eq(k,v){if(k==='key')key=v;return q},is(){return q},neq(){return q},not(){hiddenMemory=true;return q},gt(){return q},gte(){return q},in(){return q},order(){return q},limit(){return q},upsert(){return Promise.resolve({error:null})},maybeSingle:async()=>({data:table==='broadcasts'?{id:'bc',status:'ON',paused_at:'2026-11-19T18:00:00Z'}:{value:key==='live_automation_chat_rate_pct'?String(rate):key==='live_automation_director_log'?'[]':''}}),then(resolve,reject){const data=table==='live_automation_sessions'?[session]:table==='live_automation_actors'?[actor]:table==='visitor_presence'?[{automation_session_id:session.id}]:table==='live_chat_messages'?(hiddenMemory?hidden:visible):[];return Promise.resolve({data,error:null}).then(resolve,reject)}};return q;}};
  const load=createUiLoader({
- './geminiJson':{callGeminiJson:async prompt=>{prompts.push(prompt);return {text:JSON.stringify(focused&&prompts.length===1?{speaker:'',text:''}:{speaker:'봄이',replyTo:0,text}),note:'ok'}}},
+ './geminiJson':{callGeminiJson:async prompt=>{prompts.push(prompt);return {text:JSON.stringify(focused&&prompts.length===1?{speaker:'',text:''}:{speaker:'봄이',replyTo,text}),note:'ok'}}},
  './autoTestOrderServer':{streamModeOf:async()=>transition&&++modes>=3?'replay':mode},
  './liveAutomationDialogueServer':{readDialogueCard:async()=>rotate&&++reads>1?{...card,detailName:'MX-104 와인',name:'MX-104 와인'}:card},
  './widgetFeaturedServer':{computeWidgetFeatured:async()=>({enabled:true,siteCardOff:false,targets:removed?[]:[card]})},
@@ -41,3 +41,25 @@ const cleared=await run({text:'mx107 와인 색이 예쁘네요',hidden});
 assert.equal(cleared.sent.length,0,'screen-clear does not reset repeat memory');
 assert.ok(!cleared.prompts[0].includes('#5'),'hidden row not restored as reply context');
 console.log('PASS actual director normal/focused paths, all phases, 0%, rotation/removal, transition, hidden memory');
+// Actual production gap: automated notices displace older AI turns from the visible
+// 40-row window; retain only their question family, never hidden raw dialogue.
+const olderQuestion={id:5724,body:'몽클323 블랙 모델 색감 실제로 어때요?',created_at:new Date(now-38*60_000).toISOString(),automation_actor_id:'other'};
+for(const focused of [false,true]){
+ const result=await run({mode:'live',focused,text:'mx107 와인 색감 화면이랑 실제랑 비슷한가요?',hidden:[olderQuestion]});
+ assert.equal(result.sent.length,0,'cross-product question repetition cannot reach transport');
+ for(const prompt of result.prompts){
+  assert.ok(prompt.includes('실물·화면 색감 확인 질문'),'both generation paths receive long-lived topic memory');
+  assert.ok(!prompt.includes(olderQuestion.body),'hidden text not republished as dialogue');
+  assert.ok(!prompt.includes('#5724'),'hidden message cannot be a reply target');
+ }
+}
+console.log('PASS director topic memory survives notification churn and screen clearing');
+
+const clarification={id:6000,nickname:'다른사람',body:'어느 부분이 궁금하세요?',created_at:new Date(now-120_000).toISOString(),badge:null};
+const repeated='mx107 와인 색감 화면이랑 실제랑 비슷한가요?';
+const aiReply=await run({mode:'live',text:repeated,hidden:[olderQuestion],visible:[{...clarification,automation_actor_id:'other'}],replyTo:6000});
+assert.equal(aiReply.prompts.length,1,'AI reply regression reaches model');
+assert.equal(aiReply.sent.length,0,'replyTo a TEST actor cannot bypass product question memory');
+const humanReply=await run({mode:'live',text:repeated,hidden:[olderQuestion],visible:[clarification],replyTo:6000});
+assert.equal(humanReply.sent.length,1,'verified human clarification can receive a contextual answer');
+console.log('PASS verified human exception without TEST-reply bypass');
