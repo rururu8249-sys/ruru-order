@@ -76,3 +76,15 @@ for(const focused of [false,true]){
  }
 }
 console.log('PASS off-air flow through both real director paths');
+const sparseTurn={id:7100,nickname:'다른테스트',body:'연베이지 색감 차분해 보여요',created_at:new Date(now-2*3600_000).toISOString(),automation_actor_id:'other'};
+const notices=Array.from({length:20},(_,i)=>({id:7200+i,body:'알림 개인정보',badge:'bot',bot_ref:'c:test'}));
+const sparse=await run({mode:'paused',focused:true,text:'오늘은 천천히 구경하고 있어요',visible:[...notices,sparseTurn]});
+for(const prompt of sparse.prompts){
+ assert.ok(prompt.includes(sparseTurn.body),'sparse conversation survives both notification churn and focused retry');
+ assert.ok(!prompt.includes('알림 개인정보'),'system notification content stays excluded');
+ assert.ok(prompt.includes('테스트 장바구니'),'retry retains per-speaker grounded context');
+ assert.ok(!prompt.includes('#7100'),'older context is not presented as a reply target');
+}
+console.log('PASS shared conversation context in focused recovery');
+const staleReply=await run({mode:'paused',focused:true,text:'저도 와인이 더 좋아요',visible:[{...sparseTurn,body:'와인 색감 차분해 보여요'}],replyTo:7100});
+assert.equal(staleReply.sent.length,0,'expired explicit reply is never demoted into unsolicited speech');
