@@ -17,7 +17,7 @@ import {AUTOMATION_OWNER} from './liveAutomation';
 import {automationRpc,type Action,type Campaign,type Session,type Actor} from './liveAutomationServer';
 import {automationPost} from './liveAutomationTransport';
 import {streamModeOf} from './autoTestOrderServer';
-import {judgeTestChat,productQuestionMemory,canContinueTestConversation,canContinueOwnTestTurn,planColorTestThread,type ChatObservation} from './liveAutomationQualityGate'; // RURU_QUALITY_GATE_V1
+import {judgeTestChat,productQuestionMemory,offAirQuestionPending,canContinueTestConversation,canContinueOwnTestTurn,planColorTestThread,type ChatObservation} from './liveAutomationQualityGate'; // RURU_QUALITY_GATE_V1
 import {unsupportedProductCode,unsuitableSpeech} from './liveAutomationSpeech';
 import {falseExperience} from './liveAutomationDialogue';
 import {mentionsNickname} from './liveAutomationConversation';
@@ -679,7 +679,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   // Read-only quality memory: screen-clear hides messages in UI but should NOT reset anti-repeat checks.
   // Never use these hidden rows as reply targets, sales evidence, or public chat context.
   rows<Row>(db.from('live_chat_messages').select('id,body,created_at,automation_actor_id,automation_action_id').eq('broadcast_id',c.broadcast_id)
-    .not('automation_actor_id','is',null).gte('created_at',new Date(now-2*60*60_000).toISOString())
+    .not('automation_actor_id','is',null).gte('created_at',new Date(now-12*60*60_000).toISOString())
     .order('id',{ascending:false}).limit(120)),
   db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle(),
   rows<Row>(db.from('live_automation_payment_events').select('actor_id,kind').eq('campaign_id',c.id).eq('status','sent').limit(500)),
@@ -760,7 +760,11 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));
  // Use the same bounded memory at generation and final validation. Older or
  // screen-cleared rows contribute topic summaries only, never reply context.
- const questionMemory=productQuestionMemory(previousTestChat.map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at))})),now);
+ const priorObservations=previousTestChat.map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at))}));
+ const questionMemory=productQuestionMemory(priorObservations,now);
+ const lastHumanRow=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&!m.bot_ref&&!/^\s*\//.test(clean(m.body)));
+ const lastHumanAt=lastHumanRow?Date.parse(String(lastHumanRow.created_at))||0:0;
+ const questionPending=offAirQuestionPending({recent:priorObservations,now,lastHumanAt,offAirSince:String(bc.data.paused_at||bc.data.ended_at||'')});
  const notices=messages.filter(m=>m.badge==='bot'&&/^(c|o|p):/.test(String(m.bot_ref||''))).map(m=>clean(m.body));
  const transcript=[...messages].reverse().map(m=>`#${m.id} ${hhmm(m.created_at)} ${clean(m.nickname)||'알림'}(${roleOf(m)}): ${clean(m.body).slice(0,140)}`).join('\n');
  const rosterText=roster.map(r=>`- ${r.actor.nickname}: ${r.first?'이 방송에서 아직 말 안 함(인사는 강제하지 않음)':'이미 대화함'} / 장바구니 ${r.cart.join(', ')||'없음'} / 주문 ${r.ordered.join(', ')||'없음'}${r.cardOrder?(r.paid.includes('card')?'(카드결제 주문 — 결제 완료됨)':'(카드결제 주문 — 아직 결제 전, 카톡·링크 얘기 금지)'):''}${r.bankOrder&&!r.cardOrder?'(무통장 주문 — 계좌로 입금, 카드 결제 링크 없음)':''} / 결제확인 ${r.paid.length?'받음':'아직'}${r.own.length?` / 이미 한 말: ${r.own.slice(0,4).map(x=>`「${x.slice(0,30)}」`).join(' ')}`:''}`).join('\n');
@@ -777,7 +781,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const modelRoster=[...called,...sortedRoster.filter(r=>!called.includes(r))].slice(0,8);
  const prompt=buildCompactConversationPrompt({
    mode,cardText,product:card,messages,pendingHumanId:newestHuman?Number(newestHuman.id):null,
-   styleSummary:roomSignals.style,realOrderProducts:roomSignals.realOrderProducts,rejectedLines,questionMemory,
+   styleSummary:roomSignals.style,realOrderProducts:roomSignals.realOrderProducts,rejectedLines,questionMemory,questionPending,
    nextShow:nextShow?nextShow.when:null,
    actors:modelRoster.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))
  });
@@ -798,8 +802,6 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  let lastModelNote=ans.note;
  let choiceReason=firstChoice.reason;
  let chosenPath='normal';
- const lastHumanRow=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&!m.bot_ref);
- const lastHumanAt=lastHumanRow?Date.parse(String(lastHumanRow.created_at))||0:0;
  // A verified displayed product can merit a rare, grounded conversational turn.
  // Retry once with a compact prompt if the full-context model returned no valid speaker.
  // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
@@ -817,7 +819,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
    const focusedPrompt=buildFocusedProductPrompt({
      mode,product:card,productName:card?.name||'',colors:card?.colors||[],
-     candidates:candidates.map(r=>String(r.actor.nickname)),recentAi,questionMemory
+     candidates:candidates.map(r=>String(r.actor.nickname)),recentAi,questionMemory,questionPending
    });
    if(!focusedPrompt)return;
    const focused=await callGeminiJson(focusedPrompt,{timeoutMs:12000,maxTokens:200,maxAttempts:2,temperature:.8,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
@@ -853,8 +855,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(!tgt&&roomAnnounceBlocked(t,recentAi))return false;
   if(offCardProductMention(t,[card?`${card.name} ${card.colors.join(' ')}`:'',...r.cart,...r.ordered].join(' '),notices))return false;
   if(/([가-힣]{2,}요)[\s\S]*\1/.test(t))return false;
-  // 시청 상태 혼잣말은 금지 — 단 방송 시간이 아닐 때 «다시보기 보면서 주문/담기» 얘기는 사장님 요청(08:26)이라 허용
-  if(/다시\s*보기|구경\s*(하는|중|하고)/.test(t)&&!(mode!=='live'&&/다시\s*보기/.test(t)&&/주문|담/.test(t)))return false;
+  // [2026-11-21] 구경·선택에 대한 혼잣말 허용. 과거 시청 경험을 만들지는 않음. 방송 시간이 아닐 때 «다시보기 보면서 주문/담기» 얘기는 사장님 요청(08:26)이라 허용
+  if(/다시\s*보기/.test(t)&&!(mode!=='live'&&/다시\s*보기/.test(t)&&/주문|담/.test(t)))return false;
   if(!subscribeOn&&/무배|무료\s*배송|구독.{0,6}(하면|인증|무료)/.test(t))return false;
   // [2026-11-15 14:51 사장님 「이미 주문서 냈는데 구독 무배를 물어?」] 주문서를 이미 낸 손님은 주문 전에 물을 말(구독·무배·배송비·카드 돼요·주문 방법·계좌) 안 함
   if(r.ordered.length&&orderedAskBlocked(t))return false;
@@ -914,7 +916,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    }));
    const quality=judgeTestChat({text,currentProduct:card,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:card?`${card.productId}:${card.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate,
     offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
-    replySourceIsHuman:Boolean(target&&!target.automation_actor_id),
+    replySourceIsHuman:Boolean(target&&!target.automation_actor_id),lastHumanAt,
     replySourceText:String(target?.body||'')});
    if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
    if(text){

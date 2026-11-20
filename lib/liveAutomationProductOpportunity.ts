@@ -37,7 +37,7 @@ const compact=(x:unknown,n:number)=>String(x??'').replace(/[\r\n\t]+/g,' ').repl
 export function buildFocusedProductPrompt(q:{
   mode?:'live'|'paused'|'replay';product?:ChatProductFacts|null;
   productName:string;colors:readonly string[];candidates:readonly string[];
-  recentAi:readonly string[]; questionMemory?:readonly string[];
+  recentAi:readonly string[]; questionMemory?:readonly string[]; questionPending?:boolean;
 }):string {
   const names=q.candidates.slice(0,6).map(s=>compact(s,32)).filter(Boolean);
   const product=compact(q.productName,110);
@@ -53,7 +53,8 @@ export function buildFocusedProductPrompt(q:{
     `사용 가능한 테스트 닉네임: ${names.join(' / ')}`,
     `최근 AI 발언(뜻이나 문장 모양 반복 금지): ${q.recentAi.slice(0,6).map(s=>compact(s,55)).join(' / ')||'없음'}`,
     `최근 테스트 대화에서 이미 나온 질문 유형(답장 대상 아님): ${(q.questionMemory||[]).map(s=>compact(s,40)).join(' / ')||'없음'}. 상품명·색상·닉네임이 달라도 이 질문을 다시 만들지 않는다.`,
-    '상품코드나 정확한 상품명을 문장에 포함하고, 실제 확인된 색상이나 디자인에 관한 짧은 관심·취향·확인 질문만 작성한다.',
+    '현재 상품은 대화의 근거이지 읽어 줄 대본이 아니다. 상품코드·전체 상품명·색감 질문을 매번 넣지 않는다. 자기 취향이나 선택 고민, 구경하는 마음을 짧게 말할 수 있다. 구체적인 상품 사실을 말하거나 질문할 때만 대상을 분명히 하고 확인된 정보에 한정한다.',
+    ...(q.mode&&q.mode!=='live'?[`진행자가 없는 시간이다. ${q.questionPending?'답을 기다리는 질문이 있음: 또 다른 독립 질문을 만들지 않는다.':'가끔 필요한 질문은 가능하지만 질문부터 만들지 않는다.'} 답을 요구하지 않는 자기 생각을 짧게 남기거나 침묵한다. 실물·착용감·영상 장면을 보았다고 꾸미지 않는다.`]:[]),
     '구체적 사이즈 번호, 키·몸무게, 배송 기간이나 방식, 재고, 소재 성능, 실제 착용·구매·결제 경험, 방송 음성을 추측해서 말하지 않는다.',
     '근거 없는 감탄, 기계적인 인사, 반복 맞장구, 다른 손님의 말을 빌려온 답변, 대상이 없는 "넵"이나 "빠르네요"는 쓰지 않는다.',
     '"고민되네요", "깔끔하네요", "궁금하네요" 같은 정형화된 말끝을 반복하지 마라. 짧은 취향 질문이나 다른 관찰이 없다면 침묵해라.',
