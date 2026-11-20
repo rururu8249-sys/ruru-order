@@ -4,7 +4,8 @@ import Renderer,{act} from 'react-test-renderer';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.window={addEventListener(){},removeEventListener(){}};
-globalThis.document={querySelector(){return null;}};
+// Broadcast-list refresh listens on document as well as window; keep the DOM fixture complete.
+globalThis.document={querySelector(){return null;},addEventListener(){},removeEventListener(){}};
 let catalog=[];
 let brandLinks=[];
 globalThis.fetch=async()=>({ok:true,json:async()=>({links:brandLinks})});

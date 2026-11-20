@@ -60,6 +60,7 @@ if (typeof window !== "undefined") {
 }
 
 type ProductRow = Record<string, unknown>;
+const EMPTY_PRODUCT_ROWS: ProductRow[] = [];
 
 export type ProductManageTab = "broadcast" | "shop" | "products";
 
@@ -300,6 +301,8 @@ function sortProductRows(rows: ProductRow[], key: ProductSortKey) {
 
 export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange, embedded = false, headerTarget }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
+  const [productsLoaded, setProductsLoaded] = useState(false);
+  const [productsError, setProductsError] = useState("");
   const [brandLinks, setBrandLinks] = useState<BrandProductLink[]>([]);
   const [brandMove, setBrandMove] = useState<{source:ProductRow;undoParentId?:string}|null>(null);
   const brandCatalog = useMemo(() => resolveBrandCatalog(products, brandLinks), [products, brandLinks]);
@@ -328,12 +331,22 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   // 방송 상품 탭(broadcast)
   const [bcList, setBcList] = useState<Array<{ id: string; title: string; started_at: string; status: string }>>([]);
-  const [bcSelId, setBcSelId] = useState("");
+  // 행 선택은 표시 순서를 바꾸지 않는다. 필터를 바꿀 때 보존한 방송은 다음 필터 변경까지 유지한다.
+  const [bcSelection, setBcSelection] = useState({ id: "", retainedId: "", revision: 0 });
+  const bcSelectionRef = useRef(bcSelection);
+  bcSelectionRef.current = bcSelection;
+  const bcSelId = bcSelection.id;
+  const retainBcFilterSelection = () => setBcSelection((cur) => ({ ...cur, retainedId: cur.id }));
   const [introManage, setIntroManage] = useState<{bc: string; query: string} | null>(null);
   // [2026-11-06 사장님 «방송 숨겼더니 뭘 담았는지 모르겠다»] 숨긴 방송도 따로 들고 있다가 「숨긴 방송」 펼침·되살리기·담기 창 «지난 방송»에서 쓴다
   const [bcHiddenList, setBcHiddenList] = useState<Array<{ id: string; title: string; started_at: string; status: string }>>([]);
   const [bcHiddenOpen, setBcHiddenOpen] = useState(false);
-  const [bcProducts, setBcProducts] = useState<ProductRow[]>([]);
+  const [bcProductResult, setBcProductResult] = useState<{ id: string; revision: number; sourceProducts: ProductRow[] | null; rows: ProductRow[]; error: string }>({ id: "", revision: 0, sourceProducts: null, rows: [], error: "" });
+  const bcProductLoadSeqRef = useRef(0);
+  const bcResultCurrent = bcProductResult.id === bcSelId && bcProductResult.revision === bcSelection.revision && bcProductResult.sourceProducts === products;
+  const bcProductsReady = productsLoaded && bcResultCurrent;
+  const bcProductsError = productsError || (bcResultCurrent ? bcProductResult.error : "");
+  const bcProducts = bcProductsReady && !bcProductsError ? bcProductResult.rows : EMPTY_PRODUCT_ROWS;
   const [bcLoading, setBcLoading] = useState(false);
   const [bcBusy, setBcBusy] = useState(false);
   const [bcRenameOpen, setBcRenameOpen] = useState(false);
@@ -345,6 +358,27 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcCustomFrom, setBcCustomFrom] = useState<string>(""); // YYYY-MM-DD
   const [bcCustomTo, setBcCustomTo] = useState<string>("");     // YYYY-MM-DD
   const [bcSearch, setBcSearch] = useState<string>("");         // 방송 이름 검색
+  const matchesBcFilter = useMemo(() => {
+    const q = bcSearch.trim().toLowerCase();
+    // 기간 하한(from)·상한(to) 계산 (started_at 기준)
+    let fromTs = -Infinity;
+    let toTs = Infinity;
+    if (bcDateFilter === "recent30") fromTs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    else if (bcDateFilter === "recent90") fromTs = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    else if (bcDateFilter === "custom") {
+      if (bcCustomFrom) { const d = new Date(`${bcCustomFrom}T00:00:00`); if (!Number.isNaN(d.getTime())) fromTs = d.getTime(); }
+      if (bcCustomTo) { const d = new Date(`${bcCustomTo}T23:59:59`); if (!Number.isNaN(d.getTime())) toTs = d.getTime(); }
+    }
+    return (b: { started_at: string; title: string }) => {
+      if (q && !b.title.toLowerCase().includes(q)) return false;
+      if (bcDateFilter === "all") return true;
+      const t = new Date(b.started_at).getTime();
+      if (Number.isNaN(t)) return true; // [2026-11-06 사장님 «새 방송 제목이 사라짐»] 아직 안 켠 새 방송(날짜 없음)은 기간과 상관없이 늘 보인다
+      return t >= fromTs && t <= toTs;
+    };
+  }, [bcList, bcDateFilter, bcCustomFrom, bcCustomTo, bcSearch]);
+  const bcFilterRef = useRef(matchesBcFilter);
+  bcFilterRef.current = matchesBcFilter;
   // [2026-10-03] 한 번이라도 고정한 상품은 서버 settings에 계속 보관한다.
   // 기존 브라우저 localStorage 기록은 첫 로드 때 idempotent merge하여 과거 목록도 최대한 살린다.
   const [widgetHistory, setWidgetHistory] = useState<WidgetHistoryEntry[]>([]);
@@ -480,6 +514,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // 상품 fetch (기존 loadProducts 재사용)
   const loadProducts = async (silent = false) => {
     if (!silent) setLoading(true);
+    setProductsError("");
     try {
       const allProducts: ProductRow[] = [];
       for (let offset = 0; ; offset += 1000) {
@@ -496,9 +531,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       resolveBrandCatalog(allProducts, catalog.links);
       setProducts(allProducts);
       setBrandLinks(catalog.links);
+      setProductsLoaded(true);
     } catch (e) {
       setProducts([]);
       setBrandLinks([]);
+      setProductsLoaded(false);
+      setProductsError("상품 목록을 불러오지 못했습니다.");
       showAdminToast("상품 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
       if (!silent) setLoading(false);
@@ -683,11 +721,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           .limit(60);
         setBcHiddenList(((hid as Array<Record<string, unknown>>) || []).map(toItem));
       } catch { /* 숨긴 방송 못 읽어도 무시 */ }
-      setBcSelId((cur) => {
-        if (preferId && list.some((b) => b.id === preferId)) return preferId;
-        if (cur && list.some((b) => b.id === cur)) return cur;
+      setBcSelection((cur) => {
+        if (preferId && list.some((b) => b.id === preferId)) return { id: preferId, retainedId: preferId, revision: cur.revision + Number(cur.id !== preferId) };
+        const selected = list.find((b) => b.id === cur.id);
+        if (selected) {
+          // 외부 제목/날짜 변경으로 필터 밖이 됐을 때 선택 방송을 보존한다. 행 클릭은 예외를 바꾸지 않는다.
+          return String(selected.status).toUpperCase() !== "ON" && !bcFilterRef.current(selected)
+            ? { ...cur, retainedId: cur.id } : cur;
+        }
         const active = activeBroadcastId ? list.find((b) => b.id === String(activeBroadcastId)) : null;
-        return active ? active.id : (list[0]?.id || "");
+        const id = active ? active.id : (list[0]?.id || "");
+        return { id, retainedId: id, revision: cur.revision + Number(cur.id !== id) };
       });
     } finally {
       setBcLoading(false);
@@ -765,7 +809,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     try {
       const { error } = await adminCatalogWrite({ table: "broadcasts", op: "update", values: { is_deleted: true }, filters: [{ type: "eq", col: "id", val: b.id }] });
       if (error) throw error;
-      if (bcSelId === b.id) setBcSelId("");
+      setBcSelection((cur) => cur.id === b.id ? { ...cur, id: "", revision: cur.revision + 1 } : cur);
       await loadBroadcastList();
       window.dispatchEvent(new Event("ruru-broadcast-list-updated"));
     } catch (e) {
@@ -838,32 +882,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   // [2026-09-25] 방송 목록 기간 + 이름 검색 필터 — 표시 전용. bcList 원본은 그대로 두고 렌더만 거른다.
-  //   [사장님 요청] 지금 선택된 방송·방송 중(ON)인 방송은 기간/검색 필터와 상관없이 «항상 맨 위»에 고정.
+  // [2026-11-20 사장님 요청] 선택 클릭은 행 위치를 바꾸지 않는다. ON만 상단, 필터 예외는 원래 위치.
   const bcListView = useMemo(() => {
-    const q = bcSearch.trim().toLowerCase();
-    // 기간 하한(from)·상한(to) 계산 (started_at 기준)
-    let fromTs = -Infinity;
-    let toTs = Infinity;
-    if (bcDateFilter === "recent30") fromTs = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    else if (bcDateFilter === "recent90") fromTs = Date.now() - 90 * 24 * 60 * 60 * 1000;
-    else if (bcDateFilter === "custom") {
-      if (bcCustomFrom) { const d = new Date(`${bcCustomFrom}T00:00:00`); if (!Number.isNaN(d.getTime())) fromTs = d.getTime(); }
-      if (bcCustomTo) { const d = new Date(`${bcCustomTo}T23:59:59`); if (!Number.isNaN(d.getTime())) toTs = d.getTime(); }
-    }
-    const isAlwaysTop = (b: { id: string; status: string }) => b.id === bcSelId || String(b.status || "").toUpperCase() === "ON";
-    const passesFilter = (b: { started_at: string; title: string }) => {
-      if (q && !b.title.toLowerCase().includes(q)) return false;
-      if (bcDateFilter === "all") return true;
-      const t = new Date(b.started_at).getTime();
-      if (Number.isNaN(t)) return true; // [2026-11-06 사장님 «새 방송 제목이 사라짐»] 아직 안 켠 새 방송(날짜 없음)은 기간과 상관없이 늘 보인다
-      return t >= fromTs && t <= toTs;
-    };
-    // 고정(선택·ON)은 bcList 순서(started_at 내림차순) 그대로 맨 위, 나머지는 필터 통과분만.
+    const isAlwaysTop = (b: { status: string }) => String(b.status || "").toUpperCase() === "ON";
+    // 기간을 줄여도 선택했던 방송은 남기되, 다른 행을 클릭했다고 예외 행을 제거하거나 승격하지 않는다.
     const top = bcList.filter(isAlwaysTop);
     const topIds = new Set(top.map((b) => b.id));
-    const rest = bcList.filter((b) => !topIds.has(b.id) && passesFilter(b));
+    const rest = bcList.filter((b) => !topIds.has(b.id) && (b.id === bcSelection.retainedId || matchesBcFilter(b)));
     return [...top, ...rest];
-  }, [bcList, bcDateFilter, bcCustomFrom, bcCustomTo, bcSearch, bcSelId]);
+  }, [bcList, matchesBcFilter, bcSelection.retainedId]);
 
   // [2026-08-13] 드래그 허용 조건 — 「진열 순서」 + 검색 안 함 + 복사모드 아님 + 저장 중 아님.
   //   (고정 여부는 더 이상 조건이 아니다 — ID 기준 순서변경이라 안 엉킴)
@@ -871,25 +898,38 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   // 선택 방송의 broadcast_products 목록 로드 (sort_order순, products와 매칭)
   const reloadBcProducts = async (selId: string) => {
+    // 저장 후 늦게 시작한 이전 방송 재조회도 현재 선택의 요청 번호를 무효화하면 안 된다.
+    if (selId !== widgetLibraryTargetRef.current || bcSelection.revision !== bcSelectionRef.current.revision) return;
+    const revision = bcSelection.revision;
+    const requestSeq = ++bcProductLoadSeqRef.current;
     if (!selId) {
-      setBcProducts([]);
+      setBcProductResult({ id: "", revision, sourceProducts: products, rows: [], error: "" });
       return;
     }
-    const { data: links } = await supabase
-      .from("broadcast_products")
-      .select("product_id, sort_order")
-      .eq("broadcast_id", selId)
-      .order("sort_order", { ascending: true });
-    const ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
-    const byId = new Map(products.map((p) => [productId(p), p]));
-    const rows = ids.map((pid) => byId.get(pid)).filter(Boolean) as ProductRow[];
-    setBcProducts(rows);
+    if (bcProductsError) setBcProductResult({ id: "", revision, sourceProducts: products, rows: [], error: "" });
+    try {
+      const { data: links, error } = await supabase
+        .from("broadcast_products")
+        .select("product_id, sort_order")
+        .eq("broadcast_id", selId)
+        .order("sort_order", { ascending: true });
+      if (requestSeq !== bcProductLoadSeqRef.current || selId !== widgetLibraryTargetRef.current) return;
+      if (error) throw error;
+      const ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
+      const byId = new Map(products.map((p) => [productId(p), p]));
+      const rows = ids.map((pid) => byId.get(pid)).filter(Boolean) as ProductRow[];
+      setBcProductResult({ id: selId, revision, sourceProducts: products, rows, error: "" });
+    } catch {
+      if (requestSeq !== bcProductLoadSeqRef.current || selId !== widgetLibraryTargetRef.current) return;
+      setBcProductResult({ id: selId, revision, sourceProducts: products, rows: [], error: "방송 상품을 불러오지 못했습니다." });
+    }
   };
 
   useEffect(() => {
     if (tab !== "broadcast") return;
     void reloadBcProducts(bcSelId);
     void loadBcWidgetPin(bcSelId);
+    return () => { ++bcProductLoadSeqRef.current; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, bcSelId, products]);
 
@@ -1047,7 +1087,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     const ordered = [...bcProducts];
     const [moved] = ordered.splice(from, 1);
     ordered.splice(to, 0, moved);
-    setBcProducts(ordered); // 낙관적 갱신
+    ++bcProductLoadSeqRef.current;
+    setBcProductResult({ id: bcSelId, revision: bcSelection.revision, sourceProducts: products, rows: ordered, error: "" }); // 선택 방송에만 낙관적 갱신
     setBcBusy(true);
     try {
       for (let i = 0; i < ordered.length; i++) {
@@ -1996,7 +2037,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <input
                     type="text"
                     value={bcSearch}
-                    onChange={(e) => setBcSearch(e.target.value)}
+                    onChange={(e) => { if (e.target.value !== bcSearch) { retainBcFilterSelection(); setBcSearch(e.target.value); } }}
                     placeholder="방송 이름 검색"
                     style={{ width: "100%", height: "28px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 700, padding: "0 8px" }}
                   />
@@ -2013,7 +2054,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         <button
                           key={o.key}
                           type="button"
-                          onClick={() => setBcDateFilter(o.key)}
+                          onClick={() => { if (o.key !== bcDateFilter) { retainBcFilterSelection(); setBcDateFilter(o.key); } }}
                           style={{ fontSize: "11px", fontWeight: 800, borderRadius: "999px", padding: "4px 8px", cursor: "pointer", border: active ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", background: active ? "var(--color-rose-deep)" : "var(--color-surface)", color: active ? "#fff" : "var(--color-ink-soft)" }}
                         >
                           {o.label}
@@ -2024,9 +2065,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   {/* 기간 선택: 시작 ~ 종료 (started_at 기준) */}
                   {bcDateFilter === "custom" ? (
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <input type="date" value={bcCustomFrom} onChange={(e) => setBcCustomFrom(e.target.value)} style={{ flex: 1, minWidth: 0, height: "28px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 700, padding: "0 4px" }} />
+                      <input type="date" value={bcCustomFrom} onChange={(e) => { if (e.target.value !== bcCustomFrom) { retainBcFilterSelection(); setBcCustomFrom(e.target.value); } }} style={{ flex: 1, minWidth: 0, height: "28px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 700, padding: "0 4px" }} />
                       <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>~</span>
-                      <input type="date" value={bcCustomTo} onChange={(e) => setBcCustomTo(e.target.value)} style={{ flex: 1, minWidth: 0, height: "28px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 700, padding: "0 4px" }} />
+                      <input type="date" value={bcCustomTo} onChange={(e) => { if (e.target.value !== bcCustomTo) { retainBcFilterSelection(); setBcCustomTo(e.target.value); } }} style={{ flex: 1, minWidth: 0, height: "28px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 700, padding: "0 4px" }} />
                     </div>
                   ) : null}
                 </div>
@@ -2046,7 +2087,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const d = new Date(b.started_at);
                     const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
                     return (
-                      <button type="button" key={b.id} className="group" onClick={() => { setBcSelId(b.id); setBcRenameOpen(false); if (isNarrow) setBcListOpen(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
+                      <button type="button" key={b.id} className="group" onClick={() => { setBcSelection((cur) => cur.id === b.id ? cur : { ...cur, id: b.id, revision: cur.revision + 1 }); setBcRenameOpen(false); if (isNarrow) setBcListOpen(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "1px 6px", borderRadius: "4px", background: isOn ? "var(--color-ok-bg)" : "var(--color-surface-2)", color: isOn ? "var(--color-ok-tx)" : "var(--color-ink-mute)" }}>{isOn ? "ON" : b.started_at ? "종료" : "준비"}</span>
                           <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: on ? "var(--color-rose-deep)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</span>
@@ -2094,7 +2135,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
             <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: isNarrow ? "none" : "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
-                <span style={{ ...TAB_TITLE_STYLE, whiteSpace: "nowrap", flexBasis: isNarrow ? "100%" : undefined }}>방송 상품 {bcProducts.length}개</span>
+                <span style={{ ...TAB_TITLE_STYLE, whiteSpace: "nowrap", flexBasis: isNarrow ? "100%" : undefined }}>방송 상품{bcProductsReady && !bcProductsError ? ` ${bcProducts.length}개` : ""}</span>
                 {bcSelId && bcProducts.length > 0 ? (
                   <select
                     value={bcSort}
@@ -2111,7 +2152,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {bcSelId && bcProducts.length > 0 ? (
                   <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ height: "36px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", background: bcCopyMode ? "var(--color-surface-2)" : "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "선택 취소" : "선택 복사"}</button>
                 ) : null}
-                <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: bcSelId && bcProducts.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 담기</button>
+                <button type="button" disabled={!bcSelId || bcBusy || !bcProductsReady || !!bcProductsError} onClick={openBcPicker} style={{ marginLeft: bcSelId && bcProducts.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy || !bcProductsReady || bcProductsError ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy || !bcProductsReady || bcProductsError ? 0.5 : 1 }}>+ 담기</button>
               </div>
               {selectedBroadcastForEdit ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
@@ -2202,7 +2243,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               ) : null}
               {/* [2026-08-29 사장님 지시] 소개 중인 상품은 늘 맨 위 카드에(검색 중이어도). [2026-11-09] DESIGN-ADMIN 색(검정 테두리·연회색)·버튼 [안내글 복사][소개 끝] 둘만 — 수정은 줄 「⋯」에서. */}
               {(() => {
-                if (bcWidgetPin.mode !== "pin") {
+                if (bcWidgetPin.mode !== "pin" || !bcProductsReady || bcProductsError) {
                   return null;
                 }
                 const pinnedRow = findBroadcastProduct(bcWidgetPin.productId);
@@ -2255,6 +2296,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               >
                 {!bcSelId ? (
                   <div style={{ textAlign: "center", padding: "32px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>방송을 선택하세요.</div>
+                ) : bcProductsError ? (
+                  <div role="alert" style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-soft)", fontSize: "13px", lineHeight: 1.7 }}>
+                    <div>{bcProductsError}</div>
+                    <button type="button" onClick={() => { if (productsError) void loadProducts(); else void reloadBcProducts(bcSelId); }} style={{ ...rowBtn, marginTop: "8px" }}>다시 불러오기</button>
+                  </div>
+                ) : !bcProductsReady ? (
+                  <div role="status" style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>방송 상품을 불러오는 중…</div>
                 ) : bcProducts.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품 없음 — 아래에서 골라 「진열」</div></div>
                 ) : (
