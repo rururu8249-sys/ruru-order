@@ -56,9 +56,9 @@ Files: `components/admin-live/CustomerFullOrderHistory.tsx`, `scripts/test-membe
 
 - [x] DESIGN-ADMIN의 회원 보완 규칙 및 CLAUDE/기존 계획의 PR #49 배포 기록 교정.
 - [x] 34종 회귀·전체 guard·TypeScript·build(58/58)·diff 점검, 독립 변경 검토.
-- [x] PC/모바일·키보드·선택 메뉴 검증 범위 기록: 새 버전은 React fixture/소스/빌드 통과, 실제 브라우저는 아직 미검증. 기존 PR #49 운영 검수와 구분.
+- [x] PC/모바일·키보드·선택 메뉴 검증 범위 기록: PR #50 배포 후 실제 Chrome PC/360·375·390·430px 표시·필터·상세·중첩 포커스 확인. 정렬 메뉴 Esc 문제는 아래 후속 작업으로 분리.
 - [x] 수정 ZIP/한 번 붙여넣는 배포 명령 준비. 새 작업 폴더, 기준 commit/tree 대조, 검사 통과 후 PR/일반 병합/Vercel success 확인. 기존 사용자 작업 폴더를 덮어쓰지 않음.
-- [ ] 배포 및 실화면 확인 후 상태 구분 보고.
+- [x] PR #50 병합/main `7565e5f817942bb59ab59c9a497b4b8871aa40ed`·Vercel success·검증 tree 동일 확인. 실화면 통과 항목과 Esc 결함을 구분해서 보고.
 
 ### 검토 중 보완한 재현 사례
 
@@ -67,3 +67,12 @@ Files: `components/admin-live/CustomerFullOrderHistory.tsx`, `scripts/test-membe
 - 상태 건수가 aria-label로 가려짐, 주문 상품 줄 수 누락, 주문 focus outline 잘림: 표시 구조 보완.
 - 이미 열린 전화번호 폼의 재조회 실패: native fieldset으로 자식 입력/버튼을 비활성화하고 초안 보존.
 - 제품 변경은 4개 회원 컴포넌트와 회원 영역 CSS에 한정. 저장/식별/집계 함수 AST 비교 결과 동일.
+
+## Task 5: PR #50 실화면 검수에서 확인한 Esc 이중 닫힘
+
+- [x] 실제 PC 새 탭에서 정렬 메뉴→End→Esc 시 상세까지 닫힘 재현.
+- [x] 기존 설계의 첫 Esc는 메뉴만 닫는 규칙과 대조. 설치 Next/React 소스 및 DOM 규격으로 같은 document의 리스너 전달 확인.
+- [x] 기존 화면 fixture를 native EventTarget 전달로 교정하고 기존 제품 코드에서 실패 확인. 카카오·주문 집계 등 정책 기대값 변경 없음.
+- [x] 공통 모달 훅의 Escape 분기에 defaultPrevented 확인 추가. 다른 키·저장·데이터 코드 수정 없음.
+- [x] 34종 회귀·guard·TypeScript·build(58/58)·독립 리뷰 통과. 메뉴/부모 두 단계 닫힘·취소한 정렬 유지·포커스/스크롤 복원 검증.
+- [ ] 후속 수정(v7) 배포 및 실제 PC/모바일 Esc 재검증.

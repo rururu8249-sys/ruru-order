@@ -18,7 +18,12 @@ export function useAdminModalFocus(panelRef:RefObject<HTMLDivElement|null>,onClo
     panel.focus();
     const keydown=(event:KeyboardEvent)=>{
       if(activePanels.at(-1)!==panel) return;
-      if(event.key==="Escape") {event.preventDefault();event.stopPropagation();closeRef.current();return;}
+      if(event.key==="Escape") {
+        // A nested select can consume Escape in React's document listener.
+        // stopPropagation alone does not skip this listener on the same target.
+        if(event.defaultPrevented) return;
+        event.preventDefault();event.stopPropagation();closeRef.current();return;
+      }
       if(event.key!=="Tab") return;
       const nodes=Array.from(panel.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex="0"]')).filter(node=>node.getClientRects().length>0 && !node.closest("[hidden]"));
       const first=nodes[0],last=nodes.at(-1);
