@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 const now=Date.parse('2026-11-20T14:50:24+09:00');
-const card={productId:'818',detailName:'MX-107 와인',name:'MX-107 와인',parentName:'막스마라',colors:[],sizes:['36','38','40']};
-async function run({mode='paused',focused=false,text='mx107 와인 병 디자인이 독특하네요~',rate=80,rotate=false,removed=false,transition=false,hidden=[],visible=[],replyTo=0}={}){
- const sent=[],prompts=[],actions=[];let reads=0,modes=0;
+const baseCard={productId:'818',detailName:'MX-107 와인',name:'MX-107 와인',parentName:'막스마라',colors:[],sizes:['36','38','40']};
+export async function run({mode='paused',focused=false,text='mx107 와인 병 디자인이 독특하네요~',rate=80,rotate=false,removed=false,transition=false,hidden=[],visible=[],replyTo=0,drafts=null,cardOverride=null,clockNow=now}={}){
+ const now=clockNow,card=cardOverride||baseCard;
+ const sent=[],prompts=[],actions=[],decisions=[];let reads=0,modes=0;
  const actor={id:'actor-a',nickname:'봄이',profile:{seed:17}},session={id:'session-a',actor_id:'actor-a',watching:true,last_ack_at:new Date(now-1000).toISOString()};
- const db={from(table){let key='',hiddenMemory=false;const q={select(){return q},eq(k,v){if(k==='key')key=v;return q},is(){return q},neq(){return q},not(){hiddenMemory=true;return q},gt(){return q},gte(){return q},in(){return q},order(){return q},limit(){return q},upsert(){return Promise.resolve({error:null})},maybeSingle:async()=>({data:table==='broadcasts'?{id:'bc',status:'ON',paused_at:'2026-11-19T18:00:00Z'}:{value:key==='live_automation_chat_rate_pct'?String(rate):key==='live_automation_director_log'?'[]':''}}),then(resolve,reject){const data=table==='live_automation_sessions'?[session]:table==='live_automation_actors'?[actor]:table==='visitor_presence'?[{automation_session_id:session.id}]:table==='live_chat_messages'?(hiddenMemory?hidden:visible):[];return Promise.resolve({data,error:null}).then(resolve,reject)}};return q;}};
+ const db={from(table){let key='',hiddenMemory=false;const q={select(){return q},eq(k,v){if(k==='key')key=v;return q},is(){return q},neq(){return q},not(){hiddenMemory=true;return q},gt(){return q},gte(){return q},in(){return q},order(){return q},limit(){return q},upsert(v){const row=Array.isArray(v)?v[0]:v;if(row?.key==='live_automation_director_log')decisions.push(...JSON.parse(row.value));return Promise.resolve({error:null})},maybeSingle:async()=>({data:table==='broadcasts'?{id:'bc',status:'ON',paused_at:'2026-11-19T18:00:00Z'}:{value:key==='live_automation_chat_rate_pct'?String(rate):key==='live_automation_director_log'?'[]':''}}),then(resolve,reject){const data=table==='live_automation_sessions'?[session]:table==='live_automation_actors'?[actor]:table==='visitor_presence'?[{automation_session_id:session.id}]:table==='live_chat_messages'?(hiddenMemory?hidden:visible):[];return Promise.resolve({data,error:null}).then(resolve,reject)}};return q;}};
  const load=createUiLoader({
- './geminiJson':{callGeminiJson:async prompt=>{prompts.push(prompt);return {text:JSON.stringify(focused&&prompts.length===1?{speaker:'',text:''}:{speaker:'봄이',replyTo,text}),note:'ok'}}},
+ './geminiJson':{callGeminiJson:async prompt=>{prompts.push(prompt);return {text:JSON.stringify(focused&&prompts.length===1?{speaker:'',text:''}:drafts?{candidates:drafts.map(text=>({speaker:'봄이',replyTo:0,text}))}:{speaker:'봄이',replyTo,text}),note:'ok'}}},
  './autoTestOrderServer':{streamModeOf:async()=>transition&&++modes>=3?'replay':mode},
  './liveAutomationDialogueServer':{readDialogueCard:async()=>rotate&&++reads>1?{...card,detailName:'MX-104 와인',name:'MX-104 와인'}:card},
  './widgetFeaturedServer':{computeWidgetFeatured:async()=>({enabled:true,siteCardOff:false,targets:removed?[]:[card]})},
@@ -24,7 +25,7 @@ async function run({mode='paused',focused=false,text='mx107 와인 병 디자인
  });
  const dateNow=Date.now,random=Math.random;Date.now=()=>now;Math.random=()=>0;
  try{await load('lib/liveAutomationDirector.ts').runRoomDirector(db,{id:'campaign',broadcast_id:'bc',chat_enabled:true,revision:1},'https://invalid.test');}finally{Date.now=dateNow;Math.random=random;}
- return {sent,prompts,actions};
+ return {sent,prompts,actions,decisions};
 }
 for(const mode of ['live','paused','replay'])for(const focused of [false,true]){
  const bad=await run({mode,focused});assert.equal(bad.sent.length,0,`${mode}/${focused}: semantic error must not reach transport`);
@@ -88,3 +89,17 @@ for(const prompt of sparse.prompts){
 console.log('PASS shared conversation context in focused recovery');
 const staleReply=await run({mode:'paused',focused:true,text:'저도 와인이 더 좋아요',visible:[{...sparseTurn,body:'와인 색감 차분해 보여요'}],replyTo:7100});
 assert.equal(staleReply.sent.length,0,'expired explicit reply is never demoted into unsolicited speech');
+const multi=await run({focused:true,drafts:['mx107 와인 병에 따라 마시기 좋겠네요','겨울에 어떤 스타일이랑 입을지 고민되네요.']});
+assert.equal(multi.sent.length,1,'reject unsafe first draft and send the valid second draft');
+assert.ok(multi.sent[0].body.includes('스타일'));
+assert.equal(multi.prompts.length,2,'draft selection adds no model calls');
+assert.equal(multi.actions.length,1,'candidate batch creates only one action');
+assert.equal((await run({focused:true,drafts:['mx107 와인 병에 따라 마시기 좋겠네요']})).sent.length,0,'all invalid drafts remain silent');
+const propertyDraft=await run({mode:'live',focused:true,drafts:['드라이클리닝 맡길 때 따로 주의할 점 있나요?']});
+assert.equal(propertyDraft.sent.length,1);
+assert.ok(!/손님들은|줄여 부름|«|107/.test(propertyDraft.sent[0].body),'never invent a subject or append prompt alias hints');
+assert.equal((await run({mode:'live',focused:true,drafts:['소재는 샤넬 가방도 같은가요?']})).sent.length,0,'missing subject cannot be repaired by attributing another item to the current card');
+assert.equal((await run({mode:'live',focused:true,drafts:['mx107 와인 지퍼가 예뻐 보여요, 세탁은 어떻게 하나요?']})).sent.length,0,'mixed visual assertion and question is rejected');
+const wave={id:8000,nickname:'손님',body:'👋',created_at:new Date(now-120000).toISOString()};
+assert.equal((await run({mode:'paused',text:'고생하셨어요',visible:[wave],replyTo:8000})).sent.length,0,'shared quality validation preserves stale-farewell protection');
+assert.equal((await run({mode:'paused',text:'반가워요',visible:[wave],replyTo:8000})).sent.length,1,'same source allows a genuine greeting');

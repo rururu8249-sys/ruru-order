@@ -1,0 +1,288 @@
+[
+  {
+    "capturedAt": "2026-11-20T22:53:01.672Z",
+    "model": "gemini-3.5-flash-lite",
+    "context": {
+      "now": 1795215178936,
+      "mode": "live",
+      "cardText": "MC-310 아이보리(제니패딩) / 사이즈 0,1,2,3,4",
+      "product": {
+        "productId": "748",
+        "name": "MC-310 아이보리(제니패딩)",
+        "detailName": "MC-310 아이보리(제니패딩)",
+        "parentName": "몽클레어",
+        "colors": [],
+        "sizes": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "actors": [
+        {
+          "nickname": "봄이",
+          "own": []
+        }
+      ],
+      "messages": [
+        {
+          "id": 200,
+          "nickname": "다른테스트0",
+          "body": "MC-310 아이보리 0번과 1번의 가슴둘레 단면 차이가 어떻게 되나요?",
+          "automation_actor_id": "prior0",
+          "created_at": "2026-11-20T22:48:58.936Z"
+        },
+        {
+          "id": 201,
+          "nickname": "다른테스트1",
+          "body": "MC-342 블랙 0사이즈 실측 기장 감이 어느 정도인가요?",
+          "automation_actor_id": "prior1",
+          "created_at": "2026-11-20T22:44:58.936Z"
+        },
+        {
+          "id": 100,
+          "nickname": "테스트0",
+          "body": "아이보리 컬러 차분해 보이네요",
+          "automation_actor_id": "other0",
+          "created_at": "2026-11-20T21:52:58.936Z"
+        },
+        {
+          "id": 99,
+          "nickname": "테스트1",
+          "body": "연베이지 색감 차분해 보여요",
+          "automation_actor_id": "other1",
+          "created_at": "2026-11-20T20:52:58.936Z"
+        },
+        {
+          "id": 98,
+          "nickname": "테스트2",
+          "body": "와인 색감 화면이랑 실제랑 비슷한가요",
+          "automation_actor_id": "other2",
+          "created_at": "2026-11-20T19:52:58.936Z"
+        },
+        {
+          "id": 97,
+          "nickname": "테스트3",
+          "body": "블랙 시크해 보여요",
+          "automation_actor_id": "other3",
+          "created_at": "2026-11-20T18:52:58.936Z"
+        }
+      ],
+      "questionPending": false
+    },
+    "raw": "{\"candidates\":[{\"speaker\":\"봄이\",\"replyTo\":0,\"text\":\"MC-310 아이보리 0사이즈와 1사이즈 총장 기장 차이가 얼마나 나나요?\"},{\"speaker\":\"봄이\",\"replyTo\":0,\"text\":\"MC-310 아이보리퍼나 지퍼 부분 여밈은 어떤 방식으로 되어 있나요?\"},{\"speaker\":\"봄이\",\"replyTo\":0,\"text\":\"MC-310 아이보리 컬러 세탁이나 드라이클리닝은 어떻게 관리해야 하나요?\"}]}"
+  },
+  {
+    "capturedAt": "2026-11-20T22:54:11.964Z",
+    "model": "gemini-3.5-flash-lite",
+    "context": {
+      "now": 1795215249097,
+      "mode": "paused",
+      "cardText": "MC-310 아이보리(제니패딩) / 사이즈 0,1,2,3,4",
+      "product": {
+        "productId": "748",
+        "name": "MC-310 아이보리(제니패딩)",
+        "detailName": "MC-310 아이보리(제니패딩)",
+        "parentName": "몽클레어",
+        "colors": [],
+        "sizes": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "actors": [
+        {
+          "nickname": "봄이",
+          "own": []
+        }
+      ],
+      "messages": [
+        {
+          "id": 200,
+          "nickname": "다른테스트0",
+          "body": "MC-310 아이보리 0번과 1번의 가슴둘레 단면 차이가 어떻게 되나요?",
+          "automation_actor_id": "prior0",
+          "created_at": "2026-11-20T22:34:09.097Z"
+        },
+        {
+          "id": 201,
+          "nickname": "다른테스트1",
+          "body": "MC-342 블랙 0사이즈 실측 기장 감이 어느 정도인가요?",
+          "automation_actor_id": "prior1",
+          "created_at": "2026-11-20T22:14:09.097Z"
+        },
+        {
+          "id": 100,
+          "nickname": "테스트0",
+          "body": "아이보리 컬러 차분해 보이네요",
+          "automation_actor_id": "other0",
+          "created_at": "2026-11-20T21:54:09.097Z"
+        },
+        {
+          "id": 99,
+          "nickname": "테스트1",
+          "body": "연베이지 색감 차분해 보여요",
+          "automation_actor_id": "other1",
+          "created_at": "2026-11-20T20:54:09.097Z"
+        },
+        {
+          "id": 98,
+          "nickname": "테스트2",
+          "body": "와인 색감 화면이랑 실제랑 비슷한가요",
+          "automation_actor_id": "other2",
+          "created_at": "2026-11-20T19:54:09.097Z"
+        },
+        {
+          "id": 97,
+          "nickname": "테스트3",
+          "body": "블랙 시크해 보여요",
+          "automation_actor_id": "other3",
+          "created_at": "2026-11-20T18:54:09.097Z"
+        }
+      ],
+      "questionPending": true
+    },
+    "raw": "{\n  \"candidates\": [\n    {\n      \"speaker\": \"봄이\",\n      \"replyTo\": 0,\n      \"text\": \"MC-310 아이보리 0사이즈와 1사이즈를 두고 어깨나 소매 품이 얼마나 차이 나는지 비교해 보는 중이다.\"\n    },\n    {\n      \"speaker\": \"봄이\",\n      \"replyTo\": 0,\n      \"text\": \"아이보리 컬러가 전체적으로 밝고 부드러운 느낌을 줘서 코디하기 편해 보인다.\"\n    },\n    {\n      \"speaker\": \"봄이\",\n      \"replyTo\": 0,\n      \"text\": \"사이즈별로 총장이나 품의 세부 치수를 확인하면서 어떤 핏으로 떨어질지 구경하고 있다.\"\n    }\n  ]\n}"
+  },
+  {
+    "capturedAt": "2026-11-20T22:55:52.701Z",
+    "model": "gemini-3.5-flash-lite",
+    "context": {
+      "now": 1795215349788,
+      "mode": "paused",
+      "cardText": "MC-310 아이보리(제니패딩) / 사이즈 0,1,2,3,4",
+      "product": {
+        "productId": "748",
+        "name": "MC-310 아이보리(제니패딩)",
+        "detailName": "MC-310 아이보리(제니패딩)",
+        "parentName": "몽클레어",
+        "colors": [],
+        "sizes": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "actors": [
+        {
+          "nickname": "봄이",
+          "own": []
+        }
+      ],
+      "messages": [
+        {
+          "id": 200,
+          "nickname": "다른테스트0",
+          "body": "MC-310 아이보리 0번과 1번의 가슴둘레 단면 차이가 어떻게 되나요?",
+          "automation_actor_id": "prior0",
+          "created_at": "2026-11-20T22:35:49.788Z"
+        },
+        {
+          "id": 201,
+          "nickname": "다른테스트1",
+          "body": "MC-342 블랙 0사이즈 실측 기장 감이 어느 정도인가요?",
+          "automation_actor_id": "prior1",
+          "created_at": "2026-11-20T22:15:49.788Z"
+        },
+        {
+          "id": 100,
+          "nickname": "테스트0",
+          "body": "아이보리 컬러 차분해 보이네요",
+          "automation_actor_id": "other0",
+          "created_at": "2026-11-20T21:55:49.788Z"
+        },
+        {
+          "id": 99,
+          "nickname": "테스트1",
+          "body": "연베이지 색감 차분해 보여요",
+          "automation_actor_id": "other1",
+          "created_at": "2026-11-20T20:55:49.788Z"
+        },
+        {
+          "id": 98,
+          "nickname": "테스트2",
+          "body": "와인 색감 화면이랑 실제랑 비슷한가요",
+          "automation_actor_id": "other2",
+          "created_at": "2026-11-20T19:55:49.788Z"
+        },
+        {
+          "id": 97,
+          "nickname": "테스트3",
+          "body": "블랙 시크해 보여요",
+          "automation_actor_id": "other3",
+          "created_at": "2026-11-20T18:55:49.788Z"
+        }
+      ],
+      "questionPending": true
+    },
+    "raw": "{\n  \"candidates\": [\n    {\n      \"speaker\": \"봄이\",\n      \"replyTo\": 0,\n      \"text\": \"아이보리랑 다른 컬러도 같이 두고 고민되네요\"\n    },\n    {\n      \"speaker\": \"봄이\",\n      \"replyTo\": 0,\n      \"text\": \"겨울에 입을 아우터 고르는 중인데 눈에 띄어요\"\n    },\n    {\n      \"speaker\": \"봄이\",\n      \"replyTo\": 0,\n      \"text\": \"사이즈 번호별로 어떻게 다를지 계속 보게 되네요\"\n    }\n  ]\n}"
+  },
+  {
+    "capturedAt": "2026-11-20T22:56:39.615Z",
+    "model": "gemini-3.5-flash-lite",
+    "context": {
+      "now": 1795215396880,
+      "mode": "live",
+      "cardText": "MC-310 아이보리(제니패딩) / 사이즈 0,1,2,3,4",
+      "product": {
+        "productId": "748",
+        "name": "MC-310 아이보리(제니패딩)",
+        "detailName": "MC-310 아이보리(제니패딩)",
+        "parentName": "몽클레어",
+        "colors": [],
+        "sizes": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "actors": [
+        {
+          "nickname": "봄이",
+          "own": []
+        }
+      ],
+      "messages": [
+        {
+          "id": 100,
+          "nickname": "테스트0",
+          "body": "아이보리 컬러 차분해 보이네요",
+          "automation_actor_id": "other0",
+          "created_at": "2026-11-20T21:56:36.880Z"
+        },
+        {
+          "id": 99,
+          "nickname": "테스트1",
+          "body": "연베이지 색감 차분해 보여요",
+          "automation_actor_id": "other1",
+          "created_at": "2026-11-20T20:56:36.880Z"
+        },
+        {
+          "id": 98,
+          "nickname": "테스트2",
+          "body": "와인 색감 화면이랑 실제랑 비슷한가요",
+          "automation_actor_id": "other2",
+          "created_at": "2026-11-20T19:56:36.880Z"
+        },
+        {
+          "id": 97,
+          "nickname": "테스트3",
+          "body": "블랙 시크해 보여요",
+          "automation_actor_id": "other3",
+          "created_at": "2026-11-20T18:56:36.880Z"
+        }
+      ],
+      "questionPending": false
+    },
+    "raw": "[\n  {\n    \"speaker\": \"봄이\",\n    \"replyTo\": 0,\n    \"text\": \"사이즈별로 총장 기장 차이가 얼마나 나나요?\"\n  },\n  {\n    \"speaker\": \"봄이\",\n    \"replyTo\": 0,\n    \"text\": \"드라이클리닝 맡길 때 따로 주의할 점 있나요?\"\n  },\n  {\n    \"speaker\": \"봄이\",\n    \"replyTo\": 0,\n    \"text\": \"지퍼 여밈이나 모자 구조가 어떻게 되어 있어요?\"\n  }\n]"
+  }
+]
