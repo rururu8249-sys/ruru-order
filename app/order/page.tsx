@@ -9224,6 +9224,8 @@ export default function OrderPage() {
             onClose={closeRegisteredOptionSelectSheet}
             ariaLabel="옵션 선택"
             tone={uiV2 ? "v2" : undefined}
+            stabilizeHeaderHeight
+            headerHeightKey={registeredOptionSelectProduct.id}
             bodyDataAttr="data-registered-option-scroll"
             bodyPadding={optionSheetHasPhoto ? "0 16px 16px" : "16px 16px 16px"}
             onBodyScroll={(event) => {
