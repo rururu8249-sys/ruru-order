@@ -9,6 +9,7 @@ export type QualityInput = {
   priority?:boolean; replyingToHuman?:boolean; recent:ChatObservation[];
   offAirSince?:string|null; replySourceText?:string|null;
   replySourceIsHuman?:boolean;
+  lastHumanAt?:number;
 };
 export type QualityResult = {ok:true;intent:ChatIntent}|{ok:false;reason:string;intent:ChatIntent};
 const norm=(t:string)=>t.toLowerCase().replace(/[\s!?.,~ㅋㅎㅠㅜ♡♥\p{Extended_Pictographic}]/gu,'');
@@ -81,6 +82,24 @@ export function productQuestionMemory(recent:ChatObservation[],now:number):strin
  return [...new Set(recent.filter(r=>Number.isFinite(r.at)&&r.at<=now&&r.at>=now-90*60_000)
    .map(r=>productQuestionFamily(r.text)).filter(Boolean))];
 }
+/** Off-air cadence follows conversational turns, not a timer that forgets an
+ * unanswered question. Descriptions/preferences never require another question. */
+export function seeksAnswer(text:string):boolean {
+ const s=String(text||'').replace(/\s+/g,'');
+ if(/고를까|살까|어쩌지|뭘고르/.test(s)&&!/(나요|가요|까요|어때|궁금)/.test(s))return false;
+ return /[?？]|(?:인|한|은|는|떤)가[요용여유]|(?:나|까)[요용여유]|어때|알려|궁금/.test(s);
+}
+export function offAirQuestionPending(q:Pick<QualityInput,'recent'|'now'|'offAirSince'|'lastHumanAt'>):boolean {
+ const off=Date.parse(String(q.offAirSince||''));
+ // Without a verified boundary we cannot call an old live question unanswered
+ // in this off-air period. Existing mode/repetition checks still apply.
+ if(!Number.isFinite(off)||off>q.now)return false;
+ const human=Number(q.lastHumanAt)||0;
+ const since=Math.max(q.now-12*60*60_000,off,
+   Number.isFinite(human)&&human<=q.now?human:0);
+ return q.recent.filter(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>since)
+   .sort((a,b)=>b.at-a.at).slice(0,3).some(r=>seeksAnswer(r.text));
+}
 /** No ending-of-show farewell for an emoji-only message or an old pause.
  * An existing paused broadcast is not evidence the stream ended just now.
  * Only affects explicitly marked TEST automation, never live customer messages. */
@@ -118,6 +137,7 @@ export function judgeTestChat(q:QualityInput):QualityResult {
  if(q.mode!=='live'&&intent==='size'&&!q.currentProductKey)return fail('off-size-talk');
  const recent=q.recent.filter(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-30*60_000);
  const questionFamily=productQuestionFamily(text);
+ if(q.mode!=='live'&&!q.replySourceIsHuman&&seeksAnswer(text)&&offAirQuestionPending(q))return fail('off-air-unanswered-question');
  if(!q.replySourceIsHuman&&questionFamily&&productQuestionMemory(q.recent,q.now).includes(questionFamily))return fail('room-repeated-product-question');
  // Preserve a longer read-only memory of overused reactions, including screen-cleared TEST chat.
  const family=reactionFamily(text);

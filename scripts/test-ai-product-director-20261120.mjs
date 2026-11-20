@@ -63,3 +63,16 @@ assert.equal(aiReply.sent.length,0,'replyTo a TEST actor cannot bypass product q
 const humanReply=await run({mode:'live',text:repeated,hidden:[olderQuestion],visible:[clarification],replyTo:6000});
 assert.equal(humanReply.sent.length,1,'verified human clarification can receive a contextual answer');
 console.log('PASS verified human exception without TEST-reply bypass');
+// 11/21: long off-air silence must not turn the room back into a questionnaire.
+const oldOffAirQuestion={id:7000,body:'몽2 네이비 색감 차분한 편인가용?',created_at:new Date(now-5*3600_000).toISOString(),automation_actor_id:'other'};
+for(const focused of [false,true]){
+ const q=await run({mode:'paused',focused,text:'mx107 와인 색감 어때요?',hidden:[oldOffAirQuestion]});
+ assert.equal(q.sent.length,0,'off-air unanswered question remembered beyond short topic window');
+ const thought=await run({mode:'paused',focused,text:'오늘은 천천히 구경하고 있어요',hidden:[oldOffAirQuestion]});
+ assert.equal(thought.sent.length,1,'grounded off-air browsing reflection is not discarded');
+ for(const prompt of thought.prompts){
+  assert.ok(prompt.includes('답을 기다리는 질문이 있음'),'both prompts get off-air conversation state');
+  assert.ok(!prompt.includes(oldOffAirQuestion.body),'hidden source text stays private');
+ }
+}
+console.log('PASS off-air flow through both real director paths');

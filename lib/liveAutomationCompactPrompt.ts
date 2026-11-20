@@ -22,7 +22,7 @@ export type CompactRoomContext = {
   mode: 'live' | 'paused' | 'replay'; cardText: string; product?: ChatProductFacts | null; actors: CompactRoomActor[];
   messages: CompactRoomMessage[]; pendingHumanId?: number | null;
   styleSummary?: string; realOrderProducts?: string[];
-  rejectedLines?: string[]; nextShow?: string | null; questionMemory?: readonly string[];
+  rejectedLines?: string[]; nextShow?: string | null; questionMemory?: readonly string[]; questionPending?:boolean;
 };
 const clean = (value: unknown, max = 80) => String(value ?? '')
   .replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -56,6 +56,8 @@ export function buildCompactConversationPrompt(c: CompactRoomContext): string {
     `지금 실제 위젯이 보여주는 상품: ${clean(c.cardText, 240)}. 검증된 상품 외 번호·색상·사이즈·가격을 지어내지 마라.`,
     ...(c.product ? [productFactsPrompt(c.product)] : []),
     `실제 고객의 최근 발언 가운데 응답 판단 대상: ${c.pendingHumanId ? '#' + c.pendingHumanId : '없음'}. 실제 질문이나 닉네임 호출에만 필요할 때 답한다.`,
+    '현재 카드가 바뀌었다고 새 화제가 생긴 것은 아니다. 상품번호를 매번 부르지 않아도 된다. 실제 대화는 취향 혼잣말 → 그 말에 짧은 호응 → 같은 화제의 고민처럼 이어질 수 있지만, 정해진 순서나 인원으로 연출하지 않는다. 고객의 경험·관계·말을 자기 것으로 복제하지 않는다.',
+    ...(c.mode!=='live'?[`지금은 진행자가 즉시 답하는 자리가 아니다. ${c.questionPending?'답을 기다리는 질문이 있음: 새로운 독립 질문을 더 쌓지 않는다.':'필요한 질문이 가끔 나올 수 있지만 질문부터 만들지 않는다.'} 자기 취향·선택 고민·구경하는 마음을 짧게 표현하거나, 실제 최근 글에 이어갈 말이 있으면 호응하고 없으면 쉰다. 상품 실물·착용감·영상 장면을 본 것처럼 단정하지 않는다.`]:[]),
     '인사/질문/감탄/대답/침묵 모두 가능하다. 인사나 상품 질문을 의무적으로 만들지 않는다. 다른 사람의 질문에 답하되 모르는 사실·사이즈 추천·입금 정보를 꾸며내지 않는다.',
     '다른 메시지에 답할 때만 그 메시지의 정확한 #번호를 replyTo에 적는다. 관련 없는 새 상품 이야기에는 replyTo:0. 혼잣말로 "네", "그쵸", "생각보다 빠르네" 같은 맥락 없는 반응을 하지 마라.',
     '방송이 paused 또는 다시보기여도 방금 종료된 것은 아니다. 종료 안내가 방금 올라온 근거가 없다면 "고생하셨어요" "수고하셨어요"처럼 방송 마무리 인사로 반응하지 마라. 👋는 채팅방 입장/가벼운 인사 버튼으로도 쓰인다. 이는 방송 종료 통지가 아니다. 👋에 답할 이유가 있을 때는 짧은 일반 인사(예: 반가워요)를 하거나 침묵하되, 수고하셨어요처럼 방송을 마친 듯 말하지 마라.',
