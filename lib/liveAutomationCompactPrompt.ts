@@ -35,7 +35,7 @@ export function buildCompactConversationPrompt(c: CompactRoomContext): string {
     return `${clean(a.nickname, 36)} | 이전 발언: ${mine || '-'} | 테스트 주문: ${items || '-'} | 테스트 장바구니: ${cart || '-'}`;
   });
   // Notifications must not consume the conversational context budget.
-  const chronological = c.messages.filter(m=>!m.bot_ref&&m.badge!=='bot').slice(0,18).reverse();
+  const chronological = c.messages.filter(m=>!m.bot_ref&&m.badge!=='bot'&&!/^\s*\//.test(String(m.body||''))).slice(0,18).reverse();
   const cartNotices = c.messages.filter(m=>String(m.bot_ref||'').startsWith('c:')).length;
   const orderNotices = c.messages.filter(m=>String(m.bot_ref||'').startsWith('o:')).length;
   const chat = chronological.flatMap(m => {

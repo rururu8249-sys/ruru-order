@@ -6,7 +6,8 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {callGeminiJson} from './geminiJson';
 import {buildCompactConversationPrompt,shouldFallbackModel,eligibleTestChatSession} from './liveAutomationCompactPrompt';
-import {shouldRecoverProductSilence,buildFocusedProductPrompt} from './liveAutomationProductOpportunity';
+import {shouldRecoverProductSilence} from './liveAutomationProductOpportunity';
+import {buildChatCandidatePrompt,parseChatCandidates,rankChatCandidates,hasUnseenVisualClaim} from './liveAutomationCandidates';
 import {parseDirectorChoice,shouldTryFocusedProductTurn,cardRemainsInRotation,resolveExplicitReplyTarget} from './liveAutomationFocus';
 import {readRoomSignals} from './liveAutomationRoomSignals';
 import {CHAT_RATE_KEY,ratePercent,chatRateConfig} from './liveAutomationRate';
@@ -803,6 +804,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  let lastModelNote=ans.note;
  let choiceReason=firstChoice.reason;
  let chosenPath='normal';
+ let focusedChoices:ReturnType<typeof parseChatCandidates>=[];
  // A verified displayed product can merit a rare, grounded conversational turn.
  // Retry once with a compact prompt if the full-context model returned no valid speaker.
  // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
@@ -818,29 +820,17 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:true,firstReason:firstChoice.reason,firstModel:ans.note.slice(0,85)});
    const bucket=Math.floor(now/(10*60_000));
    const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
-   const focusedPrompt=buildFocusedProductPrompt({
-     mode,product:card,productName:card?.name||'',colors:card?.colors||[],
-     candidates:candidates.map(r=>String(r.actor.nickname)),recentAi,questionMemory,questionPending,
-     conversationContext:buildCompactConversationPrompt({...roomContext,
-       actors:candidates.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))})
-   });
+   const focusedPrompt=buildChatCandidatePrompt({...roomContext,
+     actors:candidates.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))},priorObservations);
    if(!focusedPrompt)return;
-   const focused=await callGeminiJson(focusedPrompt,{timeoutMs:12000,maxTokens:200,maxAttempts:2,temperature:.8,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
-   const retryChoice=parseDirectorChoice(focused.text,candidates.map(r=>String(r.actor.nickname)));
+   const focused=await callGeminiJson(focusedPrompt,{timeoutMs:12000,maxTokens:500,maxAttempts:2,temperature:.8,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
+   focusedChoices=rankChatCandidates(parseChatCandidates(focused.text,candidates.map(r=>String(r.actor.nickname))),priorObservations,now);
+   const retryChoice=focusedChoices[0]||parseDirectorChoice(null,[]);
    lastModelNote=focused.note;
    choiceReason=retryChoice.reason;
    chosenPath='focused';
    if(retryChoice.reason==='ok')pick={speaker:retryChoice.speaker,text:retryChoice.text,replyTo:retryChoice.replyTo};
    else await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-unsent',why:retryChoice.reason,model:focused.note.slice(0,85),cardPresent:Boolean(card)});
- }
- const speaker=roster.find(r=>r.actor.nickname===String(pick.speaker||'').trim())||null;
- const replyId=Number(pick.replyTo)||0;
- // Reply to a specific recent human or TEST message only. A new human
- // message by itself is not proof that an unrelated AI product question answers it.
- const target=resolveExplicitReplyTarget(replyId,messages.filter(m=>!m.bot_ref),now);
- if(replyId&&!target){
-   void noteDecision(db,{at:new Date(now).toISOString(),result:'invalid-reply-target',path:chosenPath});
-   return; // Never reinterpret a rejected reply as a new unsolicited message.
  }
  const acceptable=(t:string,r:(typeof roster)[number],tgt:Row|null)=>{
   if(t.length<1||t.length>70)return false;
@@ -888,14 +878,38 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(/^(네|넵|넹)?\s*(감사(합니다|해요|해용|합니당)|고맙(습니다|습니당|어요))[\s~!.😊🙏ㅎ]*$/.test(t.trim())&&!(tgt&&/감사|고마|드려요|드릴게요|보내|확인|챙겨|축하|당첨|선물|포인트/.test(clean(tgt.body))&&mentionsNickname(clean(tgt.body),String(r.actor.nickname||''))))return false;
   return true;
  };
+ const actionById=new Map(actions.map(a=>[String(a.id),a]));
+ const recentForGate:ChatObservation[]=[...new Map([...messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'),...previousTestChat]
+   .map(m=>[String(m.id),m] as const)).values()].map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||''),productKey:String(actionById.get(String(m.automation_action_id||''))?.plan?.chatProductKey||'')}));
+ const qualityFor=(t:string,r:(typeof roster)[number],tgt:Row|null,latestBroadcast:{data:Row},phase:typeof mode)=>judgeTestChat({
+   text:t,currentProduct:card,mode:phase,now,actorId:String(r.actor.id),currentProductKey:card?`${card.productId}:${card.detailName}`:null,
+   replyingToHuman:Boolean(tgt),recent:recentForGate,offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
+   replySourceIsHuman:Boolean(tgt&&!tgt.automation_actor_id),lastHumanAt,replySourceText:String(tgt?.body||'')});
+ const styleLine=(t:string,r:(typeof roster)[number])=>personaVoice(varyLaughTail(shortProductCodes(t,seedOf(r.actor)+now),recentAi,seedOf(r.actor)+now),seedOf(r.actor),now);
+ if(focusedChoices.length){
+   pick={};
+   for(const candidate of focusedChoices){
+     const r=roster.find(r=>r.actor.nickname===candidate.speaker);if(!r)continue;
+     const raw=clean(candidate.text);
+     if(hasUnseenVisualClaim(raw)||!acceptable(raw,r,null)){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:content-filter',raw:raw.slice(0,70)});continue;}
+     const prepared=styleLine(raw,r),quality=qualityFor(prepared,r,null,{data:bc.data},mode);
+     if(!quality.ok){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:'+quality.reason,raw:raw.slice(0,70)});continue;}
+     pick={speaker:candidate.speaker,replyTo:0,text:raw,prepared};break;
+   }
+   if(!pick.speaker)choiceReason='all-drafts-rejected';
+ }
+ const speaker=roster.find(r=>r.actor.nickname===String(pick.speaker||'').trim())||null;
+ const replyId=Number(pick.replyTo)||0;
+ const target=resolveExplicitReplyTarget(replyId,messages.filter(m=>!m.bot_ref),now);
+ if(replyId&&!target){void noteDecision(db,{at:new Date(now).toISOString(),result:'invalid-reply-target',path:chosenPath});return;}
  let text=typeof pick.text==='string'?clean(pick.text):'';
  const rawText=text;
  if(speaker&&text&&!acceptable(text,speaker,target))text='';
- void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent:'+choiceReason:text?'sent':'rejected',model:lastModelNote.slice(0,85),path:chosenPath,cardPresent:Boolean(card)});
+ await noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent:'+choiceReason:text?'candidate':'rejected',model:lastModelNote.slice(0,85),path:chosenPath,cardPresent:Boolean(card)});
  if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor),speaker.own,speaker.paid.includes('card'))||'';
  if(speaker&&text&&(wrongPaymentTalk(text,speaker.cardOrder,speaker.bankOrder)||cardLinkTalkBlocked(text,speaker.cardOrder,speaker.paid.includes('card'))))text='';
  // [2026-11-15 07:40 사장님] 상품번호는 손님처럼 줄여 부름(프222·버58·몽319), 웃음·이모지 끝맺음은 최근 AI 글과 안 겹치게
- if(speaker&&text){const sd=seedOf(speaker.actor)+now;text=personaVoice(varyLaughTail(shortProductCodes(text,sd),recentAi,sd),seedOf(speaker.actor),now);}
+ if(speaker&&text)text=typeof pick.prepared==='string'?pick.prepared:styleLine(text,speaker);
  // RURU_QUALITY_GATE_V1: Final validation after persona styling and before any send.
  if(speaker&&text){
    const latestBroadcast=await db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle();
@@ -915,16 +929,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    }
    // Associate each previous TEST chat with the product actually discussed.
    // Do not confuse the 5-second rotating card with a new conversation topic.
-   const actionById=new Map(actions.map(a=>[String(a.id),a]));
-   const recentForGate:ChatObservation[]=[...new Map([...messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'),...previousTestChat]
-     .map(m=>[String(m.id),m] as const)).values()].map(m=>({
-     text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||''),
-     productKey:String(actionById.get(String(m.automation_action_id||''))?.plan?.chatProductKey||'')
-   }));
-   const quality=judgeTestChat({text,currentProduct:card,mode:latestMode,now,actorId:String(speaker.actor.id),currentProductKey:card?`${card.productId}:${card.detailName}`:null,replyingToHuman:Boolean(target),recent:recentForGate,
-    offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
-    replySourceIsHuman:Boolean(target&&!target.automation_actor_id),lastHumanAt,
-    replySourceText:String(target?.body||'')});
+   const quality=qualityFor(text,speaker,target,{data:latestBroadcast.data},latestMode);
    if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
    if(text){
     // Identify whether previous AI messages were genuine replies to customers.
@@ -956,5 +961,6 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   const ctx=await automationRpc<AutomationContext>(db,'live_automation_context',{p_session:claimed.session_id,p_revision:claimed.revision,p_scope:'chat'});
   await automationRpc(db,'live_automation_ai_admission',{p_actor:claimed.actor_id,p_kind:claimed.kind});
   await automationPost(origin,'/api/live-chat',ctx,claimed,'chat',{kakao_id:AUTOMATION_OWNER,bc:c.broadcast_id,body:text},transport);
+  await noteDecision(db,{at:new Date(now).toISOString(),result:'sent',raw:rawText.slice(0,70),speaker:who.actor.nickname,model:lastModelNote.slice(0,85),path:chosenPath,actionId:claimed.id});
  }catch(e){await skip(e instanceof Error?e.message:'CHAT_SKIPPED');}
 }
