@@ -22,7 +22,7 @@ export type CompactRoomContext = {
   mode: 'live' | 'paused' | 'replay'; cardText: string; product?: ChatProductFacts | null; actors: CompactRoomActor[];
   messages: CompactRoomMessage[]; pendingHumanId?: number | null;
   styleSummary?: string; realOrderProducts?: string[];
-  rejectedLines?: string[]; nextShow?: string | null;
+  rejectedLines?: string[]; nextShow?: string | null; questionMemory?: readonly string[];
 };
 const clean = (value: unknown, max = 80) => String(value ?? '')
   .replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -62,6 +62,7 @@ export function buildCompactConversationPrompt(c: CompactRoomContext): string {
     '같은 상품의 키/몸무게 사이즈 질문이 최근에 나왔다면 다른 테스트 계정이 다시 묻지 마라. 직전 화제에 더할 말 없으면 침묵한다. 연속된 3명 인사/감탄/유사 맞장구 금지.',
     '누군가 색상·코디·선택을 고민한다고 썼다면, 가능할 때만 그 글의 정확한 #번호로 짧게 답한다. 개인 취향을 묻거나 본인의 선호를 가볍게 말할 수 있으나, 상품 재고·실측·색상 존재 여부는 추측하지 마라. 한두 마디면 충분하며 억지로 후속 글을 만들지 않는다.',
     '"고민되네요", "깔끔하네요", "궁금하네요" 같은 동일한 감상 어미를 다른 테스트 계정이 연달아 반복하지 마라. 같은 뜻이라도 질문·취향·관찰을 나누고, 새 맥락이 없으면 침묵한다.',
+    `최근 테스트 대화에서 이미 나온 질문 유형(답장 대상 아님): ${(c.questionMemory||[]).map(x=>clean(x,40)).join(' / ')||'없음'}. 닉네임·상품·색상·말끝만 바꿔 같은 질문을 다시 꺼내지 마라. 실제 고객에게 필요한 답장은 그 고객의 현재 글을 기준으로 판단한다.`,
     '사람처럼 간혹 한 군데 붙여 쓸 수 있지만 긴 문장을 통째로 붙여 쓰면 안 된다. 두세 단어 이상인 문장은 읽을 수 있게 기본 띄어쓰기를 유지한다.',
     '상품을 찾지도 않고 "529는 없는 것 같아요"처럼 등록·재고·품절 여부를 단정하거나 반박하지 마라. 정확히 확인된 상품 정보만 언급하고 모르면 단정하지 않는다.',
     '누가 특정 테스트 닉네임을 부르면 그 계정이 맥락에 맞게 대답한다. 응답을 요구하지 않는 채팅에는 가만히 있어도 된다.',

@@ -8,6 +8,7 @@ export type QualityInput = {
   currentProductKey?:string|null; currentProductName?:string|null; currentProduct?:ChatProductFacts|null;
   priority?:boolean; replyingToHuman?:boolean; recent:ChatObservation[];
   offAirSince?:string|null; replySourceText?:string|null;
+  replySourceIsHuman?:boolean;
 };
 export type QualityResult = {ok:true;intent:ChatIntent}|{ok:false;reason:string;intent:ChatIntent};
 const norm=(t:string)=>t.toLowerCase().replace(/[\s!?.,~ㅋㅎㅠㅜ♡♥\p{Extended_Pictographic}]/gu,'');
@@ -65,6 +66,21 @@ export function reactionFamily(text:string):string {
  if(/궁금하네요|궁금하네용|궁금해요|궁금해용/.test(s))return 'curious';
  return '';
 }
+/** Narrow question formulas observed in production; color preference and styling
+ * are different topics. Product codes, nicknames and polite endings are irrelevant. */
+export function productQuestionFamily(text:string):string {
+ const s=String(text||'').replace(/\s+/g,'');
+ if(!/[?？]|나요|까요|가요|어때|어떤|궁금/.test(s))return '';
+ if(/색감|색상|컬러|색깔|색이/.test(s)&&
+   /실제|실물|화면|조명/.test(s)&&/어때|어떤|비슷|다르|같|느낌/.test(s))return '실물·화면 색감 확인 질문';
+ if(/디자인/.test(s)&&/어떻게.{0,8}(나왔|빠졌)|어떤.{0,4}(느낌|모양)/.test(s))return '막연한 디자인 확인 질문';
+ return '';
+}
+/** Summaries only: hidden messages must never become reply targets or copied dialogue. */
+export function productQuestionMemory(recent:ChatObservation[],now:number):string[] {
+ return [...new Set(recent.filter(r=>Number.isFinite(r.at)&&r.at<=now&&r.at>=now-90*60_000)
+   .map(r=>productQuestionFamily(r.text)).filter(Boolean))];
+}
 /** No ending-of-show farewell for an emoji-only message or an old pause.
  * An existing paused broadcast is not evidence the stream ended just now.
  * Only affects explicitly marked TEST automation, never live customer messages. */
@@ -101,6 +117,8 @@ export function judgeTestChat(q:QualityInput):QualityResult {
  if(q.mode!=='live'&&/(잠시\s*쉬는|곧\s*재개|잠깐\s*쉬었다|다시\s*시작.{0,5}(하겠|하나))/.test(text))return fail('ended-as-paused');
  if(q.mode!=='live'&&intent==='size'&&!q.currentProductKey)return fail('off-size-talk');
  const recent=q.recent.filter(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-30*60_000);
+ const questionFamily=productQuestionFamily(text);
+ if(!q.replySourceIsHuman&&questionFamily&&productQuestionMemory(q.recent,q.now).includes(questionFamily))return fail('room-repeated-product-question');
  // Preserve a longer read-only memory of overused reactions, including screen-cleared TEST chat.
  const family=reactionFamily(text);
  if(family && q.recent.some(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-90*60_000&&
