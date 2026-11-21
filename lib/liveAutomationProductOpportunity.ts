@@ -1,3 +1,4 @@
+import {chatPhaseConfig} from './liveAutomationRate';
 import {productFactsPrompt,type ChatProductFacts} from './liveAutomationProductFacts';
 /** A limited, grounded opportunity for a TEST-labelled shopper to speak.
  * Does not create any chat, order, or payment action. Existing DB admission
@@ -22,7 +23,7 @@ export function shouldRecoverProductSilence(q:ProductOpportunity):boolean {
   if(q.mode!=='live'||!q.hasCard||q.hasPendingHuman||q.candidates<1||q.chatRate<=0)return false;
   const intensity=Math.max(0,Math.min(100,q.chatRate));
   // Retry budget is separate from the slider-aware DB send interval.
-  const gap=intensity>=80?3*60_000:intensity>=50?5*60_000:intensity>=20?8*60_000:12*60_000;
+  const gap=Math.max(120_000,chatPhaseConfig(intensity,q.mode).gapMax);
   if(q.lastHumanAt>0&&q.now-q.lastHumanAt<100_000)return false;
   if(q.lastAiAt>0&&q.now-q.lastAiAt<gap)return false;
   if(q.lastFocusAt>0&&q.now-q.lastFocusAt<gap)return false;

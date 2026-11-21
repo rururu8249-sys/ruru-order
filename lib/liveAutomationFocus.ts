@@ -1,3 +1,4 @@
+import {chatPhaseConfig} from './liveAutomationRate';
 /** Diagnostics and conservative focused recovery for a verified product card.
  * No fixed chat lines, fabricated orders, or direct customer content in logs.
  */
@@ -36,14 +37,15 @@ export function resolveExplicitReplyTarget<T extends Record<string, unknown>>(
 
 export function shouldTryFocusedProductTurn(q:{
   now:number;mode:'live'|'paused'|'replay';hasProduct:boolean;hasPendingHuman:boolean;
-  lastHumanAt:number;lastAiAt:number;lastFocusAt:number;
+  lastHumanAt:number;lastAiAt:number;lastFocusAt:number;chatRate?:number;
 }):boolean {
   if(!q.hasProduct||q.hasPendingHuman)return false;
   if(q.lastHumanAt>0&&q.now-q.lastHumanAt<3*60_000)return false;
-  const aiGap=q.mode==='live'?7*60_000:12*60_000;
+  if(q.chatRate===0)return false;
+  const aiGap=q.chatRate===undefined?(q.mode==='live'?7*60_000:12*60_000):Math.max(120_000,chatPhaseConfig(q.chatRate,q.mode).gapMax);
   if(q.lastAiAt>0&&q.now-q.lastAiAt<aiGap)return false;
   // Persisted in director logs before the model retry: no repeated retry per polling tick.
-  const focusGap=q.mode==='live'?7*60_000:12*60_000;
+  const focusGap=aiGap;
   if(q.lastFocusAt>0&&q.now-q.lastFocusAt<focusGap)return false;
   return true;
 }

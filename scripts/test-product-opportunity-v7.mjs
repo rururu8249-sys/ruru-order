@@ -10,11 +10,11 @@ const cases=[
   ['no connected candidates', {...base,candidates:0},false],
   ['human just spoke', {...base,lastHumanAt:now-60_000},false],
   ['AI just spoke', {...base,lastAiAt:now-90_000},false],
-  ['already attempted recently', {...base,lastFocusAt:now-150_000},false],
-  ['after three minutes, can try again', {...base,lastFocusAt:now-190_000},true],
-  ['moderate pace still cooling', {...base,chatRate:50,lastFocusAt:now-220_000},false],
-  ['moderate pace after five minutes', {...base,chatRate:50,lastFocusAt:now-310_000},true],
-  ['low pace cooling longer', {...base,chatRate:15,lastFocusAt:now-600_000},false],
+  ['already attempted recently', {...base,lastFocusAt:now-90_000},false],
+  ['after slider-aware two-minute retry floor, can try again', {...base,lastFocusAt:now-120_000},true],
+  ['moderate pace still cooling', {...base,chatRate:50,lastFocusAt:now-110_000},false],
+  ['moderate pace after retry floor', {...base,chatRate:50,lastFocusAt:now-120_000},true],
+  ['low pace cooling longer', {...base,chatRate:15,lastFocusAt:now-300_000},false],
   ['offline no extra chatter', {...base,mode:'replay'},false]
 ];
 for(const [name,q,expected] of cases){assert.equal(shouldRecoverProductSilence(q),expected,name);console.log('PASS',name)}

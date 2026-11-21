@@ -782,9 +782,22 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const topicCards=[...new Map([...(card?[card]:[]),...orderedCards].map(p=>[`${p.productId}:${p.detailName}`,p])).values()];
  const references=(t:string)=>topicCards.filter(p=>identifiesChatProduct(t,p));
  const topicFor=(t:string,tgt:Row|null)=>references(t)[0]||references(String(tgt?.body||''))[0]||card;
+ const actionById=new Map(actions.map(a=>[String(a.id),a]));
+ const recentForGate:ChatObservation[]=[...new Map([...messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&!m.bot_ref),...previousTestChat.filter(m=>m.badge!=='bot'&&!m.bot_ref)]
+   .map(m=>[String(m.id),m] as const)).values()].map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||''),productKey:String(actionById.get(String(m.automation_action_id||''))?.plan?.chatProductKey||'')}));
+ const room:RoomTurnRow[]=messages.map(m=>({id:Number(m.id),at:Date.parse(String(m.created_at||'')),
+   actorId:m.automation_actor_id?String(m.automation_actor_id):null,
+   kind:(m.badge==='bot'||m.bot_ref?'system':m.automation_actor_id?'ai':'human') as RoomTurnRow['kind'],
+   responseToId:actionById.get(String(m.automation_action_id||''))?.kind==='reply'?Number(actionById.get(String(m.automation_action_id||''))?.source_message_id)||0:0,
+   asksQuestion:/[?？]|나요|까요|어때|뭐가/.test(clean(m.body))}));
+ const roomFor=(t:string,speakerId:string,tgt:Row|null,phase:typeof mode)=>{
+   const topic=topicFor(t,tgt);
+   return assessRoomTurn({now,mode:phase,chatRate,currentProductKey:topic?`${topic.productId}:${topic.detailName}`:'',
+    newGroundedInterest:hasNewGroundedInterest(t,topic,recentForGate,now),replyToId:tgt?Number(tgt.id):0,speakerId,room});
+ };
  // Read recent decisions once, preserving an auditable cooldown for a focused retry.
  const decisionLog:Row[]=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle().then(r=>{try{const v=JSON.parse(String((r.data as {value?:unknown}|null)?.value??'[]'));return Array.isArray(v)?v.filter((e:unknown):e is Row=>Boolean(e)&&typeof e==='object'&&!Array.isArray(e)):[];}catch{return [] as Row[];}},()=>[] as Row[]);
- const rejectedLines=decisionLog.filter(e=>(e.result==='rejected'||e.result==='quality:room-repeated-interest'||e.result==='quality:unanchored-product-impression')&&Date.parse(String(e.at))>now-600000).map(e=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6);
+ const rejectedLines=decisionLog.filter(e=>(e.result==='rejected'||e.result==='quality:room-repeated-interest'||e.result==='quality:unanchored-product-impression'||String(e.result).startsWith('room:'))&&Date.parse(String(e.at))>now-600000).map(e=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6);
  const lastFocusAt=Math.max(0,...decisionLog.filter(e=>e.result==='focus-attempt').map(e=>Date.parse(String(e.at))||0));
  const selectionBucket=Math.floor(now/180_000);
  // Rotate the small candidate set; prioritize a recently addressed TEST identity.
@@ -810,7 +823,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    void noteDecision(db,{at:new Date(now).toISOString(),result:'model-fallback',primary:primary.note.slice(0,80),secondary:secondary.note.slice(0,80)});
  }
  const firstChoice=parseDirectorChoice(ans.text,modelRoster.map(r=>String(r.actor.nickname)));
- const repeatedChoice=firstChoice.reason==='ok'&&firstChoice.replyTo===0&&repeatsRoomTopic(firstChoice.text,priorObservations,now);
+ const repeatedChoice=firstChoice.reason==='ok'&&firstChoice.replyTo===0&&(repeatsRoomTopic(firstChoice.text,priorObservations,now)||roomFor(firstChoice.text,'',null,mode).reason==='two-unrelated-ai-turns-without-new-context');
  let pick:Row=firstChoice.reason==='ok'?{speaker:firstChoice.speaker,text:firstChoice.text,replyTo:firstChoice.replyTo}:{};
  let lastModelNote=ans.note;
  let choiceReason=firstChoice.reason;
@@ -826,7 +839,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
      now,mode,hasCard:topicCards.length>0,chatRate,hasPendingHuman:Boolean(newestHuman),
      lastHumanAt,lastAiAt:lastAi,lastFocusAt,candidates:roster.length
    }):shouldTryFocusedProductTurn({
-     now,mode,hasProduct:topicCards.length>0,hasPendingHuman:Boolean(newestHuman),
+     now,mode,chatRate,hasProduct:topicCards.length>0,hasPendingHuman:Boolean(newestHuman),
      lastHumanAt,lastAiAt:lastAi,lastFocusAt
    })
  )){
@@ -899,9 +912,6 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(/^(네|넵|넹)?\s*(감사(합니다|해요|해용|합니당)|고맙(습니다|습니당|어요))[\s~!.😊🙏ㅎ]*$/.test(t.trim())&&!(tgt&&/감사|고마|드려요|드릴게요|보내|확인|챙겨|축하|당첨|선물|포인트/.test(clean(tgt.body))&&mentionsNickname(clean(tgt.body),String(r.actor.nickname||''))))return false;
   return true;
  };
- const actionById=new Map(actions.map(a=>[String(a.id),a]));
- const recentForGate:ChatObservation[]=[...new Map([...messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&!m.bot_ref),...previousTestChat.filter(m=>m.badge!=='bot'&&!m.bot_ref)]
-   .map(m=>[String(m.id),m] as const)).values()].map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||''),productKey:String(actionById.get(String(m.automation_action_id||''))?.plan?.chatProductKey||'')}));
  const qualityFor=(t:string,r:(typeof roster)[number],tgt:Row|null,latestBroadcast:{data:Row},phase:typeof mode)=>{
   const topic=topicFor(t,tgt);
   return judgeTestChat({
@@ -918,6 +928,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
      if(hasUnseenVisualClaim(raw)||!acceptable(raw,r,null)){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:content-filter',raw:raw.slice(0,70)});continue;}
      const prepared=styleLine(raw,r),quality=qualityFor(prepared,r,null,{data:bc.data},mode);
      if(!quality.ok){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:'+quality.reason,raw:raw.slice(0,70)});continue;}
+     const turn=roomFor(prepared,String(r.actor.id),null,mode);
+     if(!turn.ok){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:room:'+turn.reason,raw:raw.slice(0,70)});continue;}
      pick={speaker:candidate.speaker,replyTo:0,text:raw,prepared};break;
    }
    if(!pick.speaker)choiceReason='all-drafts-rejected';
@@ -966,16 +978,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    const quality=qualityFor(text,speaker,target,{data:latestBroadcast.data},latestMode);
    if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
    if(text){
-    // Identify whether previous AI messages were genuine replies to customers.
-    const room:RoomTurnRow[]=messages.map(m=>({id:Number(m.id),at:Date.parse(String(m.created_at||'')),
-      actorId:m.automation_actor_id?String(m.automation_actor_id):null,
-      kind:(m.badge==='bot'||m.bot_ref?'system':m.automation_actor_id?'ai':'human') as RoomTurnRow['kind'],
-      responseToId:actionById.get(String(m.automation_action_id||''))?.kind==='reply'?Number(actionById.get(String(m.automation_action_id||''))?.source_message_id)||0:0,
-      asksQuestion:/[?？]|나요|까요|어때|뭐가/.test(clean(m.body))}));
-    const roomPolicy=assessRoomTurn({now,mode:latestMode,chatRate,
-      currentProductKey:selectedTopicKey,
-      newGroundedInterest:hasNewGroundedInterest(text,selectedTopic,recentForGate,now),
-      replyToId:target?Number(target.id):0,speakerId:String(speaker.actor.id),room});
+    const roomPolicy=roomFor(text,String(speaker.actor.id),target,latestMode);
     if(!roomPolicy.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'room:'+roomPolicy.reason});}
    }
  }
