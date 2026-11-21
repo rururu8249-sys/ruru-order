@@ -96,7 +96,7 @@ export default function OrderCustomerInfoFormCard({
               value={address}
               readOnly
               onClick={onOpenAddressSearch}
-              placeholder="주소검색으로 기본주소를 선택해 주세요"
+              placeholder="이 칸을 누르거나 오른쪽 주소검색을 선택하세요"
               className="h-12 min-w-0 rounded-[18px] border border-coral-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
 

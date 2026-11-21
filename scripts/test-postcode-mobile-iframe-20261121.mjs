@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const page = fs.readFileSync('app/order/page.tsx', 'utf8');
+const form = fs.readFileSync('components/order/OrderCustomerInfoFormCard.tsx', 'utf8');
+const editor = fs.readFileSync('components/customer/CustomerInfoEditBottomSheet.tsx', 'utf8');
+let assertions = 0;
+function check(label, cond){assert.ok(cond,label);assertions++}
+const start=page.indexOf('data-ruru-postcode-document-overlay="true"');
+const end=page.indexOf('document.body',start);
+check('postcode document overlay exists',start>0 && end>start);
+const ui = page.slice(start,end);
+check('POSTCODE not in fixed bottom sheet',!ui.includes('<CustomerBottomSheet'));
+check('document flow absolute overlay',ui.includes('position: "absolute"'));
+check('stable document position when keyboard scrolls',ui.includes('top: postcodeOverlayTopRef.current'));
+check('start position saved on search click',page.includes('postcodeOverlayTopRef.current = typeof window !== "undefined" ? window.scrollY : 0;'));
+check('no fixed positioning in postcode overlay',!ui.includes('position: "fixed"'));
+check('no nested scroll around postcode embed',ui.includes('overflow: "visible"') && !ui.includes('overflowY: "auto"'));
+check('portaled directly to body',page.includes('createPortal(') && page.includes('document.body'));
+check('search script Kakao CDN',ui.includes('scriptUrl="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"'));
+check('onResize expands document-flow iframe',ui.includes('postcodeDocumentFrameRef.current.style.height'));
+check('result selection unchanged',ui.includes('onComplete={handleAddressSearchComplete}'));
+check('search window X closes',ui.includes('requestCloseAddressSearch()'));
+check('reuses unified close history hook',page.includes('useCustomerOverlayClose({\n    open: addressSearchOpen'));
+check('still no manual address bypass',!page.includes('setManualAddressOpen(') && !page.includes('<CustomerManualAddressPanel'));
+check('new user base address read only',form.includes('value={address}\n              readOnly'));
+check('old user base address read only',editor.includes('value={addrForm.address} readOnly'));
+check('selected address/zip retained',page.includes('setAddress(nextAddress);') && page.includes('setZipcode(nextZipcode);'));
+check('existing shipping address callback still retained',page.includes('onPicked(nextAddress, nextZipcode);'));
+check('new user field clearly tells to select',form.includes('이 칸을 누르거나 오른쪽 주소검색을 선택하세요'));
+check('existing user field clearly tells to select',editor.includes('눌러서 주소를 검색해 선택하세요'));
+check('no change to order/payment API route',page.includes('const completeEditCustomerInfo = async () => {'));
+// Execute actual callback with state stubs: no live Kakao, Supabase, payment or order writes.
+function callback(name,inject){
+ const ast=ts.createSourceFile('app/order/page.tsx',page,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TSX);
+ let fn;const visit=n=>{if(ts.isVariableDeclaration(n)&&n.name.getText(ast)===name)fn=n.initializer;ts.forEachChild(n,visit);};visit(ast);
+ assert.ok(fn,'actual callback absent '+name);
+ const js=ts.transpileModule(`const target=${fn.getText(ast)};globalThis.f=target;`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+ const context=vm.createContext({...inject,setTimeout:cb=>cb()});
+ vm.runInContext(js,context,{timeout:3000});return context.f;
+}
+let open=false, address='', zip='', focus='', ref={current:null};
+const shared={postcodeOverlayTopRef:{current:0},window:{scrollY:48},addressPickedHandlerRef:ref,setAddressSearchOpen:v=>open=v,setAddress:v=>address=v,setZipcode:v=>zip=v,document:{getElementById:id=>({focus:()=>focus=id})}};
+callback('openAddressSearch',shared)();check('search opens for new user',open===true);
+callback('handleAddressSearchComplete',shared)({roadAddress:'서울 중구 세종대로 110',zonecode:'04524'});
+check('selected address received',address==='서울 중구 세종대로 110');
+check('selected zip received',zip==='04524');
+check('new customer detail focus',focus==='ruru-customer-detail-address');
+check('selection closes overlay',open===false);
+let selected=null;callback('openAddressSearch',shared)((a,z)=>selected={a,z});
+callback('handleAddressSearchComplete',shared)({jibunAddress:'부천시 중동 1',zonecode:'14500'});
+check('existing user selection callback',selected?.a==='부천시 중동 1' && selected?.z==='14500');
+check('existing callback is reset',ref.current===null);
+console.log(`PASS: ${assertions} postcode non-fixed mobile contract/runtime assertions (isolated; no real customer data)`);

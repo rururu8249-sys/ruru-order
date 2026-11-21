@@ -13,7 +13,7 @@ assert.ok(markup.includes('처음 주문 정보 입력'));
 assert.ok(markup.includes('저장하면 상품을 보고 주문'));
 assert.ok(!markup.includes('정보수정'));
 assert.ok(renderToStaticMarkup(React.createElement(Intro,{mode:'edit'})).includes('정보수정'));
-const fields={youtubeNickname:'시험닉네임',customerName:'시험',customerPhone:'01000000000',address:'시험 주소',detailAddress:'1층'};
+const fields={youtubeNickname:'시험닉네임',customerName:'시험',customerPhone:'01000000000',address:'시험 주소',detailAddress:'1층',zipcode:'04524'};
 const form=renderToStaticMarkup(React.createElement(Form,{...fields,isEdit:false}));
 assert.ok(form.includes('저장하고 상품 보기'));
 assert.ok(!form.includes('취소'));

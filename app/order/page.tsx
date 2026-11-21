@@ -43,6 +43,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText } from "@/lib/livePausedText";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, chatBadgeOf, isChatOwnerPhone, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
@@ -105,7 +106,7 @@ import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup
 import { POINT_GIFT_REFRESH_EVENT } from "@/lib/welcomePoint";
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
 // [2026-09-20 사장님] 바텀시트 «한 벌» 틀 — 손님 시트 전부 같은 높이·헤더·✕·닫기 5종
-import CustomerBottomSheet, { CS_SHEET_Z_STACKED, csPrimaryButtonStyle, csCancelButtonStyle } from "@/components/customer/CustomerBottomSheet";
+import CustomerBottomSheet, { csPrimaryButtonStyle, csCancelButtonStyle, useCustomerOverlayClose } from "@/components/customer/CustomerBottomSheet";
 import CustomerManualField from "@/components/customer/CustomerManualField";
 import CustomerDialog from "@/components/customer/CustomerDialog";
 import { KakaoPostcodeEmbed } from "react-daum-postcode";
@@ -1675,6 +1676,16 @@ export default function OrderPage() {
   const [noteUnread, setNoteUnread] = useState(0);
   const [addressSearchOpen, setAddressSearchOpen] = useState(false);
   const addressPickedHandlerRef = useRef<((addr: string, zipcode: string) => void) | null>(null);
+  const postcodeDocumentFrameRef = useRef<HTMLDivElement | null>(null);
+  const postcodeOverlayTopRef = useRef(0);
+  // Preserve the existing X / escape / Android back behavior when leaving the fixed sheet.
+  const { requestClose: requestCloseAddressSearch } = useCustomerOverlayClose({
+    open: addressSearchOpen,
+    onClose: () => {
+      setAddressSearchOpen(false);
+      addressPickedHandlerRef.current = null;
+    },
+  });
   const [missingDetailAddressConfirmOpen, setMissingDetailAddressConfirmOpen] = useState(false);
   const PRIVACY_CONSENT_VERSION = "2026-05-24-v1";
   const PRIVACY_CONSENT_STORAGE_KEY = "ruru_privacy_consent_version";
@@ -4044,6 +4055,8 @@ export default function OrderPage() {
   // react-daum-postcode(KakaoPostcodeEmbed)를 state로 띄운다.
   // iOS 카카오톡 인앱브라우저의 about:blank/팝업차단 이슈를 라이브러리 embed 방식으로 회피.
   const openAddressSearch = (onPicked?: (addr: string, zipcode: string) => void) => {
+    // Stable document scroll anchor: avoid jumping when the virtual keyboard changes viewport.
+    postcodeOverlayTopRef.current = typeof window !== "undefined" ? window.scrollY : 0;
     addressPickedHandlerRef.current = onPicked ?? null;
     setAddressSearchOpen(true);
   };
@@ -10173,41 +10186,73 @@ export default function OrderPage() {
           onClose={closeCustomerNotice}
         />
 
-        {addressSearchOpen ? (
-          <CustomerBottomSheet
-            tone={uiS5 ? "v2" : undefined}
-            open
-            onClose={() => { setAddressSearchOpen(false); addressPickedHandlerRef.current = null; }}
-            zIndex={CS_SHEET_Z_STACKED}
-            title="카카오 주소검색"
-            subtitle="도로명·지번·건물명으로 검색해 주세요"
-            bodyPadding="0"
-            bodyStyle={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
+        {addressSearchOpen && typeof document !== "undefined" ? createPortal(
+          /* Kakao guide: Safari/WebView fixed + inner scroll can block keyboard touches.
+             Render iframe in document flow (not inside fixed CustomerBottomSheet),
+             retaining order form state and the original search/selection callbacks. */
+          <div
+            data-ruru-postcode-document-overlay="true"
+            role="dialog"
+            aria-modal="true"
+            aria-label="카카오 주소검색"
+            style={{
+              position: "absolute",
+              top: postcodeOverlayTopRef.current,
+              left: 0,
+              right: 0,
+              minHeight: "100svh",
+              background: "#FFFFFF",
+              zIndex: 3000,
+              boxSizing: "border-box",
+              paddingBottom: "max(20px, env(safe-area-inset-bottom))",
+            }}
           >
-            <KakaoPostcodeEmbed
-              scriptUrl="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
-              onComplete={handleAddressSearchComplete}
-              onClose={(state) => { if (state === "FORCE_CLOSE") setAddressSearchOpen(false); }}
-              autoClose={false}
-              style={s5s({ width: "100%", height: "100%", flex: 1, minHeight: 0 })}
-              errorMessage={
-                <div role="alert" style={s5s({ padding: "28px 20px", textAlign: "center" })}>
-                  <div style={s5s({ fontSize: "16px", fontWeight: 900, color: "#0f172a" })}>
-                    카카오 주소검색을 불러오지 못했어요
-                  </div>
-                  <p style={s5s({ marginTop: "12px", fontSize: "14px", lineHeight: 1.7, color: "#475569", wordBreak: "keep-all" })}>
-                    인터넷 연결을 확인해 주세요. 카카오톡 안에서 열리지 않으면
-                    오른쪽 위 메뉴에서 '다른 브라우저로 열기'를 선택해 다시 접속해 주세요.
-                    기본주소는 검색으로만 선택할 수 있어요.
-                  </p>
-                  <button type="button" onClick={() => { setAddressSearchOpen(false); addressPickedHandlerRef.current = null; }}
-                    style={s5s({ marginTop: "18px", height: "48px", padding: "0 22px", borderRadius: "12px", background: "#111111", color: "#ffffff", fontWeight: 800 })}>
-                    닫기
-                  </button>
+            <div style={{ maxWidth: "560px", margin: "0 auto", background: "#FFFFFF" }}>
+              <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", padding: "18px 16px 14px", borderBottom: "1px solid #E5E5E5" }}>
+                <div>
+                  <div style={{ fontSize: "18px", fontWeight: 800, color: "#111111" }}>카카오 주소검색</div>
+                  <div style={{ fontSize: "13px", color: "#707072", marginTop: "4px" }}>도로명·지번·건물명을 검색해 주소를 선택하세요.</div>
                 </div>
-              }
-            />
-          </CustomerBottomSheet>
+                <button type="button" aria-label="주소검색 닫기" onClick={() => requestCloseAddressSearch()}
+                  style={{ width: "44px", height: "44px", flexShrink: 0, fontSize: "20px", border: "none", borderRadius: "50%", background: "#F5F5F5", cursor: "pointer", color: "#111111" }}>✕</button>
+              </header>
+              <div
+                ref={postcodeDocumentFrameRef}
+                data-ruru-postcode-frame="in-page"
+                style={{ width: "100%", height: "520px", overflow: "visible", position: "relative" }}
+              >
+                <KakaoPostcodeEmbed
+                  scriptUrl="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
+                  onComplete={handleAddressSearchComplete}
+                  onClose={(state) => { if (state === "FORCE_CLOSE") requestCloseAddressSearch(); }}
+                  onResize={(size) => {
+                    const height = Number(size?.height);
+                    if (postcodeDocumentFrameRef.current && Number.isFinite(height) && height > 0) {
+                      // Expand the page rather than nesting another scroll box around the iframe.
+                      postcodeDocumentFrameRef.current.style.height = `${Math.max(480, Math.min(2400, Math.ceil(height) + 16))}px`;
+                    }
+                  }}
+                  autoClose={false}
+                  style={{ width: "100%", height: "100%", display: "block" }}
+                  errorMessage={
+                    <div role="alert" style={{ padding: "28px 20px", textAlign: "center" }}>
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: "#111111" }}>카카오 주소검색을 불러오지 못했어요.</div>
+                      <p style={{ marginTop: "10px", fontSize: "14px", color: "#475569", lineHeight: 1.7 }}>
+                        인터넷 연결을 확인하거나, 카카오톡 오른쪽 위 메뉴에서 다른 브라우저로 열어 주세요.
+                        기본주소는 반드시 검색 결과에서 선택해야 합니다.
+                      </p>
+                      <button type="button" onClick={() => requestCloseAddressSearch()}
+                        style={{ marginTop: "16px", border: "none", borderRadius: "12px", background: "#111111", color: "#fff", fontSize: "15px", padding: "12px 24px" }}>닫기</button>
+                    </div>
+                  }
+                />
+              </div>
+              <p style={{ fontSize: "13px", color: "#707072", padding: "14px 16px", lineHeight: 1.5 }}>
+                기본주소는 검색으로 선택하고, 동·호수 등 상세주소는 검색창을 닫은 뒤 입력해 주세요.
+              </p>
+            </div>
+          </div>,
+          document.body
         ) : null}
 
         {howToOpen && !liveWatchShown && !liveBootCover ? (

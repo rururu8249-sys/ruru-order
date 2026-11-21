@@ -289,7 +289,7 @@ export default function CustomerInfoEditBottomSheet({
                   </button>
                 </div>
                 <input value={addrForm.address} readOnly onClick={handleAddressSearch}
-                  placeholder="주소검색으로 기본주소를 선택해 주세요"
+                  placeholder="눌러서 주소를 검색해 선택하세요"
                   style={s5({ ...inputStyle, marginBottom: "8px", cursor: "pointer" })} />
                 <input id="ruru-shipping-detail-address" value={addrForm.detailAddress} onChange={(e) => setAddrForm((f) => ({ ...f, detailAddress: e.target.value }))}
                   placeholder="상세 주소 (동/호수 등)" style={s5(inputStyle)} />
