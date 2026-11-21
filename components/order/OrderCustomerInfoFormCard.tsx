@@ -15,7 +15,6 @@ type OrderCustomerInfoFormCardProps = {
   onYoutubeNicknameChange: (value: string) => void;
   onCustomerNameChange: (value: string) => void;
   onCustomerPhoneChange: (value: string) => void;
-  onAddressChange: (value: string) => void;
   onDetailAddressChange: (value: string) => void;
   onOpenAddressSearch: () => void;
   onCancel?: () => void;
@@ -45,7 +44,6 @@ export default function OrderCustomerInfoFormCard({
   onYoutubeNicknameChange,
   onCustomerNameChange,
   onCustomerPhoneChange,
-  onAddressChange,
   onDetailAddressChange,
   onOpenAddressSearch,
   onCancel,
@@ -96,8 +94,9 @@ export default function OrderCustomerInfoFormCard({
           <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_106px]">
             <input
               value={address}
-              onChange={(event) => onAddressChange(event.target.value)}
-              placeholder="주소검색 또는 직접 입력"
+              readOnly
+              onClick={onOpenAddressSearch}
+              placeholder="주소검색으로 기본주소를 선택해 주세요"
               className="h-12 min-w-0 rounded-[18px] border border-coral-100 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none transition placeholder:text-slate-400 focus:border-coral-500"
             />
 

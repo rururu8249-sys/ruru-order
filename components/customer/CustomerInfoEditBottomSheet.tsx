@@ -140,7 +140,10 @@ export default function CustomerInfoEditBottomSheet({
     //   손님은 새 주소로 갈 거라 믿는데 택배는 옛 집으로 가는 구조였다.
     if (!addrForm.name.trim()) { window.alert("받는 분 이름을 입력해 주세요."); return; }
     if (!String(addrForm.phone || "").trim()) { window.alert("받는 분 연락처를 입력해 주세요."); return; }
-    if (!addrForm.address.trim()) { window.alert("주소를 입력해 주세요. (주소검색 버튼을 눌러주세요)"); return; }
+    if (!addrForm.address.trim() || !/^\d{5}$/.test(String(addrForm.zipcode || ""))) {
+      window.alert("주소검색 버튼으로 기본주소를 선택해 주세요.");
+      return;
+    }
 
     const nextAddresses = editingAddrIndex !== null
       ? shippingAddresses.map((a, i) => i === editingAddrIndex ? { ...addrForm } : a)
@@ -257,8 +260,9 @@ export default function CustomerInfoEditBottomSheet({
                     주소검색
                   </button>
                 </div>
-                <input value={addrForm.address} onChange={(e) => setAddrForm((f) => ({ ...f, address: e.target.value }))}
-                  placeholder="기본 주소" style={s5({ ...inputStyle, marginBottom: "8px" })} />
+                <input value={addrForm.address} readOnly onClick={handleAddressSearch}
+                  placeholder="주소검색으로 기본주소를 선택해 주세요"
+                  style={s5({ ...inputStyle, marginBottom: "8px", cursor: "pointer" })} />
                 <input value={addrForm.detailAddress} onChange={(e) => setAddrForm((f) => ({ ...f, detailAddress: e.target.value }))}
                   placeholder="상세 주소 (동/호수 등)" style={s5(inputStyle)} />
               </div>

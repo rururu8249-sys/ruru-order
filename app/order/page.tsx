@@ -117,7 +117,6 @@ import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotic
 import OrderNicknameConflictNotice from "@/components/order/OrderNicknameConflictNotice";
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
-import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddressPanel";
 import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import OrderPurchaseConsentModal from "@/components/order/OrderPurchaseConsentModal";
@@ -1672,7 +1671,6 @@ export default function OrderPage() {
       }, autoHideMs);
     }
   };
-  const [manualAddressOpen, setManualAddressOpen] = useState(false);
   // [2026-08-30] 하단 메뉴 「공지·쪽지」의 안 읽은 개수 — 쪽지함 컴포넌트가 이벤트로 알려준다.
   const [noteUnread, setNoteUnread] = useState(0);
   const [addressSearchOpen, setAddressSearchOpen] = useState(false);
@@ -3951,7 +3949,11 @@ export default function OrderPage() {
     }
 
     if (!address.trim()) {
-      showCustomerNotice("주소를 입력해 주세요.");
+      showCustomerNotice("주소검색 버튼으로 기본주소를 선택해 주세요.");
+      return;
+    }
+    if (isFirstInfoEntry && !/^\d{5}$/.test(zipcode.trim())) {
+      showCustomerNotice("카카오 주소검색에서 주소를 선택해 주세요.");
       return;
     }
 
@@ -4038,25 +4040,6 @@ export default function OrderPage() {
     window.addEventListener("ruru-note-unread", onCount as EventListener);
     return () => window.removeEventListener("ruru-note-unread", onCount as EventListener);
   }, []);
-
-  const applyManualAddress = (nextAddress: string) => {
-    const cleanAddress = nextAddress.trim();
-
-    if (!cleanAddress) {
-      showCustomerNotice("주소를 입력해 주세요.", "warning");
-      return;
-    }
-
-    setAddress(cleanAddress);
-    setManualAddressOpen(false);
-
-    setTimeout(() => {
-      const detailInput = document.querySelector<HTMLInputElement>(
-        'input[placeholder*="상세주소"]'
-      );
-      detailInput?.focus();
-    }, 80);
-  };
 
   // react-daum-postcode(KakaoPostcodeEmbed)를 state로 띄운다.
   // iOS 카카오톡 인앱브라우저의 about:blank/팝업차단 이슈를 라이브러리 embed 방식으로 회피.
@@ -7718,7 +7701,6 @@ export default function OrderPage() {
             onYoutubeNicknameChange={setYoutubeNickname}
             onCustomerNameChange={setCustomerName}
             onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
-            onAddressChange={setAddress}
             onDetailAddressChange={setDetailAddress}
             onOpenAddressSearch={openAddressSearch}
             onCancel={cancelEditCustomerInfo}
@@ -8986,70 +8968,6 @@ export default function OrderPage() {
           </CustomerBottomSheet>
           )}
 
-            <CustomerToastNotice
-              open={Boolean(customerNotice.message)}
-              type={customerNotice.type}
-              message={customerNotice.message}
-              onClose={closeCustomerNotice}
-            />
-
-            <CustomerManualAddressPanel
-              open={manualAddressOpen}
-              defaultValue={address}
-              onClose={() => setManualAddressOpen(false)}
-              onSubmit={applyManualAddress}
-            />
-
-            {/* [2026-08-30 사장님 지시] "주소검색이 안된다"는 문의가 간헐적으로 온다.
-                원인: 주소검색 창은 카카오(다음) 서버의 postcode.v2.js 를 손님 폰이 직접 받아온다.
-                      인앱브라우저·광고차단·회사망 등에서 못 받아오면 흰 화면만 남았고,
-                      그때 손님이 할 수 있는 게 화면에 아무것도 없었다.
-                수정: ① 스크립트 실패 시(errorMessage) 안내 + [직접 입력] 버튼
-                      ② 실패가 아니어도 아래에 [직접 입력] 을 항상 둔다
-                      ③ 이미 만들어져 있던 CustomerManualAddressPanel 을 여기서 연다
-                      (직접 입력해도 주문은 정상 제출된다 — 검증은 주소 유무만 본다) */}
-            {addressSearchOpen ? (
-              <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
-                open
-                onClose={() => setAddressSearchOpen(false)}
-                zIndex={CS_SHEET_Z_STACKED}
-                title="주소 검색"
-                subtitle="도로명·지번·건물명으로 찾아요"
-                bodyPadding="0"
-                bodyStyle={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
-                footer={(
-                  <button
-                    type="button"
-                    onClick={() => { setAddressSearchOpen(false); setManualAddressOpen(true); }}
-                    style={s5s(csCancelButtonStyle)}
-                  >{uiS5 ? "검색이 안 되면 직접 입력" : "✏️ 검색이 안 되면 직접 입력"}</button>
-                )}
-              >
-                    <KakaoPostcodeEmbed
-                      onComplete={handleAddressSearchComplete}
-                      onClose={(state) => { if (state === "FORCE_CLOSE") setAddressSearchOpen(false); }}
-                      autoClose={false}
-                      style={s5s({ width: "100%", height: "100%", flex: 1, minHeight: 0 })}
-                      errorMessage={
-                        <div style={s5s({ padding: "28px 20px", textAlign: "center" })}>
-                          <div style={s5s({ fontSize: "34px" })}>{uiS5 ? <svg aria-hidden="true" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#707072" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block" }}><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16h.01" /></svg> : "😥"}</div>
-                          <div style={s5s({ marginTop: "10px", fontSize: "16px", fontWeight: 900, color: "#0f172a" })}>주소검색 창을 열지 못했어요</div>
-                          <div style={s5s({ marginTop: "8px", fontSize: "13px", fontWeight: 700, lineHeight: 1.7, color: "#64748b" })}>
-                            카카오톡·인스타 안에서 열었거나 인터넷이 불안정하면
-                            <br />주소검색 창이 안 뜰 수 있어요.
-                            <br />아래에서 <b>주소를 직접 입력</b>하셔도 주문됩니다.
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => { setAddressSearchOpen(false); setManualAddressOpen(true); }}
-                            style={s5s({ marginTop: "18px", height: "48px", padding: "0 22px", borderRadius: "16px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 900, cursor: "pointer" })}
-                          >{uiS5 ? "주소 직접 입력하기" : "✏️ 주소 직접 입력하기"}</button>
-                        </div>
-                      }
-                    />
-              </CustomerBottomSheet>
-            ) : null}
-
             <CustomerMissingDetailAddressPanel
               open={missingDetailAddressConfirmOpen}
               onClose={() => setMissingDetailAddressConfirmOpen(false)}
@@ -10247,6 +10165,51 @@ export default function OrderPage() {
           )}
         </>
       )}
+
+        {/* 신규·기존 고객 공통: 카카오 공식 주소검색 (기본주소 직접입력 불가). */}
+        <CustomerToastNotice
+          open={Boolean(customerNotice.message)}
+          type={customerNotice.type}
+          message={customerNotice.message}
+          onClose={closeCustomerNotice}
+        />
+
+        {addressSearchOpen ? (
+          <CustomerBottomSheet
+            tone={uiS5 ? "v2" : undefined}
+            open
+            onClose={() => { setAddressSearchOpen(false); addressPickedHandlerRef.current = null; }}
+            zIndex={CS_SHEET_Z_STACKED}
+            title="카카오 주소검색"
+            subtitle="도로명·지번·건물명으로 검색해 주세요"
+            bodyPadding="0"
+            bodyStyle={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
+          >
+            <KakaoPostcodeEmbed
+              scriptUrl="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
+              onComplete={handleAddressSearchComplete}
+              onClose={(state) => { if (state === "FORCE_CLOSE") setAddressSearchOpen(false); }}
+              autoClose={false}
+              style={s5s({ width: "100%", height: "100%", flex: 1, minHeight: 0 })}
+              errorMessage={
+                <div role="alert" style={s5s({ padding: "28px 20px", textAlign: "center" })}>
+                  <div style={s5s({ fontSize: "16px", fontWeight: 900, color: "#0f172a" })}>
+                    카카오 주소검색을 불러오지 못했어요
+                  </div>
+                  <p style={s5s({ marginTop: "12px", fontSize: "14px", lineHeight: 1.7, color: "#475569", wordBreak: "keep-all" })}>
+                    인터넷 연결을 확인해 주세요. 카카오톡 안에서 열리지 않으면
+                    오른쪽 위 메뉴에서 '다른 브라우저로 열기'를 선택해 다시 접속해 주세요.
+                    기본주소는 검색으로만 선택할 수 있어요.
+                  </p>
+                  <button type="button" onClick={() => { setAddressSearchOpen(false); addressPickedHandlerRef.current = null; }}
+                    style={s5s({ marginTop: "18px", height: "48px", padding: "0 22px", borderRadius: "12px", background: "#111111", color: "#ffffff", fontWeight: 800 })}>
+                    닫기
+                  </button>
+                </div>
+              }
+            />
+          </CustomerBottomSheet>
+        ) : null}
 
         {howToOpen && !liveWatchShown && !liveBootCover ? (
           <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
