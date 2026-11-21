@@ -94,6 +94,7 @@ export default function CustomerInfoEditBottomSheet({
   const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5");
   const [screen, setScreen] = useState<Screen>(initialScreen ?? "info");
   const [editingAddrIndex, setEditingAddrIndex] = useState<number | null>(null);
+  const [savingShipping, setSavingShipping] = useState(false);
   const [addrForm, setAddrForm] = useState<ShippingAddress>({ name: "", phone: "", address: "", detailAddress: "", zipcode: "" });
 
   // 시트가 열릴 때마다 initialScreen으로 진입 화면을 맞춘다.
@@ -134,55 +135,82 @@ export default function CustomerInfoEditBottomSheet({
     setScreen("shipping_form");
   };
 
-  const handleSaveAddrForm = () => {
-    // [2026-08-31 전수조사 수정 · 오배송 위험] 빈 주소도 저장되고,
-    //   새 주소를 "추가"해도 주문은 옛 기본배송지로 나갔다(방금 만든 주소가 적용 안 됨).
-    //   손님은 새 주소로 갈 거라 믿는데 택배는 옛 집으로 가는 구조였다.
+  // 배송지 변경은 DB 저장 성공 후에만 적용한다. 실패 시 입력 화면을 유지한다.
+  const persistShippingAddresses = async (next: ShippingAddress[]) => {
+    if (!onSaveShippingAddresses) throw new Error("배송지 저장 기능이 연결되지 않았습니다.");
+    await onSaveShippingAddresses(next);
+  };
+  const reportShippingSaveError = (error: unknown) => {
+    console.error("배송지 저장 실패", error);
+    window.alert("배송지를 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.");
+  };
+
+  const handleSaveAddrForm = async () => {
+    if (savingShipping) return;
     if (!addrForm.name.trim()) { window.alert("받는 분 이름을 입력해 주세요."); return; }
     if (!String(addrForm.phone || "").trim()) { window.alert("받는 분 연락처를 입력해 주세요."); return; }
     if (!addrForm.address.trim() || !/^\d{5}$/.test(String(addrForm.zipcode || ""))) {
       window.alert("주소검색 버튼으로 기본주소를 선택해 주세요.");
       return;
     }
-
     const nextAddresses = editingAddrIndex !== null
       ? shippingAddresses.map((a, i) => i === editingAddrIndex ? { ...addrForm } : a)
       : [...shippingAddresses, { ...addrForm, isDefault: shippingAddresses.length === 0 }];
-    onSaveShippingAddresses?.(nextAddresses);
-    // 방금 저장한 주소(추가든 수정이든)를 이번 주문에 바로 적용한다.
-    //   방금 입력한 주소 = 손님이 지금 쓰려는 주소다. 기본배송지 별표는 그대로 둔다.
-    const saved = editingAddrIndex !== null ? nextAddresses[editingAddrIndex] : nextAddresses[nextAddresses.length - 1];
-    if (saved) onSelectShippingAddress?.(saved.address, saved.detailAddress ?? "", saved.name, saved.phone, saved.zipcode ?? "");
-    setScreen("shipping_list");
-    setEditingAddrIndex(null);
+    setSavingShipping(true);
+    try {
+      await persistShippingAddresses(nextAddresses);
+      // 저장 완료 후에만 이번 주문의 수령 주소로 적용한다.
+      const saved = editingAddrIndex !== null ? nextAddresses[editingAddrIndex] : nextAddresses[nextAddresses.length - 1];
+      if (saved) onSelectShippingAddress?.(saved.address, saved.detailAddress ?? "", saved.name, saved.phone, saved.zipcode ?? "");
+      setScreen("shipping_list");
+      setEditingAddrIndex(null);
+    } catch (error) {
+      reportShippingSaveError(error);
+    } finally {
+      setSavingShipping(false);
+    }
   };
 
-  const handleDeleteAddr = (index: number) => {
-    const next = shippingAddresses.filter((_, i) => i !== index);
-    if (shippingAddresses[index].isDefault && next.length > 0) next[0].isDefault = true;
-    onSaveShippingAddresses?.(next);
-    // 삭제 후 결과 배열의 기본배송지를 주문 단일 state에 즉시 동기화.
-    const def = next.find((a) => a.isDefault) ?? next[0];
-    if (def) onSelectShippingAddress?.(def.address, def.detailAddress ?? "", def.name, def.phone, def.zipcode ?? "");
+  const handleDeleteAddr = async (index: number) => {
+    if (savingShipping) return;
+    const next = shippingAddresses.filter((_, i) => i !== index).map((a) => ({ ...a }));
+    if (shippingAddresses[index]?.isDefault && next.length > 0) next[0].isDefault = true;
+    setSavingShipping(true);
+    try {
+      await persistShippingAddresses(next);
+      const def = next.find((a) => a.isDefault) ?? next[0];
+      if (def) onSelectShippingAddress?.(def.address, def.detailAddress ?? "", def.name, def.phone, def.zipcode ?? "");
+    } catch (error) {
+      reportShippingSaveError(error);
+    } finally {
+      setSavingShipping(false);
+    }
   };
 
-  const handleSetDefault = (index: number) => {
+  const handleSetDefault = async (index: number) => {
+    if (savingShipping) return;
     const target = shippingAddresses[index];
     if (!target) return;
-    // 기본 배송지로 설정한 항목을 배열 맨 앞으로 이동하고 isDefault 갱신.
     const reordered = [
       { ...target, isDefault: true },
       ...shippingAddresses.filter((_, i) => i !== index).map((x) => ({ ...x, isDefault: false })),
     ];
-    onSaveShippingAddresses?.(reordered);
-    // 기본 배송지로 설정하면 곧 주문 주소로도 적용한다.
-    onSelectShippingAddress?.(target.address, target.detailAddress, target.name, target.phone, target.zipcode);
+    setSavingShipping(true);
+    try {
+      await persistShippingAddresses(reordered);
+      onSelectShippingAddress?.(target.address, target.detailAddress, target.name, target.phone, target.zipcode);
+    } catch (error) {
+      reportShippingSaveError(error);
+    } finally {
+      setSavingShipping(false);
+    }
   };
 
   // 주소검색 — 현재 팝업 위에서 열림 (order/page.tsx의 openAddressSearch가 최상위 zIndex로 처리)
   const handleAddressSearch = () => {
     onOpenAddressSearchForForm?.((addr, zipcode) => {
       setAddrForm((f) => ({ ...f, address: addr, zipcode: zipcode || "" }));
+      window.setTimeout(() => document.getElementById("ruru-shipping-detail-address")?.focus(), 100);
     });
   };
 
@@ -217,7 +245,7 @@ export default function CustomerInfoEditBottomSheet({
     : undefined;
   const footer =
     screen === "shipping_form" ? (
-      <button type="button" onClick={handleSaveAddrForm} style={s5(csPrimaryButtonStyle(true))}>저장</button>
+      <button type="button" onClick={() => { void handleSaveAddrForm(); }} disabled={savingShipping} style={s5(csPrimaryButtonStyle(!savingShipping))}>{savingShipping ? "저장 중..." : "저장"}</button>
     ) : screen === "shipping_list" ? undefined : (
       <button type="button" onClick={onSave} disabled={saving} style={s5({ ...csPrimaryButtonStyle(!saving), cursor: saving ? "default" : "pointer" })}>
         {saving ? "저장 중..." : "저장"}
@@ -233,7 +261,7 @@ export default function CustomerInfoEditBottomSheet({
       headerLeft={headerLeft}
       footer={footer}
       closeGuard={closeGuard}
-      closeDisabled={saving}
+      closeDisabled={saving || savingShipping}
       bodyPadding={screen === "shipping_form" ? "20px 16px" : "16px"}
       bodyStyle={v5 ? { background: "#F5F5F5" } : { background: "#F7F4F1" }}
     >
@@ -263,7 +291,7 @@ export default function CustomerInfoEditBottomSheet({
                 <input value={addrForm.address} readOnly onClick={handleAddressSearch}
                   placeholder="주소검색으로 기본주소를 선택해 주세요"
                   style={s5({ ...inputStyle, marginBottom: "8px", cursor: "pointer" })} />
-                <input value={addrForm.detailAddress} onChange={(e) => setAddrForm((f) => ({ ...f, detailAddress: e.target.value }))}
+                <input id="ruru-shipping-detail-address" value={addrForm.detailAddress} onChange={(e) => setAddrForm((f) => ({ ...f, detailAddress: e.target.value }))}
                   placeholder="상세 주소 (동/호수 등)" style={s5(inputStyle)} />
               </div>
             </div>

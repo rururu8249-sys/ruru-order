@@ -4065,9 +4065,7 @@ export default function OrderPage() {
     setZipcode(nextZipcode);
 
     setTimeout(() => {
-      const detailInput = document.querySelector<HTMLInputElement>(
-        "input[placeholder='상세주소를 입력해주세요']"
-      );
+      const detailInput = document.getElementById("ruru-customer-detail-address");
       detailInput?.focus();
     }, 100);
   };
@@ -5416,35 +5414,36 @@ export default function OrderPage() {
   };
 
   const saveShippingAddresses = async (addresses: any[]) => {
-    setShippingAddresses(addresses);
     const phoneKey = onlyNumber(customerPhone);  // DB customer_phone 키는 숫자만(2026-06-16 정규화)
-    if (!phoneKey || phoneKey.length < 9) return;
+    if (!phoneKey || phoneKey.length < 9) throw new Error("주문자 연락처를 먼저 확인해 주세요.");
     // customers row가 아직 없으면(신규 사용자가 배송지부터 추가) insert로 보완해 DB 유실을 막는다.
     // [2026-08-31 계정분리 근본차단] 카카오 계정으로 먼저 찾는다(번호는 바뀔 수 있다).
     const kakaoIdForAddr = (() => {
       try { return String(localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
     })();
     let addrRowId: number | string | null = null;
-    let addrKakaoFailed = false;
     if (kakaoIdForAddr) {
       const { data: byKakao, error: e2 } = await supabase.from("customers").select("id")
         .eq("kakao_id", kakaoIdForAddr).order("created_at", { ascending: false }).limit(1);
-      if (e2) addrKakaoFailed = true;
+      if (e2) throw e2;
       if (Array.isArray(byKakao) && byKakao.length > 0) addrRowId = (byKakao[0] as any).id;
     }
     if (addrRowId === null) {
-      const { data: existing } = await supabase.from("customers").select("id").eq("customer_phone", phoneKey).limit(1);
+      const { data: existing, error: lookupError } = await supabase.from("customers").select("id").eq("customer_phone", phoneKey).limit(1);
+      if (lookupError) throw lookupError;
       if (existing && existing.length > 0) addrRowId = (existing[0] as any).id;
     }
     if (addrRowId !== null) {
-      await supabase.from("customers").update({ shipping_addresses: addresses }).eq("id", addrRowId);
-    } else if (addrKakaoFailed) {
-      // 카카오 조회 일시 실패 — 중복 줄을 만들지 않기 위해 이번 저장만 건너뛴다(화면 상태에는 이미 반영됨).
+      const { error: saveError } = await supabase.from("customers").update({ shipping_addresses: addresses }).eq("id", addrRowId);
+      if (saveError) throw saveError;
     } else {
       const row: any = { customer_phone: phoneKey, youtube_nickname: youtubeNickname.trim() || "", customer_name: customerName.trim() || "", shipping_addresses: addresses };
       if (kakaoIdForAddr) row.kakao_id = kakaoIdForAddr;
-      await supabase.from("customers").insert(row);
+      const { error: insertError } = await supabase.from("customers").insert(row);
+      if (insertError) throw insertError;
     }
+    // 서버 저장이 확인된 뒤에만 주문 화면의 배송지를 바꾼다.
+    setShippingAddresses(addresses);
   };
 
   const validate = (options?: { allowMissingDetailAddress?: boolean }) => {

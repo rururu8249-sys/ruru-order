@@ -113,6 +113,7 @@ export default function OrderCustomerInfoFormCard({
         <div className="grid gap-2">
           <FieldLabel>상세주소</FieldLabel>
           <input
+            id="ruru-customer-detail-address"
             value={detailAddress}
             onChange={(event) => onDetailAddressChange(event.target.value)}
             placeholder="동/호수, 건물명 등 상세주소"
