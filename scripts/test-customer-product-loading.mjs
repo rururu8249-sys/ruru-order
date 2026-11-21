@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const loadModule=createUiLoader();
+const paused=loadModule('lib/livePausedText.ts');
+const watch=loadModule('lib/liveWatch.ts');
 
 // Execute the real page loader. Delayed I/O is the only replacement.
 const text=fs.readFileSync('app/order/page.tsx','utf8');
@@ -26,6 +30,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
 function fixture({live=true,broadcastError=false,productOk=true,catalogOk=true}={}){
   const events=[];const catalog=deferred();const products=deferred();
   const context={
+    ...paused,...watch,setLiveWatchSetting:()=>{},setLivePausedText:()=>{},
     supabase:{from:table=>{const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>table==='broadcasts'?{data:live?{id:7,status:'ON'}:null,error:broadcastError?{message:'offline'}:null}:{data:{value:''},error:null}};return q;}},
     console:{log:()=>{}},
     loadGroupBuyQuickProductsFromCatalog:async()=>{events.push('catalog-start');await catalog.promise;events.push('catalog-end');return catalogOk;},

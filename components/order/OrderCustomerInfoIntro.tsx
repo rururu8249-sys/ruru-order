@@ -23,17 +23,17 @@ export default function OrderCustomerInfoIntro({
 
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
-            {isEdit ? "배송정보 수정" : "주문 전 필수 확인"}
+            {isEdit ? "배송정보 수정" : "첫 주문 준비"}
           </p>
 
           <h1 className="mt-1 break-keep text-[24px] font-black leading-tight tracking-[-0.07em] text-[#151923]">
-            {isEdit ? "정보수정" : "주문 전 정보 확인"}
+            {isEdit ? "정보수정" : "처음 주문 정보 입력"}
           </h1>
 
           <p className="mt-2 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
             {isEdit
               ? "닉네임, 이름, 전화번호, 주소를 확인하고 저장해 주세요."
-              : "주문 전 닉네임, 이름, 전화번호, 배송지를 확인해 주세요."}
+              : "아래에 이름, 전화번호, 배송지를 입력해 주세요. 저장하면 상품을 보고 주문할 수 있어요."}
           </p>
         </div>
       </div>

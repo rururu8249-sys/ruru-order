@@ -137,7 +137,7 @@ export default function OrderCustomerInfoFormCard({
             onClick={onConfirm}
             className="h-13 min-h-[52px] rounded-[18px] bg-coral-600 text-[16px] font-black tracking-[-0.04em] text-white shadow-[0_12px_24px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"
           >
-            {isEdit ? "수정완료" : "확인"}
+            {isEdit ? "수정완료" : "저장하고 상품 보기"}
           </button>
         </div>
       </div>
