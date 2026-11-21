@@ -38,7 +38,7 @@ assert.equal((await run({text:'mx107 와인 색이 예쁘네요',rotate:true})).
 assert.equal((await run({text:'mx107 와인 색이 예쁘네요',rotate:true,removed:true})).sent.length,0,'removed product denied');
 assert.equal((await run({text:'mx107 와인 색이 예쁘네요',transition:true})).sent.length,0,'mode changed during generation denied');
 const prior=await run({text:'mx107 와인 색이 예쁘네요'});
-const hidden=[{id:5,body:prior.sent[0].body,created_at:new Date(now-60_000).toISOString(),automation_actor_id:'other'}];
+const hidden=[{id:5,body:prior.sent[0].body,created_at:new Date(now-180_000).toISOString(),automation_actor_id:'other'}];
 const cleared=await run({text:'mx107 와인 색이 예쁘네요',hidden});
 assert.equal(cleared.sent.length,0,'screen-clear does not reset repeat memory');
 assert.ok(!cleared.prompts[0].includes('#5'),'hidden row not restored as reply context');

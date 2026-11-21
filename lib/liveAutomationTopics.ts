@@ -51,11 +51,11 @@ export function roomTopicPrompt(recent:ChatObservation[],now:number):string{
 }
 
 /** A genuinely new, explicitly named catalog topic, not a carousel tick.
- * Both the product and interest must add something to recent conversation. */
+ * The interest must add something; a previously named product is not exhausted. */
 export function hasNewGroundedInterest(text:string,product:ChatProductFacts|null,recent:ChatObservation[],now:number):boolean{
  if(!product||!identifiesChatProduct(text,product))return false;
  const topics=conversationTopics(text);if(!topics.length)return false;
  const rows=recent.filter(r=>Number.isFinite(r.at)&&r.at<=now&&r.at>=now-90*60000).sort((a,b)=>b.at-a.at).slice(0,12);
- if(rows.some(r=>identifiesChatProduct(r.text,product)))return false;
+ if(rows.some(r=>identifiesChatProduct(r.text,product)&&conversationTopics(r.text).some(t=>topics.includes(t))))return false;
  return rows.slice(0,2).every(r=>!conversationTopics(r.text).some(t=>topics.includes(t)));
 }

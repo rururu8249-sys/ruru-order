@@ -1,3 +1,4 @@
+import {chatPhaseConfig} from './liveAutomationRate';
 /** One room-level policy for TEST-chat spontaneity and contextual replies.
  * Independent chat never receives a free pass merely because the public
  * carousel advanced to its next product every five seconds.
@@ -6,10 +7,11 @@
 export type RoomTurnRow={id:number; at:number; actorId?:string|null;
   kind:'ai'|'human'|'system'; responseToId?:number|null; asksQuestion?:boolean};
 export type RoomTurnInput={now:number; mode:'live'|'paused'|'replay'; currentProductKey:string;
-  replyToId:number; speakerId:string; previousProductKey?:string; newGroundedInterest?:boolean; room:RoomTurnRow[]};
+  replyToId:number; speakerId:string; previousProductKey?:string; newGroundedInterest?:boolean; chatRate?:number; room:RoomTurnRow[]};
 export type RoomTurnDecision={ok:boolean;reason:string};
 export function assessRoomTurn(x:RoomTurnInput):RoomTurnDecision {
   const reject=(reason:string):RoomTurnDecision=>({ok:false,reason});
+  if(x.chatRate===0)return reject('chat-rate-zero');
   const conversation=x.room.filter(m=>m.kind!=='system'&&Number.isFinite(m.at))
     .sort((a,b)=>b.id-a.id);
   const latest=conversation[0];
@@ -35,7 +37,7 @@ export function assessRoomTurn(x:RoomTurnInput):RoomTurnDecision {
   }
   if(!x.currentProductKey&&!x.room.some(m=>m.kind==='human'&&x.now-m.at<180_000))
     return reject('no-product-or-human-context');
-  if(latest?.kind==='human'&&x.now-latest.at<60_000)
+  if(latest?.kind==='human'&&x.now-latest.at<(x.chatRate===undefined?60_000:chatPhaseConfig(x.chatRate,x.mode).humanQuietMs))
     return reject('let-real-customer-conversation-breathe');
   if(latest?.kind==='ai'){
     const age=x.now-latest.at;
@@ -44,10 +46,10 @@ export function assessRoomTurn(x:RoomTurnInput):RoomTurnDecision {
     if(original?.kind==='human'&&!original.asksQuestion&&age<(x.mode==='live'?5*60_000:8*60_000))
       return reject('human-remark-already-answered');
     if(continuousAi>=2&&!x.newGroundedInterest)return reject('two-unrelated-ai-turns-without-new-context');
-    const gap=x.mode==='live'?150_000:360_000;
+    const gap=x.chatRate===undefined?(x.mode==='live'?150_000:360_000):chatPhaseConfig(x.chatRate,x.mode).gapMin;
     if(age<gap)return reject('independent-ai-too-close');
   }
-  // Only the caller-verified new product AND new interest can pass the streak
+  // Only the caller-verified product with a new interest can pass the streak
   // limit; the normal gap and human reply protections above still apply.
   // previousProductKey is intentionally not an exemption: public product cards
   // auto-rotate every 5s without any human conversational signal.

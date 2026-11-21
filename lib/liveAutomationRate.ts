@@ -47,3 +47,12 @@ export function admitTestOrderPercent(percent:number,waveId:string,offsetIndex:n
  for(const ch of `${waveId}:${offsetIndex}`){h=Math.imul(h^ch.charCodeAt(0),16777619)>>>0;}
  return (h%10000)<percent*100;
 }
+
+/** Match the existing per-minute DB safety floor; off-air stays slower.
+ * Slider intensity is an opportunity rate, never a promise to publish unsafe/repeated text. */
+export function chatPhaseConfig(percent:number,mode:'live'|'paused'|'replay') {
+ const base=chatRateConfig(percent),factor=mode==='live'?1:2.4;
+ const gapMin=Math.max(mode==='live'?60_000:120_000,Math.round(base.gapMin*factor));
+ return {...base,humanQuietMs:percent<=20?90_000:60_000,gapMin,gapMax:Math.max(gapMin,Math.round(base.gapMax*factor)),
+  chance:mode==='live'?base.chance:Math.min(.65,base.chance*.65)};
+}

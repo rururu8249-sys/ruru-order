@@ -10,7 +10,7 @@ import {shouldRecoverProductSilence} from './liveAutomationProductOpportunity';
 import {buildChatCandidatePrompt,parseChatCandidates,rankChatCandidates,hasUnseenVisualClaim} from './liveAutomationCandidates';
 import {parseDirectorChoice,shouldTryFocusedProductTurn,cardRemainsInRotation,resolveExplicitReplyTarget} from './liveAutomationFocus';
 import {readRoomSignals} from './liveAutomationRoomSignals';
-import {CHAT_RATE_KEY,ratePercent,chatRateConfig} from './liveAutomationRate';
+import {CHAT_RATE_KEY,ratePercent,chatPhaseConfig} from './liveAutomationRate';
 import {assessRoomTurn,type RoomTurnRow} from './liveAutomationTurnPolicy';
 import {duplicateLine,safeConversationLine} from './liveAutomationPersona';
 import type {AutomationContext} from './liveAutomationAuth';
@@ -708,19 +708,19 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  // 언제 판단할지: 사람이 새 글을 쓰면(아직 판단 안 한 글) 10초 뒤 바로, 아니면 AI 글 사이 20~45초 + 확률(밤엔 아주 드물게)
  const considered=Math.max(0,...actions.map(a=>Number((a as Action&{source_message_id?:unknown}).source_message_id)||0));
  const newestHuman=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&!m.bot_ref&&Number(m.id)>considered&&Date.parse(String(m.created_at))>now-180000)||null;
- const lastAi=Math.max(0,...messages.filter(m=>m.automation_actor_id).map(m=>Date.parse(String(m.created_at))||0));
+ const lastAi=Math.max(0,...[...messages,...previousTestChat].filter(m=>m.automation_actor_id&&m.badge!=='bot'&&!m.bot_ref).map(m=>Date.parse(String(m.created_at))||0));
  const lastAction=Math.max(0,...actions.filter(a=>a.kind!=='order').map(a=>Date.parse(String((a as Action&{created_at?:unknown}).created_at))||0));
  // [2026-11-15 08:49 사장님 «빨리 할 때도·늦게 할 때도·적당히»] 사람 글에 답하는 시각을 글마다 다르게 4~45초(그 안에서 고르게)
  if(newestHuman){if(now-lastAction<10000)return;if(now-Date.parse(String(newestHuman.created_at))<Math.max(8_000,humanReplyDelay(Number(newestHuman.id))))return;}
  else{
   // DB 가 정한 방 쉬는 시간(auto_chat_after) 안이면 Gemini 를 부르지 않음(불러도 글이 막힘)
-  const restUntil=Date.parse(String((c as Row).auto_chat_after||''));
+  const pace=chatPhaseConfig(chatRate,mode0);
+  const restUntil=Math.min(Date.parse(String((c as Row).auto_chat_after||'')),lastAi+pace.gapMax);
   if(restUntil&&restUntil>now)return;
   // [2026-11-14 09:03 사장님 「채팅량도 적게·보통·많게」] 관리자 「채팅 양」 설정으로 AI 글 사이 간격·차례 확률을 정함(밤은 그대로 드물게)
-  const pace=chatRateConfig(chatRate);
-  const naturalGap=mode0==='live'?pace.gapMin+Math.floor(Math.random()*(pace.gapMax-pace.gapMin)):Math.max(120000,Math.round(pace.gapMax*2.4));
+  const naturalGap=pace.gapMin+Math.floor(Math.random()*(pace.gapMax-pace.gapMin));
   if(now-lastAi<naturalGap||now-lastAction<(mode0==='live'?20000:90000))return;
-  if(Math.random()>(isNightKst(now)?.08:mode0==='live'?pace.chance:Math.min(.65,pace.chance*.65)))return;
+  if(Math.random()>(isNightKst(now)?Math.min(.08,pace.chance):pace.chance))return;
  }
  const spoke=new Set(spokeRows.map(r=>String(r.automation_actor_id)));
  const mode=await streamModeOf(db,bc.data);
@@ -972,7 +972,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
       kind:(m.badge==='bot'||m.bot_ref?'system':m.automation_actor_id?'ai':'human') as RoomTurnRow['kind'],
       responseToId:actionById.get(String(m.automation_action_id||''))?.kind==='reply'?Number(actionById.get(String(m.automation_action_id||''))?.source_message_id)||0:0,
       asksQuestion:/[?？]|나요|까요|어때|뭐가/.test(clean(m.body))}));
-    const roomPolicy=assessRoomTurn({now,mode:latestMode,
+    const roomPolicy=assessRoomTurn({now,mode:latestMode,chatRate,
       currentProductKey:selectedTopicKey,
       newGroundedInterest:hasNewGroundedInterest(text,selectedTopic,recentForGate,now),
       replyToId:target?Number(target.id):0,speakerId:String(speaker.actor.id),room});
