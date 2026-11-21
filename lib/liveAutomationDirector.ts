@@ -26,6 +26,7 @@ import {readEmojiSetting} from './liveChatEmojiServer';
 import {readDialogueCard} from './liveAutomationDialogueServer';
 import {readOrderedDialogueCards} from './liveAutomationOrderedProducts';
 import {identifiesChatProduct} from './liveAutomationProductFacts';
+import {repeatsRoomTopic} from './liveAutomationTopics';
 import {computeWidgetFeatured} from './widgetFeaturedServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
@@ -783,7 +784,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const topicFor=(t:string,tgt:Row|null)=>references(t)[0]||references(String(tgt?.body||''))[0]||card;
  // Read recent decisions once, preserving an auditable cooldown for a focused retry.
  const decisionLog:Row[]=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle().then(r=>{try{const v=JSON.parse(String((r.data as {value?:unknown}|null)?.value??'[]'));return Array.isArray(v)?v.filter((e:unknown):e is Row=>Boolean(e)&&typeof e==='object'&&!Array.isArray(e)):[];}catch{return [] as Row[];}},()=>[] as Row[]);
- const rejectedLines=decisionLog.filter(e=>e.result==='rejected'&&Date.parse(String(e.at))>now-600000).map(e=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6);
+ const rejectedLines=decisionLog.filter(e=>(e.result==='rejected'||e.result==='quality:room-repeated-interest'||e.result==='quality:unanchored-product-impression')&&Date.parse(String(e.at))>now-600000).map(e=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6);
  const lastFocusAt=Math.max(0,...decisionLog.filter(e=>e.result==='focus-attempt').map(e=>Date.parse(String(e.at))||0));
  const selectionBucket=Math.floor(now/180_000);
  // Rotate the small candidate set; prioritize a recently addressed TEST identity.
@@ -809,6 +810,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    void noteDecision(db,{at:new Date(now).toISOString(),result:'model-fallback',primary:primary.note.slice(0,80),secondary:secondary.note.slice(0,80)});
  }
  const firstChoice=parseDirectorChoice(ans.text,modelRoster.map(r=>String(r.actor.nickname)));
+ const repeatedChoice=firstChoice.reason==='ok'&&firstChoice.replyTo===0&&repeatsRoomTopic(firstChoice.text,priorObservations,now);
  let pick:Row=firstChoice.reason==='ok'?{speaker:firstChoice.speaker,text:firstChoice.text,replyTo:firstChoice.replyTo}:{};
  let lastModelNote=ans.note;
  let choiceReason=firstChoice.reason;
@@ -817,7 +819,9 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  // A verified displayed product can merit a rare, grounded conversational turn.
  // Retry once with a compact prompt if the full-context model returned no valid speaker.
  // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
- if(!firstChoice.speaker&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&(
+ // A parsed but repetitive independent draft is not a usable turn either.
+ // Reuse the same recovery cooldown/budget; never rewrite an explicit reply.
+ if((!firstChoice.speaker||repeatedChoice)&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&(
    mode==='live'?shouldRecoverProductSilence({
      now,mode,hasCard:topicCards.length>0,chatRate,hasPendingHuman:Boolean(newestHuman),
      lastHumanAt,lastAiAt:lastAi,lastFocusAt,candidates:roster.length
@@ -826,7 +830,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
      lastHumanAt,lastAiAt:lastAi,lastFocusAt
    })
  )){
-   await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:Boolean(card),orderedTopicCount:orderedCards.length,firstReason:firstChoice.reason,firstModel:ans.note.slice(0,85)});
+   await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:Boolean(card),orderedTopicCount:orderedCards.length,firstReason:repeatedChoice?'repeated-interest':firstChoice.reason,firstModel:ans.note.slice(0,85)});
    const bucket=Math.floor(now/(10*60_000));
    const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
    const focusedPrompt=buildChatCandidatePrompt({...roomContext,
