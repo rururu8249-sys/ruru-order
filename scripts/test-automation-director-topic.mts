@@ -147,7 +147,13 @@ console.log('ok pay talk');}
  const fs=await import('node:fs');
  const src=fs.readFileSync(new URL('../lib/liveAutomationDirector.ts',import.meta.url),'utf8');
  if(!src.includes("if(!tgt&&/^(아니|아닌데|아닌가|맞아요|맞네|그쵸|그죠|그니까)/.test(t.trim()))return false;"))throw new Error('대꾸 거름 없음');
- if(!src.includes('[사람처럼 — 티 나는 말 금지]'))throw new Error('사람처럼 규칙 없음');
+ // The prompt moved to the shared builder. Verify the actual instructions sent
+ // to Gemini rather than the removed heading in the old inline prompt.
+ const {buildCompactConversationPrompt}=await import('../lib/liveAutomationCompactPrompt');
+ const prompt=buildCompactConversationPrompt({mode:'live',cardText:'',actors:[],messages:[]});
+ for(const rule of ['기계적 말투','연속된 3명 인사/감탄/유사 맞장구 금지','고객의 경험·관계·말을 자기 것으로 복제하지 않는다']){
+   if(!prompt.includes(rule))throw new Error('사람처럼 규칙 없음: '+rule);
+ }
  console.log('PASS 안내 글 대꾸·티 나는 말 규칙');
 }
 // [2026-11-15 21:14] 품절·재고 질문 버림

@@ -1,4 +1,5 @@
 import {colorNameSwatch} from './colorNameSwatch';
+import {BRAND_SPEECH_ALIASES} from './liveAutomationSpeech';
 
 /** Catalog evidence only. product_type is a sales channel, not a garment category. */
 export type ChatProductFacts = {
@@ -6,6 +7,16 @@ export type ChatProductFacts = {
   colors:readonly string[]; sizes:readonly string[];
 };
 const clean=(s:unknown,n=90)=>String(s??'').replace(/\s+/g,' ').trim().slice(0,n);
+/** Only catalog identifiers/established spoken aliases count, never a bare color
+ * or a guessed product appended after generation. */
+export function identifiesChatProduct(text:string,p:ChatProductFacts):boolean{
+ const name=p.detailName||p.name;
+ const code=name.match(/\b([a-z]{2,5})\s*-?\s*(\d+)\b/i);
+ if(!code)return name.length>=3&&text.replace(/\s/g,'').includes(name.replace(/\s/g,''));
+ const aliases=[code[1],...(BRAND_SPEECH_ALIASES[code[1].toUpperCase()]||[])];
+ const escape=(s:string)=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ return aliases.some(alias=>new RegExp(`(?:^|[^a-z가-힣])${escape(alias)}\\s*-?\\s*${code[2]}(?![0-9a-z])`,'i').test(text));
+}
 export function productSemanticFacts(p:ChatProductFacts) {
   const name=clean(p.name),parentName=clean(p.parentName),detailName=clean(p.detailName);
   const colors=[...new Set(p.colors.map(c=>clean(c,24)).filter(c=>c&&c!=='없음'))].slice(0,8);
@@ -28,6 +39,7 @@ export function productFactsPrompt(p:ChatProductFacts):string {
     `선택 색상: ${f.colors.join(', ')||'별도 선택 없음'}; 세부상품명 속 색상: ${f.namedColors.join(', ')||'미확인'}; 사이즈: ${f.sizes.join(', ')||'미확인'}.`,
     '색상 이름은 음식·음료·재료가 아니다. 와인·초코·올리브 등 색상을 마시는 술, 먹는 음식, 병·잔·안주로 해석하지 마라. 종류·소재·착용 모습은 확인되지 않으면 추측하지 않는다.',
     '이미 표시된 색상·사이즈의 유무를 다시 묻지 마라. 색감·코디·핏에 관한 자연스러운 질문은 가능하다.',
+    '색상·외형 감상을 독립적으로 꺼낼 때는 검증된 품번이나 기존 한글 약칭+번호를 직접 밝혀 어느 상품인지 알 수 있게 한다. 색상만 단독으로 말하지 않는다. 실제 답장에서는 상대 글에 대상이 확인되면 이름을 매번 반복하지 않아도 된다. 서버는 상품명을 자동으로 덧붙이지 않는다.',
   ].join('\n');
 }
 /** Reject concrete edible/drink properties of a wearable, not the color word itself.
