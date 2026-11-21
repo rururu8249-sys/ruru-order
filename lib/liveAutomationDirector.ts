@@ -24,6 +24,8 @@ import {falseExperience} from './liveAutomationDialogue';
 import {mentionsNickname} from './liveAutomationConversation';
 import {readEmojiSetting} from './liveChatEmojiServer';
 import {readDialogueCard} from './liveAutomationDialogueServer';
+import {readOrderedDialogueCards} from './liveAutomationOrderedProducts';
+import {identifiesChatProduct} from './liveAutomationProductFacts';
 import {computeWidgetFeatured} from './widgetFeaturedServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
@@ -85,7 +87,7 @@ const TOPICS=[/카톡|링크|결제|입금/,/사이즈|라지|미듐|스몰|엑�
 // 어느 상품인지(상품번호·줄임말+번호) 붙어 있어야 하고, 크기·핏 질문은 자기 체형(키·몸무게·평소 사이즈)도 같이 말해야 함.
 const DETAIL_Q=/엑라|어깨|가슴|기장|총장|소매|핏|사이즈|커요|작아요|크게|작게|크나요|작나요|넉넉|두께|두꺼|얇|충전재|구스|덕다운|재질|소재|원단|무게/;
 const ASKING=/\?|나요|까요|가요|인가|어때|커요|작아요|되나|될까|맞나|려나|겠죠|까유|나유|까용|나용|까여|나여|을까|ㄹ까/;
-const HAS_REF=/[A-Za-z]{2,3}\s?-?\s?\d{2,4}|(몽클|몽|버버|버|막스|막|프라|프|미우|로에|셀|디올|브루)\s?-?\s?\d{2,4}|\d{2,4}\s?번/i;
+const HAS_REF=/[A-Za-z]{2,3}\s?-?\s?\d{1,4}(?!\d)|(몽클|몽|버버|버|막스|막|프라|프|미우|로에|셀|디올|브루)\s?-?\s?\d{1,4}(?!\d)|\d{2,4}\s?번/i;
 // [2026-11-14 21:26 사장님 「날씬한데 엑스라지를 물어봐?」] 체형과 안 맞는 사이즈를 콕 집어 묻지 않음
 const SMALL_BODY=/(^|[^\d])(44|55)(반)?([^\d]|$)|마른|날씬|슬림|(4\d)\s*(kg|키로)/i;
 const BIG_SIZE=/엑라|엑스라지|투엑|2\s?xl|xxl|\bxl\b|빅사이즈|(^|[^\d])(77|88)([^\d]|$)/i;
@@ -157,7 +159,10 @@ export function vagueProductQuestion(text:string):boolean{
  if(vagueProductRemark(text))return true;
  if(!ASKING.test(text))return false;
  if(vaguePointerQuestion(text))return true;
- const sizeAsk=SIZE_REC.test(text)&&!/기장|총장|어깨|가슴|소매|단면/.test(text.replace(/어깨\s?(넓|좁)/g,''));
+ // “후드 분리되나요?” is a construction question, not a request for a personal
+ // size recommendation. Do not demand invented height/weight for it.
+ const sizeText=text.replace(/(?:분리|탈부착|세탁|드라이|보관)(?:가|이|도)?\s*되나[요용여유]/g,'');
+ const sizeAsk=SIZE_REC.test(sizeText)&&!/기장|총장|어깨|가슴|소매|단면/.test(text.replace(/어깨\s?(넓|좁)/g,''));
  if(sizeAsk)return !HAS_REF.test(text)||!HEIGHT_WEIGHT.test(text)||namesSize(text.replace(HEIGHT_WEIGHT,' '));
  if(!DETAIL_Q.test(text))return false;
  return !HAS_REF.test(text);
@@ -679,8 +684,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   rows<Row>(db.from('live_chat_messages').select('id,nickname,body,created_at,badge,bot_ref,automation_actor_id,automation_action_id').eq('broadcast_id',c.broadcast_id).is('hidden_at',null).order('id',{ascending:false}).limit(40)),
   // Read-only quality memory: screen-clear hides messages in UI but should NOT reset anti-repeat checks.
   // Never use these hidden rows as reply targets, sales evidence, or public chat context.
-  rows<Row>(db.from('live_chat_messages').select('id,body,created_at,automation_actor_id,automation_action_id').eq('broadcast_id',c.broadcast_id)
-    .not('automation_actor_id','is',null).gte('created_at',new Date(now-12*60*60_000).toISOString())
+  rows<Row>(db.from('live_chat_messages').select('id,body,created_at,badge,bot_ref,automation_actor_id,automation_action_id').eq('broadcast_id',c.broadcast_id)
+    .not('automation_actor_id','is',null).is('bot_ref',null).gte('created_at',new Date(now-12*60*60_000).toISOString())
     .order('id',{ascending:false}).limit(120)),
   db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle(),
   rows<Row>(db.from('live_automation_payment_events').select('actor_id,kind').eq('campaign_id',c.id).eq('status','sent').limit(500)),
@@ -761,7 +766,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const recentAi=messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&Date.parse(String(m.created_at))>now-600000).map(m=>clean(m.body));
  // Use the same bounded memory at generation and final validation. Older or
  // screen-cleared rows contribute topic summaries only, never reply context.
- const priorObservations=previousTestChat.map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at))}));
+ const priorObservations=previousTestChat.filter(m=>m.badge!=='bot'&&!m.bot_ref).map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at))}));
  const questionMemory=productQuestionMemory(priorObservations,now);
  const lastHumanRow=messages.find(m=>!m.automation_actor_id&&m.badge!=='bot'&&!m.bot_ref&&!/^\s*\//.test(clean(m.body)));
  const lastHumanAt=lastHumanRow?Date.parse(String(lastHumanRow.created_at))||0:0;
@@ -772,6 +777,10 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const cardText=card?`${spokenCardName(card.name)} / 색상 ${card.colors.join(',')||'-'} / 사이즈 ${card.sizes.join(',')||'-'}${card.overseas?' / 해외배송':''}`:'없음';
  // [2026-11-15 08:49] 최근 10분 걸러진 말(규칙 위반) — 같은 말을 계속 골라 30초마다 버려지며 조용해지던 것 막기
  const roomSignals=await readRoomSignals(db,c.broadcast_id,now).catch(()=>({style:'실제 채팅 표본을 못 읽음',realOrderProducts:[] as string[]}));
+ const orderedCards=await readOrderedDialogueCards(db,c.broadcast_id,now).catch(()=>[]);
+ const topicCards=[...new Map([...(card?[card]:[]),...orderedCards].map(p=>[`${p.productId}:${p.detailName}`,p])).values()];
+ const references=(t:string)=>topicCards.filter(p=>identifiesChatProduct(t,p));
+ const topicFor=(t:string,tgt:Row|null)=>references(t)[0]||references(String(tgt?.body||''))[0]||card;
  // Read recent decisions once, preserving an auditable cooldown for a focused retry.
  const decisionLog:Row[]=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle().then(r=>{try{const v=JSON.parse(String((r.data as {value?:unknown}|null)?.value??'[]'));return Array.isArray(v)?v.filter((e:unknown):e is Row=>Boolean(e)&&typeof e==='object'&&!Array.isArray(e)):[];}catch{return [] as Row[];}},()=>[] as Row[]);
  const rejectedLines=decisionLog.filter(e=>e.result==='rejected'&&Date.parse(String(e.at))>now-600000).map(e=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6);
@@ -781,8 +790,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const sortedRoster=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+selectionBucket)-hashOf(String(b.actor.id)+':'+selectionBucket));
  const modelRoster=[...called,...sortedRoster.filter(r=>!called.includes(r))].slice(0,8);
  const roomContext={
-   now,mode,cardText,product:card,messages,pendingHumanId:newestHuman?Number(newestHuman.id):null,
-   styleSummary:roomSignals.style,realOrderProducts:roomSignals.realOrderProducts,rejectedLines,questionMemory,questionPending,
+   now,mode,cardText,product:card,orderedProducts:orderedCards,messages,pendingHumanId:newestHuman?Number(newestHuman.id):null,
+   styleSummary:roomSignals.style,realOrderProducts:orderedCards.map(p=>p.name),rejectedLines,questionMemory,questionPending,recentTopics:priorObservations,
    nextShow:nextShow?nextShow.when:null,
    actors:modelRoster.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))
  };
@@ -810,14 +819,14 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
  if(!firstChoice.speaker&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&(
    mode==='live'?shouldRecoverProductSilence({
-     now,mode,hasCard:Boolean(card),chatRate,hasPendingHuman:Boolean(newestHuman),
+     now,mode,hasCard:topicCards.length>0,chatRate,hasPendingHuman:Boolean(newestHuman),
      lastHumanAt,lastAiAt:lastAi,lastFocusAt,candidates:roster.length
    }):shouldTryFocusedProductTurn({
-     now,mode,hasProduct:Boolean(card),hasPendingHuman:Boolean(newestHuman),
+     now,mode,hasProduct:topicCards.length>0,hasPendingHuman:Boolean(newestHuman),
      lastHumanAt,lastAiAt:lastAi,lastFocusAt
    })
  )){
-   await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:true,firstReason:firstChoice.reason,firstModel:ans.note.slice(0,85)});
+   await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:Boolean(card),orderedTopicCount:orderedCards.length,firstReason:firstChoice.reason,firstModel:ans.note.slice(0,85)});
    const bucket=Math.floor(now/(10*60_000));
    const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
    const focusedPrompt=buildChatCandidatePrompt({...roomContext,
@@ -833,6 +842,14 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    else await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-unsent',why:retryChoice.reason,model:focused.note.slice(0,85),cardPresent:Boolean(card)});
  }
  const acceptable=(t:string,r:(typeof roster)[number],tgt:Row|null)=>{
+  if(references(t).length>1)return false; // Do not guess which item's options to validate.
+  const topic=topicFor(t,tgt);
+  // Topic permission is not ownership. Another customer's order never proves
+  // this TEST actor added or ordered the same item.
+  if(topic&&identifiesChatProduct(t,topic)){
+    if(/담았|담아\s*(?:뒀|놨|놓았)|장바구니.{0,8}넣었/.test(t)&&!r.cart.some(item=>identifiesChatProduct(item,topic)))return false;
+    if(/주문.{0,8}(했|냈|넣었|제출했|보냈|완료)/.test(t)&&!r.ordered.some(item=>identifiesChatProduct(item,topic)))return false;
+  }
   if(t.length<1||t.length>70)return false;
   if(/밴드/.test(t))return false;
   if(mode!=='live'&&/(지금|방금|현재).{0,12}(입으|보여|설명|방송.{0,3}(중이|하|켜져))/.test(t)&&!/방송.{0,3}(중.{0,3}아니|끝|종료)/.test(t))return false;
@@ -841,7 +858,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(!safeConversationLine(t,r.paid.length>0)||/가상|봇|자동|테스트/.test(t))return false;
   const pk=r.paid.includes('card')?'card':r.paid.includes('bank')?'bank':undefined;
   if(falseExperience(t.replace(/(링크|카톡|톡|문자|알림).{0,6}(받았|왔)/g,''),pk))return false;
-  if(unsupportedProductCode(t,[...r.ordered,...r.cart,...(card?[card.name]:[])].map(productName=>({productName}))))return false;
+  if(unsupportedProductCode(t,[...r.ordered,...r.cart,...topicCards.map(p=>p.name)].map(productName=>({productName}))))return false;
   if(!tgt&&(unsuitableSpeech(t,mode,'chat')||duplicateLine(t,recent.slice(0,15))))return false;
   if(!r.ordered.length&&/주문.{0,8}(했|냈|넣었|제출했|보냈|완료)/.test(t))return false;
   if(repeatsOwnLine(t,r.own)||advisesOthers(t)||mentionsSelf(t,r.actor.nickname))return false;
@@ -850,7 +867,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   if(cardLinkTalkBlocked(t,r.cardOrder,r.paid.includes('card')))return false;
   if(cardAckBlocked(t,r.cardOrder,r.paid.includes('card')))return false;
   if(!tgt&&roomAnnounceBlocked(t,recentAi))return false;
-  if(offCardProductMention(t,[card?`${card.name} ${card.colors.join(' ')}`:'',...r.cart,...r.ordered].join(' '),notices))return false;
+  if(offCardProductMention(t,[topic?`${topic.name} ${topic.colors.join(' ')}`:'',...r.cart,...r.ordered].join(' '),notices))return false;
   if(/([가-힣]{2,}요)[\s\S]*\1/.test(t))return false;
   // [2026-11-21] 구경·선택에 대한 혼잣말 허용. 과거 시청 경험을 만들지는 않음. 방송 시간이 아닐 때 «다시보기 보면서 주문/담기» 얘기는 사장님 요청(08:26)이라 허용
   if(/다시\s*보기/.test(t)&&!(mode!=='live'&&/다시\s*보기/.test(t)&&/주문|담/.test(t)))return false;
@@ -860,7 +877,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   // [2026-11-15 14:51 사장님 「샵 뭔소리야? 우리가 샵이 어딨어」] 매장·샵이 없음 — 지어낸 장소·신청 경로 말 버림, 구독 인증은 주문서에서 캡처 올리는 것
   if(/샵|숍|매장|오프라인|스토어|가게에서|앱에서\s*신청|홈페이지에서\s*신청/.test(t))return false;
   if(/구독/.test(t)&&/신청했|인증했|등록했|가입했/.test(t)&&!/주문서/.test(t))return false;
-  if(shippingTalkBlocked(t,Boolean(card?.overseas)))return false;
+  if(shippingTalkBlocked(t,Boolean(topic?.overseas)))return false;
   // [2026-11-15 21:14 사장님 「막스119 36호 품절인가용? — 시스템 안 봐?」] 품절·재고는 사이트 상품에 표시됨 → 품절·재고·남았나 묻는 말 버림
   if(stockQuestionBlocked(t))return false;
   // [09:44 사장님 「배송 기간 질문은 아주 가끔, 남발 금지」] 다른 가상 손님이 최근(대화 40줄 안) 배송을 물었으면 버림
@@ -879,12 +896,15 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
   return true;
  };
  const actionById=new Map(actions.map(a=>[String(a.id),a]));
- const recentForGate:ChatObservation[]=[...new Map([...messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'),...previousTestChat]
+ const recentForGate:ChatObservation[]=[...new Map([...messages.filter(m=>m.automation_actor_id&&m.badge!=='bot'&&!m.bot_ref),...previousTestChat.filter(m=>m.badge!=='bot'&&!m.bot_ref)]
    .map(m=>[String(m.id),m] as const)).values()].map(m=>({text:clean(m.body),at:Date.parse(String(m.created_at)),actorId:String(m.automation_actor_id||''),productKey:String(actionById.get(String(m.automation_action_id||''))?.plan?.chatProductKey||'')}));
- const qualityFor=(t:string,r:(typeof roster)[number],tgt:Row|null,latestBroadcast:{data:Row},phase:typeof mode)=>judgeTestChat({
-   text:t,currentProduct:card,mode:phase,now,actorId:String(r.actor.id),currentProductKey:card?`${card.productId}:${card.detailName}`:null,
+ const qualityFor=(t:string,r:(typeof roster)[number],tgt:Row|null,latestBroadcast:{data:Row},phase:typeof mode)=>{
+  const topic=topicFor(t,tgt);
+  return judgeTestChat({
+   text:t,currentProduct:topic,mode:phase,now,actorId:String(r.actor.id),currentProductKey:topic?`${topic.productId}:${topic.detailName}`:null,
    replyingToHuman:Boolean(tgt),recent:recentForGate,offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
    replySourceIsHuman:Boolean(tgt&&!tgt.automation_actor_id),lastHumanAt,replySourceText:String(tgt?.body||'')});
+ };
  const styleLine=(t:string,r:(typeof roster)[number])=>personaVoice(varyLaughTail(shortProductCodes(t,seedOf(r.actor)+now),recentAi,seedOf(r.actor)+now),seedOf(r.actor),now);
  if(focusedChoices.length){
    pick={};
@@ -910,14 +930,24 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  if(speaker&&text&&(wrongPaymentTalk(text,speaker.cardOrder,speaker.bankOrder)||cardLinkTalkBlocked(text,speaker.cardOrder,speaker.paid.includes('card'))))text='';
  // [2026-11-15 07:40 사장님] 상품번호는 손님처럼 줄여 부름(프222·버58·몽319), 웃음·이모지 끝맺음은 최근 AI 글과 안 겹치게
  if(speaker&&text)text=typeof pick.prepared==='string'?pick.prepared:styleLine(text,speaker);
+ const selectedTopic=topicFor(text,target);
+ const selectedTopicKey=selectedTopic?`${selectedTopic.productId}:${selectedTopic.detailName}`:'';
  // RURU_QUALITY_GATE_V1: Final validation after persona styling and before any send.
  if(speaker&&text){
    const latestBroadcast=await db.from('broadcasts').select('*').eq('id',c.broadcast_id).maybeSingle();
    if(latestBroadcast.error||!latestBroadcast.data)return;
    const latestMode=await streamModeOf(db,latestBroadcast.data);
    if(latestMode!==mode)return; // Broadcast changed while Gemini generated a message.
-   const latestCard=await readDialogueCard(db,c.broadcast_id).catch(()=>null);
-   if(String(latestCard?.productId||'')!==String(card?.productId||'')||String(latestCard?.detailName||'')!==String(card?.detailName||'')){
+   const fromOrders=selectedTopic&&(!card||selectedTopic.productId!==card.productId||selectedTopic.detailName!==card.detailName);
+   if(fromOrders){
+     const freshOrdered=await readOrderedDialogueCards(db,c.broadcast_id,Date.now()).catch(()=>[]);
+     const fresh=freshOrdered.find(p=>`${p.productId}:${p.detailName}`===selectedTopicKey);
+     if(!fresh||JSON.stringify([fresh.name,fresh.colors,fresh.sizes,fresh.overseas])!==JSON.stringify([selectedTopic.name,selectedTopic.colors,selectedTopic.sizes,selectedTopic.overseas])){
+       await noteDecision(db,{at:new Date(now).toISOString(),result:'ordered-topic-removed-or-changed'});return;
+     }
+   }
+   const latestCard=fromOrders?card:await readDialogueCard(db,c.broadcast_id).catch(()=>null);
+   if(!fromOrders&&(String(latestCard?.productId||'')!==String(card?.productId||'')||String(latestCard?.detailName||'')!==String(card?.detailName||''))){
      // The public widget auto-rotates in 5-second steps, while an LLM response
      // can take longer. Only reject if the ORIGINAL validated card disappeared
      // from the active carousel; do not reject a routine next-frame rotation.
@@ -939,7 +969,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
       responseToId:actionById.get(String(m.automation_action_id||''))?.kind==='reply'?Number(actionById.get(String(m.automation_action_id||''))?.source_message_id)||0:0,
       asksQuestion:/[?？]|나요|까요|어때|뭐가/.test(clean(m.body))}));
     const roomPolicy=assessRoomTurn({now,mode:latestMode,
-      currentProductKey:card?`${card.productId}:${card.detailName}`:'',
+      currentProductKey:selectedTopicKey,
       replyToId:target?Number(target.id):0,speakerId:String(speaker.actor.id),room});
     if(!roomPolicy.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'room:'+roomPolicy.reason});}
    }
@@ -952,7 +982,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  if(!who)return;
  const kind=speaker&&text&&target?'reply':'chat';
  try{await automationRpc(db,'live_automation_ai_admission',{p_actor:who.actor.id,p_kind:kind})}catch(e){void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:'막힘 '+String((e as Error)?.message||e).slice(0,40),result:'blocked'});return}
- const action=await automationRpc<Action>(db,'live_automation_action',{p_session:who.session.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,mode,chatProductKey:card?`${card.productId}:${card.detailName}`:'',replyToAi:target?.automation_actor_id?Number(target.id):null},p_manual:false,p_source:sourceId,p_revision:c.revision});
+ const action=await automationRpc<Action>(db,'live_automation_action',{p_session:who.session.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,mode,chatProductKey:selectedTopicKey,replyToAi:target?.automation_actor_id?Number(target.id):null},p_manual:false,p_source:sourceId,p_revision:c.revision});
  const claimed=await automationRpc<Action|null>(db,'live_automation_claim',{p_action:action.id,p_revision:c.revision});
  if(!claimed)return;
  const skip=(message:string)=>automationRpc(db,'live_automation_complete',{p_action:claimed.id,p_lease:claimed.lease_token,p_status:'skipped',p_result:{ok:false,message}}).catch(()=>{});

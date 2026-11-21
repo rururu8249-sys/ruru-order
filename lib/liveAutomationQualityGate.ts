@@ -1,4 +1,5 @@
-import {productMeaningMismatch,type ChatProductFacts} from './liveAutomationProductFacts';
+import {identifiesChatProduct,productMeaningMismatch,type ChatProductFacts} from './liveAutomationProductFacts';
+import {conversationTopics,repeatsRoomTopic} from './liveAutomationTopics';
 /** Pure fail-closed policy for TEST-chat composition. No DB writes or network calls. */
 export type StreamPhase = 'live'|'paused'|'replay';
 export type ChatIntent = 'size'|'length'|'color'|'price'|'delivery'|'order'|'visit'|'pause'|'replay'|'live-action'|'memory'|'other';
@@ -139,6 +140,9 @@ export function judgeTestChat(q:QualityInput):QualityResult {
  const questionFamily=productQuestionFamily(text);
  if(q.mode!=='live'&&!q.replySourceIsHuman&&seeksAnswer(text)&&offAirQuestionPending(q))return fail('off-air-unanswered-question');
  if(!q.replySourceIsHuman&&questionFamily&&productQuestionMemory(q.recent,q.now).includes(questionFamily))return fail('room-repeated-product-question');
+ if(!q.replySourceIsHuman&&repeatsRoomTopic(text,q.recent,q.now))return fail('room-repeated-interest');
+ if(q.currentProduct&&!q.replySourceIsHuman&&conversationTopics(text).includes('appearance')&&
+   !identifiesChatProduct(text,q.currentProduct)&&!identifiesChatProduct(q.replySourceText||'',q.currentProduct))return fail('unanchored-product-impression');
  // Preserve a longer read-only memory of overused reactions, including screen-cleared TEST chat.
  const family=reactionFamily(text);
  if(family && q.recent.some(r=>Number.isFinite(r.at)&&r.at<=q.now&&r.at>=q.now-90*60_000&&
