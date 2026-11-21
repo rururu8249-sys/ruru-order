@@ -6,7 +6,7 @@
 export type RoomTurnRow={id:number; at:number; actorId?:string|null;
   kind:'ai'|'human'|'system'; responseToId?:number|null; asksQuestion?:boolean};
 export type RoomTurnInput={now:number; mode:'live'|'paused'|'replay'; currentProductKey:string;
-  replyToId:number; speakerId:string; previousProductKey?:string; room:RoomTurnRow[]};
+  replyToId:number; speakerId:string; previousProductKey?:string; newGroundedInterest?:boolean; room:RoomTurnRow[]};
 export type RoomTurnDecision={ok:boolean;reason:string};
 export function assessRoomTurn(x:RoomTurnInput):RoomTurnDecision {
   const reject=(reason:string):RoomTurnDecision=>({ok:false,reason});
@@ -43,10 +43,12 @@ export function assessRoomTurn(x:RoomTurnInput):RoomTurnDecision {
       ?conversation.find(m=>m.id===latest.responseToId):null;
     if(original?.kind==='human'&&!original.asksQuestion&&age<(x.mode==='live'?5*60_000:8*60_000))
       return reject('human-remark-already-answered');
-    if(continuousAi>=2)return reject('two-unrelated-ai-turns-without-new-context');
+    if(continuousAi>=2&&!x.newGroundedInterest)return reject('two-unrelated-ai-turns-without-new-context');
     const gap=x.mode==='live'?150_000:360_000;
     if(age<gap)return reject('independent-ai-too-close');
   }
+  // Only the caller-verified new product AND new interest can pass the streak
+  // limit; the normal gap and human reply protections above still apply.
   // previousProductKey is intentionally not an exemption: public product cards
   // auto-rotate every 5s without any human conversational signal.
   return {ok:true,reason:'room-is-ready'};

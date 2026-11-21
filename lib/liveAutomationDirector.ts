@@ -26,7 +26,7 @@ import {readEmojiSetting} from './liveChatEmojiServer';
 import {readDialogueCard} from './liveAutomationDialogueServer';
 import {readOrderedDialogueCards} from './liveAutomationOrderedProducts';
 import {identifiesChatProduct} from './liveAutomationProductFacts';
-import {repeatsRoomTopic} from './liveAutomationTopics';
+import {hasNewGroundedInterest,repeatsRoomTopic} from './liveAutomationTopics';
 import {computeWidgetFeatured} from './widgetFeaturedServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
@@ -974,6 +974,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
       asksQuestion:/[?？]|나요|까요|어때|뭐가/.test(clean(m.body))}));
     const roomPolicy=assessRoomTurn({now,mode:latestMode,
       currentProductKey:selectedTopicKey,
+      newGroundedInterest:hasNewGroundedInterest(text,selectedTopic,recentForGate,now),
       replyToId:target?Number(target.id):0,speakerId:String(speaker.actor.id),room});
     if(!roomPolicy.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'room:'+roomPolicy.reason});}
    }
