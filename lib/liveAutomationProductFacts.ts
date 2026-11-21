@@ -32,14 +32,14 @@ export function productSemanticFacts(p:ChatProductFacts) {
   return {name,parentName,detailName,colors,namedColors,sizes,wearable,food,
     kind:food?'식품·음료 명칭 있음':clothing?'의류 명칭 있음':clothingSizes?'의류형 사이즈 표기 있음(세부 종류 미확인)':'종류 미확인'};
 }
-export function productFactsPrompt(p:ChatProductFacts):string {
+export function productFactsPrompt(p:ChatProductFacts,includePolicy=true):string {
   const f=productSemanticFacts(p);
   return [
     `부모 상품/브랜드: ${f.parentName||'미확인'}; 세부상품: ${f.detailName||f.name}; 종류 근거: ${f.kind}.`,
     `선택 색상: ${f.colors.join(', ')||'별도 선택 없음'}; 세부상품명 속 색상: ${f.namedColors.join(', ')||'미확인'}; 사이즈: ${f.sizes.join(', ')||'미확인'}.`,
-    '색상 이름은 음식·음료·재료가 아니다. 와인·초코·올리브 등 색상을 마시는 술, 먹는 음식, 병·잔·안주로 해석하지 마라. 종류·소재·착용 모습은 확인되지 않으면 추측하지 않는다.',
+    ...(includePolicy ? ['색상 이름은 음식·음료·재료가 아니다. 와인·초코·올리브 등 색상을 마시는 술, 먹는 음식, 병·잔·안주로 해석하지 마라. 종류·소재·착용 모습은 확인되지 않으면 추측하지 않는다.',
     '이미 표시된 색상·사이즈의 유무를 다시 묻지 마라. 색감·코디·핏에 관한 자연스러운 질문은 가능하다.',
-    '색상·외형 감상을 독립적으로 꺼낼 때는 검증된 품번이나 기존 한글 약칭+번호를 직접 밝혀 어느 상품인지 알 수 있게 한다. 색상만 단독으로 말하지 않는다. 실제 답장에서는 상대 글에 대상이 확인되면 이름을 매번 반복하지 않아도 된다. 서버는 상품명을 자동으로 덧붙이지 않는다.',
+    '색상·외형 감상을 독립적으로 꺼낼 때는 검증된 품번이나 기존 한글 약칭+번호를 직접 밝혀 어느 상품인지 알 수 있게 한다. 색상만 단독으로 말하지 않는다. 실제 답장에서는 상대 글에 대상이 확인되면 이름을 매번 반복하지 않아도 된다. 서버는 상품명을 자동으로 덧붙이지 않는다.'] : []),
   ].join('\n');
 }
 /** Reject concrete edible/drink properties of a wearable, not the color word itself.

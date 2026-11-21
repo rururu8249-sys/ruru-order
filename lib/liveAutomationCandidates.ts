@@ -1,5 +1,5 @@
 import {conversationTopics,repeatsRoomTopic,recentTopicCounts,roomTopicPrompt} from './liveAutomationTopics';
-import {orderedProductPrompt,type CompactRoomContext} from './liveAutomationCompactPrompt';
+import {summaryOnlyRepeatedTest,productUsagePrompt,orderedProductPrompt,type CompactRoomContext} from './liveAutomationCompactPrompt';
 import type {ChatObservation} from './liveAutomationQualityGate';
 import {parseDirectorChoice,type DirectorChoice} from './liveAutomationFocus';
 import {productFactsPrompt,productSemanticFacts} from './liveAutomationProductFacts';
@@ -29,14 +29,15 @@ export function rankChatCandidates(choices:DirectorChoice[],recent:ChatObservati
  return choices.filter(c=>!repeatsRoomTopic(c.text,recent,now)).sort((a,b)=>cost(a.text)-cost(b.text));
 }
 export function buildChatCandidatePrompt(c:CompactRoomContext,recent:ChatObservation[]):string{
- const messages=c.messages.filter(m=>!m.bot_ref&&m.badge!=='bot'&&!/^\s*\//.test(String(m.body||''))).slice(0,18).reverse();
+ const messages=c.messages.filter(m=>!m.bot_ref&&m.badge!=='bot'&&!/^\s*\//.test(String(m.body||''))).filter(m=>!summaryOnlyRepeatedTest(m,recent,c.now)).slice(0,18).reverse();
  const actors=c.actors.slice(0,6).map(a=>`${clean(a.nickname,32)} | 이전 발언: ${(a.own||[]).slice(0,2).map(x=>clean(x,60)).join(' / ')||'없음'} | 테스트 장바구니: ${(a.cart||[]).slice(0,2).map(x=>clean(x,45)).join(' / ')||'없음'} | 테스트 주문: ${(a.ordered||[]).slice(0,2).map(x=>clean(x,45)).join(' / ')||'없음'}`);
  return [
   '공개적으로 [테스트] 표시되는 쇼핑 채팅의 공개 전 검토용 후보를 작성한다. 서버가 빈도와 휴식 간격을 확인해 허용한 드문 독립 발언 기회다. 새 질문을 받지 않았어도 새로운 관심을 표현할 수 있다. 최종 전송 여부는 서버가 검사한다.',
   `방송 상태: ${c.mode}. ${c.mode==='live'?'진행자에게 상품의 모르는 점을 질문할 수 있다.':'즉시 시연·응답을 기대하지 않는 시간이다.'}`,
   `확인된 상품명·옵션: ${clean(c.cardText,240)}`,
   ...(c.product?[productFactsPrompt(c.product)]:[]),
-  ...orderedProductPrompt(c.orderedProducts||[]),
+  ...orderedProductPrompt(c.orderedProducts||[],!c.product),
+  productUsagePrompt(c,recent),
   '입력에 사진·영상·소리는 없다. 이름·표시 옵션만 사실로 안다. 미확인 외형·구조·소재·착용감·성능을 봤다고 평가하거나 단정하지 않는다. 그 특성을 알고 싶은 질문과 사실 주장은 다르다. 상품 특성을 묻는 질문에는 실제 품번을 넣는다.',
   '개인에게 맞는 사이즈 추천 질문은 그 계정의 기존 키·몸무게 기록이 있어야 한다. 체형을 만들거나 특정 사이즈가 맞는지 근거 없이 묻지 않는다. 일반적인 상품 실측 문의와 개인 사이즈 추천은 다르다. 표시된 옵션의 존재 여부는 다시 묻지 않는다.',
   '실제 구매·결제·착용·시청 경험, 직장·관계·일정을 만들지 않는다. 다른 사람의 경험을 자기 것으로 말하지 않는다. 입을 상황을 고민하는 것과 이미 입어봤다고 하는 것은 다르다.',

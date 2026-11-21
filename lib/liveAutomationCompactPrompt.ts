@@ -1,5 +1,5 @@
-import {productFactsPrompt,type ChatProductFacts} from './liveAutomationProductFacts';
-import {roomTopicPrompt} from './liveAutomationTopics';
+import {identifiesChatProduct,productFactsPrompt,type ChatProductFacts} from './liveAutomationProductFacts';
+import {roomTopicPrompt,conversationTopics,recentTopicCounts} from './liveAutomationTopics';
 import type {ChatObservation} from './liveAutomationQualityGate';
 /** Only retry transport/service failures once, never a deliberate model silence. */
 export function shouldFallbackModel(r:{text:string|null;note:string}):boolean {
@@ -52,6 +52,7 @@ export function buildCompactConversationPrompt(c: CompactRoomContext): string {
     const actorLabel = m.automation_actor_id ? '테스트' : '실제';
     const age=(c.now??Date.now())-Date.parse(String(m.created_at||''));
     const stale=c.now!==undefined&&(!Number.isFinite(age)||age<0||age>=150_000);
+    if(summaryOnlyRepeatedTest(m,c.recentTopics||[],c.now))return [];
     return [`${stale?'[이전 대화·반복 방지 참고만·답장 불가]':'#'+id} ${actorLabel} ${clean(m.nickname, 24)}: ${clean(m.body, 115)}`];
   });
   const mode = c.mode === 'live' ? '라이브 방송 중' : c.mode === 'paused' ? '방송 일시정지, 카드/주문은 유지될 수 있음' : '방송 종료, 다시보기/상품카드 이용 가능';
@@ -60,7 +61,8 @@ export function buildCompactConversationPrompt(c: CompactRoomContext): string {
     `상황: ${mode}. 실시간 영상을 보거나 음성을 들었다고 주장하지 마라.`,
     `지금 실제 위젯이 보여주는 상품: ${clean(c.cardText, 240)}. 검증된 상품 외 번호·색상·사이즈·가격을 지어내지 마라.`,
     ...(c.product ? [productFactsPrompt(c.product)] : []),
-    ...orderedProductPrompt(c.orderedProducts||[]),
+    ...orderedProductPrompt(c.orderedProducts||[],!c.product),
+    productUsagePrompt(c,c.recentTopics||[]),
     `실제 고객의 최근 발언 가운데 응답 판단 대상: ${c.pendingHumanId ? '#' + c.pendingHumanId : '없음'}. 실제 질문이나 닉네임 호출에만 필요할 때 답한다.`,
     '현재 카드가 바뀌었다고 새 화제가 생긴 것은 아니다. 상품번호를 매번 부르지 않아도 된다. 실제 대화는 취향 혼잣말 → 그 말에 짧은 호응 → 같은 화제의 고민처럼 이어질 수 있지만, 정해진 순서나 인원으로 연출하지 않는다. 고객의 경험·관계·말을 자기 것으로 복제하지 않는다.',
     ...(c.mode!=='live'?[`지금은 진행자가 즉시 답하는 자리가 아니다. ${c.questionPending?'답을 기다리는 질문이 있음: 새로운 독립 질문을 더 쌓지 않는다.':'필요한 질문이 가끔 나올 수 있지만 질문부터 만들지 않는다.'} 자기 취향·선택 고민·구경하는 마음을 짧게 표현하거나, 실제 최근 글에 이어갈 말이 있으면 호응하고 없으면 쉰다. 상품 실물·착용감·영상 장면을 본 것처럼 단정하지 않는다.`]:[]),
@@ -91,9 +93,28 @@ export function buildCompactConversationPrompt(c: CompactRoomContext): string {
   return lines.join('\n');
 }
 
-export function orderedProductPrompt(products:ChatProductFacts[]):string[]{
+export function orderedProductPrompt(products:ChatProductFacts[],includePolicy=true):string[]{
  if(!products.length)return [];
  return ['[당일 주문에서 확인하고 현재 판매 목록과 대조한 다른 대화 소재]',
-  ...products.slice(0,6).map(productFactsPrompt),
+  ...products.slice(0,6).map((p,i)=>productFactsPrompt(p,includePolicy&&i===0)),
   '현재 카드에만 머무를 필요 없다. 이 상품들도 방송 중·일시정지·종료 모두 대화 소재로 쓸 수 있다. 다른 상품을 꺼낼 때는 정확한 품번 또는 기존 한글 약칭+번호를 밝혀 한 상품에 대해 말한다. 주문 내역은 상품을 확인하는 근거일 뿐, 자기 구매·착용 경험이나 인기·판매량의 근거가 아니다. 고객·주문량·주문자의 옵션을 추측하지 않는다. 정해진 상품 순환도 하지 않는다.'];
+}
+
+/** Bounded product evidence, not a forced product rotation or a sending filter. */
+export function productUsagePrompt(c:CompactRoomContext,recent:ChatObservation[]):string{
+ const now=c.now??Date.now();
+ const rows=recent.filter(r=>Number.isFinite(r.at)&&r.at<=now&&r.at>=now-90*60000).sort((a,b)=>b.at-a.at).slice(0,12);
+ const products=[...new Map([...(c.product?[c.product]:[]),...(c.orderedProducts||[])].map(p=>[p.detailName||p.name,p])).values()];
+ const summary=products.map(p=>`${p.detailName||p.name} ${rows.filter(r=>identifiesChatProduct(r.text,p)).length}회`).join(' / ');
+ return `검증된 상품별 최근 명시 언급: ${summary||'없음'}. 현재 위젯은 판매 상품 중 하나이지 모든 대화의 지정 주제가 아니다. 실제 고객의 현재 대화가 있으면 그 대상을 우선한다. 독립 발언에서는 이미 같은 상품 이야기가 충분히 나왔다면 아직 다루지 않은 위 검증 상품의 다른 관심을 먼저 검토한다. 상품명만 바꾼 같은 색상 감상은 새 관심이 아니다. 상품 순서나 발언 횟수를 채우지 않으며 쓸 말이 없으면 쉰다.`;
+}
+
+/** Keep sparse conversation context, but do not replay an old repeated TEST wave
+ * as many positive examples. Its bounded topic/product counts remain above. */
+export function summaryOnlyRepeatedTest(m:CompactRoomMessage,recent:ChatObservation[],now?:number):boolean{
+ if(!m.automation_actor_id||now===undefined)return false;
+ const at=Date.parse(String(m.created_at));
+ if(Number.isFinite(at)&&at<=now&&now-at<150_000)return false;
+ const counts=recentTopicCounts(recent,now);
+ return conversationTopics(String(m.body||'')).some(t=>(counts[t]||0)>=2);
 }
