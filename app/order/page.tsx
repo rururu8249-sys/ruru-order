@@ -2588,7 +2588,7 @@ export default function OrderPage() {
 
             if (nicknameConfirmed) {
               setTimeout(() => {
-                document.getElementById("orderProductInputSection")?.scrollIntoView({
+                document.getElementById("ruru-shop-top")?.scrollIntoView({
                   behavior: "smooth",
                   block: "start",
                 });
@@ -3671,7 +3671,7 @@ export default function OrderPage() {
   const scrollToProductInput = () => {
     window.setTimeout(() => {
       const target =
-        document.getElementById("orderProductInputSection") ||
+        document.getElementById("ruru-shop-top") ||
         document.getElementById("firstProductNameInput");
 
       target?.scrollIntoView({
@@ -3921,6 +3921,7 @@ export default function OrderPage() {
   };
 
   const completeEditCustomerInfo = async () => {
+    const isFirstInfoEntry = !hasSavedInfo;
     const cleanPhone = normalizePhone(customerPhone);
 
     if (!youtubeNickname.trim()) {
@@ -3985,7 +3986,15 @@ export default function OrderPage() {
       setCustomerInfoEditSnapshot(null);
       setPin("");
 
-      showCustomerNotice("고객정보수정이 완료되었습니다.");
+      // Saving completes this session's order information even when browser auto-save is off.
+      setHasSavedInfo(true);
+      setCustomerMode("load");
+      if (isEditMode) window.history.replaceState(null, "", "/order");
+      setIsEditMode(false);
+      showCustomerNotice(isFirstInfoEntry
+        ? "정보가 저장되었어요. 이제 상품을 선택해 주세요."
+        : "고객정보수정이 완료되었습니다.");
+      if (isFirstInfoEntry) scrollToProductInput();
     } catch (error: any) {
       showCustomerNotice("고객정보 저장 오류: " + error.message);
     }
@@ -7701,10 +7710,10 @@ export default function OrderPage() {
 
       {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-          <OrderCustomerInfoIntro mode={isEditingCustomerInfo ? "edit" : "check"} />
+          <OrderCustomerInfoIntro mode={isEditingCustomerInfo && hasSavedInfo ? "edit" : "check"} />
 
           <OrderCustomerInfoFormCard
-            isEdit={isEditingCustomerInfo}
+            isEdit={isEditingCustomerInfo && hasSavedInfo}
             youtubeNickname={youtubeNickname}
             customerName={customerName}
             customerPhone={formatPhone(customerPhone)}
@@ -7735,7 +7744,7 @@ export default function OrderPage() {
             // 쇼핑몰 닫힘(방송 OFF + shop_open=false)이면 그리드 대신 준비중 안내. 방송 ON이면 무관(항상 그리드).
             if (broadcastLoaded && productListState === "ready" && !isBroadcastOn && !shopOpen) {
               return (
-                <section style={{ margin: "12px auto 0", width: "100%", maxWidth: pageMax }}>
+                <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: pageMax }}>
                   <div style={s5s({ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 })}>
                     {uiS5 ? "쇼핑몰 준비 중입니다" : "🛍 쇼핑몰 준비 중입니다"}
                     <div style={s5s({ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#6E655E" })}>잠시 후 다시 찾아 주세요.</div>
@@ -7744,7 +7753,7 @@ export default function OrderPage() {
               );
             }
             if (productListState === "error") {
-              return <section role="alert" style={{ margin: "12px auto", maxWidth: pageMax, padding: "30px 20px", textAlign: "center", background: "#fff", borderRadius: "16px" }}>
+              return <section id="ruru-shop-top" role="alert" style={{ margin: "12px auto", maxWidth: pageMax, padding: "30px 20px", textAlign: "center", background: "#fff", borderRadius: "16px" }}>
                 <p>상품을 불러오지 못했습니다. 다시 시도해 주세요.</p>
                 <button type="button" onClick={() => { void loadBroadcast().catch(() => { setProductListState("error"); setBroadcastLoaded(true); }); }} style={uiV2 ? { marginTop: "12px", height: "48px", padding: "0 24px", borderRadius: "9999px", border: "none", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600 } : { marginTop: "12px", padding: "12px 20px", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontWeight: 700 }}>다시 불러오기</button>
               </section>;
@@ -7752,7 +7761,7 @@ export default function OrderPage() {
             // Broadcast metadata alone is not enough: wait for the active mode's products.
             if (!broadcastLoaded || productListState === "loading") {
               return (
-                <section style={{ margin: "12px auto 0", width: "100%", maxWidth: pageMax }}>
+                <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: pageMax }}>
                   <div style={uiV2 ? { padding: "44px 26px", textAlign: "center", color: "#707072", fontSize: "15px", fontWeight: 400, border: "1px solid #E5E5E5", borderRadius: "16px", background: "#FFFFFF" } : { padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "14px", fontWeight: 700, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff" }}>
                     상품을 불러오는 중…
                   </div>
