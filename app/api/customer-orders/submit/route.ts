@@ -9,6 +9,7 @@ import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnounc
 import { buildCartHoldSnapshotItem, missingCartHoldRows } from "@/lib/cartHoldDetail";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import { activeSubscribeWaiverFor } from "@/lib/subscribeFreeShipServer";
+import { COMBINE_SHIPPING_SETTING_KEYS, getKoreaTodayCombineWindow, isCombineShippingActiveNow, parseCombineShippingSettings } from "@/lib/admin-v2/combineShipping";
 import { shippingAddressKey } from "@/lib/shippingAddressKey";
 import {
   canonicalCustomerDetailProductName,
@@ -503,7 +504,9 @@ async function assertShippingFeeNotSkipped(
 
   // [2026-11-01] 구독 인증 무료배송 — 사장님이 켠 시간 + 이 카카오 계정 인증됨이면, 고른 갈래는 최소 배송비에서 뺀다.
   //   (제주·산간 추가금은 원래 서버 최소액에 안 들어가므로 여기선 갈래만 0원으로.) 못 읽으면 null → 예전 검사 그대로.
-  const subscribeWaiver = await activeSubscribeWaiverFor(supabase, kakaoId);
+  const subscribeWaiver = orderRows[0]?.ruru_subscribe_waiver_requested === true
+    ? await activeSubscribeWaiverFor(supabase, kakaoId)
+    : null;
   if (subscribeWaiver) {
     const waived = new Set(subscribeWaiver.groups);
     const expectedAfterWaiver = expectedMinimumShipping(
@@ -546,7 +549,7 @@ async function assertShippingFeeNotSkipped(
   const safeKakaoIdForShipping = String(kakaoId || "").replace(/[^0-9A-Za-z_-]/g, "");
   let priorShippingQuery = supabase
     .from("orders")
-    .select("id, order_manage_status, zipcode, address, detail_address, broadcast_id, created_at, customer_phone, kakao_id, is_deleted");
+    .select("id, product_id, order_manage_status, zipcode, address, detail_address, broadcast_id, created_at, customer_phone, kakao_id, is_deleted, subscribe_promo_redemption");
   priorShippingQuery = safeKakaoIdForShipping
     ? priorShippingQuery.or(
         `kakao_id.eq.${safeKakaoIdForShipping},customer_phone.in.(${phoneValues.join(",")})`,
@@ -566,6 +569,7 @@ async function assertShippingFeeNotSkipped(
     if (isCanceledForSubmitShipping(row?.order_manage_status)) return false;
     // [2026-09-06 사장님 승인] 삭제된 주문(is_deleted=true)은 합배송 근거 아님 — 손님 화면과 같은 기준(JS 비교, null 은 유효)
     if (row?.is_deleted === true) return false;
+    if (row?.subscribe_promo_redemption === true) return false;
     // 카카오 손님이면: 내 kakao_id 주문 또는 kakao_id 없는(옛) 주문만. 다른 카카오 계정 주문은 전화가 같아도 제외.
     if (safeKakaoIdForShipping) {
       const rowKakao = String(row?.kakao_id || "").trim();
@@ -574,24 +578,52 @@ async function assertShippingFeeNotSkipped(
     const sig = shippingAddressKey(row?.address, row?.detail_address);
     return Boolean(sig) && sig === signature;
   });
-  const hasSameAddressOrder = sameAddressOrders.length > 0;
-
-  // 이전 주문이 하나라도 있으면 합배송으로 한 그룹분이 빠졌을 수 있다 → 무조건 통과(재구매 손님 보호).
-  //   합배송 판정(관리자 시간설정 > 방송 단위 > 업체배송 그룹)은 손님 화면이 그대로 담당하고
-  //   여기서는 재현하지 않는다. 재현하다 틀리면 정상 주문이 막히는 더 큰 사고가 난다.
-  // [2026-09-05 추적 로그 · 읽기 전용] 배송비 0원/부족 주문을 "통과"시킬 때 근거를 Vercel 로그에 남긴다.
-  //   윤땡땡 9/4 단독주문 0원 사고(RURU-MTMZ1RA8)는 남은 데이터로 원인 확정이 안 됐다 → 다음 발생 시 증거 확보용.
-  if (hasSameAddressOrder) {
-    const basis = sameAddressOrders.slice(0, 5).map((row: AnyRow) =>
-      `#${row?.id}(${String(row?.created_at || "").slice(0, 10)}|bc=${String(row?.broadcast_id || "").slice(0, 8)}|kk=${row?.kakao_id ? "Y" : "N"})`,
-    );
-    console.warn(
-      `배송비 검증 통과(합배송 추정): phone=${digits.slice(-4)} kakao=${safeKakaoIdForShipping ? "Y" : "N"} 낸배송비=${paidShipping} 필요=${expectedShipping} 기본배송비설정=${baseShippingFee} 주문방송=${String(firstOrderValue(orderRows, "broadcast_id") || "").slice(0, 8)} 근거주문=${basis.join(",")}`,
-    );
-    return;
+  // Mirror the shopper's exact combine window and shipping groups, not "any historical order".
+  const { data: combinationRows, error: combinationError } = await supabase.from("settings")
+    .select("key,value").in("key", [...COMBINE_SHIPPING_SETTING_KEYS]);
+  if (combinationError) throw new Error("합배송 기간을 확인하지 못했습니다. 다시 시도해 주세요.");
+  const combineSettings = parseCombineShippingSettings(combinationRows || []);
+  const manualActive = isCombineShippingActiveNow(combineSettings);
+  const requestedBroadcastId = text(firstOrderValue(orderRows, "broadcast_id"));
+  let byBroadcast = false;
+  if (!manualActive && requestedBroadcastId) {
+    const { data: currentBroadcast, error: broadcastError } = await supabase.from("broadcasts")
+      .select("id,status").eq("id", requestedBroadcastId).maybeSingle();
+    if (broadcastError) throw new Error("방송 합배송 상태를 확인하지 못했습니다. 다시 시도해 주세요.");
+    byBroadcast = String(currentBroadcast?.status || "").trim().toUpperCase() === "ON";
   }
+  const dayWindow = getKoreaTodayCombineWindow();
+  const windowStart = manualActive ? combineSettings.startAt : dayWindow.startAt;
+  const windowEnd = manualActive ? combineSettings.endAt : dayWindow.endAt;
+  const withinCurrentCombine = sameAddressOrders.filter((row: AnyRow) => byBroadcast
+    ? String(row?.broadcast_id || "") === requestedBroadcastId
+    : Boolean(row?.created_at && Date.parse(windowStart) <= Date.parse(String(row.created_at)) && Date.parse(String(row.created_at)) <= Date.parse(windowEnd)));
 
-  // 여기까지 = 같은 주소 이전 주문이 아예 없다 = 합배송이 성립할 수 없다
+  const previousProductIds = Array.from(new Set(withinCurrentCombine
+    .map((o: AnyRow) => text(o.product_id)).filter((id: string) => /^\d+$/.test(id))));
+  const previousProductById = new Map<string, AnyRow>();
+  if (previousProductIds.length) {
+    const { data: products, error: productsError } = await supabase.from("products")
+      .select("id,shipping_type,combine_shipping,product_type,badge_type,badge_types")
+      .in("id", previousProductIds);
+    if (productsError) throw new Error("이전 주문의 배송 구분을 확인하지 못했습니다. 다시 시도해 주세요.");
+    for (const prod of products || []) previousProductById.set(String(prod.id), prod);
+  }
+  const alreadyCombinedGroups = new Set<ShippingGroup>();
+  for (const prior of withinCurrentCombine) {
+    const product = previousProductById.get(text(prior.product_id));
+    alreadyCombinedGroups.add(product ? resolveSubmitShippingGroup(product, overseasShippingFee > 0) : "normal");
+  }
+  const promoCovered = new Set(subscribeWaiver?.groups || []);
+  const stillDueGroups = Array.from(groups).filter((g) => !alreadyCombinedGroups.has(g) && !promoCovered.has(g));
+  const stillDueMinimum = expectedMinimumShipping(stillDueGroups, {
+    normalFee: baseShippingFee, normalRemoteFee: baseShippingFee,
+    vendorFee: vendorShippingFee, vendorRemoteFee: vendorShippingFee,
+    overseasFee: overseasShippingFee,
+  });
+  if (paidShipping >= stillDueMinimum) return;
+
+  // 현재 합배송 조건·구독 1회 면제·정상 배송비 중 어느 기준으로도 금액이 부족함
   //   → 배송그룹 수만큼 전액을 냈어야 한다. 그런데 안 냈다.
   console.warn(
     `배송비 검증 차단: phone=${digits.slice(-4)} 낸배송비=${paidShipping} 필요=${expectedShipping}(갈래 ${Array.from(groups).join("+")}·일반 ${baseShippingFee}·업체 ${vendorShippingFee}) 같은주소_이전주문=없음`,
@@ -800,6 +832,10 @@ export async function POST(request: NextRequest) {
     const kakaoId = text(body.kakao_id);
 
     const supabase = getSupabaseOrderSubmitClient();
+    const promoClaimed = orderRows.some((r) => r.ruru_subscribe_waiver_requested === true);
+    if (promoClaimed && !(await activeSubscribeWaiverFor(supabase, kakaoId))) {
+      throw new Error("구독 인증 무료배송은 1회만 사용할 수 있습니다. 새로고침 후 배송비를 확인해 주세요.");
+    }
 
     // [2026-08-11 담기 선착순] 세션키 전달 — RPC가 "남의 선점 못 뺏기" 검증 + 제출 성공 시 본인 선점 해제
     //   [2026-09-28] 선점 검증(assertCartHoldAlive)에서도 이 값을 쓰므로 assert 들보다 위로 이동(내용 무변경).
@@ -922,21 +958,8 @@ export async function POST(request: NextRequest) {
       console.warn("제출 후 장바구니 비움 기록 실패(주문은 정상):", (markCleanupError as Error)?.message);
     }
 
-    // [2026-11-01] 구독 인증 무료배송 표시 — 혜택 켠 시간 + 인증된 손님 주문이면 주문 줄에 시각만 찍는다(표시 전용).
-    //   금액·상태 칸 무접촉. 칸이 없거나(SQL 전) 실패해도 주문 성공 응답 유지.
-    try {
-      const waiverForMark = await activeSubscribeWaiverFor(supabase, kakaoId);
-      const groupIdForMark = text((orderRows[0] as AnyRow | undefined)?.order_group_id);
-      if (waiverForMark && groupIdForMark) {
-        const { error: subMarkError } = await supabase
-          .from("orders")
-          .update({ subscribe_free_ship_at: new Date().toISOString() })
-          .eq("order_group_id", groupIdForMark);
-        if (subMarkError) console.warn("구독 무배 표시 실패(주문은 정상):", subMarkError.message);
-      }
-    } catch (subMarkCatch) {
-      console.warn("구독 무배 표시 실패(주문은 정상):", (subMarkCatch as Error)?.message);
-    }
+    // Promotion redemption and the order-time point-rate snapshot are saved
+    // transactionally by submit_customer_order_with_bank_routing, not here.
 
     // 유튜브 라이브 채팅 자동 게시(자동알림 ON일 때만). 주문 저장 완료 후 응답과 별개로 실행 →
     //   - after()로 응답 보낸 뒤 실행하므로 주문 제출 속도/성공에 영향 0.

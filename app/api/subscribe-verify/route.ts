@@ -12,6 +12,8 @@ import {
   ensureSubscribeProofBucket,
   isKakaoSubscribeVerified,
   readSubscribeFreeShipConfig,
+  readSubscribeBenefitStatus,
+  resolveSubscribeBenefitWindow,
 } from "@/lib/subscribeFreeShipServer";
 
 export const runtime = "nodejs";
@@ -33,8 +35,8 @@ export async function GET(request: NextRequest) {
   try {
     const kakaoId = cleanKakaoId(new URL(request.url).searchParams.get("kakao_id"));
     if (!kakaoId) return NextResponse.json({ ok: true, verified: false });
-    const verified = await isKakaoSubscribeVerified(db(), kakaoId);
-    return NextResponse.json({ ok: true, verified });
+    const status = await readSubscribeBenefitStatus(db(), kakaoId);
+    return NextResponse.json({ ok: true, ...status });
   } catch {
     return NextResponse.json({ ok: true, verified: false });
   }
@@ -49,7 +51,13 @@ export async function POST(request: NextRequest) {
 
     const config = await readSubscribeFreeShipConfig(supabase);
     if (!isSubscribeFreeShipActive(config)) return fail("지금은 구독 인증 무료배송 시간이 아니에요.");
-    if (await isKakaoSubscribeVerified(supabase, kakaoId)) return NextResponse.json({ ok: true, verified: true, reason: "" });
+    if (await isKakaoSubscribeVerified(supabase, kakaoId)) {
+      const status = await readSubscribeBenefitStatus(supabase, kakaoId);
+      return NextResponse.json({ ok: true, ...status, reason: "" });
+    }
+    const { data: canceledHistory } = await supabase.from("subscribe_verifications")
+      .select("id").eq("kakao_id", kakaoId).eq("status", "canceled").limit(1);
+    if (canceledHistory?.length) return fail("이전에 인증한 계정입니다. 인증 상태 변경은 고객센터로 문의해 주세요.");
 
     const since = new Date(Date.now() - 24 * 3600_000).toISOString();
     const { count } = await supabase
@@ -111,6 +119,9 @@ export async function POST(request: NextRequest) {
       imagePath = null;
     }
 
+    // Successful certification consumes the *opportunity to certify again*, not the
+    // shipping waiver itself. Claiming a waived order happens transactionally in the RPC.
+    const benefitWindow = ok ? await resolveSubscribeBenefitWindow(supabase) : null;
     const { error: insertError } = await supabase.from("subscribe_verifications").insert({
       kakao_id: kakaoId,
       customer_phone: phone,
@@ -121,10 +132,13 @@ export async function POST(request: NextRequest) {
       ai_note: aiNote.slice(0, 300),
       image_path: imagePath,
       image_hash: hash,
+      benefit_window_start_at: ok ? benefitWindow?.startAt ?? null : null,
+      benefit_window_end_at: ok ? benefitWindow?.endAt ?? null : null,
+      benefit_broadcast_id: ok ? benefitWindow?.broadcastId ?? null : null,
     });
     if (insertError) return fail("인증 기록을 저장하지 못했어요. 잠시 뒤 다시 올려 주세요.", 500);
 
-    return NextResponse.json({ ok: true, verified: ok, reason });
+    return NextResponse.json({ ok: true, verified: ok, reason, available: ok, everVerified: ok });
   } catch {
     return fail("사진 확인 중 문제가 생겼어요. 잠시 뒤 다시 올려 주세요.", 500);
   }

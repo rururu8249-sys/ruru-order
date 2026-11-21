@@ -1872,6 +1872,11 @@ export default function OrderPage() {
   // [2026-11-01] 구독 인증 무료배송 — 설정(사장님이 켠 시간) + 이 카카오 계정 인증 여부. 못 읽으면 꺼짐.
   const [subscribeConfig, setSubscribeConfig] = useState<SubscribeFreeShipConfig>(DEFAULT_SUBSCRIBE_FREE_SHIP);
   const [subscribeVerified, setSubscribeVerified] = useState(false);
+  const [subscribeEverVerified, setSubscribeEverVerified] = useState(false);
+  const [subscribeStatusLoading, setSubscribeStatusLoading] = useState(true);
+  const [subscribeAvailable, setSubscribeAvailable] = useState(false);
+  const [subscribeStatusReload, setSubscribeStatusReload] = useState(0);
+  const [subscribePromoEarnRate, setSubscribePromoEarnRate] = useState(0.5);
   const [subscribeNow, setSubscribeNow] = useState(() => Date.now());
   const [subscribeDetailOpen, setSubscribeDetailOpen] = useState(false);
   const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
@@ -2110,7 +2115,7 @@ export default function OrderPage() {
   const shippingFeeOfGroupBeforeSubscribe = shippingFeeByGroup(shippingFeeSettingsForGroups, isRemoteAreaShippingAddress);
   // [2026-11-01] 구독 인증 무료배송 — 켠 시간 안 + 인증된 손님이면 고른 갈래만 0원(제주 추가금은 설정 따라). 서버(submit)도 같은 lib 로 다시 확인.
   const subscribeFreeShipActive = isSubscribeFreeShipActive(subscribeConfig, new Date(subscribeNow));
-  const subscribeWaiverOn = subscribeFreeShipActive && subscribeVerified;
+  const subscribeWaiverOn = subscribeFreeShipActive && subscribeAvailable;
   const shippingFeeOfGroup = subscribeWaiverOn
     ? applySubscribeWaiver(shippingFeeOfGroupBeforeSubscribe, shippingFeeByGroup(shippingFeeSettingsForGroups, false), subscribeConfig)
     : shippingFeeOfGroupBeforeSubscribe;
@@ -2122,16 +2127,35 @@ export default function OrderPage() {
     const timer = window.setInterval(() => setSubscribeNow(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, [subscribeConfig.enabled]);
-  // 이 카카오 계정이 이미 인증돼 있는지(혜택이 켜져 있을 때만 물어봄)
+  // Verified means the screenshot was accepted; available means the ONE waived order
+  // has not been used and the ORIGINAL certificate's combine window is still valid.
   useEffect(() => {
-    if (!subscribeFreeShipActive || !subscribeKakaoId || subscribeVerified) return;
+    if (!subscribeFreeShipActive || !subscribeKakaoId) {
+      setSubscribeAvailable(false);
+      setSubscribeStatusLoading(!subscribeKakaoId ? false : true);
+      return;
+    }
     let alive = true;
+    setSubscribeAvailable(false);
+    setSubscribeStatusLoading(true);
     void fetch(`/api/subscribe-verify?kakao_id=${encodeURIComponent(subscribeKakaoId)}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => { if (alive && j?.verified === true) setSubscribeVerified(true); })
-      .catch(() => {});
+      .then((j) => {
+        if (!alive || j?.ok !== true) return;
+        setSubscribeVerified(j.verified === true);
+        setSubscribeEverVerified(j.everVerified === true);
+        setSubscribeAvailable(j.available === true);
+        setSubscribeStatusLoading(false);
+      }).catch(() => { if (alive) setSubscribeAvailable(false); });
     return () => { alive = false; };
-  }, [subscribeFreeShipActive, subscribeKakaoId, subscribeVerified]);
+  }, [subscribeFreeShipActive, subscribeKakaoId, subscribeStatusReload]);
+  const onSubscribeVerified = () => {
+    setSubscribeVerified(true);
+    setSubscribeEverVerified(true);
+    setSubscribeDetailOpen(false);
+    setSubscribeStatusReload((v) => v + 1);
+  };
+  const subscribeShouldShow = subscribeFreeShipActive && !subscribeEverVerified && !subscribeVerified && !subscribeStatusLoading;
   // [2026-10-29] 해외배송 갈래 — 해외배송비 > 0 이고 «상품 정보»에 해외배송 배지가 있을 때만.
   //   장바구니 줄엔 배지가 없어서 product_id 로 상품 목록(방송·카탈로그·부족분 조회)에서 찾는다.
   //   서버(submit)도 products 배지로 같은 판정 → 손님 화면 금액과 서버 검사가 같다.
@@ -2215,7 +2239,7 @@ export default function OrderPage() {
     : shippingFee;
   const subscribeWaivedAmount = Math.max(0, shippingFeeBeforeSubscribe - shippingFee);
   // [2026-11-02] 인증 전 손님에게 「배송비 N원 무료」를 보여 주려고만 계산(표시 전용 — 금액표·제출 금액에 안 씀)
-  const subscribePotentialAmount = subscribeFreeShipActive && !subscribeVerified
+  const subscribePotentialAmount = subscribeShouldShow
     ? Math.max(0, shippingFee - calculateShippingBreakdown(
         getChargeableShippingItems(items).map((item) => shippingGroupOf(item)),
         normalizePaidShippingGroups(paidShippingGroups),
@@ -2743,6 +2767,7 @@ export default function OrderPage() {
         "overseas_remote_area_shipping_fee",
         "point_auto_earn_enabled",
         "point_earn_rate",
+        "subscribe_free_ship_point_earn_rate",
         "direct_input_enabled",
         "howto_enabled",
         "howto_steps",
@@ -2809,6 +2834,7 @@ export default function OrderPage() {
       String((data || []).find((item: any) => item.key === "point_auto_earn_enabled")?.value || "").trim() === "true";
     const pointEarnRate = Math.min(100, Math.max(0, readNumber("point_earn_rate", 0)));
     setPointEarnRateForDisplay(pointAutoEarnEnabled ? pointEarnRate : 0);
+    setSubscribePromoEarnRate(pointAutoEarnEnabled ? Math.min(100, Math.max(0, readNumber("subscribe_free_ship_point_earn_rate", 0.5))) : 0);
 
     // [2026-09-22 사장님] 주문 안내 문구의 «전체 기본값»(설정 → 주문서 표시). 상품별 설정이 없을 때만 쓰인다.
     setProductNoticeGlobal({
@@ -3462,7 +3488,7 @@ export default function OrderPage() {
 
     let combineQuery = supabase
       .from("orders")
-      .select("id, product_id, customer_phone, kakao_id, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id, is_deleted");
+      .select("id, product_id, customer_phone, kakao_id, shipping_fee, adjusted_shipping_fee, subscribe_promo_redemption, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id, is_deleted");
 
     combineQuery = kakaoIdForCombine
       ? combineQuery.or(`kakao_id.eq.${kakaoIdForCombine},customer_phone.in.(${phoneValues.join(",")})`)
@@ -3485,6 +3511,8 @@ export default function OrderPage() {
       // [2026-09-06 사장님 승인] 관리자가 삭제한 주문(is_deleted=true)은 합배송 근거에서 제외.
       //   (null/false 는 그대로 유효 — JS 비교라 is_deleted 가 null 인 옛 행이 빠지는 일 없음)
       if (order?.is_deleted === true) return false;
+      // A first-time marketing waiver is NOT a general combine-shipping payment.
+      if (order?.subscribe_promo_redemption === true) return false;
       // 카카오 손님이면: 내 kakao_id 주문 또는 kakao_id 없는(옛) 주문만. 다른 카카오 계정 주문은 제외.
       if (kakaoIdForCombine) {
         const rowKakao = String(order?.kakao_id || "").trim();
@@ -5710,6 +5738,8 @@ export default function OrderPage() {
 
         return {
           order_group_id: groupId,
+          // Only claims the single promotion when shipping was ACTUALLY discounted.
+          ruru_subscribe_waiver_requested: subscribeWaivedAmount > 0,
           order_lookup_code: lookupCode,
 
           broadcast_id: broadcast?.id || null,
@@ -5808,6 +5838,10 @@ export default function OrderPage() {
 
       // 제출 성공(서버가 신규 저장 또는 멱등 중복감지로 기존 주문을 반환) → 다음 주문은 새 키 사용
       pendingOrderKeyRef.current = null;
+      if (subscribeWaivedAmount > 0) {
+        setSubscribeAvailable(false);
+        setSubscribeStatusReload((v) => v + 1);
+      }
 
       const savedPointUsedAmount = toNumber(orderSubmitPayload?.point_used_amount);
       const savedPointOriginalAmount = toNumber(orderSubmitPayload?.point_original_amount) || appliedTotalAmount;
@@ -7659,7 +7693,7 @@ export default function OrderPage() {
               </div>
             </div>
           )}
-          {subscribeFreeShipActive ? (
+          {subscribeShouldShow ? (
             <SubscribeFreeShipCard
               variant="strip"
               channelName={subscribeConfig.channelName}
@@ -7667,7 +7701,7 @@ export default function OrderPage() {
               groupsText={subscribeGroupsText}
               verified={subscribeVerified}
               kakaoId={subscribeKakaoId}
-              onVerified={() => setSubscribeVerified(true)}
+              onVerified={onSubscribeVerified}
               onOpenDetail={() => setSubscribeDetailOpen(true)}
             />
           ) : null}
@@ -7675,7 +7709,7 @@ export default function OrderPage() {
       ) : null}
 
       {/* [2026-11-01] 첫 화면 「구독 인증하면 배송비 무료」 한 줄을 누르면 — 주문서 확인과 같은 카드를 창으로 */}
-      {subscribeDetailOpen && subscribeFreeShipActive ? (
+      {subscribeDetailOpen && subscribeShouldShow ? (
         <div role="dialog" aria-label="구독 인증 무료배송" onClick={() => setSubscribeDetailOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", maxHeight: "90vh", overflowY: "auto", background: "#FFFFFF", borderRadius: "16px 16px 0 0", padding: "16px 16px calc(16px + env(safe-area-inset-bottom))" }}>
             {/* [08:22 사장님] 맨 아래 「닫기」 대신 오른쪽 위 X — 내려도 늘 보이게(높이 0 칸에 붙여 둠) */}
@@ -7693,7 +7727,7 @@ export default function OrderPage() {
               kakaoId={subscribeKakaoId}
               customerPhone={customerPhone}
               youtubeNickname={youtubeNickname}
-              onVerified={() => setSubscribeVerified(true)}
+              onVerified={onSubscribeVerified}
             />
           </div>
         </div>
@@ -8614,7 +8648,7 @@ export default function OrderPage() {
             )}
           >
                 {/* [2026-11-02 사장님 「구독인증이 안 보여 — 놓치고 어제 주문도 깎아 달라」] 구독 인증 카드를 주문서 맨 위(받는 곳 위)로 — 스크롤 안 해도 보이게 */}
-                {subscribeFreeShipActive && selectedItemEntries.length > 0 ? (
+                {subscribeShouldShow && selectedItemEntries.length > 0 ? (
                   <div style={{ padding: "16px 16px 0" }}>
                     <SubscribeFreeShipCard
                       variant="card"
@@ -8628,7 +8662,7 @@ export default function OrderPage() {
                       kakaoId={subscribeKakaoId}
                       customerPhone={customerPhone}
                       youtubeNickname={youtubeNickname}
-                      onVerified={() => setSubscribeVerified(true)}
+                      onVerified={onSubscribeVerified}
                     />
                   </div>
                 ) : null}
@@ -8943,7 +8977,7 @@ export default function OrderPage() {
                   pointUseInput={commaNumberText(pointUseInput)}
                   pointUsedAmount={selectedPointUseAmount}
                   finalAmount={finalPaymentAmount}
-                  pointEarnRate={pointEarnRateForDisplay}
+                  pointEarnRate={subscribeWaivedAmount > 0 ? subscribePromoEarnRate : pointEarnRateForDisplay}
                   showPointUse={customerPointBalance >= 1000 && totalAmount > 0}
                   onPointUseInputChange={(value) => setPointUseInput(onlyNumber(value))}
                   onUseAllPoints={() => setPointUseInput(String(Math.min(customerPointBalance, totalAmount)))}

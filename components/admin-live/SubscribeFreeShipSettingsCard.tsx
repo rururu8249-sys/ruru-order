@@ -60,6 +60,10 @@ export default function SubscribeFreeShipSettingsCard() {
   const [zoom, setZoom] = useState("");
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [listSearch, setListSearch] = useState("");
+  const [listOpen, setListOpen] = useState(false);
+  const [listPage, setListPage] = useState(0);
+  const [listTotal, setListTotal] = useState(0);
+  const [listCounts, setListCounts] = useState<Record<ListFilter, number>>({ all: 0, verified: 0, rejected: 0, canceled: 0 });
 
   useEffect(() => {
     void (async () => {
@@ -72,16 +76,20 @@ export default function SubscribeFreeShipSettingsCard() {
 
   const loadRows = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin-live/subscribe-verify", { cache: "no-store" });
+      if (!listOpen) return;
+      const params = new URLSearchParams({ page: String(listPage), limit: "10", filter: listFilter, q: listSearch.trim() });
+      const res = await fetch(`/api/admin-live/subscribe-verify?${params}`, { cache: "no-store" });
       const json = await res.json();
       setRows(Array.isArray(json?.rows) ? json.rows : []);
+      setListTotal(Math.max(0, Number(json?.total || 0)));
+      if (json?.counts) setListCounts(json.counts);
       setListError(json?.ok ? "" : String(json?.message || "목록을 못 불러왔어요"));
     } catch {
       setRows([]);
       setListError("목록을 못 불러왔어요");
     }
-  }, []);
-  useEffect(() => { void loadRows(); }, [loadRows]);
+  }, [listOpen, listPage, listFilter, listSearch]);
+  useEffect(() => { if (listOpen) void loadRows(); }, [loadRows, listOpen]);
 
   if (!cfg) return <div className="rounded-xl border border-line bg-surface p-4 text-sm text-ink-mute">구독 인증 무료배송 불러오는 중…</div>;
 
@@ -213,26 +221,31 @@ export default function SubscribeFreeShipSettingsCard() {
       </div>
 
       <div className="mt-4 border-t border-line pt-4">
+        <button type="button" onClick={() => setListOpen((v) => !v)}
+          className="mb-3 flex w-full items-center justify-between rounded-xl border border-line bg-surface-2 px-4 py-3 text-left text-sm font-bold text-ink">
+          <span>인증 기록</span><span>{listOpen ? "접기 ▲" : "목록 보기 ▼"}</span>
+        </button>
+        {listOpen ? <>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-bold text-ink">인증 기록</span>
           <button type="button" onClick={() => void loadRows()} className="h-8 rounded-full border border-line px-3 text-xs font-semibold text-ink-soft">새로고침</button>
         </div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {(["all", "verified", "rejected", "canceled"] as ListFilter[]).map((f) => {
-            const n = (rows || []).filter((r) => f === "all" || r.status === f).length;
+            const n = listCounts[f];
             const label = f === "all" ? "전체" : statusLabel(f);
             return (
-              <button key={f} type="button" aria-pressed={listFilter === f} onClick={() => setListFilter(f)} className={`h-8 rounded-full px-3 text-xs font-semibold ${listFilter === f ? "bg-ink text-white" : "border border-line text-ink-soft"}`}>
+              <button key={f} type="button" aria-pressed={listFilter === f} onClick={() => { setListFilter(f); setListPage(0); }} className={`h-8 rounded-full px-3 text-xs font-semibold ${listFilter === f ? "bg-ink text-white" : "border border-line text-ink-soft"}`}>
                 {label} {n}
               </button>
             );
           })}
-          <input value={listSearch} onChange={(e) => setListSearch(e.target.value)} placeholder="닉네임·전화 뒷자리" className="h-8 min-w-[140px] flex-1 rounded-full border border-line bg-surface px-3 text-xs" />
+          <input value={listSearch} onChange={(e) => { setListSearch(e.target.value); setListPage(0); }} placeholder="닉네임·전화 뒷자리" className="h-8 min-w-[140px] flex-1 rounded-full border border-line bg-surface px-3 text-xs" />
         </div>
         {listError ? <div className="mb-2 text-xs text-warn-tx">{listError}</div> : null}
         {rows && rows.length === 0 && !listError ? <div className="text-xs text-ink-mute">아직 인증 기록이 없어요</div> : null}
         <div className="grid gap-2">
-          {(rows || []).filter((r) => (listFilter === "all" || r.status === listFilter) && (!listSearch.trim() || `${r.youtube_nickname || ""} ${r.customer_phone}`.toLowerCase().includes(listSearch.trim().toLowerCase()))).map((r) => (
+          {(rows || []).map((r) => (
             <div key={r.id} className="flex items-center gap-3 rounded-xl border border-line p-2">
               {r.imageUrl ? (
                 <button type="button" onClick={() => setZoom(r.imageUrl)} className="shrink-0" aria-label="캡처 크게 보기">
@@ -246,7 +259,7 @@ export default function SubscribeFreeShipSettingsCard() {
                   <span className="text-xs text-ink-mute">{r.customer_phone}</span>
                   <span className={`rounded-full px-2 text-xs font-semibold ${r.status === "verified" ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-mute"}`}>{statusLabel(r.status)}</span>
                   <span className="text-xs text-ink-mute">{shortTime(r.created_at)}</span>
-                  {r.orderCount ? <span className="text-xs font-semibold text-ink-soft">구독 무배 주문 {r.orderCount}건</span> : null}
+                  {r.orderCount ? <span className="text-xs font-semibold text-ink-soft">구독 혜택 표시 {r.orderCount}건</span> : null}
                 </div>
                 <div className="truncate text-xs text-ink-mute">{r.reason || r.ai_note || ""}</div>
               </div>
@@ -258,6 +271,16 @@ export default function SubscribeFreeShipSettingsCard() {
             </div>
           ))}
         </div>
+        <div className="mt-3 flex items-center justify-between text-xs font-semibold text-ink-mute">
+          <span>{listTotal}건 · {listPage + 1} / {Math.max(1, Math.ceil(listTotal / 10))} 페이지</span>
+          <div className="flex gap-2">
+            <button type="button" className="rounded-full border border-line px-3 py-2 disabled:opacity-30" disabled={listPage === 0}
+              onClick={() => setListPage((n) => Math.max(0, n - 1))}>이전</button>
+            <button type="button" className="rounded-full border border-line px-3 py-2 disabled:opacity-30"
+              disabled={(listPage + 1) * 10 >= listTotal} onClick={() => setListPage((n) => n + 1)}>다음</button>
+          </div>
+        </div>
+        </> : null}
       </div>
 
       {zoom ? (
