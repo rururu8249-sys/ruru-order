@@ -31,7 +31,7 @@ import {computeWidgetFeatured} from './widgetFeaturedServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
 import {readLearning,refreshLearning} from './liveAutomationLearningServer';
-import {shortProductCodes,spokenCardName,varyLaughTail} from './liveAutomationVoice';
+import {spokenCardName} from './liveAutomationVoice';
 import {readSubscribeFreeShipConfig} from './subscribeFreeShipServer';
 import {isSubscribeFreeShipActive} from './subscribeFreeShip';
 import {soldItems,purchaseMemoryText,type SoldItem,agreeTopic,agreeAnswerText,factTopic,factAnswerText,EMOJI_ONLY_LINES,emojiReactText,fixLaughCount,BRAND_WORDS,brandAskText,topProductNamesByBrand,smallTalkAnswer,smallTalkPool,topBrands,SMALL_TALKS,askLunaText,parseNextShow,type NextShow,greetChance,greetingPool,farewellTimePool,FAREWELL_LINES,ORDER_AFTER_LINES,ORDER_FIRST_LINES,VISIT_LINES,VISIT_RE,fillVisitLine,farewellPlan,hashOf,isEndNotice,isSizeQuestion,orderAfterDelay,orderNoticePlan,parseHeightWeight,personaVoice,sizeAnswerText,recentNameSet,similarToRecent} from './liveAutomationLines';
@@ -870,7 +870,8 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    replyingToHuman:Boolean(tgt),recent:recentForGate,offAirSince:String(latestBroadcast.data.paused_at||latestBroadcast.data.ended_at||''),
    replySourceIsHuman:Boolean(tgt&&!tgt.automation_actor_id),lastHumanAt,replySourceText:String(tgt?.body||'')});
  };
- const styleLine=(t:string,r:(typeof roster)[number])=>personaVoice(varyLaughTail(shortProductCodes(t,seedOf(r.actor)+now),recentAi,seedOf(r.actor)+now),seedOf(r.actor),now);
+ // Keep Gemini's wording and product identifiers intact; do not add a synthetic persona.
+ const styleLine=(t:string,_r:(typeof roster)[number])=>t.trim();
  const draftFor=(raw:string,r:(typeof roster)[number])=>{
    if(hasUnseenVisualClaim(raw)||!acceptable(raw,r,null))return {ok:false,reason:'content-filter',prepared:raw};
    const prepared=styleLine(raw,r),quality=qualityFor(prepared,r,null,{data:bc.data},mode);
@@ -903,11 +904,11 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  let chosenPath='normal';
  let focusedChoices:ReturnType<typeof parseChatCandidates>=[];
  // A verified displayed product can merit a rare, grounded conversational turn.
- // Retry once with a compact prompt if the full-context model returned no valid speaker.
+ // Recover malformed/rejected drafts only. A deliberate silence is a completed decision.
  // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
  // A parsed independent draft must pass content, quality and room checks to be usable.
  // Reuse the same recovery cooldown/budget; never rewrite an explicit reply.
- if((!firstChoice.speaker||unusableIndependent)&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&(
+ if(firstChoice.reason!=='model-chose-silence'&&(!firstChoice.speaker||unusableIndependent)&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&(
    mode==='live'?shouldRecoverProductSilence({
      now,mode,hasCard:topicCards.length>0,chatRate,hasPendingHuman:Boolean(newestHuman),
      lastHumanAt,lastAiAt:lastAi,lastFocusAt,candidates:roster.length
@@ -954,7 +955,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  await noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:rawText.slice(0,70),result:!speaker?'silent:'+choiceReason:text?'candidate':'rejected',model:lastModelNote.slice(0,85),path:chosenPath,cardPresent:Boolean(card)});
  if(speaker&&!text&&target)text=shortReply(clean(target.body),recent,seedOf(speaker.actor),speaker.own,speaker.paid.includes('card'))||'';
  if(speaker&&text&&(wrongPaymentTalk(text,speaker.cardOrder,speaker.bankOrder)||cardLinkTalkBlocked(text,speaker.cardOrder,speaker.paid.includes('card'))))text='';
- // [2026-11-15 07:40 사장님] 상품번호는 손님처럼 줄여 부름(프222·버58·몽319), 웃음·이모지 끝맺음은 최근 AI 글과 안 겹치게
+ // Preserve the validated model wording through the final send.
  if(speaker&&text)text=typeof pick.prepared==='string'?pick.prepared:styleLine(text,speaker);
  const selectedTopic=topicFor(text,target);
  const selectedTopicKey=selectedTopic?`${selectedTopic.productId}:${selectedTopic.detailName}`:'';

@@ -48,7 +48,7 @@ export function roomTopicPrompt(recent:ChatObservation[],now:number):string{
  const counts=recentTopicCounts(recent,now);
  const avoid=[...new Set(recentTopics(recent,now).slice(0,2).flat())].map(t=>labels[t]).join(', ');
  const summary=Object.entries(counts).map(([t,n])=>`${labels[t]} ${n}회`).join(', ');
- return `최근 관심사: ${summary||'별도 기록 없음'}. 다음 독립 발언은 최근 두 발언의 관심사(${avoid||'없음'})를 그대로 되풀이하지 않고, 검증된 상품의 다른 관심사를 보탠다. 색상 감상을 코디·활용·선택 고민으로 바꾸어도 같은 색상 감상을 반복할 수 있다. 최근 두 발언과 겹치는 관심사를 세 번째 독립 발언으로 반복하지 않는다. 다른 계정·상품·말끝으로 바꾸어도 마찬가지다. 아직 다루지 않은 실제 관심이 있으면 표현하고, 없으면 침묵한다. 정해진 주제 순환은 하지 않는다.`;
+ return `최근 관심사: ${summary||'별도 기록 없음'}. 다음 독립 발언은 최근 두 발언의 관심사(${avoid||'없음'})를 그대로 되풀이하지 않는다. 다른 관심사를 만들어낼 필요도 없다. 현재 맥락에 구체적으로 보탤 내용이 있을 때만 말한다. 색상 감상을 코디·활용·선택 고민으로 바꾸어도 같은 색상 감상을 반복할 수 있다. 최근 두 발언과 겹치는 관심사를 세 번째 독립 발언으로 반복하지 않는다. 다른 계정·상품·말끝으로 바꾸어도 마찬가지다. 아직 다루지 않은 실제 관심이 있으면 표현하고, 없으면 침묵한다. 정해진 주제 순환은 하지 않는다.`;
 }
 
 /** A genuinely new, explicitly named catalog topic, not a carousel tick.

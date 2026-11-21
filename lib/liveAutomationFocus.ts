@@ -13,7 +13,8 @@ export function parseDirectorChoice(raw:string|null, allowed:string[]):DirectorC
   }catch{return blank('invalid-json');}
   if(!obj||typeof obj!=='object'||Array.isArray(obj))return blank('invalid-object');
   const v=obj as Record<string,unknown>;
-  const speaker=typeof v.speaker==='string'?v.speaker.trim():'';
+  if(typeof v.speaker!=='string')return blank('invalid-speaker');
+  const speaker=v.speaker.trim();
   if(!speaker)return blank('model-chose-silence');
   if(!allowed.includes(speaker))return blank('unknown-speaker');
   const body=typeof v.text==='string'?v.text.trim():'';
