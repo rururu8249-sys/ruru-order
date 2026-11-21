@@ -26,7 +26,7 @@ import {readEmojiSetting} from './liveChatEmojiServer';
 import {readDialogueCard} from './liveAutomationDialogueServer';
 import {readOrderedDialogueCards} from './liveAutomationOrderedProducts';
 import {identifiesChatProduct} from './liveAutomationProductFacts';
-import {hasNewGroundedInterest,repeatsRoomTopic} from './liveAutomationTopics';
+import {hasNewGroundedInterest} from './liveAutomationTopics';
 import {computeWidgetFeatured} from './widgetFeaturedServer';
 import {isNightKst} from './liveAutomationTempo';
 import {learningDue,learningPromptText} from './liveAutomationLearning';
@@ -797,7 +797,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  };
  // Read recent decisions once, preserving an auditable cooldown for a focused retry.
  const decisionLog:Row[]=await db.from('settings').select('value').eq('key','live_automation_director_log').maybeSingle().then(r=>{try{const v=JSON.parse(String((r.data as {value?:unknown}|null)?.value??'[]'));return Array.isArray(v)?v.filter((e:unknown):e is Row=>Boolean(e)&&typeof e==='object'&&!Array.isArray(e)):[];}catch{return [] as Row[];}},()=>[] as Row[]);
- const rejectedLines=decisionLog.filter(e=>(e.result==='rejected'||e.result==='quality:room-repeated-interest'||e.result==='quality:unanchored-product-impression'||String(e.result).startsWith('room:'))&&Date.parse(String(e.at))>now-600000).map(e=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6);
+ const rejectedLines=decisionLog.filter(e=>(e.result==='rejected'||String(e.result).startsWith('quality:')||String(e.result).startsWith('room:'))&&Date.parse(String(e.at))>now-600000).map(e=>`${clean(e.speaker)}: ${clean(e.raw)}`).slice(0,6);
  const lastFocusAt=Math.max(0,...decisionLog.filter(e=>e.result==='focus-attempt').map(e=>Date.parse(String(e.at))||0));
  const selectionBucket=Math.floor(now/180_000);
  // Rotate the small candidate set; prioritize a recently addressed TEST identity.
@@ -809,55 +809,6 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    nextShow:nextShow?nextShow.when:null,
    actors:modelRoster.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))
  };
- const prompt=buildCompactConversationPrompt(roomContext);
- const priority=newestHuman?'interactive':'background';
- // A timeout is a service failure, not a decision to stay silent. Retry ONCE with a
- // different permitted model and the same grounded, short context. No extra turns.
- const primary=await callGeminiJson(prompt,{timeoutMs:12000,maxTokens:320,maxAttempts:1,temperature:.75,
-   priority,models:['gemini-3.5-flash-lite']});
- let ans=primary;
- if(shouldFallbackModel(primary)){
-   const secondary=await callGeminiJson(prompt,{timeoutMs:11000,maxTokens:320,maxAttempts:1,temperature:.75,
-     priority,models:['gemini-3.1-flash-lite']});
-   ans=secondary;
-   void noteDecision(db,{at:new Date(now).toISOString(),result:'model-fallback',primary:primary.note.slice(0,80),secondary:secondary.note.slice(0,80)});
- }
- const firstChoice=parseDirectorChoice(ans.text,modelRoster.map(r=>String(r.actor.nickname)));
- const repeatedChoice=firstChoice.reason==='ok'&&firstChoice.replyTo===0&&(repeatsRoomTopic(firstChoice.text,priorObservations,now)||roomFor(firstChoice.text,'',null,mode).reason==='two-unrelated-ai-turns-without-new-context');
- let pick:Row=firstChoice.reason==='ok'?{speaker:firstChoice.speaker,text:firstChoice.text,replyTo:firstChoice.replyTo}:{};
- let lastModelNote=ans.note;
- let choiceReason=firstChoice.reason;
- let chosenPath='normal';
- let focusedChoices:ReturnType<typeof parseChatCandidates>=[];
- // A verified displayed product can merit a rare, grounded conversational turn.
- // Retry once with a compact prompt if the full-context model returned no valid speaker.
- // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
- // A parsed but repetitive independent draft is not a usable turn either.
- // Reuse the same recovery cooldown/budget; never rewrite an explicit reply.
- if((!firstChoice.speaker||repeatedChoice)&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&(
-   mode==='live'?shouldRecoverProductSilence({
-     now,mode,hasCard:topicCards.length>0,chatRate,hasPendingHuman:Boolean(newestHuman),
-     lastHumanAt,lastAiAt:lastAi,lastFocusAt,candidates:roster.length
-   }):shouldTryFocusedProductTurn({
-     now,mode,chatRate,hasProduct:topicCards.length>0,hasPendingHuman:Boolean(newestHuman),
-     lastHumanAt,lastAiAt:lastAi,lastFocusAt
-   })
- )){
-   await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:Boolean(card),orderedTopicCount:orderedCards.length,firstReason:repeatedChoice?'repeated-interest':firstChoice.reason,firstModel:ans.note.slice(0,85)});
-   const bucket=Math.floor(now/(10*60_000));
-   const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
-   const focusedPrompt=buildChatCandidatePrompt({...roomContext,
-     actors:candidates.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))},priorObservations);
-   if(!focusedPrompt)return;
-   const focused=await callGeminiJson(focusedPrompt,{timeoutMs:12000,maxTokens:500,maxAttempts:2,temperature:.8,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
-   focusedChoices=rankChatCandidates(parseChatCandidates(focused.text,candidates.map(r=>String(r.actor.nickname))),priorObservations,now);
-   const retryChoice=focusedChoices[0]||parseDirectorChoice(null,[]);
-   lastModelNote=focused.note;
-   choiceReason=retryChoice.reason;
-   chosenPath='focused';
-   if(retryChoice.reason==='ok')pick={speaker:retryChoice.speaker,text:retryChoice.text,replyTo:retryChoice.replyTo};
-   else await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-unsent',why:retryChoice.reason,model:focused.note.slice(0,85),cardPresent:Boolean(card)});
- }
  const acceptable=(t:string,r:(typeof roster)[number],tgt:Row|null)=>{
   if(references(t).length>1)return false; // Do not guess which item's options to validate.
   const topic=topicFor(t,tgt);
@@ -920,16 +871,74 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    replySourceIsHuman:Boolean(tgt&&!tgt.automation_actor_id),lastHumanAt,replySourceText:String(tgt?.body||'')});
  };
  const styleLine=(t:string,r:(typeof roster)[number])=>personaVoice(varyLaughTail(shortProductCodes(t,seedOf(r.actor)+now),recentAi,seedOf(r.actor)+now),seedOf(r.actor),now);
+ const draftFor=(raw:string,r:(typeof roster)[number])=>{
+   if(hasUnseenVisualClaim(raw)||!acceptable(raw,r,null))return {ok:false,reason:'content-filter',prepared:raw};
+   const prepared=styleLine(raw,r),quality=qualityFor(prepared,r,null,{data:bc.data},mode);
+   if(!quality.ok)return {...quality,prepared};
+   const turn=roomFor(prepared,String(r.actor.id),null,mode);
+   return {ok:turn.ok,reason:turn.ok?'ok':'room:'+turn.reason,prepared};
+ };
+ const prompt=buildCompactConversationPrompt(roomContext);
+ const priority=newestHuman?'interactive':'background';
+ // A timeout is a service failure, not a decision to stay silent. Retry ONCE with a
+ // different permitted model and the same grounded, short context. No extra turns.
+ const primary=await callGeminiJson(prompt,{timeoutMs:12000,maxTokens:320,maxAttempts:1,temperature:.75,
+   priority,models:['gemini-3.5-flash-lite']});
+ let ans=primary;
+ if(shouldFallbackModel(primary)){
+   const secondary=await callGeminiJson(prompt,{timeoutMs:11000,maxTokens:320,maxAttempts:1,temperature:.75,
+     priority,models:['gemini-3.1-flash-lite']});
+   ans=secondary;
+   void noteDecision(db,{at:new Date(now).toISOString(),result:'model-fallback',primary:primary.note.slice(0,80),secondary:secondary.note.slice(0,80)});
+ }
+ const firstChoice=parseDirectorChoice(ans.text,modelRoster.map(r=>String(r.actor.nickname)));
+ const firstSpeaker=roster.find(r=>r.actor.nickname===firstChoice.speaker);
+ const firstDraft=firstChoice.replyTo===0&&firstSpeaker?draftFor(firstChoice.text,firstSpeaker):null;
+ const unusableIndependent=Boolean(firstDraft&&!firstDraft.ok);
+ let pick:Row=firstChoice.reason==='ok'&&!unusableIndependent?{speaker:firstChoice.speaker,text:firstChoice.text,replyTo:firstChoice.replyTo,
+   ...(firstDraft?.ok?{prepared:firstDraft.prepared}:{})}:{};
+ let lastModelNote=ans.note;
+ let choiceReason=firstDraft&&!firstDraft.ok?firstDraft.reason:firstChoice.reason;
+ let chosenPath='normal';
+ let focusedChoices:ReturnType<typeof parseChatCandidates>=[];
+ // A verified displayed product can merit a rare, grounded conversational turn.
+ // Retry once with a compact prompt if the full-context model returned no valid speaker.
+ // The persisted 'focus-attempt' log prevents repeatedly retrying on each scheduler tick.
+ // A parsed independent draft must pass content, quality and room checks to be usable.
+ // Reuse the same recovery cooldown/budget; never rewrite an explicit reply.
+ if((!firstChoice.speaker||unusableIndependent)&&!/no_key|quota|timeout|fetch_error|http_5\d\d/.test(ans.note)&&(
+   mode==='live'?shouldRecoverProductSilence({
+     now,mode,hasCard:topicCards.length>0,chatRate,hasPendingHuman:Boolean(newestHuman),
+     lastHumanAt,lastAiAt:lastAi,lastFocusAt,candidates:roster.length
+   }):shouldTryFocusedProductTurn({
+     now,mode,chatRate,hasProduct:topicCards.length>0,hasPendingHuman:Boolean(newestHuman),
+     lastHumanAt,lastAiAt:lastAi,lastFocusAt
+   })
+ )){
+   await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-attempt',mode,cardPresent:Boolean(card),orderedTopicCount:orderedCards.length,firstReason:firstDraft&&!firstDraft.ok?firstDraft.reason:firstChoice.reason,firstModel:ans.note.slice(0,85)});
+   const bucket=Math.floor(now/(10*60_000));
+   const candidates=[...roster].sort((a,b)=>hashOf(String(a.actor.id)+':'+bucket)-hashOf(String(b.actor.id)+':'+bucket)).slice(0,6);
+   const focusedPrompt=buildChatCandidatePrompt({...roomContext,
+     rejectedLines:[...rejectedLines,...(firstDraft&&!firstDraft.ok?[`${firstDraft.reason}: ${firstChoice.text}`]:[])].slice(-6),
+     actors:candidates.map(r=>({nickname:String(r.actor.nickname),own:r.own,cart:r.cart,ordered:r.ordered,paid:r.paid}))},priorObservations);
+   if(!focusedPrompt)return;
+   const focused=await callGeminiJson(focusedPrompt,{timeoutMs:12000,maxTokens:500,maxAttempts:2,temperature:.8,priority:'background',models:['gemini-3.5-flash-lite','gemini-3.1-flash-lite']});
+   focusedChoices=rankChatCandidates(parseChatCandidates(focused.text,candidates.map(r=>String(r.actor.nickname))),priorObservations,now);
+   const retryChoice=focusedChoices[0]||parseDirectorChoice(null,[]);
+   lastModelNote=focused.note;
+   choiceReason=retryChoice.reason;
+   chosenPath='focused';
+   if(retryChoice.reason==='ok')pick={speaker:retryChoice.speaker,text:retryChoice.text,replyTo:retryChoice.replyTo};
+   else await noteDecision(db,{at:new Date(now).toISOString(),result:'focus-unsent',why:retryChoice.reason,model:focused.note.slice(0,85),cardPresent:Boolean(card)});
+ }
  if(focusedChoices.length){
    pick={};
    for(const candidate of focusedChoices){
      const r=roster.find(r=>r.actor.nickname===candidate.speaker);if(!r)continue;
      const raw=clean(candidate.text);
-     if(hasUnseenVisualClaim(raw)||!acceptable(raw,r,null)){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:content-filter',raw:raw.slice(0,70)});continue;}
-     const prepared=styleLine(raw,r),quality=qualityFor(prepared,r,null,{data:bc.data},mode);
-     if(!quality.ok){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:'+quality.reason,raw:raw.slice(0,70)});continue;}
-     const turn=roomFor(prepared,String(r.actor.id),null,mode);
-     if(!turn.ok){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:room:'+turn.reason,raw:raw.slice(0,70)});continue;}
+     const verdict=draftFor(raw,r);
+     if(!verdict.ok){await noteDecision(db,{at:new Date(now).toISOString(),result:'draft:'+verdict.reason,raw:raw.slice(0,70)});continue;}
+     const prepared=verdict.prepared;
      pick={speaker:candidate.speaker,replyTo:0,text:raw,prepared};break;
    }
    if(!pick.speaker)choiceReason='all-drafts-rejected';

@@ -13,3 +13,12 @@ for(const mode of ['live','paused','replay']){
  assert.ok(result.sent[0].body.includes('관리'));
 }
 console.log('PASS actual production mixed-topic rejection recovers via an admissible grounded draft in all modes');
+
+const offAir=await run({mode:'paused',clockNow:now,rate:80,focused:true,normalText:'HR-7 블랙 소재감이 어떤 느낌일지 궁금하네요',cardOverride:card,orderedCards:[ordered],visible:prior,hidden:prior,
+ drafts:['HR-7 블랙은 관리 방법도 따져보고 고를래요']});
+assert.equal(offAir.sent.length,1,'off-air unanswered-question rejection must recover with a non-question');
+assert.ok(offAir.sent[0].body.includes('관리'));
+const cooled=await run({mode:'live',clockNow:now,rate:80,text:'mx107 와인 색이 예뻐 보여요',recentDecisionLog:[{at:new Date(now).toISOString(),result:'focus-attempt'}]});
+assert.equal(cooled.prompts.length,1);assert.equal(cooled.sent.length,0,'rejected first draft stays rejected when recovery is cooling');
+const empty=await run({mode:'live',clockNow:now,rate:80,focused:true,normalText:'mx107 와인 색이 예뻐 보여요',drafts:[]});
+assert.equal(empty.prompts.length,2);assert.equal(empty.sent.length,0,'empty recovery cannot resurrect rejected primary');

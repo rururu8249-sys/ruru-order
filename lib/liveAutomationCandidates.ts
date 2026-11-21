@@ -42,6 +42,7 @@ export function buildChatCandidatePrompt(c:CompactRoomContext,recent:ChatObserva
   '개인에게 맞는 사이즈 추천 질문은 그 계정의 기존 키·몸무게 기록이 있어야 한다. 체형을 만들거나 특정 사이즈가 맞는지 근거 없이 묻지 않는다. 일반적인 상품 실측 문의와 개인 사이즈 추천은 다르다. 표시된 옵션의 존재 여부는 다시 묻지 않는다.',
   '실제 구매·결제·착용·시청 경험, 직장·관계·일정을 만들지 않는다. 다른 사람의 경험을 자기 것으로 말하지 않는다. 입을 상황을 고민하는 것과 이미 입어봤다고 하는 것은 다르다.',
   roomTopicPrompt(recent,c.now??Date.now()),
+  ...(c.rejectedLines?.length?['이미 거절된 후보(따라 쓰지 말 것): '+c.rejectedLines.slice(-6).map(t=>clean(t,100)).join(' / '),'같은 거절 이유에 걸리지 않는 다른 관심의 문장을 검토한다.']:[]),
   `이미 나온 질문 유형: ${(c.questionMemory||[]).join(' / ')||'없음'}. 같은 질문을 다시 만들지 않는다.`,
   ...(c.product&&productSemanticFacts(c.product).wearable?['의류로 확인된 상품의 관심사에는 여밈·후드·주머니 같은 구조, 관리, 코디, 선택 과정도 있다. 이 목록은 사실 정보나 정해진 질문 순서가 아니다.']:[]),
   '[발언 가능한 계정의 확인된 기록]\n'+actors.join('\n'),

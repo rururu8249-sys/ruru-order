@@ -30,7 +30,7 @@ export async function run({mode='paused',focused=false,text='mx107 와인 병 �
 }
 for(const mode of ['live','paused','replay'])for(const focused of [false,true]){
  const bad=await run({mode,focused});assert.equal(bad.sent.length,0,`${mode}/${focused}: semantic error must not reach transport`);
- assert.equal(bad.prompts.length,focused?2:1);for(const p of bad.prompts)assert.ok(p.includes('막스마라')&&p.includes('세부상품명 속 색상: 와인'));
+ assert.equal(bad.prompts.length,2);for(const p of bad.prompts)assert.ok(p.includes('막스마라')&&p.includes('세부상품명 속 색상: 와인'));
  const good=await run({mode,focused,text:'mx107 와인 색이 예쁘네요'});assert.equal(good.sent.length,1,`${mode}/${focused}: normal color remark is sent`);
 }
 assert.equal((await run({rate:0})).prompts.length,0,'0% no model call');
