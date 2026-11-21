@@ -21,7 +21,7 @@ export type ProductOpportunity = {
 export function shouldRecoverProductSilence(q:ProductOpportunity):boolean {
   if(q.mode!=='live'||!q.hasCard||q.hasPendingHuman||q.candidates<1||q.chatRate<=0)return false;
   const intensity=Math.max(0,Math.min(100,q.chatRate));
-  // Even at 100%, the DB's 6 unsolicited messages/hour limit still applies.
+  // Retry budget is separate from the slider-aware DB send interval.
   const gap=intensity>=80?3*60_000:intensity>=50?5*60_000:intensity>=20?8*60_000:12*60_000;
   if(q.lastHumanAt>0&&q.now-q.lastHumanAt<100_000)return false;
   if(q.lastAiAt>0&&q.now-q.lastAiAt<gap)return false;

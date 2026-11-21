@@ -8,7 +8,7 @@ for(const mode of ['live','paused','replay']){
  const args={mode,clockNow:now,visible,hidden:visible,cardOverride:card,orderedCards:[ordered]};
  assert.equal((await run({...args,text:'HR-7 블랙은 기장감이 어느 정도인지 궁금하네요.'})).sent.length,1,'verified new product AND interest can follow old independent messages: '+mode);
  assert.equal((await run({...args,text:'HR-7 블랙은 디자인이 깔끔하네요.'})).sent.length,0,'changing only the product cannot repeat the same interest');
- assert.equal((await run({...args,text:'HR-7 블랙은 기장감이 어느 정도인지 궁금하네요.',visible:[{...visible[0],created_at:new Date(now-60000).toISOString()},visible[1]]})).sent.length,0,'new grounded topic cannot bypass resting gap');
+ assert.equal((await run({...args,text:'HR-7 블랙은 기장감이 어느 정도인지 궁금하네요.',visible:[{...visible[0],created_at:new Date(now-30000).toISOString()},visible[1]]})).sent.length,0,'new grounded topic cannot bypass resting gap');
  assert.equal((await run({...args,text:'HR-7 블랙은 기장감이 어느 정도인지 궁금하네요.',orderedRemoved:true})).sent.length,0,'source must remain valid at send');
 }
-console.log('PASS production third-turn regression: verified distinct product/interest, unchanged gaps and catalog recheck');
+console.log('PASS production third-turn regression: verified distinct product/interest, slider-aware minimum gaps and catalog recheck');
