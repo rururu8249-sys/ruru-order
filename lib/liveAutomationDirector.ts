@@ -174,7 +174,7 @@ export function advisesOthers(text:string):boolean{
  if(/[?？]|까요|나요|될까|맞을까|어때요|어떤가요/.test(text))return false;
  // [2026-11-15 14:15 사장님 「165에 55면 36이나 38이 나을 것 같아용」] 돌려 말한 추천·단정도 버림 — 사이즈 답은 코드(sizeAnswerFlow)만 함
  if(/(나을|맞을|될|클|작을|괜찮을|좋을|낫)\s*(것\s*같|거\s*같|수도|듯)|(이|가)\s*나아요|(크|작)게\s*나올/.test(text)&&/사이즈|\d{2}|[sml]\b|엑라|입으|입어|크|작|맞/i.test(text))return true;
- return /(하시면|하면|입으시면|사시면|고르시면|가시면)\s*(될|돼|되|맞|괜찮|좋|딱)/.test(text)||/추천(해요|드려요|드림|합니다)|정사이즈|한\s*치수\s*(크게|작게)|(작게|크게)\s*나왔/.test(text);
+ return /(하시면|하면|입으시면|사시면|고르시면|가시면)\s*(될|돼|되|맞|괜찮|좋(?!을지)|딱)/.test(text)||/추천(해요|드려요|드림|합니다)|정사이즈|한\s*치수\s*(크게|작게)|(작게|크게)\s*나왔/.test(text);
 }
 // [2026-11-14 10:53 사장님 「별빛이 지가 한 주문에 지가 축하」] 가상 손님이 자기 닉네임을 남처럼 부르는 말은 버림(별빛향기 → 「별빛님도 주문 완료하셨네용」)
 export function mentionsSelf(text:string,nick:string):boolean{
@@ -895,6 +895,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const firstSpeaker=roster.find(r=>r.actor.nickname===firstChoice.speaker);
  const firstDraft=firstChoice.replyTo===0&&firstSpeaker?draftFor(firstChoice.text,firstSpeaker):null;
  const unusableIndependent=Boolean(firstDraft&&!firstDraft.ok);
+ if(unusableIndependent)await noteDecision(db,{at:new Date(now).toISOString(),result:'rejected',reason:firstDraft?.reason,raw:firstChoice.text.slice(0,70),speaker:firstChoice.speaker});
  let pick:Row=firstChoice.reason==='ok'&&!unusableIndependent?{speaker:firstChoice.speaker,text:firstChoice.text,replyTo:firstChoice.replyTo,
    ...(firstDraft?.ok?{prepared:firstDraft.prepared}:{})}:{};
  let lastModelNote=ans.note;
