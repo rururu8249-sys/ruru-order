@@ -889,7 +889,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
    const secondary=await callGeminiJson(prompt,{timeoutMs:11000,maxTokens:320,maxAttempts:1,temperature:.75,
      priority,models:['gemini-3.1-flash-lite']});
    ans=secondary;
-   void noteDecision(db,{at:new Date(now).toISOString(),result:'model-fallback',primary:primary.note.slice(0,80),secondary:secondary.note.slice(0,80)});
+   await noteDecision(db,{at:new Date(now).toISOString(),result:'model-fallback',primary:primary.note.slice(0,80),secondary:secondary.note.slice(0,80)});
  }
  const firstChoice=parseDirectorChoice(ans.text,modelRoster.map(r=>String(r.actor.nickname)));
  const firstSpeaker=roster.find(r=>r.actor.nickname===firstChoice.speaker);
@@ -946,7 +946,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const speaker=roster.find(r=>r.actor.nickname===String(pick.speaker||'').trim())||null;
  const replyId=Number(pick.replyTo)||0;
  const target=resolveExplicitReplyTarget(replyId,messages.filter(m=>!m.bot_ref),now);
- if(replyId&&!target){void noteDecision(db,{at:new Date(now).toISOString(),result:'invalid-reply-target',path:chosenPath});return;}
+ if(replyId&&!target){await noteDecision(db,{at:new Date(now).toISOString(),result:'invalid-reply-target',path:chosenPath});return;}
  let text=typeof pick.text==='string'?clean(pick.text):'';
  const rawText=text;
  if(speaker&&text&&!acceptable(text,speaker,target))text='';
@@ -978,17 +978,17 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
      // from the active carousel; do not reject a routine next-frame rotation.
      const freshRotation=await computeWidgetFeatured(c.broadcast_id).catch(()=>null);
      if(!cardRemainsInRotation(card,freshRotation)){
-       void noteDecision(db,{at:new Date(now).toISOString(),result:'card-removed-or-unavailable',cardPresent:Boolean(card)});
+       await noteDecision(db,{at:new Date(now).toISOString(),result:'card-removed-or-unavailable',cardPresent:Boolean(card)});
        return;
      }
    }
    // Associate each previous TEST chat with the product actually discussed.
    // Do not confuse the 5-second rotating card with a new conversation topic.
    const quality=qualityFor(text,speaker,target,{data:latestBroadcast.data},latestMode);
-   if(!quality.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
+   if(!quality.ok){text='';await noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'quality:'+quality.reason});}
    if(text){
     const roomPolicy=roomFor(text,String(speaker.actor.id),target,latestMode);
-    if(!roomPolicy.ok){text='';void noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'room:'+roomPolicy.reason});}
+    if(!roomPolicy.ok){text='';await noteDecision(db,{at:new Date(now).toISOString(),speaker:speaker.actor.nickname,raw:String(pick.text||'').slice(0,70),result:'room:'+roomPolicy.reason});}
    }
  }
  // 사람 글은 한 번만 판단 — 침묵이어도 그 글 번호를 남겨 같은 글로 Gemini 를 다시 부르지 않음
@@ -998,7 +998,7 @@ export async function runRoomDirector(db:SupabaseClient,c:Campaign,origin:string
  const who=speaker&&text?speaker:(sourceId?roster[0]:null);
  if(!who)return;
  const kind=speaker&&text&&target?'reply':'chat';
- try{await automationRpc(db,'live_automation_ai_admission',{p_actor:who.actor.id,p_kind:kind})}catch(e){void noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:'막힘 '+String((e as Error)?.message||e).slice(0,40),result:'blocked'});return}
+ try{await automationRpc(db,'live_automation_ai_admission',{p_actor:who.actor.id,p_kind:kind})}catch(e){await noteDecision(db,{at:new Date(now).toISOString(),human:!!newestHuman,speaker:String(pick.speaker||''),raw:'막힘 '+String((e as Error)?.message||e).slice(0,40),result:'blocked'});return}
  const action=await automationRpc<Action>(db,'live_automation_action',{p_session:who.session.id,p_kind:kind,p_due:new Date().toISOString(),p_plan:{director:true,text,mode,chatProductKey:selectedTopicKey,replyToAi:target?.automation_actor_id?Number(target.id):null},p_manual:false,p_source:sourceId,p_revision:c.revision});
  const claimed=await automationRpc<Action|null>(db,'live_automation_claim',{p_action:action.id,p_revision:c.revision});
  if(!claimed)return;
