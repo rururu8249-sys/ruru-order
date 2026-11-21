@@ -53,3 +53,11 @@ console.log('PASS current card or verified daily order topic in all broadcast ph
 for(const text of ['MX-133 초코 담았어요','막스133 초코 담아뒀어요','MX-133 초코 주문했어요'])assert.equal((await run({mode:'live',text,cardOverride:card,orderedCards:[ordered],clockNow:now})).sent.length,0,'daily topic is not proof of the TEST actor cart/order: '+text);
 
 for(const mode of ['live','paused','replay'])assert.equal((await run({mode,focused:true,noCard:true,text:'막스133 초코 세탁은 어떻게 하나요?',orderedCards:[ordered],clockNow:now})).sent.length,1,'verified daily order source remains usable without a displayed card');
+const recovery=await run({mode:'live',focused:true,normalText:'CP-1 올리브 컬러가 확실히 활용도는 높을 것 같아요.',drafts:['막스133 초코 세탁은 어떻게 하나요?'],cardOverride:card,orderedCards:[ordered],hidden:history,clockNow:now});
+assert.equal(recovery.sent.length,1,'a repeated normal choice should use the existing bounded recovery opportunity for a different valid topic');
+assert.ok(recovery.sent[0].body.includes('세탁'));
+assert.equal(recovery.prompts.length,2,'one recovery, not an unbounded regeneration loop');
+const cooldown=await run({mode:'live',focused:true,normalText:text,drafts:['막스133 초코 세탁은 어떻게 하나요?'],cardOverride:card,orderedCards:[ordered],hidden:history,clockNow:now,recentDecisionLog:[{result:'focus-attempt',at:new Date(now-60000).toISOString()},{result:'quality:room-repeated-interest',at:new Date(now-30000).toISOString(),raw:'거절된 실제 반복 문장'}]});
+assert.equal(cooldown.sent.length,0,'cooldown cannot be bypassed by repetitive drafts');
+assert.equal(cooldown.prompts.length,1,'no repeated recovery call each scheduler tick');
+assert.ok(cooldown.prompts[0].includes('거절된 실제 반복 문장'),'quality-rejected text is fed back as forbidden, not silently retried');
