@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import TestRenderer,{act} from 'react-test-renderer';
+import fs from 'node:fs';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const Watch=createUiLoader()('components/order/OrderBroadcastWatch.tsx').default;
+const url='https://www.youtube.com/live/JcgOGlZ0-8U?feature=share';
+let calls=0,renderer;
+async function render(props){await act(async()=>{renderer=TestRenderer.create(React.createElement(Watch,{url,orderReady:false,embeddedUsable:false,embeddedShown:false,paused:false,onWatchHere:()=>calls++,...props}));});return renderer.root;}
+let root=await render({embeddedUsable:true,embeddedShown:true});
+assert.equal(root.findByType('a').props.href,'https://www.youtube.com/watch?v=JcgOGlZ0-8U','new customer can watch without saving or embedded eligibility');
+assert.equal(root.findByType('a').props.target,'_blank','keep order entry in its tab');
+assert.ok(root.findByType('a').props.rel.includes('noopener'));
+assert.equal(root.findAllByType('button').length,0,'no inaccessible embedded switch for unfinished profile');
+await act(async()=>renderer.unmount());
+root=await render({orderReady:true,embeddedUsable:true});
+await act(async()=>root.findByType('button').props.onClick());assert.equal(calls,1);
+assert.equal(root.findAllByType('a').length,0,'one primary watch action');
+await act(async()=>renderer.unmount());
+root=await render({orderReady:true,embeddedUsable:false});assert.equal(root.findAllByType('a').length,1);
+await act(async()=>renderer.unmount());
+root=await render({url:'',orderReady:false});assert.equal(root.findAllByType('a').length,0);assert.equal(root.findAllByType('button').length,0);assert.ok(JSON.stringify(renderer.toJSON()).includes('방송 주소를 준비 중'));
+await act(async()=>renderer.unmount());
+root=await render({paused:true});assert.ok(JSON.stringify(renderer.toJSON()).includes('유튜브에서 방송 영상 보기'));
+await act(async()=>renderer.unmount());
+const source=fs.readFileSync('app/order/page.tsx','utf8');assert.match(source,/<OrderBroadcastWatch[\s\S]*?orderReady=\{isAutoLoggedIn\}/);
+console.log('PASS new-customer native video link, ready-customer embedded click, paused/missing URL, one CTA');

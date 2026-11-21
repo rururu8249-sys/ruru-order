@@ -95,6 +95,7 @@ import {
 } from "@/lib/admin-v2/combineShipping";
 import OrderPageShell from "@/components/order/OrderPageShell";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
+import OrderBroadcastWatch from "@/components/order/OrderBroadcastWatch";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import ProductPhotoCarousel from "@/components/order/ProductPhotoCarousel";
@@ -7647,24 +7648,19 @@ export default function OrderPage() {
                   아래 {quickGroupBuyProducts.length === 1 ? "상품은" : "상품들은"} <b>지금 바로 구매</b>할 수 있어요
                 </div>
               ) : null}
-              {/* [2026-11-09] 「방송 보며 주문」 — 쇼핑몰 화면에서 방송 화면으로 돌아가기(설정이 켜졌고 영상 주소가 있을 때만) */}
-              {liveWatchUsable && !liveWatchShown ? (
-                <button type="button" onClick={() => chooseLiveView(true)} style={{ width: "100%", height: "48px", marginBottom: "8px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.8"><rect x="2" y="5" width="20" height="14" rx="3" /><path d="M10 9l5 3-5 3z" /></svg>
-                  방송 보면서 주문하기
-                </button>
-              ) : null}
-              {/* [2026-11-10 사장님] 알림·「방송 보러가기」(유튜브) 줄은 새 모양 손님 전원 숨김(16:40 「방송을 하든 안 하든 다 안 나와야」) — 알림은 위 닉네임 옆 종, 코드는 그대로 둠 */}
+              <OrderBroadcastWatch
+                url={broadcastYoutubeUrl}
+                orderReady={isAutoLoggedIn}
+                embeddedUsable={liveWatchUsable}
+                embeddedShown={liveWatchShown}
+                paused={isBroadcastPaused}
+                onWatchHere={() => chooseLiveView(true)}
+              />
+              {/* [2026-11-10 사장님] 알림 줄은 새 모양 손님 전원 숨김(16:40 「방송을 하든 안 하든 다 안 나와야」) — 알림은 위 닉네임 옆 종, 코드는 그대로 둠 */}
               <div style={{ display: uiV2 ? "none" : "flex", gap: "8px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1, height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
                   {liveAlertOptin ? (uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓") : (uiS5 ? "다음방송 알림받기" : "🔔 다음방송 알림받기")}
                 </button>
-                {isBroadcastPaused ? (
-                  /* [2026-11-09 13:58 사장님 「쉬는 중일 땐 방송 보러가기가 아니라 유튜브 채널 바로가기」] 쉬는 중엔 채널 홈(앱)으로 — /youtube 와 같은 규칙 */
-                  <button type="button" onClick={() => openYoutubeChannel()} style={uiV2 ? { flex: 1, height: "44px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "none", borderRadius: "11px", background: "#FF0033", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: "pointer" }}>▶ 유튜브 채널 바로가기</button>
-                ) : (
-                <button type="button" disabled={!broadcastYoutubeUrl} onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flex: 1, height: "44px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 } : { flex: 1, height: "40px", border: "none", borderRadius: "11px", background: broadcastYoutubeUrl ? "#FF0033" : "#5A4048", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 }}>▶ 방송 보러가기</button>
-                )}
               </div>
             </div>
           )}
