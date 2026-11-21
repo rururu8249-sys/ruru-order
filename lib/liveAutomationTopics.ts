@@ -1,3 +1,4 @@
+import {identifiesChatProduct,type ChatProductFacts} from './liveAutomationProductFacts';
 import type {ChatObservation} from './liveAutomationQualityGate';
 const clean=(v:string,n=200)=>String(v||'').replace(/\s+/g,' ').trim().slice(0,n);
 const APPEARANCE=/색감|컬러|색상|색깔|색(?:이|은|도|을|으로|만|이라)|디자인|블랙|화이트|베이지|브라운|카멜|그레이|네이비|아이보리|핑크|레드|초코|차콜|크림|카키|민트|실버|골드|퍼플|블루|그린|옐로우|오렌지|와인|버건디|소라|하늘|모카|라벤더|올리브|스카이|백색|검정|검은|흰색|회색|갈색|남색/;
@@ -47,4 +48,14 @@ export function roomTopicPrompt(recent:ChatObservation[],now:number):string{
  const counts=recentTopicCounts(recent,now);
  const summary=Object.entries(counts).map(([t,n])=>`${labels[t]} ${n}회`).join(', ');
  return `최근 관심사: ${summary||'별도 기록 없음'}. 색상 감상을 코디·활용·선택 고민으로 바꾸어도 같은 색상 감상을 반복할 수 있다. 최근 두 발언과 겹치는 관심사를 세 번째 독립 발언으로 반복하지 않는다. 다른 계정·상품·말끝으로 바꾸어도 마찬가지다. 아직 다루지 않은 실제 관심이 있으면 표현하고, 없으면 침묵한다. 정해진 주제 순환은 하지 않는다.`;
+}
+
+/** A genuinely new, explicitly named catalog topic, not a carousel tick.
+ * Both the product and interest must add something to recent conversation. */
+export function hasNewGroundedInterest(text:string,product:ChatProductFacts|null,recent:ChatObservation[],now:number):boolean{
+ if(!product||!identifiesChatProduct(text,product))return false;
+ const topics=conversationTopics(text);if(!topics.length)return false;
+ const rows=recent.filter(r=>Number.isFinite(r.at)&&r.at<=now&&r.at>=now-90*60000).sort((a,b)=>b.at-a.at).slice(0,12);
+ if(rows.some(r=>identifiesChatProduct(r.text,product)))return false;
+ return rows.slice(0,2).every(r=>!conversationTopics(r.text).some(t=>topics.includes(t)));
 }
