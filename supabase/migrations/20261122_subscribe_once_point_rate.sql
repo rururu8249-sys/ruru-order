@@ -1,6 +1,7 @@
 -- RURU 2026-11-22: one-time subscription shipping reward + order-time point rate.
--- Additive schema changes; legacy redemption backfill also tags the matching first
--- old order group in a new metadata column. Never changes money/status/points.
+-- Additive schema changes only, with conservative legacy-account eligibility lock.
+-- The "subscribe_promo_redemption" field is set ONLY for new, transactionally
+-- verified promotions; historical orders cannot be reliably labeled as used.
 ALTER TABLE public.subscribe_verifications
   ADD COLUMN IF NOT EXISTS benefit_window_start_at timestamptz,
   ADD COLUMN IF NOT EXISTS benefit_window_end_at timestamptz,
@@ -48,12 +49,11 @@ INSERT INTO public.subscribe_free_ship_redemptions(kakao_id,order_group_id,redee
 SELECT kakao_id,order_group_id,used_at FROM ranked WHERE n=1
 ON CONFLICT DO NOTHING;
 
--- Mark only the single FIRST historical promo-looking group, not every order
--- that the old UI marker indiscriminately labeled during an active campaign.
-UPDATE public.orders o SET subscribe_promo_redemption=true
-FROM public.subscribe_free_ship_redemptions r
-WHERE o.order_group_id=r.order_group_id AND o.kakao_id=r.kakao_id
-  AND o.subscribe_promo_redemption IS DISTINCT FROM true;
+-- The old orders.subscribe_free_ship_at is not proof that a fee was ACTUALLY
+-- waived by subscription. Do not write subscribe_promo_redemption to historical
+-- orders. Admin review of ambiguous old usage remains necessary before making
+-- any account-specific exception. The distinct redemptions table is a cautious
+-- limit on reissuing the promotion, not proof of past discount amount.
 
 -- New customer verification: approvedAt and effective combine-window are captured in the application.
 -- Existing customer verification rows are not overwritten or re-dated.

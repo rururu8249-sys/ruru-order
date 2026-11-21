@@ -30,9 +30,18 @@ const cases = [
   ['point rate at submission stored by RPC', targets.sql.includes('point_earn_rate_snapshot=v_promo_rate') && targets.sql.includes('point_earn_rate_snapshot=v_earn_rate')],
   ['payment trigger uses saved rate', targets.sql.includes('NEW.point_earn_rate_snapshot')],
   ['no automatic reward when global fee is already zero', targets.page.includes('ruru_subscribe_waiver_requested: subscribeWaivedAmount > 0')],
-  ['free-first promo does not authorize second free combine', targets.page.includes('if (order?.subscribe_promo_redemption === true) return false;') && targets.submit.includes('if (row?.subscribe_promo_redemption === true) return false;')],
+  ['promo-waived first order IS eligible for same-window combined shipping',
+    targets.page.includes('const paidShippingOrders = activeCombineShippingOrders.filter') &&
+    targets.submit.includes('const withinCurrentCombine = sameAddressOrders.filter') &&
+    !targets.page.includes('if (order?.subscribe_promo_redemption === true) return false;') &&
+    !targets.submit.includes('if (row?.subscribe_promo_redemption === true) return false;')],
   ['server rechecks combine time and categories', targets.submit.includes('withinCurrentCombine') && targets.submit.includes('stillDueMinimum')],
-  ['only claimed promo orders carry permanent combine exclusion flag', targets.sql.includes('subscribe_promo_redemption=true')],
+  ['promo redemption metadata does NOT disable normal combine shipping',
+    targets.sql.includes('subscribe_promo_redemption=true') &&
+    !targets.page.includes('order?.subscribe_promo_redemption === true') &&
+    !targets.submit.includes('row?.subscribe_promo_redemption === true')],
+  ['no historical order falsely stamped as confirmed promo',
+    !targets.sql.includes('UPDATE public.orders o SET subscribe_promo_redemption=true')],
   ['one redemption per kakao account', targets.sql.includes('kakao_id text PRIMARY KEY')],
   ['atomic redemption with order creation', targets.sql.includes('INSERT INTO public.subscribe_free_ship_redemptions') && targets.sql.includes('IF NOT FOUND THEN')],
   ['legacy markers are treated conservatively', targets.sql.includes('historical redeemers are conservatively blocked')],

@@ -3488,7 +3488,7 @@ export default function OrderPage() {
 
     let combineQuery = supabase
       .from("orders")
-      .select("id, product_id, customer_phone, kakao_id, shipping_fee, adjusted_shipping_fee, subscribe_promo_redemption, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id, is_deleted");
+      .select("id, product_id, customer_phone, kakao_id, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id, is_deleted");
 
     combineQuery = kakaoIdForCombine
       ? combineQuery.or(`kakao_id.eq.${kakaoIdForCombine},customer_phone.in.(${phoneValues.join(",")})`)
@@ -3511,8 +3511,8 @@ export default function OrderPage() {
       // [2026-09-06 사장님 승인] 관리자가 삭제한 주문(is_deleted=true)은 합배송 근거에서 제외.
       //   (null/false 는 그대로 유효 — JS 비교라 is_deleted 가 null 인 옛 행이 빠지는 일 없음)
       if (order?.is_deleted === true) return false;
-      // A first-time marketing waiver is NOT a general combine-shipping payment.
-      if (order?.subscribe_promo_redemption === true) return false;
+      // [2026-11-22] 구독 인증 1회 무료배송 주문도 같은 합배송 기간의 정상 주문이다.
+      // 취소/삭제·배송지·배송 갈래·기간 기준만 적용한다. 배송비 납부 여부로 차별하지 않는다.
       // 카카오 손님이면: 내 kakao_id 주문 또는 kakao_id 없는(옛) 주문만. 다른 카카오 계정 주문은 제외.
       if (kakaoIdForCombine) {
         const rowKakao = String(order?.kakao_id || "").trim();
