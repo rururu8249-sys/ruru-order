@@ -5884,11 +5884,18 @@ export default function OrderPage() {
       setPointUseInput("");
       setPin("");
 
+      // [2026-11-22] 같은 회차 합배송 기준은 '배송비 납부 여부'가 아니라
+      // '같은 주소로 제출 완료한 유효 상품 주문'이다. 구독 인증으로 첫 주문이
+      // 0원이었더라도 이후 같은 기간/주소/배송 갈래의 주문에 합배송을 적용한다.
+      // 0원 무료나눔·배송비 비대상 상품은 합배송 출발점으로 보지 않는다.
+      const newlyCombinedShippingGroups = new Set(
+        getChargeableShippingItems(validItems).map((item) => shippingGroupOf(item)),
+      );
       const nextPaidShippingGroupsAfterSubmit: PaidShippingGroups = {
-        normal: paidShippingGroupsBeforeSubmit.normal || appliedShippingFeeBreakdown.normalShippingFee > 0,
-        vendor: paidShippingGroupsBeforeSubmit.vendor || appliedShippingFeeBreakdown.vendor1ShippingFee > 0,
-        vendor2: paidShippingGroupsBeforeSubmit.vendor2 || appliedShippingFeeBreakdown.vendor2ShippingFee > 0,
-        overseas: paidShippingGroupsBeforeSubmit.overseas || appliedShippingFeeBreakdown.overseasShippingFee > 0,
+        normal: paidShippingGroupsBeforeSubmit.normal || newlyCombinedShippingGroups.has("normal"),
+        vendor: paidShippingGroupsBeforeSubmit.vendor || newlyCombinedShippingGroups.has("vendor"),
+        vendor2: paidShippingGroupsBeforeSubmit.vendor2 || newlyCombinedShippingGroups.has("vendor2"),
+        overseas: paidShippingGroupsBeforeSubmit.overseas || newlyCombinedShippingGroups.has("overseas"),
       };
 
       if (appliedShippingFeeBreakdown.totalShippingFee > 0) {

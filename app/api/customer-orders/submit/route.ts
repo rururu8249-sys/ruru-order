@@ -834,7 +834,24 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseOrderSubmitClient();
     const promoClaimed = orderRows.some((r) => r.ruru_subscribe_waiver_requested === true);
     if (promoClaimed && !(await activeSubscribeWaiverFor(supabase, kakaoId))) {
-      throw new Error("구독 인증 무료배송은 1회만 사용할 수 있습니다. 새로고침 후 배송비를 확인해 주세요.");
+      // Network timeouts can make an already-saved promotional order retry with
+      // the same order_group_id. Never block the existing RPC's idempotency
+      // gate merely because its FIRST successful submission consumed the waiver.
+      // Do not allow a new order to reuse the consumed promotion.
+      const groupForRetry = text(firstOrderValue(orderRows, "order_group_id"));
+      let sameOrderRetry = false;
+      if (groupForRetry) {
+        const { data: existing, error: retryError } = await supabase.from("orders")
+          .select("id,kakao_id,customer_phone")
+          .eq("order_group_id", groupForRetry).limit(1);
+        if (retryError) throw new Error("기존 주문 확인이 지연되고 있습니다. 다시 시도해 주세요.");
+        const expectedPhone = phone.replace(/[^0-9]/g, "");
+        sameOrderRetry = (existing || []).some((prior: AnyRow) =>
+          text(prior.kakao_id) === kakaoId &&
+          String(prior.customer_phone || "").replace(/[^0-9]/g, "") === expectedPhone,
+        );
+      }
+      if (!sameOrderRetry) throw new Error("구독 인증 무료배송은 1회만 사용할 수 있습니다. 새로고침 후 배송비를 확인해 주세요.");
     }
 
     // [2026-08-11 담기 선착순] 세션키 전달 — RPC가 "남의 선점 못 뺏기" 검증 + 제출 성공 시 본인 선점 해제
