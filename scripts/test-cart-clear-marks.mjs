@@ -89,7 +89,13 @@ function claimCartHold({ p_session_key, p_phone, p_items, p_hold_minutes }) {
 }
 const fakeClient = { from: query, rpc: async (name, params) => (name === 'claim_cart_hold' ? { data: claimCartHold(params), error: null } : { data: null, error: { message: 'unknown rpc ' + name } }) };
 
-const nextServer = { NextResponse: { json: (body, init) => ({ status: init?.status ?? 200, body }) } };
+// 실제 라우트는 headers.get으로 자동화 인증을 확인하고 after로 알림을 예약한다.
+// 인증 코드는 그대로 실행하되 응답 뒤 외부 알림은 이 메모리 DB 검사에서 실행하지 않는다.
+const afterCallbacks = [];
+const nextServer = {
+  NextResponse: { json: (body, init) => ({ status: init?.status ?? 200, body }) },
+  after: (callback) => { afterCallbacks.push(callback); },
+};
 const load = createUiLoader({
   '@supabase/supabase-js': { createClient: () => fakeClient },
   'next/server': nextServer,
@@ -107,11 +113,14 @@ function tab({ session, kakao = '', phone = '', browser = session }) {
   return { session, kakao, phone, browser, items: [], notices: 0 };
 }
 function add(t, productId, opts = {}) { t.items.push({ product_id: String(productId), product_name: `상품${productId}`, color: opts.color ?? '', size: opts.size ?? '', qty: String(opts.qty ?? 1), product_price: '10000', cart_seq: undefined }); }
+const jsonRequest = (pathname, body) => new Request(`https://cart-clear-test.invalid${pathname}`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+});
 async function sync(t) {
-  const res = await syncRoute.POST({ json: async () => ({
+  const res = await syncRoute.POST(jsonRequest('/api/cart-reservations', {
     action: 'sync', sessionKey: t.session, phone: t.phone, kakaoId: t.kakao, nickname: 'n', customerName: 'c',
     items: t.items.map((it) => ({ productId: it.product_id, productName: it.product_name, color: it.color, size: it.size, qty: it.qty, unitPrice: 10000, cartSeq: it.cart_seq === undefined ? lib.CART_SEQ_NEW : it.cart_seq })),
-  }) });
+  }));
   const claim = res.body;
   assert.equal(res.status, 200, JSON.stringify(claim));
   if (Number.isFinite(Number(claim.cartSeq)) && claim.cartSeq !== null) t.items = t.items.map((it) => (it.cart_seq === undefined ? { ...it, cart_seq: Number(claim.cartSeq) } : it));
@@ -125,8 +134,8 @@ async function sync(t) {
   return claim;
 }
 const holdsOf = (session) => db.cart_reservations.filter((r) => r.session_key === session);
-const adminClear = (sessionKey) => adminRoute.POST({ json: async () => ({ action: 'clear', sessionKey }) });
-const adminClearAll = (sessionKeys) => adminRoute.POST({ json: async () => ({ action: 'clear-all', sessionKeys }) });
+const adminClear = (sessionKey) => adminRoute.POST(jsonRequest('/api/admin-live/cart-holds', { action: 'clear', sessionKey }));
+const adminClearAll = (sessionKeys) => adminRoute.POST(jsonRequest('/api/admin-live/cart-holds', { action: 'clear-all', sessionKeys }));
 function age(minutes) { for (const r of db.cart_reservations) { r.created_at = new Date(Date.parse(r.created_at) - minutes * 60_000).toISOString(); r.expires_at = new Date(Date.parse(r.expires_at) - minutes * 60_000).toISOString(); } }
 function reset() { for (const k of Object.keys(db)) db[k] = []; db.settings.push({ key: 'cart_hold_minutes', value: '600' }); db.products.push({ id: '56', status: '판매중', is_visible: true, product_note: '{}' }, { id: '57', status: '판매중', is_visible: true, product_note: '{}' }, { id: '58', status: '숨김', is_visible: true, product_note: '{"name_suggestion_enabled":false}' }); marksTableMissing = false; noticeStore.clear(); }
 const pass = [];

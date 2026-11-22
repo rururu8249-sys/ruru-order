@@ -161,6 +161,7 @@ import {
   resolveOrderGroupBankAccount,
   type OrderBankAccountSnapshot,
 } from "@/lib/orderBankAccount";
+import { readOrderSubmitAmounts } from "@/lib/orderSubmitAmounts";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
 import { liveWatchDetailProduct } from "@/lib/liveFeaturedProducts";
 import { linkedSourceInfo, resolveDetailInfo, selectedDetailInfo } from "@/lib/productDetailInfo";
@@ -1631,7 +1632,11 @@ export default function OrderPage() {
   // 중복 제출 방지: state는 반영이 느려 연타를 못 막으므로 ref로 즉시 빗장을 건다.
   const submitInFlightRef = useRef(false);
   // 멱등성: 같은 주문의 재시도는 같은 키를 재사용하고, 성공 후에만 다음 주문용으로 비운다.
-  const pendingOrderKeyRef = useRef<{ groupId: string; lookupCode: string } | null>(null);
+  const pendingOrderKeyRef = useRef<{
+    groupId: string;
+    lookupCode: string;
+    cartItems?: ReturnType<typeof buildCartHoldSnapshotItem>[];
+  } | null>(null);
   const [customerBlockStatus, setCustomerBlockStatus] = useState<CustomerBlockStatus>({
     blocked: false,
     checking: false,
@@ -1940,6 +1945,7 @@ export default function OrderPage() {
   const verifiedCombineShippingSettingsRef = useRef<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [combineShippingCheckError, setCombineShippingCheckError] = useState("");
   const [customerPointBalance, setCustomerPointBalance] = useState(0);
+  const [customerPointReload, setCustomerPointReload] = useState(0);
   const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
   const [customerPointLoading, setCustomerPointLoading] = useState(false);
   // [2026-08-31] 포인트 조회 실패 표시 — 0원(정상)과 "못 불러옴"을 구분한다
@@ -4204,7 +4210,7 @@ export default function OrderPage() {
       alive = false;
       window.removeEventListener(POINT_GIFT_REFRESH_EVENT, onPointGift);
     };
-  }, [customerPhone]);
+  }, [customerPhone, customerPointReload]);
 
   useEffect(() => {
     setPointUseInput((current) => {
@@ -4452,8 +4458,16 @@ export default function OrderPage() {
       const normR = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
       // [2026-09-28 · ㉛] 서버가 뺀 줄 — 만료(expired)·관리자 비우기/제출 뒤 옛 줄(cleared)·내린 상품(unavailable).
       //   화면과 임시 장바구니에서 지운다. 안내는 관리자 비우기·만료만, 같은 비움 기록에 대해 한 번만(제출 후 정리는 조용히).
+      // A lost submit response must leave its original cart available for retry.
+      // Preserve only matching pending options cleared by submission; this does
+      // not restore server holds, and explicit expiry/admin removal still applies.
+      const pendingCartItems = pendingOrderKeyRef.current?.cartItems || [];
       const droppedRows = (claim?.ok && Array.isArray(claim.results))
-        ? claim.results.filter((r: any) => r && r.ok === false && (r.expired === true || r.cleared === true || r.unavailable === true))
+        ? claim.results.filter((r: any) => r && r.ok === false &&
+            (r.expired === true || r.cleared === true || r.unavailable === true) &&
+            !(r.cleared === true && r.clearReason === "submitted" &&
+              pendingCartItems.some((item) => item.productId === String(r.productId) &&
+                normR(item.color) === normR(r.color) && normR(item.size) === normR(r.size))))
         : [];
       if (droppedRows.length > 0) {
         setItems((prev) => prev.filter((it) => !droppedRows.some((r: any) => String(r.productId) === String(it.product_id) && normR(r.color) === normR(it.color) && normR(r.size) === normR(it.size))));
@@ -5803,6 +5817,9 @@ export default function OrderPage() {
           : 0;
 
       assertSubmitShippingContext();
+      pendingOrderKeyRef.current.cartItems = orderRows
+        .map((row) => buildCartHoldSnapshotItem(row))
+        .filter((item) => Boolean(item.productId));
       const orderSubmitResponse = await fetch("/api/customer-orders/submit", {
         method: "POST",
         headers: {
@@ -5832,9 +5849,18 @@ export default function OrderPage() {
       const orderSubmitPayload = await orderSubmitResponse.json().catch(() => null);
 
       if (!orderSubmitResponse.ok || !orderSubmitPayload?.ok) {
+        // A definite rejection ends this UI-only preservation. Keep the same
+        // group key: an error must never automatically create another order.
+        if (orderSubmitPayload?.ok === false && orderSubmitResponse.status < 500 && pendingOrderKeyRef.current) {
+          pendingOrderKeyRef.current.cartItems = [];
+        }
         throw new Error(orderSubmitPayload?.message || "주문 저장 실패");
       }
       const assignedBank = parseOrderBankRoutingResult(orderSubmitPayload);
+      const savedSubmitAmounts = readOrderSubmitAmounts(orderSubmitPayload, {
+        productAmount, shippingFee: appliedShippingFee, cardExtra: appliedCardExtra,
+        totalAmount: appliedTotalAmount, customerCardRate: cardRateForCustomer,
+      });
 
       // 제출 성공(서버가 신규 저장 또는 멱등 중복감지로 기존 주문을 반환) → 다음 주문은 새 키 사용
       pendingOrderKeyRef.current = null;
@@ -5844,10 +5870,15 @@ export default function OrderPage() {
       }
 
       const savedPointUsedAmount = toNumber(orderSubmitPayload?.point_used_amount);
-      const savedPointOriginalAmount = toNumber(orderSubmitPayload?.point_original_amount) || appliedTotalAmount;
+      const savedPointOriginalAmount = orderSubmitPayload?.point_original_amount == null
+        ? savedSubmitAmounts.totalAmount : toNumber(orderSubmitPayload.point_original_amount);
       const savedFinalAmount = Math.max(0, savedPointOriginalAmount - savedPointUsedAmount);
 
-      if (savedPointUsedAmount > 0) {
+      if (orderSubmitPayload.duplicate === true) {
+        // The first request already used these points. The balance may have
+        // refreshed while its response was lost, so read it instead of subtracting again.
+        setCustomerPointReload((value) => value + 1);
+      } else if (savedPointUsedAmount > 0) {
         setCustomerPointBalance((current) => Math.max(0, Number(current || 0) - savedPointUsedAmount));
       }
 
@@ -5860,11 +5891,11 @@ export default function OrderPage() {
         paymentMethod: paymentMethod === "카드결제" ? "카드결제" : "무통장입금",
         items: validItems,
         totalQty,
-        productAmount,
-        shippingFee: appliedShippingFee,
-        cardExtra: appliedCardExtra,
-        customerCardRate: cardRateForCustomer,
-        totalAmount: appliedTotalAmount,
+        productAmount: savedSubmitAmounts.productAmount,
+        shippingFee: savedSubmitAmounts.shippingFee,
+        cardExtra: savedSubmitAmounts.cardExtra,
+        customerCardRate: savedSubmitAmounts.customerCardRate,
+        totalAmount: savedSubmitAmounts.totalAmount,
         pointUsedAmount: savedPointUsedAmount,
         finalAmount: savedFinalAmount,
         bankAccount: assignedBank.bankAccount,

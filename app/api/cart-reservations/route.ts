@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
         const notice = cartClearNeedsNotice(hit.reason);
         if (notice) clearedSeq = Math.max(clearedSeq, hit.seq);
         // expired:true 는 예전 손님 화면(배포 전 열린 탭)도 품절 안내 없이 줄을 빼게 하려는 호환 표시.
-        clearedResults.push({ productId: r.productId, color: r.color, size: r.size, requested: r.qty, ok: false, cleared: true, expired: true, silent: !notice, clearedSeq: hit.seq, available: 0 });
+        clearedResults.push({ productId: r.productId, color: r.color, size: r.size, requested: r.qty, ok: false, cleared: true, expired: true, silent: !notice, clearReason: hit.reason, clearedSeq: hit.seq, available: 0 });
         return false;
       });
     }

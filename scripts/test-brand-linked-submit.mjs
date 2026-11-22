@@ -26,8 +26,20 @@ console.log('PASS actual submission validation keeps linked name, original ID an
 // order persistence, points, inventory, or after-response notifications.
 const {createUiLoader}=await import('./admin-ui-test-loader.mjs');
 let rpcCalls=0;
+const catalogFailureGroup='46e71a4c-ec38-4b36-8d2a-5232b3860789';
 const unavailableDb={
   from(table){
+    // A realistic fresh order has no saved replay. Keep the original failure
+    // at the catalog boundary and still prove it never reaches persistence.
+    if(table==='orders'){
+      const query={
+        select(names,options){assert(names.includes('kakao_id'));assert.deepEqual(options,{count:'exact'});return query;},
+        eq(field,value){assert.equal(field,'order_group_id');assert.equal(value,catalogFailureGroup);return query;},
+        order(field,options){assert.equal(field,'id');assert.deepEqual(options,{ascending:true});return query;},
+        async limit(value){assert.equal(value,2);return {data:[],error:null,count:0};},
+      };
+      return query;
+    }
     assert.equal(table,'products');
     return {select(){return {in:async()=>({data:null,error:{message:'fixture catalog unavailable'}})};}};
   },
@@ -39,7 +51,7 @@ const load=createUiLoader({'@supabase/supabase-js':{createClient:()=>unavailable
 const {POST}=load('app/api/customer-orders/submit/route.ts');
 const response=await POST(new Request('https://fixture.invalid/api/customer-orders/submit',{
   method:'POST',headers:{'content-type':'application/json'},
-  body:JSON.stringify({customer_phone:'01000000000',orderRows:[row]}),
+  body:JSON.stringify({customer_phone:'01000000000',orderRows:[{...row,order_group_id:catalogFailureGroup}]}),
 }));
 assert.equal(response.status,400);
 assert.match((await response.json()).message,/상품 정보를 확인할 수 없어요/);

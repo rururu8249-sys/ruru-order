@@ -27,6 +27,7 @@ import {
 } from "@/lib/orderPurchaseConsent";
 import { purchaseLimitProductSelect } from "@/lib/orderSchemaQueries";
 import { readAutomationRequest, AutomationError } from "@/lib/liveAutomationAuth";
+import { CustomerOrderReplayError, readCustomerOrderReplay } from "@/lib/customerOrderReplay";
 
 // [2026-11-06] 주문 알림 채팅을 20초 묶어 올리느라 응답 뒤 작업(after)이 길어짐 — 응답 속도와는 무관.
 export const maxDuration = 60;
@@ -832,27 +833,6 @@ export async function POST(request: NextRequest) {
     const kakaoId = text(body.kakao_id);
 
     const supabase = getSupabaseOrderSubmitClient();
-    const promoClaimed = orderRows.some((r) => r.ruru_subscribe_waiver_requested === true);
-    if (promoClaimed && !(await activeSubscribeWaiverFor(supabase, kakaoId))) {
-      // Network timeouts can make an already-saved promotional order retry with
-      // the same order_group_id. Never block the existing RPC's idempotency
-      // gate merely because its FIRST successful submission consumed the waiver.
-      // Do not allow a new order to reuse the consumed promotion.
-      const groupForRetry = text(firstOrderValue(orderRows, "order_group_id"));
-      let sameOrderRetry = false;
-      if (groupForRetry) {
-        const { data: existing, error: retryError } = await supabase.from("orders")
-          .select("id,kakao_id,customer_phone")
-          .eq("order_group_id", groupForRetry).limit(1);
-        if (retryError) throw new Error("기존 주문 확인이 지연되고 있습니다. 다시 시도해 주세요.");
-        const expectedPhone = phone.replace(/[^0-9]/g, "");
-        sameOrderRetry = (existing || []).some((prior: AnyRow) =>
-          text(prior.kakao_id) === kakaoId &&
-          String(prior.customer_phone || "").replace(/[^0-9]/g, "") === expectedPhone,
-        );
-      }
-      if (!sameOrderRetry) throw new Error("구독 인증 무료배송은 1회만 사용할 수 있습니다. 새로고침 후 배송비를 확인해 주세요.");
-    }
 
     // [2026-08-11 담기 선착순] 세션키 전달 — RPC가 "남의 선점 못 뺏기" 검증 + 제출 성공 시 본인 선점 해제
     //   [2026-09-28] 선점 검증(assertCartHoldAlive)에서도 이 값을 쓰므로 assert 들보다 위로 이동(내용 무변경).
@@ -862,6 +842,22 @@ export async function POST(request: NextRequest) {
     })();
     const automation = await readAutomationRequest(request, { owner: kakaoId, phone, sessionKey: cartSessionKey }, "order", supabase);
     if (automation && pointUseAmount !== 0) throw new AutomationError("AUTOMATION_POINTS_NOT_ALLOWED");
+
+    const replayInput = {
+      orderRows, phone, kakaoId, customerName, youtubeNickname,
+      recipientName: text(body.recipient_name), recipientPhone: text(body.recipient_phone),
+    };
+    if (!automation) {
+      // A committed order has already consumed its promotion and cart holds.
+      // Verify its entire saved group and acknowledge it before new-order gates.
+      const replay = await readCustomerOrderReplay(supabase, replayInput);
+      if (replay) return NextResponse.json(replay);
+    }
+
+    const promoClaimed = orderRows.some((r) => r.ruru_subscribe_waiver_requested === true);
+    if (promoClaimed && !(await activeSubscribeWaiverFor(supabase, kakaoId))) {
+      throw new Error("구독 인증 무료배송은 1회만 사용할 수 있습니다. 새로고침 후 배송비를 확인해 주세요.");
+    }
 
     // 개인당 구매제한 차단(돈/재고/포인트 RPC 무변경 — RPC 호출 전 검증만)
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
@@ -906,6 +902,14 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       throw new Error(error.message || "주문 저장 실패");
+    }
+
+    if (data?.duplicate === true) {
+      // Another request can commit after the initial lookup. Validate that
+      // saved result too, and never repeat recipient/cart/notification writes.
+      const replay = await readCustomerOrderReplay(supabase, replayInput);
+      if (!replay) throw new CustomerOrderReplayError("접수된 주문을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.", 503);
+      return NextResponse.json(replay);
     }
 
     const assignedBank = parseOrderBankRoutingResult(data);
@@ -999,6 +1003,6 @@ export async function POST(request: NextRequest) {
       bankAccount: assignedBank.bankAccount,
     });
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : "주문 저장 실패", error instanceof AutomationError ? error.status : 400);
+    return jsonError(error instanceof Error ? error.message : "주문 저장 실패", error instanceof AutomationError || error instanceof CustomerOrderReplayError ? error.status : 400);
   }
 }
