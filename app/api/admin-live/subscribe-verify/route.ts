@@ -82,35 +82,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!(await verifyAdminSessionFromRequest(request))) return NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 });
   try {
-    const body = (await request.json().catch(() => null)) as { action?: string; id?: number; phone?: string } | null;
-    const supabase = db();
-    // [2026-11-23 사장님] 캡처를 카톡으로 보낸 손님 — 전화번호로 찾아 사장님이 직접 인증(캡처 올리기 없이).
-    //   이미 혜택을 쓴 손님(redemptions)·이미 인증된 손님은 새로 만들지 않는다. 돈 무접촉(인증 줄 한 개만).
-    if (body?.action === "manual") {
-      const digits = String(body?.phone || "").replace(/[^0-9]/g, "");
-      if (digits.length < 9) return NextResponse.json({ ok: false, message: "전화번호를 숫자로 적어 주세요." }, { status: 400 });
-      const dashed = digits.length === 11 ? `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}` : digits;
-      const { data: found, error: findError } = await supabase.from("customers").select("id,kakao_id,customer_phone,youtube_nickname,customer_name")
-        .in("customer_phone", Array.from(new Set([digits, dashed]))).limit(5);
-      if (findError) throw findError;
-      const customer = (found || []).find((c: { kakao_id?: string | null }) => String(c.kakao_id || "").trim());
-      if (!customer) return NextResponse.json({ ok: false, message: "그 번호로 가입한(카톡 로그인) 회원이 없어요." }, { status: 404 });
-      const kakaoId = String(customer.kakao_id).trim();
-      const { data: used } = await supabase.from("subscribe_free_ship_redemptions").select("kakao_id").eq("kakao_id", kakaoId).maybeSingle();
-      if (used) return NextResponse.json({ ok: false, message: `${customer.youtube_nickname || customer.customer_name || "이 손님"}님은 이미 구독 무배 혜택을 썼어요(1회).` }, { status: 409 });
-      const { data: already } = await supabase.from("subscribe_verifications").select("id").eq("kakao_id", kakaoId).eq("status", "verified").limit(1);
-      if (already?.length) return NextResponse.json({ ok: true, already: true, message: `${customer.youtube_nickname || customer.customer_name || "이 손님"}님은 이미 인증돼 있어요. 새로고침 후 주문하면 배송비가 빠져요.` });
-      const benefitWindow = await resolveSubscribeBenefitWindow(supabase);
-      const { error: insError } = await supabase.from("subscribe_verifications").insert({
-        kakao_id: kakaoId, customer_phone: digits.slice(0, 11), youtube_nickname: customer.youtube_nickname || null,
-        channel_name: null, status: "verified", reason: null, ai_note: "사장님 직접 인증(카톡 캡처 확인)", image_path: null, image_hash: null,
-        benefit_window_start_at: benefitWindow.startAt, benefit_window_end_at: benefitWindow.endAt, benefit_broadcast_id: benefitWindow.broadcastId,
-      });
-      if (insError) throw insError;
-      return NextResponse.json({ ok: true, message: `${customer.youtube_nickname || customer.customer_name || "손님"}님 인증 처리했어요. 손님이 새로고침 후 이 방송(오늘) 안에 주문하면 배송비가 빠져요.` });
-    }
+    const body = (await request.json().catch(() => null)) as { action?: string; id?: number } | null;
     const id = Number(body?.id);
     if (!Number.isFinite(id) || id <= 0) return NextResponse.json({ ok: false, message: "잘못된 요청" }, { status: 400 });
+    const supabase = db();
     if (body?.action === "cancel") {
       const { error } = await supabase.from("subscribe_verifications").update({ status: "canceled", canceled_at: new Date().toISOString() }).eq("id", id).eq("status", "verified");
       if (error) throw error;

@@ -138,24 +138,6 @@ export default function SubscribeFreeShipSettingsCard() {
 
   const statusLabel = (s: string) => (s === "verified" ? "통과" : s === "canceled" ? "취소함" : "불합격");
 
-  // [2026-11-23 사장님] 카톡으로 캡처를 보낸 손님 — 전화번호로 직접 인증
-  const [manualPhone, setManualPhone] = useState("");
-  const [manualBusy, setManualBusy] = useState(false);
-  const manualVerify = async () => {
-    const digits = manualPhone.replace(/[^0-9]/g, "");
-    if (digits.length < 9) return showAdminToast("전화번호를 적어 주세요", "error");
-    if (!window.confirm(`${digits} 손님을 구독 인증 처리할까요?\n(캡처는 카톡으로 확인한 걸로 봐요. 무료배송은 1회만.)`)) return;
-    setManualBusy(true);
-    try {
-      const res = await fetch("/api/admin-live/subscribe-verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "manual", phone: digits }) });
-      const json = await res.json().catch(() => null);
-      showAdminToast(json?.message || (json?.ok ? "처리했어요" : "처리 실패"), json?.ok ? "success" : "error");
-      if (json?.ok) { setManualPhone(""); void loadRows(); }
-    } finally {
-      setManualBusy(false);
-    }
-  };
-
   return (
     <div className="rounded-xl border border-line bg-surface p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -247,15 +229,6 @@ export default function SubscribeFreeShipSettingsCard() {
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-bold text-ink">인증 기록</span>
           <button type="button" onClick={() => void loadRows()} className="h-8 rounded-full border border-line px-3 text-xs font-semibold text-ink-soft">새로고침</button>
-        </div>
-        <div className="mb-3 rounded-lg bg-surface-2 p-3">
-          <div className="mb-1 text-[13px] font-semibold text-ink">카톡으로 캡처 보낸 손님 직접 인증</div>
-          <div className="mb-2 text-xs text-ink-mute">캡처를 사장님이 확인했으면 전화번호만 넣고 인증. 이미 혜택을 쓴 손님은 안 돼요(1회).</div>
-          <div className="flex items-center gap-2">
-            <input value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} inputMode="numeric" placeholder="010-0000-0000"
-              className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[13px] text-ink outline-none focus-visible:border-ink" />
-            <button type="button" disabled={manualBusy} onClick={() => void manualVerify()} className="h-9 shrink-0 rounded-full bg-ink px-4 text-[13px] font-semibold text-white disabled:opacity-50">{manualBusy ? "처리 중…" : "인증 처리"}</button>
-          </div>
         </div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {(["all", "verified", "rejected", "canceled"] as ListFilter[]).map((f) => {

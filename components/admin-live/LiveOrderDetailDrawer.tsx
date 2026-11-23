@@ -392,15 +392,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
   const CANCELED_ROW_RE = /주문서취소|주문취소|취소|환불|cancel|refund/i;
 
-  const handleSaveShippingFee = async () => {
-    if (savingShipping) return;
-    const newFee = Math.max(0, Math.floor(Number(String(shipEditText).replace(/[^0-9]/g, "")) || 0));
+  const handleSaveShippingFee = async (feeOverride?: number, opts?: { skipConfirm?: boolean }) => {
+    if (savingShipping) return false;
+    const newFee = Math.max(0, Math.floor(Number(feeOverride ?? (Number(String(shipEditText).replace(/[^0-9]/g, "")) || 0))));
     const rowIds = (Array.isArray(localOrder.items) ? localOrder.items : [])
       .map((item) => Number(item.id))
       .filter((id) => Number.isFinite(id) && id > 0);
     if (rowIds.length === 0) {
       showAdminToast("수정할 주문 행을 찾지 못했습니다.", "warning");
-      return;
+      return false;
     }
 
     const currentFee = Number(localOrder.shippingFee || 0);
@@ -416,7 +416,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       ? `\n\n⚠️ 이 주문에 쓴 포인트 ${pointUsedTotal.toLocaleString("ko-KR")}원이 새 주문 금액보다 ${pointOverflow.toLocaleString("ko-KR")}원 많아요. 남는 포인트를 손님에게 돌려줄지 확인하세요.`
       : "";
 
-    const ok = await showAdminConfirm(
+    const ok = opts?.skipConfirm ? true : await showAdminConfirm(
       [
         "배송비를 수정할까요?",
         "",
@@ -425,7 +425,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         "변경 전 값은 수정이력에 누적됩니다.",
       ].join("\n") + paidWarning + pointWarning,
     );
-    if (!ok) return;
+    if (!ok) return false;
 
     setSavingShipping(true);
     try {
@@ -438,7 +438,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
       if (loadError || !Array.isArray(rows) || rows.length === 0) {
         showAdminToast("현재 주문값을 불러오지 못했습니다.\n\n" + (loadError?.message || ""), "error");
-        return;
+        return false;
       }
 
       const activeRows = rows.filter(
@@ -446,7 +446,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       );
       if (activeRows.length === 0) {
         showAdminToast("취소되지 않은 주문 행이 없어 배송비를 수정할 수 없습니다.", "warning");
-        return;
+        return false;
       }
 
       const feeOf = (row: { adjusted_shipping_fee?: unknown; shipping_fee?: unknown }) =>
@@ -502,7 +502,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         const { error: updateError } = await supabase.from("orders").update(patch).eq("id", row.id);
         if (updateError) {
           showAdminToast("배송비 수정 실패\n\n" + updateError.message, "error");
-          return;
+          return false;
         }
       }
 
@@ -514,6 +514,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       setShipEditOpen(false);
       showAdminToast(`배송비가 ${newFee.toLocaleString("ko-KR")}원으로 수정됐습니다.`, "success");
       await onAfterStatusChange?.();
+      return true;
     } finally {
       setSavingShipping(false);
     }
@@ -527,20 +528,32 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     if (savingSubscribeMark) return;
     const rowIds = (Array.isArray(localOrder.items) ? localOrder.items : []).map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
     if (rowIds.length === 0) return showAdminToast("주문 줄을 찾지 못했습니다.", "warning");
+    const currentFee = Number(localOrder.shippingFee || 0);
     const question = action === "redeem"
-      ? "이 주문을 「구독 무료배송 1회 사용」으로 기록할까요?\n\n배송비·금액은 안 바뀌어요(배송비 0원은 위 「수정」에서).\n기록하면 이 손님은 나중에 캡처 인증을 해도 무료배송이 또 되지 않아요."
-      : "구독 무배 사용 기록을 지울까요?\n지우면 이 손님은 다시 구독 인증 무료배송을 받을 수 있어요.";
-    if (!window.confirm(question)) return;
+      ? [
+          "구독 무료배송을 이 주문에 적용할까요?",
+          "",
+          currentFee > 0 ? `배송비 ${currentFee.toLocaleString("ko-KR")}원 → 0원` : "배송비는 이미 0원(그대로)",
+          "+ 이 손님 «구독 무배 1회 사용» 기록",
+          "",
+          "기록되면 이 손님은 나중에 캡처 인증을 해도 무료배송이 또 되지 않아요.",
+        ].join("\n")
+      : "구독 무배 사용 기록을 지울까요?\n지우면 이 손님은 다시 구독 인증 무료배송을 받을 수 있어요. (배송비는 안 바뀜)";
+    if (!(await showAdminConfirm(question))) return;
     setSavingSubscribeMark(true);
     try {
       const res = await fetch("/api/admin-live/subscribe-redeem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rowIds, action }) });
       const json = await res.json().catch(() => null);
-      showAdminToast(json?.message || (json?.ok ? "처리했어요" : "처리 실패"), json?.ok ? "success" : "error");
-      if (json?.ok) {
-        const stamp = action === "redeem" ? new Date().toISOString() : null;
-        setLocalOrder((prev) => ({ ...prev, items: (Array.isArray(prev.items) ? prev.items : []).map((item) => ({ ...item, subscribeFreeShipAt: stamp })) }));
-        await onAfterStatusChange?.();
+      if (!json?.ok) { showAdminToast(json?.message || "처리 실패", "error"); return; }
+      const stamp = action === "redeem" ? new Date().toISOString() : null;
+      setLocalOrder((prev) => ({ ...prev, items: (Array.isArray(prev.items) ? prev.items : []).map((item) => ({ ...item, subscribeFreeShipAt: stamp })) }));
+      // 기록 뒤 배송비 0원 — 기존 「배송비 수정」과 같은 경로(확인창만 위에서 한 번에)
+      if (action === "redeem" && currentFee > 0) {
+        const saved = await handleSaveShippingFee(0, { skipConfirm: true });
+        if (!saved) { showAdminToast("1회 사용은 기록됐지만 배송비 0원 저장이 안 됐어요. 위 「수정」에서 0원으로 바꿔 주세요.", "warning"); return; }
       }
+      showAdminToast(action === "redeem" ? "구독 무료배송 적용 완료 — 손님에게 「배송비 뺐어요」라고 알려 주세요." : (json?.message || "기록을 지웠어요"), "success");
+      await onAfterStatusChange?.();
     } finally {
       setSavingSubscribeMark(false);
     }
@@ -2055,15 +2068,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             <div className="flex items-center justify-between py-1 text-[13px]">
               <span className="text-ink-soft">구독 무배</span>
               <span className="flex items-center gap-1.5">
-                <span className={subscribeMarked ? "font-black text-ink" : "text-ink-mute"}>{subscribeMarked ? "1회 사용함" : "안 씀"}</span>
+                <span className={subscribeMarked ? "font-black text-ink" : "text-ink-mute"}>{subscribeMarked ? "적용됨 (1회)" : "안 받음"}</span>
                 <button
                   type="button"
-                  disabled={savingSubscribeMark}
+                  disabled={savingSubscribeMark || savingShipping}
                   onClick={() => void handleSubscribeMark(subscribeMarked ? "undo" : "redeem")}
-                  title={subscribeMarked ? "손님이 직접 인증해 받은 건 되돌릴 수 없어요" : "사장님이 배송비를 수동 0원 처리했을 때 — 나중에 캡처 인증해도 무배가 또 안 되게 기록"}
-                  className="h-7 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
+                  title={subscribeMarked ? "기록만 지움(배송비는 안 바뀜) · 손님이 직접 인증해 받은 건 못 지움" : "카톡으로 캡처 받았을 때 — 배송비 0원 + 1회 사용 기록을 한 번에"}
+                  className={subscribeMarked ? "h-7 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink-soft hover:bg-surface-2 disabled:opacity-50" : "h-7 rounded-lg bg-ink px-2.5 text-[12px] font-bold text-white disabled:opacity-50"}
                 >
-                  {savingSubscribeMark ? "저장중…" : subscribeMarked ? "기록 지우기" : "사용으로 기록"}
+                  {savingSubscribeMark ? "처리중…" : subscribeMarked ? "기록 지우기" : "구독 무배 적용"}
                 </button>
               </span>
             </div>
