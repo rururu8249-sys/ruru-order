@@ -2171,7 +2171,7 @@ export default function OrderPage() {
   const subscribeEndedNotice = subscribeFreeShipActive && !subscribeStatusLoading && (subscribeVerified || subscribeEverVerified || subscribeUsed) && !subscribeAvailable
     ? (subscribeUsed
       ? "구독 무료배송은 1회 혜택이라 이미 사용하셨어요. 이번 주문은 배송비가 붙어요."
-      : "구독 무료배송은 인증하신 방송(방송이 없던 날은 그날) 주문에만 적용돼요. 이번 주문은 배송비가 붙어요.")
+      : "지금은 구독 무료배송을 적용할 수 없어요. 이번 주문은 배송비가 붙어요.")
     : "";
   // [2026-10-29] 해외배송 갈래 — 해외배송비 > 0 이고 «상품 정보»에 해외배송 배지가 있을 때만.
   //   장바구니 줄엔 배지가 없어서 product_id 로 상품 목록(방송·카탈로그·부족분 조회)에서 찾는다.
