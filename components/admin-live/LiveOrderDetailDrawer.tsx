@@ -544,7 +544,24 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     try {
       const res = await fetch("/api/admin-live/subscribe-redeem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rowIds, action }) });
       const json = await res.json().catch(() => null);
-      if (!json?.ok) { showAdminToast(json?.message || "처리 실패", "error"); return; }
+      if (!json?.ok) {
+        // [2026-11-24 사장님 「내가 수동으로 하는 건 가능하게」] 이미 1회를 쓴 손님이라도 사장님 판단으로 배송비 0원은 할 수 있게 —
+        //   기록(1회 사용)은 그대로 두고 배송비만 기존 「배송비 수정」 경로로 0원. 자동 혜택은 여전히 안 됨.
+        if (action === "redeem" && currentFee > 0) {
+          const force = await showAdminConfirm([
+            String(json?.message || "1회 사용 기록을 못 남겼어요."),
+            "",
+            `그래도 사장님 판단으로 이 주문 배송비 ${currentFee.toLocaleString("ko-KR")}원 → 0원으로 할까요?`,
+            "(기록 없이 배송비만 바뀌어요)",
+          ].join("\n"));
+          if (!force) return;
+          const saved = await handleSaveShippingFee(0, { skipConfirm: true });
+          if (saved) showAdminToast("배송비 0원으로 바꿨어요(사장님 수동). 손님에게 「배송비 뺐어요」라고 알려 주세요.", "success");
+          return;
+        }
+        showAdminToast(json?.message || "처리 실패", "error");
+        return;
+      }
       const stamp = action === "redeem" ? new Date().toISOString() : null;
       setLocalOrder((prev) => ({ ...prev, items: (Array.isArray(prev.items) ? prev.items : []).map((item) => ({ ...item, subscribeFreeShipAt: stamp })) }));
       // 기록 뒤 배송비 0원 — 기존 「배송비 수정」과 같은 경로(확인창만 위에서 한 번에)

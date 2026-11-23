@@ -31,8 +31,18 @@ export async function redeemSubscribeForOrder(supabase: any, rowIds: number[], a
   if (groupIds.length !== 1) return { ok: false, status: 400, message: "주문서 하나만 처리할 수 있어요." };
   const groupId = groupIds[0];
   if (rows.some((r) => r.is_test_order === true)) return { ok: false, status: 400, message: "테스트 주문은 기록하지 않아요." };
-  const kakaoId = String(rows.find((r) => r.kakao_id)?.kakao_id || "").trim();
-  if (!kakaoId) return { ok: false, status: 400, message: "카카오 계정이 없는 주문이라 기록할 수 없어요(옛 주문)." };
+  let kakaoId = String(rows.find((r) => String(r.kakao_id || "").trim())?.kakao_id || "").trim();
+  if (!kakaoId) {
+    // [2026-11-24 실측 아로새로맘 7462] 주문 줄 kakao_id 가 빈 문자열인 경우가 있음(관리자 수정 경로) → 회원 표에서 전화번호로 찾는다
+    const { data: more } = await supabase.from("orders").select("customer_phone").eq("order_group_id", groupId).limit(50);
+    const phones = Array.from(new Set(((more || []) as Array<{ customer_phone?: string | null }>).map((r) => String(r.customer_phone || "").replace(/[^0-9]/g, "")).filter((p) => p.length >= 9)));
+    if (phones.length > 0) {
+      const dashed = phones.map((p) => (p.length === 11 ? `${p.slice(0, 3)}-${p.slice(3, 7)}-${p.slice(7)}` : p));
+      const { data: cust } = await supabase.from("customers").select("kakao_id").in("customer_phone", Array.from(new Set([...phones, ...dashed]))).limit(5);
+      kakaoId = String(((cust || []) as Array<{ kakao_id?: string | null }>).find((c) => String(c.kakao_id || "").trim())?.kakao_id || "").trim();
+    }
+  }
+  if (!kakaoId) return { ok: false, status: 400, message: "카톡 로그인 기록이 없는 손님이라 1회 사용 기록은 못 남겨요." };
 
   if (action === "undo") {
     if (rows.some((r) => r.subscribe_promo_redemption === true)) {

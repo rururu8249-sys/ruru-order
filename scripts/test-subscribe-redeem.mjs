@@ -9,7 +9,7 @@ const load = createUiLoader({
 });
 const { redeemSubscribeForOrder } = load("app/api/admin-live/subscribe-redeem/route.ts");
 
-function fakeDb(orders, redemptions) {
+function fakeDb(orders, redemptions, customers = []) {
   const log = [];
   const api = {
     from(table) {
@@ -22,11 +22,12 @@ function fakeDb(orders, redemptions) {
         in(col, vals) { q.filters.push((r) => vals.includes(r[col])); return chain; },
         eq(col, v) { q.filters.push((r) => r[col] === v); return chain; },
         is(col, v) { q.filters.push((r) => r[col] === v); return chain; },
+        limit() { return chain; },
         maybeSingle() { return run(true); },
         then(res, rej) { return run(false).then(res, rej); },
       };
       const run = async (single) => {
-        const rows = table === "orders" ? orders : redemptions;
+        const rows = table === "orders" ? orders : table === "customers" ? customers : redemptions;
         const hit = rows.filter((r) => q.filters.every((f) => f(r)));
         if (q.op === "insert") { if (redemptions.some((r) => r.kakao_id === q.payload.kakao_id)) return { error: { message: "duplicate key" } }; redemptions.push({ ...q.payload }); log.push(["insert", q.payload]); return { error: null }; }
         if (q.op === "update") { hit.forEach((r) => Object.assign(r, q.payload)); log.push(["update", table, hit.length, q.payload]); return { error: null }; }
@@ -79,6 +80,10 @@ const base = () => [
   assert.equal((await redeemSubscribeForOrder(fakeDb(o1, []), [1], "redeem")).ok, false);
   const o2 = base(); o2.forEach((o) => { o.kakao_id = null; });
   assert.equal((await redeemSubscribeForOrder(fakeDb(o2, []), [1], "redeem")).ok, false);
+  // 7) 주문 줄 kakao_id 빈 문자열이어도 회원 표(전화)에서 찾아 기록
+  const o4 = base(); o4.forEach((o) => { o.kakao_id = ""; o.customer_phone = "01011112222"; });
+  const red4 = []; const r4 = await redeemSubscribeForOrder(fakeDb(o4, red4, [{ kakao_id: "k9", customer_phone: "01011112222" }]), [1], "redeem");
+  assert.equal(r4.ok, true); assert.deepEqual(red4, [{ kakao_id: "k9", order_group_id: "G1" }]);
   const o3 = base(); o3[1].order_group_id = "G2";
   assert.equal((await redeemSubscribeForOrder(fakeDb(o3, []), [1, 2], "redeem")).ok, false);
 }
