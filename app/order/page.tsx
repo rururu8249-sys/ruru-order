@@ -2166,9 +2166,9 @@ export default function OrderPage() {
     setSubscribeDetailOpen(false);
     setSubscribeStatusReload((v) => v + 1);
   };
-  const subscribeShouldShow = subscribeFreeShipActive && !subscribeEverVerified && !subscribeVerified && !subscribeStatusLoading;
+  const subscribeShouldShow = subscribeFreeShipActive && !subscribeEverVerified && !subscribeVerified && !subscribeUsed && !subscribeStatusLoading;
   // [2026-11-23 사장님] 인증은 했는데 이번 주문엔 무료배송이 안 붙는 손님 — 이유 한 줄(표시 전용, 금액 계산 무관)
-  const subscribeEndedNotice = subscribeFreeShipActive && !subscribeStatusLoading && (subscribeVerified || subscribeEverVerified) && !subscribeAvailable
+  const subscribeEndedNotice = subscribeFreeShipActive && !subscribeStatusLoading && (subscribeVerified || subscribeEverVerified || subscribeUsed) && !subscribeAvailable
     ? (subscribeUsed
       ? "구독 무료배송은 1회 혜택이라 이미 사용하셨어요. 이번 주문은 배송비가 붙어요."
       : "구독 무료배송은 인증하신 방송(방송이 없던 날은 그날) 주문에만 적용돼요. 이번 주문은 배송비가 붙어요.")

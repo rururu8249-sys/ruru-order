@@ -519,6 +519,33 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     }
   };
 
+  // [2026-11-23 사장님] 구독 인증이 어려워 사장님이 배송비를 수동 0원으로 처리한 손님 → «구독 무배 1회 사용»으로 기록.
+  //   나중에 캡처 인증을 해도 두 번째 무료배송이 안 되게 막는 용도. 배송비·금액은 안 건드림(기록만).
+  const [savingSubscribeMark, setSavingSubscribeMark] = useState(false);
+  const subscribeMarked = (Array.isArray(localOrder.items) ? localOrder.items : []).some((item) => item.subscribeFreeShipAt);
+  const handleSubscribeMark = async (action: "redeem" | "undo") => {
+    if (savingSubscribeMark) return;
+    const rowIds = (Array.isArray(localOrder.items) ? localOrder.items : []).map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
+    if (rowIds.length === 0) return showAdminToast("주문 줄을 찾지 못했습니다.", "warning");
+    const question = action === "redeem"
+      ? "이 주문을 「구독 무료배송 1회 사용」으로 기록할까요?\n\n배송비·금액은 안 바뀌어요(배송비 0원은 위 「수정」에서).\n기록하면 이 손님은 나중에 캡처 인증을 해도 무료배송이 또 되지 않아요."
+      : "구독 무배 사용 기록을 지울까요?\n지우면 이 손님은 다시 구독 인증 무료배송을 받을 수 있어요.";
+    if (!window.confirm(question)) return;
+    setSavingSubscribeMark(true);
+    try {
+      const res = await fetch("/api/admin-live/subscribe-redeem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rowIds, action }) });
+      const json = await res.json().catch(() => null);
+      showAdminToast(json?.message || (json?.ok ? "처리했어요" : "처리 실패"), json?.ok ? "success" : "error");
+      if (json?.ok) {
+        const stamp = action === "redeem" ? new Date().toISOString() : null;
+        setLocalOrder((prev) => ({ ...prev, items: (Array.isArray(prev.items) ? prev.items : []).map((item) => ({ ...item, subscribeFreeShipAt: stamp })) }));
+        await onAfterStatusChange?.();
+      }
+    } finally {
+      setSavingSubscribeMark(false);
+    }
+  };
+
   const orderForView = localOrder;
   const items = Array.isArray(orderForView.items) ? orderForView.items : [];
   const isCanceled = isLiveOrderCanceled(orderForView);
@@ -2022,6 +2049,23 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <span className="text-[11px] text-ink-soft">원 (0원 가능)</span>
               <button type="button" disabled={savingShipping} onClick={() => void handleSaveShippingFee()} className="ml-auto h-7 rounded-lg bg-ink px-2.5 text-[12px] font-bold text-white disabled:opacity-50">{savingShipping ? "저장중…" : "저장"}</button>
               <button type="button" disabled={savingShipping} onClick={() => setShipEditOpen(false)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft">취소</button>
+            </div>
+          ) : null}
+          {!isCanceled && !orderForView.isTestOrder ? (
+            <div className="flex items-center justify-between py-1 text-[13px]">
+              <span className="text-ink-soft">구독 무배</span>
+              <span className="flex items-center gap-1.5">
+                <span className={subscribeMarked ? "font-black text-ink" : "text-ink-mute"}>{subscribeMarked ? "1회 사용함" : "안 씀"}</span>
+                <button
+                  type="button"
+                  disabled={savingSubscribeMark}
+                  onClick={() => void handleSubscribeMark(subscribeMarked ? "undo" : "redeem")}
+                  title={subscribeMarked ? "손님이 직접 인증해 받은 건 되돌릴 수 없어요" : "사장님이 배송비를 수동 0원 처리했을 때 — 나중에 캡처 인증해도 무배가 또 안 되게 기록"}
+                  className="h-7 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {savingSubscribeMark ? "저장중…" : subscribeMarked ? "기록 지우기" : "사용으로 기록"}
+                </button>
+              </span>
             </div>
           ) : null}
           {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
