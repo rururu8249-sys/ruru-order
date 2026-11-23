@@ -4102,7 +4102,9 @@ export default function OrderPage() {
   const openAddressSearch = (onPicked?: (addr: string, zipcode: string) => void) => {
     // Stable document scroll anchor: avoid jumping when the virtual keyboard changes viewport.
     postcodeOverlayTopRef.current = typeof window !== "undefined" ? window.scrollY : 0;
-    addressPickedHandlerRef.current = onPicked ?? null;
+    // [2026-11-23] 버튼 onClick 으로 바로 연결하면 클릭 이벤트가 onPicked 로 들어와, 주소를 골라도
+    //   «함수가 아님» 오류로 주소칸이 비어 있던 사고(신규 손님 주소 입력 불가). 함수일 때만 받는다.
+    addressPickedHandlerRef.current = typeof onPicked === "function" ? onPicked : null;
     setAddressSearchOpen(true);
   };
 
@@ -7797,7 +7799,7 @@ export default function OrderPage() {
             onCustomerNameChange={setCustomerName}
             onCustomerPhoneChange={(value) => setCustomerPhone(normalizePhone(value))}
             onDetailAddressChange={setDetailAddress}
-            onOpenAddressSearch={openAddressSearch}
+            onOpenAddressSearch={() => openAddressSearch()}
             onCancel={cancelEditCustomerInfo}
             onConfirm={completeEditCustomerInfo}
           />
