@@ -957,6 +957,37 @@ export default function QuickProductFastForm({
     const t = setInterval(load, 20000);
     return () => { stop = true; clearInterval(t); };
   }, [editingProductId]);
+  // [2026-11-24 사장님 「수량이 있는데 왜 품절이래?」] 판매 가능 수량(limit_qty)을 적은 옵션은 «몇 개 팔렸는지»가 폼에 안 보여
+  //   한도가 찬 걸 재고가 남은 줄 알았음 → 주문 표에서 팔린 수를 읽어 「팔림 N / 수량 M」(DB 함수 ruru_option_limit_remaining 과 같은 제외 규칙). 표시 전용.
+  const [soldByVariant, setSoldByVariant] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!editingProductId || stockManagementEnabled) return;
+    let stop = false;
+    const load = async () => {
+      try {
+        const { data, error } = await supabase.from("orders").select("product_name,color,size,qty,order_status,order_manage_status,admin_order_status_v2,is_deleted,is_test_order").eq("product_id", editingProductId).limit(5000);
+        if (stop || error || !Array.isArray(data)) return;
+        const nm = (v: unknown) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+        const by: Record<string, number> = {};
+        for (const o of data as Array<Record<string, unknown>>) {
+          if (o.is_deleted === true || o.is_test_order === true) continue;
+          if (/취소|환불|cancel|refund/i.test(`${o.order_status ?? ""} ${o.order_manage_status ?? ""} ${o.admin_order_status_v2 ?? ""}`)) continue;
+          const key = `${nm(o.product_name)}|${nm(o.color)}|${nm(o.size)}`;
+          by[key] = (by[key] || 0) + Math.max(1, Number(o.qty) || 1);
+        }
+        setSoldByVariant(by);
+      } catch { /* 표시 전용 */ }
+    };
+    void load();
+    const t = setInterval(load, 20000);
+    return () => { stop = true; clearInterval(t); };
+  }, [editingProductId, stockManagementEnabled]);
+  const soldOf = (detail: string, color: string, size: string) => {
+    const nm = (v: unknown) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+    // 브랜드 묶음(세부상품)은 product_name 이 세부상품명, 단품은 product_name 과 무관 → 단품은 색·사이즈만 합산
+    if (detail) return Number(soldByVariant[`${nm(detail)}|${nm(color)}|${nm(size)}`] || 0);
+    return Object.entries(soldByVariant).reduce((sum, [k, v]) => (k.endsWith(`|${nm(color)}|${nm(size)}`) ? sum + v : sum), 0);
+  };
   const heldOf = (color: string, size: string) => {
     const nm = (v: string) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
     return Number(heldByVariant[`${nm(color)}|${nm(size)}`] || 0);
@@ -2330,6 +2361,16 @@ export default function QuickProductFastForm({
                                   품절
                                 </label>
                                 {!row.manual_soldout && stockManagementEnabled && sellable <= 0 ? <span style={{ gridColumn: "1 / -1", fontSize: "11px", color: "var(--color-danger-tx)" }}>재고 소진 · 자동 품절</span> : null}
+                                {!stockManagementEnabled && typeof row.limit_qty === "number" && editingProductId ? (() => {
+                                  const sold = soldOf(String(group.detail || ""), String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""));
+                                  const left = Math.max(0, row.limit_qty - sold - heldQty);
+                                  return (
+                                    <span style={{ gridColumn: "1 / -1", fontSize: "11px", fontWeight: 700, color: left <= 0 ? "var(--color-danger-tx)" : "var(--color-ink-soft)", paddingLeft: group.detail ? "12px" : "2px" }}>
+                                      {left <= 0 ? `수량 ${row.limit_qty}개 다 팔림 · 자동 품절` : `팔림 ${sold} / 수량 ${row.limit_qty}${heldQty > 0 ? ` · 담김 ${heldQty}` : ""} · 남은 ${left}`}
+                                      {left <= 0 ? " (더 팔려면 수량을 올려 주세요)" : ""}
+                                    </span>
+                                  );
+                                })() : null}
                                 {stockManagementEnabled && heldQty > 0 ? (
                                   <span style={{ gridColumn: "1 / -1", marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", paddingLeft: group.detail ? "12px" : "2px" }}>
                                     담김 {heldQty}개 · 지금 판매가능 <b style={{ color: sellable > 0 ? "var(--color-ok-tx)" : "var(--color-danger-tx)" }}>{sellable}개</b>

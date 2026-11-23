@@ -4515,7 +4515,11 @@ export default function OrderPage() {
               return avail > 0 ? { ...it, qty: String(avail) } : { ...it, __removeBySoldout: true } as any;
             })
             .filter((it: any) => !it.__removeBySoldout));
-          showCustomerNotice("앗, 방금 다른 손님이 먼저 담아서 일부 상품이 품절됐어요. 주문서 수량을 확인해 주세요!");
+          // [2026-11-24 사장님] «다른 손님이 먼저»는 추측 문구였음 — 실제로는 그 옵션의 준비 수량이 다 나간 것. 어떤 옵션인지 적어 준다.
+          const soldOutNames = rejected
+            .map((r: any) => { const opt = [normR(r.color), normR(r.size)].filter(Boolean).join("/"); const avail = Math.max(0, Number(r.available) || 0); return avail > 0 ? `${opt || "기본"} ${avail}개만 남음` : `${opt || "기본"} 품절`; })
+            .slice(0, 3).join(", ");
+          showCustomerNotice(`아쉽지만 ${soldOutNames} — 준비한 수량이 다 나갔어요. 주문서에서 수량을 맞췄어요.`);
         }
       }
     } catch {
