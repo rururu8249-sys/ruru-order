@@ -7,7 +7,7 @@ function text(value: unknown): string {
   return String(value ?? "").trim();
 }
 
-function meaningful(value: unknown): string {
+export function meaningful(value: unknown): string {
   const v = text(value);
   return EMPTY_OPTION_WORDS.has(v.toLowerCase()) ? "" : v;
 }
@@ -26,7 +26,7 @@ function qtyOf(row: AnyOrderRow): number {
 //   정산 요약(lib/liveSummary.ts rowProductAmount), 주문 상세, 무결성 검사 전부 그렇게 쓴다.
 //   여기서만 단가로 착각해 × 수량을 한 번 더 곱했다(수량 1이면 티가 안 나 여태 몰랐다).
 //   → 정산 요약과 같은 규칙: 줄 합계가 있으면 그대로, 없으면 product_price × 수량.
-function itemAmountOf(row: AnyOrderRow): number {
+export function itemAmountOf(row: AnyOrderRow): number {
   const lineTotal = Number(row.adjusted_product_price);
   if (row.adjusted_product_price !== null && row.adjusted_product_price !== undefined && Number.isFinite(lineTotal) && lineTotal >= 0) {
     return Math.floor(lineTotal);
@@ -35,7 +35,7 @@ function itemAmountOf(row: AnyOrderRow): number {
   return unit * qtyOf(row);
 }
 
-function splitCompositeOption(productName: string, rawColor: string): { option: string; color: string } {
+export function splitCompositeOption(productName: string, rawColor: string): { option: string; color: string } {
   if (!rawColor.includes(ORDER_AXIS_JOIN)) return { option: "", color: meaningful(rawColor) };
   const parts = rawColor.split(ORDER_AXIS_JOIN).map((v) => meaningful(v)).filter(Boolean);
   if (parts.length < 2) return { option: "", color: meaningful(rawColor) };

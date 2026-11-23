@@ -4,7 +4,8 @@
 //   «20초 동안 들어온 주문을 한 줄로 묶어» 올려 사용량을 크게 줄인다.
 //   - 한 명:  🛒 몽상가8277님 주문 감사합니다! BB-78 트렌치코트 외 2개
 //   - 여러 명: 🛒 주문 감사합니다! 💗몽상가8277님 BB-78 외 2 💗행복나무님 PD-202
-//   금액·옵션은 안 올린다(누가 얼마 썼는지 방송에 안 나가게 — 상품 위젯 스티커와 같은 원칙).
+//   [2026-11-24 사장님 「주문알림 사이즈 색상도 나오게, 금액도」] 첫 상품의 색상/사이즈 + 상품 금액 합(배송비 제외)을 붙인다.
+//   옵션이 없음·빈칸이면 아예 안 쓴다(「없음」 글자 금지). 금액은 줄 합계 규칙(orderYoutubeAnnouncement.itemAmountOf)과 같음.
 //   표시 전용 — 주문·입금·재고·돈 무관. 대기열은 settings 한 칸(글자)이고, 실패해도 주문은 정상.
 
 export const ORDER_CHAT_QUEUE_KEY = "youtube_order_chat_queue_v1";
@@ -17,6 +18,10 @@ export type OrderChatEntry = {
   n: string;
   /** 첫 상품 이름 */
   p: string;
+  /** 첫 상품 옵션(색상/사이즈) — 없으면 빈칸 */
+  o?: string;
+  /** 상품 금액 합(배송비 제외) — 0이면 안 씀 */
+  a?: number;
   /** 나머지 상품 줄 수 */
   m: number;
   /** 넣은 시각(ms) */
@@ -25,12 +30,29 @@ export type OrderChatEntry = {
 
 type AnyRow = Record<string, unknown>;
 
+import { itemAmountOf, meaningful, splitCompositeOption } from "./orderYoutubeAnnouncement";
+
 const clean = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim();
+
+/** 첫 상품 옵션 「브라운/230」 — 없음·빈칸은 빼고, 둘 다 없으면 "" */
+export function optionLabel(row: AnyRow | undefined): string {
+  if (!row) return "";
+  const name = clean(row.product_name);
+  const { option, color } = splitCompositeOption(name, clean(row.color));
+  const size = meaningful(row.size);
+  return [option, color, size].map((v) => clean(v)).filter(Boolean).join("/");
+}
 
 /** 주문서 줄들 → 대기열 한 칸 */
 export function orderChatEntry(nickname: string, rows: AnyRow[], now: number): OrderChatEntry {
-  const names = (Array.isArray(rows) ? rows : []).map((r) => clean(r?.product_name)).filter(Boolean);
-  return { n: clean(nickname).slice(0, 30) || "고객", p: (names[0] || "").slice(0, 40), m: Math.max(0, names.length - 1), t: now };
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => clean(r?.product_name));
+  const names = list.map((r) => clean(r?.product_name));
+  const amount = list.reduce((sum, r) => sum + itemAmountOf(r as Record<string, unknown>), 0);
+  const entry: OrderChatEntry = { n: clean(nickname).slice(0, 30) || "고객", p: (names[0] || "").slice(0, 40), m: Math.max(0, names.length - 1), t: now };
+  const o = optionLabel(list[0]).slice(0, 30);
+  if (o) entry.o = o;
+  if (amount > 0) entry.a = Math.floor(amount);
+  return entry;
 }
 
 /** 묶음용 짧은 상품 이름 — 「BB-78 트렌치코트」→「BB-78」, 코드 없으면 앞 12글자 */
@@ -41,15 +63,17 @@ export function shortProductName(name: string): string {
   return s.length > 12 ? `${s.slice(0, 12)}…` : s;
 }
 
+const wonText = (a: number | undefined) => (typeof a === "number" && a > 0 ? ` · ${a.toLocaleString("ko-KR")}원` : "");
+
 function onePerson(e: OrderChatEntry): string {
   const more = e.m > 0 ? ` 외 ${e.m}개` : "";
-  const item = e.p ? ` ${e.p}${more}` : "";
-  return `🛒 ${e.n}님 주문 감사합니다!${item}`;
+  const item = e.p ? ` ${e.p}${e.o ? ` ${e.o}` : ""}${more}` : "";
+  return `🛒 ${e.n}님 주문 감사합니다!${item}${wonText(e.a)}`;
 }
 
 function personChunk(e: OrderChatEntry): string {
-  const p = e.p ? ` ${shortProductName(e.p)}${e.m > 0 ? ` 외 ${e.m}` : ""}` : "";
-  return `💗${e.n}님${p}`;
+  const p = e.p ? ` ${shortProductName(e.p)}${e.o ? ` ${e.o}` : ""}${e.m > 0 ? ` 외 ${e.m}` : ""}` : "";
+  return `💗${e.n}님${p}${wonText(e.a)}`;
 }
 
 /** 대기열 → 채팅 글들(한 줄 190자 이하, 넘치면 다음 줄) */
@@ -82,7 +106,12 @@ export function parseOrderChatQueue(raw: unknown): OrderChatEntry[] {
     if (!Array.isArray(v)) return [];
     return v
       .filter((e) => e && typeof e === "object" && typeof e.n === "string")
-      .map((e) => ({ n: String(e.n), p: String(e.p ?? ""), m: Math.max(0, Number(e.m) || 0), t: Number(e.t) || 0 }));
+      .map((e) => {
+        const entry: OrderChatEntry = { n: String(e.n), p: String(e.p ?? ""), m: Math.max(0, Number(e.m) || 0), t: Number(e.t) || 0 };
+        if (typeof e.o === "string" && e.o.trim()) entry.o = e.o.trim().slice(0, 30);
+        if (Number(e.a) > 0) entry.a = Math.floor(Number(e.a));
+        return entry;
+      });
   } catch {
     return [];
   }
