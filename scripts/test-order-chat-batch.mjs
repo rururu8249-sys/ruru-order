@@ -6,14 +6,14 @@ const e1 = B.orderChatEntry("몽상가8277", [{ product_name: "BB-78 트렌치�
 assert.deepEqual(B.buildOrderChatBatchMessages([e1]), ["🛒 몽상가8277님 주문 감사합니다! BB-78 트렌치코트 외 2개"]);
 const e2 = B.orderChatEntry("행복나무", [{ product_name: "PD-202 니트" }], 1000);
 const e3 = B.orderChatEntry("루루맘", [{ product_name: "다이슨 에어랩HS05-2세대" }, { product_name: "x" }], 1000);
-assert.deepEqual(B.buildOrderChatBatchMessages([e1, e2, e3]), ["🛒 주문 감사합니다! 💗몽상가8277님 BB-78 외 2 💗행복나무님 PD-202 💗루루맘님 다이슨 에어랩HS05-… 외 1"]);
+assert.deepEqual(B.buildOrderChatBatchMessages([e1, e2, e3]), ["🛒 주문 감사합니다! 💗몽상가8277님 BB-78 외 2 💗행복나무님 PD-202 💗루루맘님 다이슨 에어랩HS05-2세대 외 1"]);
 // [2026-11-24] 옵션·금액 붙임 — 「없음」 글자 금지, 옵션 없으면 아예 안 씀
 const e4 = B.orderChatEntry("홋홍힛", [{ product_name: "어그(UGG) 디스케트 헤리티지", color: "브라운", size: "230", qty: 1, product_price: 95000 }], 1000);
 assert.deepEqual(B.buildOrderChatBatchMessages([e4]), ["🛒 홋홍힛님 주문 감사합니다! 어그(UGG) 디스케트 헤리티지 브라운/230 · 95,000원"]);
 const e5 = B.orderChatEntry("옵션없음", [{ product_name: "다이슨 에어랩", color: "없음", size: "", qty: 2, adjusted_product_price: 500000 }, { product_name: "x", product_price: 1000, qty: 1 }], 1000);
 assert.deepEqual(B.buildOrderChatBatchMessages([e5]), ["🛒 옵션없음님 주문 감사합니다! 다이슨 에어랩 외 1개 · 501,000원"]);
 assert.ok(!B.buildOrderChatBatchMessages([e5]).join("").includes("없음님 주문 감사합니다! 다이슨 에어랩 없음"));
-assert.deepEqual(B.buildOrderChatBatchMessages([e4, e5]), ["🛒 주문 감사합니다! 💗홋홍힛님 어그(UGG) 디스케트… 브라운/230 · 95,000원 💗옵션없음님 다이슨 에어랩 외 1 · 501,000원"]);
+assert.deepEqual(B.buildOrderChatBatchMessages([e4, e5]), ["🛒 주문 감사합니다! 💗홋홍힛님 어그(UGG) 디스케트 헤리티지 브라운/230 · 95,000원 💗옵션없음님 다이슨 에어랩 외 1 · 501,000원"]);
 // 대기열 왕복에도 옵션·금액 보존
 assert.deepEqual(B.parseOrderChatQueue(JSON.stringify([e4]))[0], e4);
 // 금액 0·옵션 빈 옛 줄은 예전 문구 그대로

@@ -55,12 +55,14 @@ export function orderChatEntry(nickname: string, rows: AnyRow[], now: number): O
   return entry;
 }
 
-/** 묶음용 짧은 상품 이름 — 「BB-78 트렌치코트」→「BB-78」, 코드 없으면 앞 12글자 */
+/** 묶음용 짧은 상품 이름 — 「BB-78 트렌치코트」→「BB-78」(상품번호가 있으면 번호만).
+ *  [2026-11-24 사장님 「글이 짤려서 따로 올렸다」] 번호 없는 이름(어그(UGG) 디스케트 헤리티지)은 자르지 않고 그대로(40자까지).
+ *  한 줄 190자가 넘으면 사람 단위로 다음 줄로 넘어가므로 잘린 채 올라가지 않는다. */
 export function shortProductName(name: string): string {
   const s = clean(name);
   const m = s.match(/^([A-Za-z]+)(?:\([^)]*\))?-(\d+[A-Za-z]*)/);
   if (m) return `${m[1].toUpperCase()}-${m[2].toUpperCase()}`;
-  return s.length > 12 ? `${s.slice(0, 12)}…` : s;
+  return s.length > 40 ? `${s.slice(0, 40)}…` : s;
 }
 
 const wonText = (a: number | undefined) => (typeof a === "number" && a > 0 ? ` · ${a.toLocaleString("ko-KR")}원` : "");
