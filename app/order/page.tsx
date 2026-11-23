@@ -1880,6 +1880,8 @@ export default function OrderPage() {
   const [subscribeEverVerified, setSubscribeEverVerified] = useState(false);
   const [subscribeStatusLoading, setSubscribeStatusLoading] = useState(true);
   const [subscribeAvailable, setSubscribeAvailable] = useState(false);
+  // [2026-11-23] 1회 혜택을 이미 썼는지(서버 used) — 인증했는데 무료배송이 안 붙는 손님에게 이유 한 줄 보여 주기용(표시 전용)
+  const [subscribeUsed, setSubscribeUsed] = useState(false);
   const [subscribeStatusReload, setSubscribeStatusReload] = useState(0);
   const [subscribePromoEarnRate, setSubscribePromoEarnRate] = useState(0.5);
   const [subscribeNow, setSubscribeNow] = useState(() => Date.now());
@@ -2147,12 +2149,15 @@ export default function OrderPage() {
     void fetch(`/api/subscribe-verify?kakao_id=${encodeURIComponent(subscribeKakaoId)}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => {
-        if (!alive || j?.ok !== true) return;
+        if (!alive) return;
+        // [2026-11-23] 응답이 이상해도 «불러오는 중»에 멈추지 않게(멈추면 인증 카드가 영영 안 뜸). 혜택은 없음 쪽.
+        if (j?.ok !== true) { setSubscribeAvailable(false); setSubscribeStatusLoading(false); return; }
         setSubscribeVerified(j.verified === true);
         setSubscribeEverVerified(j.everVerified === true);
+        setSubscribeUsed(j.used === true);
         setSubscribeAvailable(j.available === true);
         setSubscribeStatusLoading(false);
-      }).catch(() => { if (alive) setSubscribeAvailable(false); });
+      }).catch(() => { if (alive) { setSubscribeAvailable(false); setSubscribeStatusLoading(false); } });
     return () => { alive = false; };
   }, [subscribeFreeShipActive, subscribeKakaoId, subscribeStatusReload]);
   const onSubscribeVerified = () => {
@@ -2162,6 +2167,12 @@ export default function OrderPage() {
     setSubscribeStatusReload((v) => v + 1);
   };
   const subscribeShouldShow = subscribeFreeShipActive && !subscribeEverVerified && !subscribeVerified && !subscribeStatusLoading;
+  // [2026-11-23 사장님] 인증은 했는데 이번 주문엔 무료배송이 안 붙는 손님 — 이유 한 줄(표시 전용, 금액 계산 무관)
+  const subscribeEndedNotice = subscribeFreeShipActive && !subscribeStatusLoading && (subscribeVerified || subscribeEverVerified) && !subscribeAvailable
+    ? (subscribeUsed
+      ? "구독 무료배송은 1회 혜택이라 이미 사용하셨어요. 이번 주문은 배송비가 붙어요."
+      : "구독 무료배송은 인증하신 방송(방송이 없던 날은 그날) 주문에만 적용돼요. 이번 주문은 배송비가 붙어요.")
+    : "";
   // [2026-10-29] 해외배송 갈래 — 해외배송비 > 0 이고 «상품 정보»에 해외배송 배지가 있을 때만.
   //   장바구니 줄엔 배지가 없어서 product_id 로 상품 목록(방송·카탈로그·부족분 조회)에서 찾는다.
   //   서버(submit)도 products 배지로 같은 판정 → 손님 화면 금액과 서버 검사가 같다.
@@ -8702,6 +8713,21 @@ export default function OrderPage() {
                       youtubeNickname={youtubeNickname}
                       onVerified={onSubscribeVerified}
                     />
+                  </div>
+                ) : null}
+                {subscribeWaiverOn && !subscribeStatusLoading && selectedItemEntries.length > 0 ? (
+                  <div style={{ padding: "16px 16px 0" }}>
+                    <div role="status" style={{ background: "#F5F5F5", borderRadius: "8px", padding: "12px 14px", fontSize: "14px", fontWeight: 600, color: "#111111", lineHeight: 1.5, wordBreak: "keep-all" }}>
+                      구독 인증 완료 · {subscribeWaivedAmount > 0 ? `이번 주문 배송비 ${subscribeWaivedAmount.toLocaleString()}원 무료` : "이번 주문 배송비 무료"}
+                      <span style={{ display: "block", fontSize: "13px", fontWeight: 400, color: "#707072" }}>무료배송은 한 번만 돼요. 이 주문서를 제출하면 사용돼요.</span>
+                    </div>
+                  </div>
+                ) : null}
+                {subscribeEndedNotice && selectedItemEntries.length > 0 ? (
+                  <div style={{ padding: "16px 16px 0" }}>
+                    <div role="note" style={{ background: "#F5F5F5", borderRadius: "8px", padding: "12px 14px", fontSize: "14px", fontWeight: 500, color: "#111111", lineHeight: 1.5, wordBreak: "keep-all" }}>
+                      {subscribeEndedNotice}
+                    </div>
                   </div>
                 ) : null}
                 {/* 🚚 배송지 카드 */}

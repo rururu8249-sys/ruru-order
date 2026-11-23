@@ -215,7 +215,7 @@ export default function SubscribeFreeShipCard(props: Props) {
       {state === "fail" && reason ? (
         <div role="alert" style={{ marginTop: "10px", fontSize: "14px", fontWeight: 600, color: C.bad, lineHeight: 1.5, wordBreak: "keep-all" }}>{reason}</div>
       ) : null}
-      <div style={{ marginTop: "12px", fontSize: "13px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>주문서 제출 전에 인증해야 배송비가 빠져요. 인증 안 해도 주문은 그대로 돼요.</div>
+      <div style={{ marginTop: "12px", fontSize: "13px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>주문서 제출 전에 인증해야 배송비가 빠져요. 무료배송은 한 번만, 인증한 방송(방송 없는 날은 그날) 주문에 돼요. 인증 안 해도 주문은 그대로 돼요.</div>
 
       {zoom ? (
         <div role="dialog" aria-label="예시 사진" onClick={() => setZoom("")} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px" }}>

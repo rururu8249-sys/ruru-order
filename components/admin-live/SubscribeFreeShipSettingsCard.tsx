@@ -143,7 +143,7 @@ export default function SubscribeFreeShipSettingsCard() {
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-ink">구독 인증 무료배송</h2>
-          <p className="mt-1 text-xs text-ink-mute">손님이 「채널 이름 + 구독중」 캡처를 올리면 AI 가 확인해 고른 배송비를 0원으로 · 켠 시간에만</p>
+          <p className="mt-1 text-xs text-ink-mute">손님이 「채널 이름 + 구독중」 캡처를 올리면 AI 가 확인해 고른 배송비를 0원으로 · 켠 시간에만 · 한 계정에 1번, 인증한 방송(방송 없는 날은 그날) 주문만</p>
         </div>
         <button
           type="button"
