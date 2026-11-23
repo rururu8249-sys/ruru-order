@@ -160,11 +160,12 @@ export function judgeSubscribeShot(
   const label = subscribeChannelLabel(channelName);
   const wants = subscribeChannelList(channelName).map(norm).filter(Boolean);
   if (!seen || !wants.some((want) => seen.includes(want))) {
-    return { ok: false, reason: `${label} 채널 이름이 안 보여요. 채널 이름과 「구독중」이 같이 나오게 찍어 주세요.` };
+    // [2026-11-23] 실제 불합격 대부분 = 방송(영상) 화면을 올림 → 어느 화면을 찍어야 하는지 말해 준다
+    return { ok: false, reason: `${label} 채널 이름이 안 보여요. 방송 화면이 아니라 유튜브 채널 홈(채널 이름 아래 「구독중」 버튼이 있는 화면)을 위 예시 사진처럼 캡처해 주세요.` };
   }
   const button = norm(ai.button_text || "");
   const subscribed = button.includes("구독중") || button.includes("subscribed");
-  if (!subscribed) return { ok: false, reason: "「구독중」이 안 보여요. 구독 버튼을 누른 뒤 다시 찍어 주세요." };
+  if (!subscribed) return { ok: false, reason: "「구독중」이 안 보여요. 아직 구독 전이면 「구독」을 먼저 누르고, 방송 화면이 아니라 채널 홈(채널 이름 아래 「구독중」)을 위 예시 사진처럼 캡처해 주세요." };
   if (ai.button_belongs === false) {
     return { ok: false, reason: `「구독중」이 ${label} 채널 것인지 안 보여요. 채널 이름 바로 아래 「구독중」이 나오게 찍어 주세요.` };
   }

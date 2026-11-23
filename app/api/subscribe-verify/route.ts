@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       .select("id", { count: "exact", head: true })
       .eq("kakao_id", kakaoId)
       .gte("created_at", since);
-    if ((count || 0) >= MAX_TRIES_PER_DAY) return fail("오늘은 더 올릴 수 없어요. 카톡채널로 문의해 주세요.", 429);
+    if ((count || 0) >= MAX_TRIES_PER_DAY) return NextResponse.json({ ok: false, limit: true, message: `오늘 올릴 수 있는 ${MAX_TRIES_PER_DAY}번을 다 썼어요. 카톡채널로 캡처를 보내 주시면 확인해 드려요.` }, { status: 429 });
 
     const image = String(body?.image || "");
     const m = image.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);

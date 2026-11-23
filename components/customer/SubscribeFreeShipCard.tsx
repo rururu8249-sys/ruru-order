@@ -56,7 +56,8 @@ async function fileToJpegDataUrl(file: File): Promise<string> {
 
 export default function SubscribeFreeShipCard(props: Props) {
   const { variant, channelName, exampleUrl, groupsText, verified, waivedAmount = 0, potentialAmount = 0 } = props;
-  const [state, setState] = useState<"idle" | "checking" | "fail">("idle");
+  // [2026-11-23] blocked = 오늘 올릴 수 있는 횟수를 다 씀(서버 429) — 버튼을 잠그고 할 일을 알려 준다
+  const [state, setState] = useState<"idle" | "checking" | "fail" | "blocked">("idle");
   const [reason, setReason] = useState("");
   const [zoom, setZoom] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -121,7 +122,7 @@ export default function SubscribeFreeShipCard(props: Props) {
         props.onVerified();
         return;
       }
-      setState("fail");
+      setState(res.status === 429 || json?.limit === true ? "blocked" : "fail");
       setReason(String(json?.reason || json?.message || "확인하지 못했어요. 다시 올려 주세요."));
     } catch (e) {
       setState("fail");
@@ -200,8 +201,13 @@ export default function SubscribeFreeShipCard(props: Props) {
           {stepNo(3)}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={stepText}>캡처한 사진 올리기</div>
+            {(state === "fail" || state === "blocked") && reason ? (
+              <div role="alert" style={{ marginTop: "8px", fontSize: "14px", fontWeight: 600, color: C.bad, lineHeight: 1.5, wordBreak: "keep-all" }}>{reason}</div>
+            ) : null}
             {state === "checking" ? (
               <div role="status" style={{ marginTop: "8px", height: "52px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "9999px", background: C.soft, fontSize: "15px", fontWeight: 600, color: C.mute }}>확인하고 있어요 (5초쯤)</div>
+            ) : state === "blocked" ? (
+              <div role="status" aria-disabled="true" style={{ marginTop: "8px", height: "52px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "9999px", background: "#E5E5E5", fontSize: "15px", fontWeight: 600, color: C.mute }}>오늘은 더 올릴 수 없어요</div>
             ) : (
               <button type="button" onClick={() => fileRef.current?.click()} style={{ marginTop: "8px", width: "100%", height: "52px", border: "none", borderRadius: "9999px", background: C.ink, color: "#FFFFFF", fontSize: "16px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 {state === "fail" ? "다시 올리기" : "캡처 사진 올리기"}
@@ -212,9 +218,6 @@ export default function SubscribeFreeShipCard(props: Props) {
       </ol>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void upload(e.target.files?.[0])} />
 
-      {state === "fail" && reason ? (
-        <div role="alert" style={{ marginTop: "10px", fontSize: "14px", fontWeight: 600, color: C.bad, lineHeight: 1.5, wordBreak: "keep-all" }}>{reason}</div>
-      ) : null}
       <div style={{ marginTop: "12px", fontSize: "13px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>주문서 제출 전에 인증해야 배송비가 빠져요. 무료배송은 한 번만, 인증한 방송(방송 없는 날은 그날) 주문에 돼요. 인증 안 해도 주문은 그대로 돼요.</div>
 
       {zoom ? (
