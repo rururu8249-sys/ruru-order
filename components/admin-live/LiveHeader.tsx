@@ -11,6 +11,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX, normalizeLivePausedText } from "@/lib/livePausedText";
+import { LIVE_END_PLAN_KEY, parseLiveEndPlan, serializeLiveEndPlan, liveEndAtFor, nextKstTime, kstLabel, type LiveEndPlan } from "@/lib/liveEndPlan";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, youtubeVideoIdFromUrl, type LiveWatchSetting } from "@/lib/liveWatch";
 import BroadcastVideoHistoryPicker from "./BroadcastVideoHistoryPicker";
 import { LIVE_CHAT_KEY, LIVE_CHAT_DEFAULT, parseLiveChatSetting, serializeLiveChatSetting, type LiveChatSetting } from "@/lib/liveChat";
@@ -252,6 +253,35 @@ export default function LiveHeader({
       showAdminToast("문구 저장에 실패했어요.", "error");
     } finally {
       setPausedSaving(false);
+    }
+  };
+
+  // [2026-11-25] 방송 종료 예정 시각 — 손님 방송 상자 카운트다운(settings live_end_plan_v1, 이번 방송 id 와 같이 저장). 표시만.
+  const [endPlan, setEndPlan] = useState<LiveEndPlan | null>(null);
+  const [endTime, setEndTime] = useState("");
+  const [endSaving, setEndSaving] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    supabase.from("settings").select("value").eq("key", LIVE_END_PLAN_KEY).maybeSingle().then(({ data }) => { if (alive) setEndPlan(parseLiveEndPlan(data?.value)); });
+    return () => { alive = false; };
+  }, []);
+  const endAtForThis = liveEndAtFor(endPlan, activeBroadcastId);
+  const saveEndPlan = async (clear: boolean) => {
+    if (endSaving || !activeBroadcastId) return;
+    const endAt = clear ? null : nextKstTime(endTime);
+    if (!clear && !endAt) { showAdminToast("종료 시각을 골라 주세요.", "error"); return; }
+    setEndSaving(true);
+    try {
+      const next = endAt ? { broadcastId: activeBroadcastId, endAt } : null;
+      const { error } = await supabase.from("settings").upsert([{ key: LIVE_END_PLAN_KEY, value: next ? serializeLiveEndPlan(next) : "" }], { onConflict: "key" });
+      if (error) throw error;
+      setEndPlan(next);
+      setEndTime("");
+      showAdminToast(next ? `${kstLabel(next.endAt)} 종료로 저장했어요. 손님 화면에 45초 안에 카운트다운이 떠요.` : "카운트다운을 껐어요.", "success");
+    } catch {
+      showAdminToast("저장에 실패했어요.", "error");
+    } finally {
+      setEndSaving(false);
     }
   };
 
@@ -796,6 +826,11 @@ export default function LiveHeader({
             <textarea value={pausedText} maxLength={LIVE_PAUSED_TEXT_MAX + 4} rows={3} onChange={(event) => setPausedText(event.target.value)}
               placeholder={LIVE_PAUSED_TEXT_DEFAULT} className={`${fieldCls} h-auto py-2 leading-normal`} />
             {normalizeLivePausedText(pausedText) !== pausedTextSaved ? <button type="button" disabled={pausedSaving} onClick={() => void savePausedText()} className={primaryCls}>{pausedSaving ? "저장 중…" : "저장"}</button> : null}
+          </FormRow>
+          <FormRow label="방송 종료 예정 시각" hint={endAtForThis && endAtForThis > Date.now() ? `${kstLabel(new Date(endAtForThis).toISOString())} 종료 · 손님 화면에 카운트다운 중` : "손님 방송 상자에 「방송 종료까지 N분 · 입금은 종료 전에」 · 지난 시각이면 다음 날로"}>
+            <input type="time" value={endTime} disabled={!activeBroadcast} onChange={(event) => setEndTime(event.target.value)} className={fieldCls} aria-label="방송 종료 예정 시각" />
+            <button type="button" disabled={!activeBroadcast || endSaving || !endTime} onClick={() => void saveEndPlan(false)} className={primaryCls}>{endSaving ? "저장 중…" : "저장"}</button>
+            {endAtForThis ? <button type="button" disabled={endSaving} onClick={() => void saveEndPlan(true)} className={secondaryCls}>끄기</button> : null}
           </FormRow>
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={!activeBroadcast || copyingCurrent} onClick={() => void copyCurrentProductLine()} className={secondaryCls}

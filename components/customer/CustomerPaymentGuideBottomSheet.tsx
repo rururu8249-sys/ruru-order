@@ -101,6 +101,8 @@ export default function CustomerPaymentGuideBottomSheet({
   // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
   const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5");
   const [installHint, setInstallHint] = useState(false);
+  // [2026-11-25 한나무드 참고] 입금금액 복사 — 숫자만(63000) 복사해서 은행 앱 금액 칸에 바로 붙여넣기. 표시·복사만
+  const [amountCopyDone, setAmountCopyDone] = useState(false);
 
   if (!open) return null;
 
@@ -200,8 +202,22 @@ export default function CustomerPaymentGuideBottomSheet({
 
               {v5 && hideAmountRowV5 ? null : (
               <div style={s5({ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px" })}>
-                <div style={s5({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>② 입금금액</div>
-                <div style={s5({ fontSize: "26px", fontWeight: 900, color: "#7A1E47" })}>{won(safeFinalAmount)}</div>
+                <div style={s5({ display: "flex", alignItems: "center", gap: "10px" })}>
+                  <div style={s5({ flex: 1, minWidth: 0 })}>
+                    <div style={s5({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>② 입금금액</div>
+                    <div style={s5({ fontSize: "26px", fontWeight: 900, color: "#7A1E47" })}>{won(safeFinalAmount)}</div>
+                  </div>
+                  {safeFinalAmount > 0 ? (
+                    <button type="button" aria-label="입금금액 복사" onClick={async () => {
+                      const digits = String(Math.round(safeFinalAmount));
+                      try { await navigator.clipboard.writeText(digits); } catch { /* 복사 권한 없으면 화면의 금액을 보고 입력 */ }
+                      setAmountCopyDone(true);
+                      window.setTimeout(() => setAmountCopyDone(false), 1800);
+                    }} style={s5({ ...(amountCopyDone ? doneButtonStyle : normalButtonStyle), flexShrink: 0, minHeight: "40px", padding: "0 14px", fontSize: "13px" })}>
+                      {amountCopyDone ? "복사됨" : "복사"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               )}
 

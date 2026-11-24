@@ -46,6 +46,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from "react-dom";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText } from "@/lib/livePausedText";
+import { LIVE_END_PLAN_KEY, parseLiveEndPlan, liveEndAtFor, type LiveEndPlan } from "@/lib/liveEndPlan";
+import BroadcastEndCountdown from "@/components/customer/BroadcastEndCountdown";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, chatBadgeOf, isChatOwnerPhone, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
 import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@/components/customer/LiveWatchView";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
@@ -1984,6 +1986,8 @@ export default function OrderPage() {
   const [nextLiveText, setNextLiveText] = useState("");
   // [2026-11-09] 「잠시 쉬는 중」 문구 — settings live_paused_text(기본값 있음), 표시만
   const [livePausedText, setLivePausedText] = useState(LIVE_PAUSED_TEXT_DEFAULT);
+  // [2026-11-25] 방송 종료 예정 시각 — settings live_end_plan_v1(방송 id 와 같이), 표시만
+  const [liveEndPlan, setLiveEndPlan] = useState<LiveEndPlan | null>(null);
   // [2026-08-10 3단] 세부상품(1번 축) 선택값. 3단이 아닌 상품에서는 사용하지 않음(기존 동작 무변경).
   const [registeredOptionDetail, setRegisteredOptionDetail] = useState("");
   // [2026-11-09 사장님 「일거수 일투족」] 옵션 창에서 고른 세부상품·색상·사이즈·수량을 관리자 「지금 접속」 타임라인에(신호만 — 담기·가격·재고 로직 무관).
@@ -3133,6 +3137,10 @@ export default function OrderPage() {
       .select("value")
       .eq("key", LIVE_PAUSED_TEXT_KEY)
       .maybeSingle();
+
+    // [2026-11-25] 방송 종료 예정 시각 — 따로 읽음(실패해도 방송 화면엔 영향 없음, 카운트다운만 안 뜸)
+    void Promise.resolve(supabase.from("settings").select("value").eq("key", LIVE_END_PLAN_KEY).maybeSingle())
+      .then(({ data: endRow }) => setLiveEndPlan(parseLiveEndPlan(endRow?.value)), () => setLiveEndPlan(null));
 
     // [2026-11-09] 「방송 보며 주문」 설정(누구에게·처음 화면) — 없거나 실패하면 꺼짐
     const liveWatchRequest = Promise.resolve(supabase
@@ -7732,6 +7740,7 @@ export default function OrderPage() {
                   아래 {quickGroupBuyProducts.length === 1 ? "상품은" : "상품들은"} <b>지금 바로 구매</b>할 수 있어요
                 </div>
               ) : null}
+              {(() => { const endAt = liveEndAtFor(liveEndPlan, broadcast?.id); return endAt ? <BroadcastEndCountdown endAt={endAt} dark /> : null; })()}
               <OrderBroadcastWatch
                 url={broadcastYoutubeUrl}
                 orderReady={isAutoLoggedIn}
