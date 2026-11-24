@@ -14,7 +14,7 @@ async function run(orders,meta={}){
  const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(await blob.arrayBuffer());return workbook;
 }
 const workbook=await run([ordinary,repick,late]);
-assert.deepEqual(workbook.worksheets.map(s=>s.name),['물건챙기기','변경 및 추가','고객이슈·특이사항']);
+assert.deepEqual(workbook.worksheets.map(s=>s.name),['물건챙기기','닉네임별 합계','변경 및 추가','고객이슈·특이사항']);
 const main=workbook.getWorksheet('물건챙기기');
 const additional=workbook.getWorksheet('변경 및 추가');
 assert.equal(main.rowCount,2,'only ordinary work belongs in the main sheet');

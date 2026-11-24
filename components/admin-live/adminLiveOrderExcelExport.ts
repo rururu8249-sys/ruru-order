@@ -476,7 +476,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   const mainByItemId = new Map(builtRows.mainRows.map((row) => [row.itemId, row]));
   const attentionByItemId = new Map(builtRows.attentionRows.map((row) => [row.itemId, row]));
   const visible = meta.visibleItemIds ? new Set(meta.visibleItemIds.map(String)) : null;
-  type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number };
+  type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number; orderKey: string };
   const keyedRows: RowWithKey[] = [];
 
   orderedOrders.forEach((order) => {
@@ -496,7 +496,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
       row.push(pickedIds?.has(String(order.id)) ? "✓" : "");
-      keyedRows.push({ row, unpaid, attention: false, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order) });
+      keyedRows.push({ row, unpaid, attention: false, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order), orderKey: String(order.groupId || order.id) });
       return;
     }
 
@@ -520,7 +520,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         : attention ? "결제 후 추가 챙기기" : pullKind);
       const picked = pickedIds ? pickedIds.has(String(item.id)) : Boolean(item.pickedAt) && built.kind !== "상품 변경 · 다시 챙기기";
       row.push(picked ? "✓" : "");
-      keyedRows.push({ row, unpaid, attention: built.kind !== "일반" && !pullKind, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order) });
+      keyedRows.push({ row, unpaid, attention: built.kind !== "일반" && !pullKind, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order), orderKey: String(order.groupId || order.id) });
     });
   });
 
@@ -585,6 +585,48 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       });
     }
   });
+
+  // [2026-11-25 사장님 「닉네임별 구매 개수 파악」] 두 번째 시트 「닉네임별 합계」 — 위 «물건챙기기» 시트 줄을 그대로 닉네임마다 묶은 것(표시 전용·재계산 없음).
+  //   개수·금액은 위 시트의 수량·상품금액 칸 합. 미입금 줄은 따로 셈. 정렬 = 총 개수 많은 순.
+  {
+    type Sum = { nick: string; orders: Set<string>; qty: number; amount: number; unpaidQty: number; lines: string[] };
+    const byNick = new Map<string, Sum>();
+    for (const k of ordinaryRows) {
+      const nick = String(k.row[1] ?? "").trim() || "(닉네임 없음)";
+      const qty = Number(k.row[4] ?? 0) || 0;
+      const amount = Number(k.row[5] ?? 0) || 0;
+      const sum = byNick.get(nick) || { nick, orders: new Set<string>(), qty: 0, amount: 0, unpaidQty: 0, lines: [] };
+      sum.orders.add(k.orderKey);
+      sum.qty += qty;
+      sum.amount += amount;
+      if (k.unpaid) sum.unpaidQty += qty;
+      const option = String(k.row[3] ?? "").trim();
+      sum.lines.push(`${String(k.row[2] ?? "").trim()}${option ? ` ${option}` : ""} ×${qty}${k.unpaid ? " (미입금)" : ""}`);
+      byNick.set(nick, sum);
+    }
+    const sums = [...byNick.values()].sort((a, b) => b.qty - a.qty || b.amount - a.amount || a.nick.localeCompare(b.nick, "ko"));
+    const summaryHeaders: WorkbookRow = ["닉네임", "주문서", "총 개수", "상품금액 합", "미입금 개수", "산 상품"];
+    const summarySheet = workbook.addWorksheet("닉네임별 합계");
+    addRows(summarySheet, [
+      summaryHeaders,
+      ...sums.map((sm) => [sm.nick, sm.orders.size, sm.qty, sm.amount, sm.unpaidQty || "", sm.lines.join("\n")] as WorkbookRow),
+      ["합계", sums.reduce((n, sm) => n + sm.orders.size, 0), sums.reduce((n, sm) => n + sm.qty, 0), sums.reduce((n, sm) => n + sm.amount, 0), sums.reduce((n, sm) => n + sm.unpaidQty, 0) || "", `${sums.length}명`],
+    ]);
+    styleFilterSheet(summarySheet, 1, sums.length + 1, summaryHeaders.length);
+    setColumnWidths(summarySheet, [20, 9, 9, 14, 11, 60]);
+    summarySheet.eachRow((row, rowNumber) => {
+      row.eachCell({ includeEmpty: true }, (cell, col) => {
+        cell.alignment = { horizontal: col === 6 ? "left" : "center", vertical: "middle", wrapText: true };
+      });
+      if (rowNumber > 1) {
+        row.getCell(4).numFmt = "#,##0";
+        const lines = String(row.getCell(6).value ?? "").split("\n").length;
+        row.height = Math.max(24, lines * 16 + 8);
+      }
+    });
+    const totalRow = summarySheet.getRow(sums.length + 2);
+    totalRow.eachCell({ includeEmpty: true }, (cell) => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F1F1" } }; });
+  }
 
   const attentionHeaders: WorkbookRow = ["고객", "방송", "최초 주문일시", "변경·취소/결제일시", "변경 전", "변경 후", "비고"];
   const appendAttentionSheet = (name: string, attentionRows: (PickingAttentionExportRow | import("@/lib/orderPickingExceptions").PickingCancellationRow)[]) => {
