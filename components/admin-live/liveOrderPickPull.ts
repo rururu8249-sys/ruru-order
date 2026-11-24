@@ -135,3 +135,25 @@ export function pulledAwayDays(order: Pick<LiveOrder, "items" | "pickPull">): st
   }
   return [...days].sort();
 }
+
+/** [2026-11-25 사장님 「기간별 필터로 물건챙기기 하면 옮긴 주문이 안 나온다」]
+ *  전체보기(방송 안 고름) 목록 = 방송/날짜 화면과 같은 규칙:
+ *   - 주문서 전부를 옮긴 원래 주문은 빼고(옮긴 곳에서만 보임 — 돈 띠는 filteredOrdersNoPull 이 원래 주문으로 한 번만 셈)
+ *   - 옮긴 줄(가상 묶음)은 «넘긴 날짜»로 기간·범위를 맞춰 넣는다.
+ *  물건챙기기(buildPickRows)는 원래 주문 쪽 옮긴 줄을 늘 빼므로, 가상 묶음을 안 넣으면 그 줄이 어디에도 안 나왔다(옛 10/25 «전체보기엔 그대로»의 빈틈).
+ *  keepVirtual = 넘긴 날짜·범위 판정(화면 필터), keepBase = 원래 주문 판정(화면 필터). */
+export function ordersWithMovedForAllView(
+  orders: readonly LiveOrder[],
+  virtualOrders: readonly LiveOrder[],
+  wholeMovedIds: ReadonlySet<string>,
+  keepBase: (order: LiveOrder) => boolean,
+  keepVirtual: (order: LiveOrder, pulledFor: string, toBroadcast: boolean) => boolean,
+): LiveOrder[] {
+  const base = orders.filter((order) => !wholeMovedIds.has(String(order.id)) && keepBase(order));
+  const moved = virtualOrders.filter((order) => {
+    const p = order.pickPull;
+    if (!p || !p.pulledFor) return false;
+    return keepVirtual(order, p.pulledFor, Boolean(String(p.broadcastId ?? "").trim()));
+  });
+  return moved.length ? [...base, ...moved] : base;
+}
