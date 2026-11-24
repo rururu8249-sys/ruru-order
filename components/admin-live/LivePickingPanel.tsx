@@ -143,6 +143,9 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
   const [view, setView] = useState<"product" | "customer">("product");
   const [pageIdx, setPageIdx] = useState<{ product: number; customer: number }>({ product: 0, customer: 0 });
   const [listOpen, setListOpen] = useState(false);
+  // [2026-11-25] 엑셀에서 2개 이상 산 손님 닉네임 색칠 — 켜고 끈 상태만 이 브라우저에 기억(화면 설정값, 운영 데이터 아님)
+  const [colorMulti, setColorMulti] = useState<boolean>(() => { try { return window.localStorage.getItem("ruru_pick_color_multi") === "1"; } catch { return false; } });
+  const toggleColorMulti = (on: boolean) => { setColorMulti(on); try { window.localStorage.setItem("ruru_pick_color_multi", on ? "1" : "0"); } catch { /* 저장 못 해도 이번엔 적용 */ } };
   const touchRef = useRef<{ x: number; y: number; horiz: boolean | null } | null>(null);
   const [dragDx, setDragDx] = useState(0);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -424,7 +427,7 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
         return items.length ? [{ ...o, items }] : [];
       });
       const extraIds = new Set(allRows.filter((r) => r.kind === "late" || r.kind === "repick").map((r) => r.id));
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${String(filterLabel || "").replace(/^방송:\s*/, "")} · 물건챙기기`, rowOrder: view === "product" ? "product" : "nickname", visibleItemIds: [...visible], attentionItemIds: [...extraIds], exceptions: p.exceptions, cancellations: p.cancellations }, new Set(picked));
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${String(filterLabel || "").replace(/^방송:\s*/, "")} · 물건챙기기`, rowOrder: view === "product" ? "product" : "nickname", visibleItemIds: [...visible], attentionItemIds: [...extraIds], colorMultiBuyers: colorMulti, exceptions: p.exceptions, cancellations: p.cancellations }, new Set(picked));
       const printed = eligibleRows.filter((r) => r.paid).map((r) => Number(r.id));
       const now = new Date().toISOString();
       for (let i = 0; i < printed.length; i += 500) {
@@ -685,8 +688,12 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
         ) : null}
 
         {/* 아래 */}
-        <div className="flex items-center gap-2 border-t border-line px-4 py-3" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+        <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
           <button type="button" disabled={blocked || exporting || scopeTooWide} onClick={() => void runExcel()} className="h-10 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-40">{exporting ? "만드는 중…" : "엑셀"}</button>
+          <label className="flex h-10 cursor-pointer items-center gap-1.5 rounded-lg px-1 text-[13px] font-semibold text-ink-soft" title="엑셀에서 이벤트 선물 빼고 2개 이상(수량 포함) 산 손님의 닉네임 칸을 손님마다 다른 색으로 칠해요">
+            <input type="checkbox" checked={colorMulti} onChange={(e) => toggleColorMulti(e.target.checked)} className="h-4 w-4 accent-ink" />
+            2개↑ 색칠
+          </label>
           <button type="button" disabled={blocked || scopeTooWide} onClick={() => void unpickAll()} className="h-10 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2 disabled:opacity-40">전부 해제</button>
           <span className="flex-1" />
           <button type="button" onClick={onClose} className="h-10 rounded-lg border border-line bg-surface px-4 text-[14px] font-semibold text-ink">닫기</button>

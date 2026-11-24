@@ -17,7 +17,18 @@ type ExportMeta = {
   attentionItemIds?: string[];
   exceptions?: import("@/lib/orderPickingExceptions").PickingExceptionRow[];
   cancellations?: import("@/lib/orderPickingExceptions").PickingCancellationRow[];
+  /** [2026-11-25] 이벤트 선물 빼고 2개 이상(수량 포함) 산 손님 — 닉네임 칸을 손님마다 다른 연한 색으로 (표시 전용) */
+  colorMultiBuyers?: boolean;
 };
+
+/** [2026-11-25] 이벤트 선물 줄 — 룰렛 당첨 연결이 있거나, 0원이면서 이름에 이벤트·선물·당첨·사은품. (최근 선물 줄은 연결 없이 0원 「이벤트 당첨자」 등으로 들어감 — 실데이터 확인) */
+export function isEventGiftItem(item: Pick<LiveOrderItem, "eventGiftWinnerId" | "productName"> & { amount?: number | null }): boolean {
+  if (String(item.eventGiftWinnerId ?? "").trim()) return true;
+  return Number(item.amount || 0) === 0 && /이벤트|선물|당첨|사은품/.test(String(item.productName || ""));
+}
+
+/** 닉네임 칸 색 — 미입금(분홍)·추가 작업(주황)과 겹치지 않는 연한 색 8개를 돌려 씀 */
+export const MULTI_BUYER_COLORS = ["FFDBEAFE", "FFD1FAE5", "FFEDE9FE", "FFFEF9C3", "FFCCFBF1", "FFE0F2FE", "FFECFCCB", "FFE2E8F0"] as const;
 
 type WorkbookRow = Array<string | number | null>;
 
@@ -476,7 +487,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   const mainByItemId = new Map(builtRows.mainRows.map((row) => [row.itemId, row]));
   const attentionByItemId = new Map(builtRows.attentionRows.map((row) => [row.itemId, row]));
   const visible = meta.visibleItemIds ? new Set(meta.visibleItemIds.map(String)) : null;
-  type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number; orderKey: string };
+  type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number; orderKey: string; gift: boolean };
   const keyedRows: RowWithKey[] = [];
 
   orderedOrders.forEach((order) => {
@@ -496,7 +507,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
       row.push(pickedIds?.has(String(order.id)) ? "✓" : "");
-      keyedRows.push({ row, unpaid, attention: false, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order), orderKey: String(order.groupId || order.id) });
+      keyedRows.push({ row, unpaid, attention: false, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order), orderKey: String(order.groupId || order.id), gift: false });
       return;
     }
 
@@ -520,7 +531,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         : attention ? "결제 후 추가 챙기기" : pullKind);
       const picked = pickedIds ? pickedIds.has(String(item.id)) : Boolean(item.pickedAt) && built.kind !== "상품 변경 · 다시 챙기기";
       row.push(picked ? "✓" : "");
-      keyedRows.push({ row, unpaid, attention: built.kind !== "일반" && !pullKind, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order), orderKey: String(order.groupId || order.id) });
+      keyedRows.push({ row, unpaid, attention: built.kind !== "일반" && !pullKind, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order), orderKey: String(order.groupId || order.id), gift: isEventGiftItem(item) });
     });
   });
 
@@ -533,6 +544,17 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   const itemRows: WorkbookRow[] = ordinaryRows.map((k) => k.row);
   const unpaidRowFlags: boolean[] = ordinaryRows.map((k) => k.unpaid);
   const attentionRowFlags: boolean[] = ordinaryRows.map((k) => k.attention);
+  // [2026-11-25] 2개 이상 산 손님 색 — 이 시트 줄 기준·선물 빼고 수량 합. 색은 시트에 처음 나온 순서로 돌려 줘서 붙어 있는 손님끼리 다름
+  const nickOf = (k: RowWithKey) => String(k.row[1] ?? "").trim() || "(닉네임 없음)";
+  const multiBuyerColor = new Map<string, string>();
+  if (meta.colorMultiBuyers) {
+    const buyQty = new Map<string, number>();
+    for (const k of ordinaryRows) if (!k.gift) buyQty.set(nickOf(k), (buyQty.get(nickOf(k)) || 0) + (Number(k.row[4] ?? 0) || 0));
+    for (const k of ordinaryRows) {
+      const nick = nickOf(k);
+      if ((buyQty.get(nick) || 0) >= 2 && !multiBuyerColor.has(nick)) multiBuyerColor.set(nick, MULTI_BUYER_COLORS[multiBuyerColor.size % MULTI_BUYER_COLORS.length]);
+    }
+  }
 
   // [2026-09-20 사장님 지시] 맨 위 합계 3줄(상품값 합계·실제 받은 돈·설명) 삭제 — 팝업 상단에 같은 숫자가 있고,
   //   엑셀에선 1행부터 표가 시작되는 게 정렬·필터에 편하다. (08-31 에 넣었던 것을 되돌림)
@@ -584,6 +606,12 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         if (colNumber === 8) cell.font = { bold: true, color: { argb: "FF9A3412" } };
       });
     }
+    const nickColor = multiBuyerColor.get(nickOf(ordinaryRows[index]));
+    if (nickColor) {
+      const cell = row.getCell(2);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: nickColor } };
+      cell.font = { bold: true, color: { argb: "FF111111" } };
+    }
   });
 
   // [2026-11-25 사장님 「닉네임별 구매 개수 파악」] 두 번째 시트 「닉네임별 합계」 — 위 «물건챙기기» 시트 줄을 그대로 닉네임마다 묶은 것(표시 전용·재계산 없음).
@@ -623,6 +651,13 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         const lines = String(row.getCell(6).value ?? "").split("\n").length;
         row.height = Math.max(24, lines * 16 + 8);
       }
+    });
+    sums.forEach((sm, i) => {
+      const nickColor = multiBuyerColor.get(sm.nick);
+      if (!nickColor) return;
+      const cell = summarySheet.getRow(i + 2).getCell(1);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: nickColor } };
+      cell.font = { bold: true, color: { argb: "FF111111" } };
     });
     const totalRow = summarySheet.getRow(sums.length + 2);
     totalRow.eachCell({ includeEmpty: true }, (cell) => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F1F1" } }; });
