@@ -1450,6 +1450,22 @@ export default function AdminLiveDashboard() {
         matchesDate(order, filters)
       );
     });
+    // [2026-11-25 사장님 「기간별 필터로 물건챙기기 하면 옮긴 주문이 안 나온다(방송별은 나옴)」]
+    //   설계(10/25): 전체보기엔 원래 주문을 «그대로» 둔다 — 원래 주문 안에 옮긴 줄이 이미 들어 있어서 가상 묶음을 또 넣으면 두 번 셈.
+    //   빈틈: 전체보기 + 기간 필터에서 원래 주문일은 기간 밖이고 «넘긴 날짜»만 기간 안이면 어디에도 안 보였음.
+    //   → 전체보기에서는 원래 주문이 목록에 «없을 때만» 넘긴 날짜 기준으로 가상 묶음을 넣는다(있으면 지금처럼 원래 주문만 — 중복 없음).
+    if (pullView.kind === "none") {
+      const baseIds = new Set(base.map((order) => String(order.id)));
+      const missingPulled = pulledVirtualOrders.filter((order) => {
+        const pull = order.pickPull;
+        if (!pull || !pull.pulledFor) return false;
+        if (baseIds.has(String(originalOrderIdOf(order)))) return false;
+        const toBroadcast = Boolean(String(pull.broadcastId ?? "").trim());
+        const matchScope = filters.scope === "all" ? true : filters.scope === "shop" ? !toBroadcast : toBroadcast;
+        return matchScope && matchesDate({ ...order, createdAt: `${pull.pulledFor}T12:00:00+09:00` }, filters);
+      });
+      return missingPulled.length ? [...base, ...missingPulled] : base;
+    }
     return pulledForScope.length ? [...base, ...pulledForScope] : base;
   }, [orders, filters, broadcasts, activeBroadcast, pulledVirtualOrders, wholeMovedIds]);
 
