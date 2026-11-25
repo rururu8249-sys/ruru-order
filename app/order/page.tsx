@@ -7757,6 +7757,13 @@ export default function OrderPage() {
               </div>
             </div>
           )}
+          {subscribeWaiverOn && !subscribeStatusLoading && !subscribeShouldShow ? (
+            /* [2026-11-26] 구독 인증(관리자 통과 포함)한 손님 — 첫 화면에도 「배송비 무료」를 바로 보이게 */
+            <div role="status" style={{ marginTop: "10px", display: "flex", gap: "10px", alignItems: "center", background: "#E6F4EC", border: "1.5px solid #007D48", borderRadius: "12px", padding: "12px 14px", color: "#007D48", wordBreak: "keep-all" }}>
+              <span aria-hidden="true" style={{ flexShrink: 0, width: "26px", height: "26px", borderRadius: "50%", background: "#007D48", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800 }}>✓</span>
+              <span style={{ fontSize: "15px", fontWeight: 700, lineHeight: 1.4 }}>구독 인증 완료 · 이번 주문 배송비 무료</span>
+            </div>
+          ) : null}
           {subscribeShouldShow ? (
             <SubscribeFreeShipCard
               variant="strip"
@@ -8732,9 +8739,13 @@ export default function OrderPage() {
                 ) : null}
                 {subscribeWaiverOn && !subscribeStatusLoading && selectedItemEntries.length > 0 ? (
                   <div style={{ padding: "16px 16px 0" }}>
-                    <div role="status" style={{ background: "#F5F5F5", borderRadius: "8px", padding: "12px 14px", fontSize: "14px", fontWeight: 600, color: "#111111", lineHeight: 1.5, wordBreak: "keep-all" }}>
-                      구독 인증 완료 · {subscribeWaivedAmount > 0 ? `이번 주문 배송비 ${subscribeWaivedAmount.toLocaleString()}원 무료` : "이번 주문 배송비 무료"}
-                      <span style={{ display: "block", fontSize: "13px", fontWeight: 400, color: "#707072" }}>무료배송은 한 번만 돼요. 이 주문서를 제출하면 사용돼요.</span>
+                    {/* [2026-11-26 사장님 「구독 무배 받는 손님은 누구나 알아보게」] 회색 → 초록 확인 상자(입금확인 색과 같은 초록) */}
+                    <div role="status" style={{ display: "flex", gap: "10px", alignItems: "flex-start", background: "#E6F4EC", border: "1.5px solid #007D48", borderRadius: "12px", padding: "12px 14px", color: "#007D48", lineHeight: 1.45, wordBreak: "keep-all" }}>
+                      <span aria-hidden="true" style={{ flexShrink: 0, width: "26px", height: "26px", borderRadius: "50%", background: "#007D48", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800 }}>✓</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: "block", fontSize: "16px", fontWeight: 700 }}>구독 인증 완료 · 배송비 {subscribeWaivedAmount > 0 ? `${subscribeWaivedAmount.toLocaleString()}원 ` : ""}무료</span>
+                        <span style={{ display: "block", marginTop: "2px", fontSize: "13px", fontWeight: 500, color: "#1F5C3F" }}>이 주문서를 제출하면 무료배송이 적용돼요 (1회)</span>
+                      </span>
                     </div>
                   </div>
                 ) : null}

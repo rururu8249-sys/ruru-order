@@ -128,12 +128,13 @@ export function buildSubscribeCheckPrompt(channelName: string): string {
   return [
     "이 사진은 손님이 올린 휴대폰 화면 캡처다. 아래를 확인해 JSON 으로만 답해라.",
     `확인할 채널 이름(이 중 하나면 됨): ${subscribeChannelLabel(channelName)}`,
-    "1) 유튜브 앱/사이트 화면인가?",
-    "2) 화면에 보이는 채널 이름(또는 @핸들)을 글자 그대로 적어라. 여러 개면 「구독중」 버튼과 붙어 있는 채널 이름.",
-    "3) 그 채널 이름 바로 아래나 바로 옆에 붙은 구독 버튼의 글자를 그대로 적어라(예: 구독중, 구독, Subscribed, Subscribe).",
-    "4) 그 구독 버튼이 2)의 채널 이름에 속한 버튼인가? 다른 채널(영상 목록·추천 채널 등)의 버튼이면 false.",
-    "5) 글자가 잘리거나 흐려서 확실하지 않으면 clear=false.",
-    '형식: {"is_youtube":true,"channel_name":"","button_text":"","button_belongs":true,"clear":true,"note":""}',
+    "1) 유튜브 앱/사이트 화면인가? (채널 홈, 영상·라이브 방송 화면 모두 해당)",
+    "2) 화면에 보이는 채널 이름(또는 @핸들)을 글자 그대로 적어라. 여러 개면 구독 버튼이나 종 모양과 붙어 있는 채널 이름. 라이브 방송 화면이면 왼쪽 위 프로필 사진 옆 @핸들.",
+    "3) 그 채널 이름 바로 아래나 바로 옆에 붙은 구독 버튼의 글자를 그대로 적어라(예: 구독중, 구독, Subscribed, Subscribe). 글자 버튼이 없으면 빈칸.",
+    "4) 그 채널 이름 바로 옆(같은 줄 오른쪽 끝 포함)에 글자 「구독」 버튼 대신 종 모양 아이콘(알림 종, 사선이 그어진 종·물결 있는 종 모두 포함)이 있으면 bell_icon=true. 유튜브는 구독한 채널에만 이 자리에 종을 보여 준다. 화면 위쪽 전체 알림(받은편지함) 종은 해당 안 됨.",
+    "5) 그 구독 버튼·종이 2)의 채널 이름에 속한 것인가? 다른 채널(영상 목록·추천 채널 등)의 것이면 false.",
+    "6) 글자가 잘리거나 흐려서 확실하지 않으면 clear=false.",
+    '형식: {"is_youtube":true,"channel_name":"","button_text":"","bell_icon":false,"button_belongs":true,"clear":true,"note":""}',
   ].join("\n");
 }
 
@@ -141,6 +142,8 @@ export type SubscribeAiJudge = {
   is_youtube?: boolean;
   channel_name?: string;
   button_text?: string;
+  /** [2026-11-26] 채널 이름 옆에 「구독」 대신 종 모양(구독한 채널에만 나옴 — 라이브·영상 화면) */
+  bell_icon?: boolean;
   button_belongs?: boolean;
   clear?: boolean;
   note?: string;
@@ -155,19 +158,22 @@ export function judgeSubscribeShot(
 ): { ok: boolean; reason: string } {
   if (!ai) return { ok: false, reason: "사진을 확인하지 못했어요. 잠시 뒤 다시 올려 주세요." };
   if (ai.is_youtube === false) return { ok: false, reason: "유튜브 화면 캡처를 올려 주세요." };
-  if (ai.clear === false) return { ok: false, reason: "글자가 잘 안 보여요. 채널 이름과 「구독중」이 또렷하게 나오게 다시 찍어 주세요." };
+  if (ai.clear === false) return { ok: false, reason: "글자가 잘 안 보여요. 채널 이름과 「구독중」(또는 이름 옆 종 모양)이 또렷하게 나오게 다시 찍어 주세요." };
   const seen = norm(ai.channel_name || "");
   const label = subscribeChannelLabel(channelName);
   const wants = subscribeChannelList(channelName).map(norm).filter(Boolean);
   if (!seen || !wants.some((want) => seen.includes(want))) {
     // [2026-11-23] 실제 불합격 대부분 = 방송(영상) 화면을 올림 → 어느 화면을 찍어야 하는지 말해 준다
-    return { ok: false, reason: `${label} 채널 이름이 안 보여요. 방송 화면이 아니라 유튜브 채널 홈(채널 이름 아래 「구독중」 버튼이 있는 화면)을 위 예시 사진처럼 캡처해 주세요.` };
+    return { ok: false, reason: `${label} 채널 이름이 안 보여요. 방송 화면이면 왼쪽 위 채널 이름과 오른쪽 위 종 모양이 함께 나오게, 채널 홈이면 채널 이름과 「구독중」이 함께 나오게 캡처해 주세요.` };
   }
   const button = norm(ai.button_text || "");
-  const subscribed = button.includes("구독중") || button.includes("subscribed");
-  if (!subscribed) return { ok: false, reason: "「구독중」이 안 보여요. 아직 구독 전이면 「구독」을 먼저 누르고, 방송 화면이 아니라 채널 홈(채널 이름 아래 「구독중」)을 위 예시 사진처럼 캡처해 주세요." };
+  // [2026-11-26 사장님] 라이브 방송 화면은 구독하면 「구독」 버튼 자리에 종(사선 종 포함)이 나온다 → 종도 구독 인정.
+  //   단 「구독」(구독 안 함) 글자가 보이면 종이 있다고 해도 통과 안 함(다른 곳의 종을 잘못 본 경우 막기).
+  const notSubscribedButton = (button.includes("구독") && !button.includes("구독중")) || (button.includes("subscribe") && !button.includes("subscribed"));
+  const subscribed = button.includes("구독중") || button.includes("subscribed") || (ai.bell_icon === true && !notSubscribedButton);
+  if (!subscribed) return { ok: false, reason: "구독한 표시가 안 보여요. 아직 구독 전이면 「구독」을 먼저 누르고, 방송 화면이면 채널 이름과 오른쪽 위 종 모양이, 채널 홈이면 「구독중」이 나오게 캡처해 주세요." };
   if (ai.button_belongs === false) {
-    return { ok: false, reason: `「구독중」이 ${label} 채널 것인지 안 보여요. 채널 이름 바로 아래 「구독중」이 나오게 찍어 주세요.` };
+    return { ok: false, reason: `구독 표시가 ${label} 채널 것인지 안 보여요. 채널 이름과 그 옆 「구독중」(또는 종 모양)이 한 화면에 나오게 찍어 주세요.` };
   }
   return { ok: true, reason: "" };
 }

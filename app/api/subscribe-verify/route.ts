@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       const judged = judgeSubscribeShot(parsed, config.channelName);
       ok = judged.ok;
       reason = judged.reason;
-      aiNote = parsed ? `채널:${parsed.channel_name || "-"} · 버튼:${parsed.button_text || "-"} · 소속:${parsed.button_belongs === false ? "아님" : "맞음"}` : "읽기 실패";
+      aiNote = parsed ? `채널:${parsed.channel_name || "-"} · 버튼:${parsed.button_text || "-"}${parsed.bell_icon ? " · 종" : ""} · 소속:${parsed.button_belongs === false ? "아님" : "맞음"}` : "읽기 실패";
     }
 
     // 캡처 보관(사장님 확인용) — 실패해도 인증 결과는 그대로

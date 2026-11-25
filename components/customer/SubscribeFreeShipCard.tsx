@@ -133,6 +133,7 @@ export default function SubscribeFreeShipCard(props: Props) {
   };
 
   const pcExample = SUBSCRIBE_EXAMPLE_PC;
+  const liveExample = "/subscribe-example-live.jpg";
   const stepNo = (n: number) => (
     <span aria-hidden="true" style={{ flexShrink: 0, width: "28px", height: "28px", borderRadius: "9999px", background: C.ink, color: "#FFFFFF", fontSize: "15px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{n}</span>
   );
@@ -149,7 +150,7 @@ export default function SubscribeFreeShipCard(props: Props) {
         >
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: "block", fontSize: "18px", fontWeight: 700, lineHeight: 1.35 }}>{potentialAmount > 0 ? `배송비 ${potentialAmount.toLocaleString()}원 무료` : "배송비 무료"}</span>
-            <span style={{ display: "block", marginTop: "2px", fontSize: "14px", fontWeight: 400, lineHeight: 1.45, color: "#E5E5E5" }}>유튜브 구독 화면을 캡처해 올리면 돼요</span>
+            <span style={{ display: "block", marginTop: "2px", fontSize: "14px", fontWeight: 400, lineHeight: 1.45, color: "#E5E5E5" }}>방송 보던 화면 그대로 캡처해 올리면 돼요</span>
           </span>
           <span style={{ flexShrink: 0, height: "40px", padding: "0 14px", display: "flex", alignItems: "center", borderRadius: "9999px", background: "#FFFFFF", color: C.ink, fontSize: "15px", fontWeight: 700 }}>인증하기</span>
         </button>
@@ -185,9 +186,15 @@ export default function SubscribeFreeShipCard(props: Props) {
           {stepNo(2)}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={stepText}>아래 사진처럼 화면 캡처</div>
-            <div style={{ marginTop: "2px", fontSize: "14px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>빨간 칸처럼 채널 이름과 「구독중」이 같이 보이게</div>
+            <div style={{ marginTop: "2px", fontSize: "14px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>방송 화면: 채널 이름 + 오른쪽 위 종 모양 · 채널 화면: 채널 이름 + 「구독중」</div>
+            {/* [2026-11-26 사장님] 유튜브 라이브 화면은 구독하면 「구독」 자리에 종이 나온다 — 방송 보던 화면 캡처가 가장 쉬워서 맨 앞에 크게 */}
+            <button type="button" onClick={() => setZoom(liveExample)} aria-label="방송 화면 예시 크게 보기" style={{ display: "block", width: "100%", marginTop: "8px", padding: 0, border: `1px solid ${C.line}`, borderRadius: "8px", background: C.soft, overflow: "hidden", cursor: "zoom-in", fontFamily: "inherit" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={liveExample} alt="구독 캡처 예시 (방송 화면)" style={{ display: "block", width: "100%", height: "auto" }} />
+              <span style={{ display: "block", padding: "4px 0", fontSize: "13px", fontWeight: 600, color: C.ink }}>방송 화면 · 크게 보기</span>
+            </button>
             <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-              {[{ src: exampleUrl, label: "폰 화면", pos: "center 70%" }, { src: pcExample, label: "PC 화면", pos: "left 92%" }].map((ex) => (
+              {[{ src: exampleUrl, label: "채널 화면(폰)", pos: "center 70%" }, { src: pcExample, label: "채널 화면(PC)", pos: "left 92%" }].map((ex) => (
                 <button key={ex.label} type="button" onClick={() => setZoom(ex.src)} aria-label={`${ex.label} 예시 크게 보기`} style={{ flex: 1, minWidth: 0, padding: 0, border: `1px solid ${C.line}`, borderRadius: "8px", background: C.soft, overflow: "hidden", cursor: "zoom-in", fontFamily: "inherit" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={ex.src} alt={`구독중 캡처 예시 (${ex.label})`} style={{ display: "block", width: "100%", height: "120px", objectFit: "cover", objectPosition: ex.pos }} />
@@ -224,7 +231,7 @@ export default function SubscribeFreeShipCard(props: Props) {
         <div role="dialog" aria-label="예시 사진" onClick={() => setZoom("")} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={zoom} alt="구독중 캡처 예시" style={{ maxWidth: "100%", maxHeight: "80vh", borderRadius: "8px" }} />
-          <div style={{ marginTop: "12px", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, textAlign: "center", wordBreak: "keep-all" }}>빨간 테두리처럼 채널 이름과 「구독중」이 같이 보여야 해요</div>
+          <div style={{ marginTop: "12px", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, textAlign: "center", wordBreak: "keep-all" }}>빨간 테두리처럼 채널 이름과 종 모양(또는 「구독중」)이 같이 보여야 해요</div>
           <button type="button" onClick={() => setZoom("")} style={{ marginTop: "12px", height: "44px", padding: "0 24px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: C.ink, fontSize: "15px", fontWeight: 600 }}>닫기</button>
         </div>
       ) : null}

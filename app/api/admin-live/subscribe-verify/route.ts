@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { SUBSCRIBE_PROOF_BUCKET, resolveSubscribeBenefitWindow } from "@/lib/subscribeFreeShipServer";
+import { callGeminiJson } from "@/lib/geminiJson";
+import { buildSubscribeCheckPrompt, judgeSubscribeShot, parseAiJudge, parseSubscribeFreeShip } from "@/lib/subscribeFreeShip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,7 +84,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!(await verifyAdminSessionFromRequest(request))) return NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 });
   try {
-    const body = (await request.json().catch(() => null)) as { action?: string; id?: number } | null;
+    const body = (await request.json().catch(() => null)) as { action?: string; id?: number; image?: string; mime?: string } | null;
+    // [2026-11-26] 관리자 시험 — 캡처를 손님과 같은 AI·같은 판정으로 읽기만(저장·인증 없음). 인식 규칙 바꿀 때 실제 캡처로 확인용
+    if (body?.action === "test") {
+      const base64 = String(body.image || "").replace(/^data:[^,]+,/, "");
+      const mime = /^image\/(png|jpe?g|webp)$/.test(String(body.mime || "")) ? String(body.mime) : "image/jpeg";
+      if (!base64 || base64.length > 8_000_000) return NextResponse.json({ ok: false, message: "사진이 없거나 너무 커요." }, { status: 400 });
+      const { data: row } = await db().from("settings").select("value").eq("key", "subscribe_free_ship_v1").maybeSingle();
+      const config = parseSubscribeFreeShip((row as { value?: unknown } | null)?.value);
+      const ai = await callGeminiJson([{ text: buildSubscribeCheckPrompt(config.channelName) }, { inline_data: { mime_type: mime, data: base64 } }], { timeoutMs: 15000, maxTokens: 400 });
+      const parsed = parseAiJudge(ai.text);
+      return NextResponse.json({ ok: true, ai: parsed, judged: judgeSubscribeShot(parsed, config.channelName) });
+    }
     const id = Number(body?.id);
     if (!Number.isFinite(id) || id <= 0) return NextResponse.json({ ok: false, message: "잘못된 요청" }, { status: 400 });
     const supabase = db();

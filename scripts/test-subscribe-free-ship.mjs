@@ -64,6 +64,11 @@ assert.equal(judgeSubscribeShot({ is_youtube: true, channel_name: "나야루루"
 assert.equal(judgeSubscribeShot({ is_youtube: false }, "나야루루").ok, false);
 assert.equal(judgeSubscribeShot(null, "나야루루").ok, false);
 assert.match(judgeSubscribeShot({ is_youtube: true, channel_name: "다른채널", button_text: "구독중" }, "나야루루").reason, /나야루루/);
+// [2026-11-26] 라이브 방송 화면 — 채널 이름 + 종(사선 종 포함)이면 구독 인정, 「구독」 글자가 보이면 불합격
+assert.equal(judgeSubscribeShot({ is_youtube: true, channel_name: "@나야루루", button_text: "", bell_icon: true, button_belongs: true, clear: true }, "나야루루").ok, true);
+assert.equal(judgeSubscribeShot({ is_youtube: true, channel_name: "@나야루루", button_text: "구독", bell_icon: true, button_belongs: true, clear: true }, "나야루루").ok, false);
+assert.equal(judgeSubscribeShot({ is_youtube: true, channel_name: "@나야루루", button_text: "", bell_icon: false, button_belongs: true, clear: true }, "나야루루").ok, false);
+assert.equal(judgeSubscribeShot({ is_youtube: true, channel_name: "다른채널", button_text: "", bell_icon: true, button_belongs: true, clear: true }, "나야루루").ok, false);
 assert.deepEqual(parseAiJudge('```json\n{"is_youtube":true}\n```'), { is_youtube: true });
 assert.equal(parseAiJudge("모름"), null);
 
