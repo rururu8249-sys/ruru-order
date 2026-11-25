@@ -22,6 +22,10 @@ export function useAdminModalFocus(panelRef:RefObject<HTMLDivElement|null>,onClo
         // A nested select can consume Escape in React's document listener.
         // stopPropagation alone does not skip this listener on the same target.
         if(event.defaultPrevented) return;
+        // [2026-11-26] 창 안에 띄운 «안쪽 창»(고객이슈 등록·상품 고르기 등 fixed 덮개)에서 Esc 를 누르면
+        //   바깥 창(주문상세)까지 통째로 닫혀 적던 내용이 날아갔다(실측 재현). 안쪽 창이 열려 있으면 바깥은 닫지 않는다.
+        const innerLayer=Array.from(panel.querySelectorAll<HTMLElement>(".fixed.inset-0")).find(el=>el!==panel && el.getClientRects().length>0);
+        if(innerLayer) return;
         event.preventDefault();event.stopPropagation();closeRef.current();return;
       }
       if(event.key!=="Tab") return;
