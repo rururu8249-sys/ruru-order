@@ -141,6 +141,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, reason: "bad_body" }, { status: 400 });
   }
 
+  // [2026-11-26] 회원 상세 «예전 계정 합치기» — 요청 줄 하나만 만든다(돈 무접촉). 실제 합치기는 아래 id 경로.
+  if (text(body.action) === "create") {
+    const newKakaoId = text(body.newKakaoId);
+    const oldPhone = text(body.oldPhone).replace(/[^0-9]/g, "");
+    if (!newKakaoId) return NextResponse.json({ ok: false, reason: "no_kakao" }, { status: 400 });
+    if (oldPhone.length < 9) return NextResponse.json({ ok: false, reason: "bad_phone" }, { status: 400 });
+    try {
+      const db = admin();
+      const { data: newRows, error: e1 } = await db.from("customers")
+        .select("id, customer_name, customer_phone, youtube_nickname, kakao_id")
+        .eq("kakao_id", newKakaoId).order("created_at", { ascending: false }).limit(1);
+      if (e1) throw new Error(e1.message);
+      const cur = (newRows || [])[0] as any;
+      if (!cur) return NextResponse.json({ ok: false, reason: "new_not_found" });
+      const { data: oldRows, error: e2 } = await db.from("customers")
+        .select("id, customer_name, customer_phone, youtube_nickname, kakao_id")
+        .in("customer_phone", koreanPhoneVariants(oldPhone)).order("id").limit(1);
+      if (e2) throw new Error(e2.message);
+      const old = (oldRows || [])[0] as any;
+      if (!old) return NextResponse.json({ ok: false, reason: "old_not_found" });
+      if (Number(old.id) === Number(cur.id)) return NextResponse.json({ ok: false, reason: "same_row" });
+      const curPhone = text(cur.customer_phone).replace(/[^0-9]/g, "");
+      const { data: exist } = await db.from("customer_link_requests").select("id")
+        .eq("status", "pending").eq("new_kakao_id", newKakaoId).eq("target_customer_id", old.id).limit(1);
+      let reqId = text((exist || [])[0]?.id);
+      if (!reqId) {
+        const { data: ins, error: e3 } = await db.from("customer_link_requests").insert({
+          nickname: text(cur.youtube_nickname) || text(old.youtube_nickname) || "회원",
+          claimed_phone: oldPhone,
+          target_customer_id: old.id,
+          target_customer_phone: text(old.customer_phone).replace(/[^0-9]/g, ""),
+          target_customer_name: text(old.customer_name),
+          new_kakao_id: newKakaoId,
+          new_customer_phone: curPhone,
+          new_customer_id: cur.id,
+          source: "admin",
+          status: "pending",
+        }).select("id").single();
+        if (e3) throw new Error(e3.message);
+        reqId = text((ins as any)?.id);
+      }
+      return NextResponse.json({
+        ok: true, id: reqId,
+        old: { name: text(old.customer_name), nickname: text(old.youtube_nickname), phone: text(old.customer_phone) },
+      });
+    } catch (error: any) {
+      return NextResponse.json({ ok: false, reason: "server", message: String(error?.message || "") }, { status: 500 });
+    }
+  }
+
   const id = text(body.id);
   if (!id) return NextResponse.json({ ok: false, reason: "no_id" }, { status: 400 });
   // 기본은 «미리보기». 실행은 confirm 을 명시적으로 보내야만 한다(오클릭으로 병합되지 않게).

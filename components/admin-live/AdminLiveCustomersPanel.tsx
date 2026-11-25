@@ -4,6 +4,7 @@
 // 목적: 실시간 관리자 고객관리 화면
 // 주의: 1차는 조회/화면 구성 전용. 고객 차단 저장, 메모 저장, 주문/입금/배송/정산 로직 없음.
 
+import LinkOldAccountBox from "./LinkOldAccountBox";
 import { useEffect, useMemo, useRef, useState } from "react";
 import AdminLiveAiMembersPanel from "./AdminLiveAiMembersPanel";
 import { NOTE_PRESETS } from "@/lib/customerNotePresets";
@@ -1073,6 +1074,10 @@ function CustomerDetailDrawer({
                 className="min-h-11 rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50 sm:min-h-9">
                 {blockSaving ? "처리 중…" : CUSTOMER_TERMS.block}
               </button>
+              <div className="flex w-full flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+                <p className="text-xs text-ink-mute">손님이 «카톡 바꿨어요» 하면 예전 계정 번호로 합쳐요.</p>
+                <LinkOldAccountBox kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)} label={clean(customer.nickname)} onMerged={() => setHistoryRefreshKey((k) => k + 1)} />
+              </div>
             </section>
           ) : null}
 

@@ -2,7 +2,8 @@
 
 // components/admin-live/AdminLiveLinkRequestsPanel.tsx
 // [2026-09-09] «계정 연결 요청» 목록 — 손님이 카톡을 바꿔 계정이 갈라졌을 때 (1단계)
-// [2026-09-11 사장님 결정] 손님한테 안 묻는다. 시스템이 «주소»로 알아내서 여기 올린다(자동 감지).
+// [2026-11-26] 주소 자동 감지 폐지(같은 집 가족이 잘못 올라옴). 회원 상세 «예전 계정 합치기»가 주 경로.
+// [2026-09-11 사장님 결정(폐기)] 손님한테 안 묻는다. 시스템이 «주소»로 알아내서 여기 올린다(자동 감지).
 //
 //   줄이 생기는 길 두 가지
 //     · 자동 감지(source='auto')  DB 트리거 ruru_detect_split_account — 상세주소까지 같은 «다른 카톡·다른 번호» 회원이
@@ -68,50 +69,60 @@ const when = (value: unknown) => {
   return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 };
 
-// 오늘(2026-09-09 용서린) 실제로 돌려서 검증한 순서 그대로. 안전핀(where 조건)이 들어 있어
-// 상태가 다르면 0건으로 지나간다. 반드시 [0] 결과를 눈으로 본 뒤 아래를 돌릴 것.
-function buildMergeSql(row: LinkRequestRow) {
-  const oldPhone = String(row.target_customer_phone || "").replace(/[^0-9]/g, "");
-  const newPhone = String(row.new_customer_phone || "").replace(/[^0-9]/g, "");
-  const kakao = String(row.new_kakao_id || "");
-  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return [
-    `-- [${stamp}] 「${row.nickname}」 계정 합치기 (관리자 화면에서 생성)`,
-    `--   옛 줄: ${oldPhone} (${row.target_customer_name || "이름없음"}) · 주문 ${row.old_order_count ?? "?"}건 · 포인트 ${(row.old_points ?? 0).toLocaleString("ko-KR")}`,
-    `--   새 줄: ${newPhone || "(번호없음)"} · 카톡 ${kakao || "(없음)"}`,
-    `--   방향: 옛 줄을 살리고 카톡ID·번호를 그쪽으로 옮긴다 (포인트 ledger 가 옛 줄에 묶여 있어 이동이 최소)`,
-    `--   ★ 순서 중요: 카톡ID 를 «먼저» 넣어야 번호를 바꿀 때 트리거가 orders.kakao_id 에 도장을 찍는다`,
-    ``,
-    `-- [0] 실행 전 상태 확인 — 여기부터 «먼저» 돌려보고 예상과 같은지 눈으로 볼 것`,
-    `select id, customer_phone, customer_name, youtube_nickname, kakao_id`,
-    `from customers where customer_phone in ('${oldPhone}','${newPhone}') order by id;`,
-    ``,
-    `-- [1] 백업`,
-    `create table if not exists customers_backup_${stamp}_${oldPhone} as`,
-    `select * from customers where customer_phone in ('${oldPhone}','${newPhone}');`,
-    ``,
-    `-- [2] 옛 줄에 카톡ID «먼저» (번호는 아직 그대로라 트리거는 안 돈다)`,
-    `update customers set kakao_id = '${kakao}'`,
-    `where customer_phone = '${oldPhone}' and coalesce(trim(kakao_id),'') = '';`,
-    ``,
-    `-- [3] 새 줄 삭제 — 번호를 비워줘야 [4] 에서 옛 줄이 그 번호를 가져갈 수 있다`,
-    `delete from customers where customer_phone = '${newPhone}' and kakao_id = '${kakao}';`,
-    ``,
-    `-- [4] 옛 줄의 번호를 새 번호로 → 여기서 트리거가 포인트·차단·orders.kakao_id 를 옮긴다`,
-    `update customers set customer_phone = '${newPhone}' where customer_phone = '${oldPhone}';`,
-    ``,
-    `-- [5] 주문의 전화번호도 새 번호로 (트리거는 주문 번호를 안 바꾼다)`,
-    `update orders set customer_phone = '${newPhone}' where customer_phone = '${oldPhone}';`,
-    `update orders set phone = '${newPhone}' where phone = '${oldPhone}';`,
-    ``,
-    `-- [6] 받는사람 번호는 «주문자와 같았던 것»만 (선물 배송지 보호)`,
-    `update orders set recipient_phone = '${newPhone}' where recipient_phone = '${oldPhone}';`,
-    ``,
-    `-- [7] 확인`,
-    `select id, customer_phone, customer_name, youtube_nickname, kakao_id from customers where customer_phone = '${newPhone}';`,
-    `select count(*) as "주문수", count(*) filter (where coalesce(trim(kakao_id),'') <> '') as "카톡ID찍힘"`,
-    `from orders where customer_phone = '${newPhone}';`,
-  ].join("\n");
+// [2026-11-26] 합치기 실행 — 계정 잇기 목록·회원 상세 «예전 계정 합치기»가 같이 쓴다.
+//   ① 미리보기(아무것도 안 바뀜) → ② 숫자 보여주고 승인 → ③ 실행. 실제 이동은 Postgres 함수 한 트랜잭션.
+export async function runLinkMerge(requestId: string, label: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/admin-live/customer-link-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: requestId }),
+    });
+    const json = await res.json().catch(() => null);
+    const p = json?.result as Record<string, any> | undefined;
+    if (!json?.ok || !p?.ok) {
+      const why = String(p?.reason || json?.reason || "");
+      if (why === "new_side_has_money") {
+        showAdminToast(`지금 계정에도 주문 ${Number(p?.new_orders || 0)}건이 있어서 자동으로 못 합쳐요.`, "warning");
+        return false;
+      }
+      if (why === "old_not_found") { showAdminToast("예전 계정을 못 찾았어요.", "error"); return false; }
+      if (why === "same_row") { showAdminToast("이미 같은 계정이에요.", "warning"); return false; }
+      if (why === "not_pending") { showAdminToast("이미 처리된 요청이에요.", "warning"); return false; }
+      showAdminToast("합치기 확인 실패" + (why ? ` (${why})` : ""), "error");
+      return false;
+    }
+    const oldPts = Number(p.old_points || 0);
+    const newPts = Number(p.new_points || 0);
+    const lines = [
+      `${label ? `「${label}」님 ` : ""}예전 계정을 지금 카톡 계정으로 합칩니다.`,
+      ``,
+      `예전 계정: ${formatKoreanPhone(p.old_phone)} ${p.old_name || ""} · 주문 ${Number(p.old_orders || 0).toLocaleString("ko-KR")}건`.trim(),
+      `포인트: ${oldPts.toLocaleString("ko-KR")}P + 지금 계정 ${newPts.toLocaleString("ko-KR")}P = ${(oldPts + newPts).toLocaleString("ko-KR")}P`,
+      p.will_change_phone ? `전화번호는 지금 계정 번호 ${formatKoreanPhone(p.new_phone)} 로 바뀝니다.` : null,
+      ``,
+      `백업을 남기고 한 번에 처리해요.`,
+    ].filter((line): line is string => line !== null).join("\n");
+    const ok = await showAdminConfirm(lines, { title: "계정 합치기", confirmText: "합치기", cancelText: "취소", tone: "warning" });
+    if (!ok) return false;
+    const res2 = await fetch("/api/admin-live/customer-link-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: requestId, confirm: true }),
+    });
+    const json2 = await res2.json().catch(() => null);
+    const d = json2?.result as Record<string, any> | undefined;
+    if (!json2?.ok || !d?.ok) {
+      showAdminToast("합치기 실패 — 아무것도 바뀌지 않았어요." + (d?.reason ? ` (${d.reason})` : ""), "error");
+      return false;
+    }
+    showAdminToast(`합쳤어요. 주문 ${Number(d.kept_orders || 0).toLocaleString("ko-KR")}건 · 포인트가 지금 계정으로 옮겨졌어요.`, "success");
+    notifyChanged();
+    return true;
+  } catch {
+    showAdminToast("합치기 중 문제가 생겼어요. 새로고침해 확인해 주세요.", "error");
+    return false;
+  }
 }
 
 export default function AdminLiveLinkRequestsPanel() {
@@ -153,85 +164,13 @@ export default function AdminLiveLinkRequestsPanel() {
     }
   };
 
-  // [2026-09-09 2단계] [합치기] — 먼저 «미리보기»로 무슨 일이 일어날지 숫자로 보여주고, 승인해야 실행한다.
-  //   ⚠ 여기가 «돈»이다. 실제 이동은 전부 Postgres 함수 한 트랜잭션 안에서 일어난다(반쪽 병합 불가).
   const mergeRow = async (row: LinkRequestRow) => {
     setMerging(row.id);
     try {
-      // ① 미리보기 (아무것도 안 바꾼다)
-      const res = await fetch("/api/admin-live/customer-link-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: row.id }),
-      });
-      const json = await res.json().catch(() => null);
-      const p = json?.result as Record<string, any> | undefined;
-
-      if (!json?.ok || !p?.ok) {
-        const why = String(p?.reason || json?.reason || "");
-        if (why === "new_side_has_money") {
-          showAdminToast(
-            `새 계정에도 주문 ${p?.new_orders ?? 0}건 · 포인트 ${(p?.new_points ?? 0).toLocaleString("ko-KR")}P 가 있어 자동 합치기를 멈췄습니다.\n\n양쪽 돈을 합치는 판단이 필요해요 — [병합 SQL 복사]로 직접 확인해 주세요.`,
-            "warning",
-          );
-          return;
-        }
-        if (why === "old_not_found") { showAdminToast("예전 계정을 못 찾았습니다. 번호가 이미 바뀌었을 수 있어요.", "error"); return; }
-        if (why === "not_pending") { showAdminToast("이미 처리된 요청입니다.", "warning"); void load(); return; }
-        showAdminToast("합치기 미리보기 실패" + (why ? `\n\n${why}` : ""), "error");
-        return;
-      }
-
-      // ② 사장님 승인 — 실제 숫자를 그대로 보여준다
-      const lines = [
-        `「${row.nickname}」님 계정을 합칩니다.`,
-        ``,
-        `남길 계정 : ${formatKoreanPhone(p.old_phone)} ${p.old_name || ""}`.trim(),
-        `  · 주문 ${Number(p.old_orders || 0).toLocaleString("ko-KR")}건`,
-        `  · 포인트 ${Number(p.old_points || 0).toLocaleString("ko-KR")}P`,
-        ``,
-        p.will_change_phone ? `번호를 ${formatKoreanPhone(p.old_phone)} → ${formatKoreanPhone(p.new_phone)} 로 바꿉니다.` : `번호는 그대로 둡니다.`,
-        p.will_change_kakao ? `카톡 로그인을 «지금 쓰는 카톡»으로 바꿉니다(예전 카톡으로는 더 못 들어옴).` : null,
-        p.will_delete_new_row ? `지금 쓰는 빈 계정 줄은 지웁니다(주문·포인트 0).` : `지울 계정 줄은 없습니다.`,
-        ``,
-        `포인트와 주문은 «없어지지 않고» 이 계정으로 따라갑니다.`,
-        `되돌릴 수 있게 백업을 먼저 남깁니다.`,
-      ].filter((line): line is string => line !== null).join("\n");
-
-      const ok = await showAdminConfirm(lines, { title: "계정 합치기", confirmText: "합치기", cancelText: "취소", tone: "warning" });
-      if (!ok) return;
-
-      // ③ 실행
-      const res2 = await fetch("/api/admin-live/customer-link-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: row.id, confirm: true }),
-      });
-      const json2 = await res2.json().catch(() => null);
-      const d = json2?.result as Record<string, any> | undefined;
-      if (!json2?.ok || !d?.ok) {
-        showAdminToast("합치기 실패 — 아무것도 바뀌지 않았습니다." + (d?.reason ? `\n\n${d.reason}` : ""), "error");
-        return;
-      }
-      showAdminToast(
-        `합쳤습니다. ${formatKoreanPhone(d.final_phone)} 한 줄로 · 주문 ${Number(d.kept_orders || 0).toLocaleString("ko-KR")}건 · 포인트 ${Number(d.kept_points || 0).toLocaleString("ko-KR")}P`,
-        "success",
-      );
-      notifyChanged();
-      void load();
-    } catch {
-      showAdminToast("합치기 중 문제가 생겼습니다. 목록을 새로고침해 확인해 주세요.", "error");
+      const merged = await runLinkMerge(row.id, row.nickname || row.new_nickname || row.old_nickname || "");
+      if (merged) void load();
     } finally {
       setMerging("");
-    }
-  };
-
-  const copySql = async (row: LinkRequestRow) => {
-    try {
-      await navigator.clipboard.writeText(buildMergeSql(row));
-      showAdminToast("병합 SQL 을 복사했습니다. Supabase SQL Editor 에 붙여넣고 «[0] 확인»부터 돌려보세요.", "success");
-    } catch {
-      showAdminToast("복사에 실패했습니다.", "error");
     }
   };
 
@@ -243,12 +182,8 @@ export default function AdminLiveLinkRequestsPanel() {
     <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[14px] font-black text-ink">같은 사람 같아요 — 계정 잇기</div>
-          <p className="mt-1 text-[12px] font-bold leading-relaxed text-ink-soft">
-            손님이 카톡을 바꾸면 우리 눈엔 «새 회원»이 됩니다. 새 회원의 <b>상세주소까지</b> 예전 회원과 같으면 여기 자동으로 올라옵니다.
-            <br />
-            양쪽을 보고 같은 사람이면 [합치기] 한 번 — 예전 주문·포인트가 지금 카톡으로 따라갑니다.
-          </p>
+          <div className="text-[14px] font-black text-ink">계정 잇기</div>
+          <p className="mt-1 text-[12px] font-bold text-ink-soft">손님이 «예전 계정이에요» 하고 요청한 것만 올라와요.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -342,22 +277,8 @@ export default function AdminLiveLinkRequestsPanel() {
                     {merging === row.id ? "확인 중…" : "합치기"}
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => void copySql(row)}
-                  className="rounded-lg border border-line px-3 py-2 text-[12px] font-black text-ink-soft hover:text-rose-deep"
-                >
-                  병합 SQL 복사
-                </button>
                 {row.status === "pending" ? (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => void mark(row.id, "done")}
-                      className="rounded-lg border border-line px-3 py-2 text-[12px] font-black text-ink-soft hover:text-rose-deep"
-                    >
-                      합쳤음 (처리함)
-                    </button>
                     <button
                       type="button"
                       onClick={() => void mark(row.id, "rejected")}
@@ -377,11 +298,7 @@ export default function AdminLiveLinkRequestsPanel() {
                 )}
               </div>
 
-              <p className="mt-2 text-[11px] font-bold leading-relaxed text-ink-mute">
-                <b>[합치기]</b>를 누르면 먼저 «무엇이 어떻게 바뀌는지» 보여주고, 승인해야 실행됩니다(한 번에 처리 · 백업 남음).
-                같은 주소에 사는 가족처럼 «다른 사람»이면 <b>[같은 사람 아님]</b>을 누르세요 — 아무것도 바뀌지 않습니다.
-                새 계정에도 주문·포인트가 있으면 자동으로 멈추니, 그때만 «병합 SQL 복사»로 직접 확인하세요.
-              </p>
+
             </div>
           ))}
         </div>
