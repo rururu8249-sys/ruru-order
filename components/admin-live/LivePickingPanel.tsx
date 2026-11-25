@@ -27,7 +27,7 @@ import { pulledForOf, shortDateWithWeekday } from "@/lib/orderPickPull";
 import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
-type Props = { orders: LiveOrder[]; fullBroadcastOrders?: LiveOrder[]; broadcastId?: string | null; filterLabel: string; scopeTooWide?: boolean; selectedCount?: number; scopeLocked?: boolean; initialShowUnpaid?: boolean; canceledCount?: number; onClose: () => void };
+type Props = { broadcastRanges?: import("./adminLiveOrderExcelExport").PickBroadcastRange[]; orders: LiveOrder[]; fullBroadcastOrders?: LiveOrder[]; broadcastId?: string | null; filterLabel: string; scopeTooWide?: boolean; selectedCount?: number; scopeLocked?: boolean; initialShowUnpaid?: boolean; canceledCount?: number; onClose: () => void };
 
 /** 줄 종류 — normal(이 출고 주문) · past(지난 주문을 이 출고로 넘김) · late(범위 밖 늦은 입금) · repick(상품 변경 뒤 다시 챙기기) */
 export type PickKind = "normal" | "past" | "late" | "repick";
@@ -129,7 +129,7 @@ export function includedNote(rows: readonly PickRow[]): string {
 const productKey = (r: PickRow) => `${r.productId || ""}|${r.productName}`;
 const optionKey = (r: PickRow) => `${r.color}|${r.size}|${r.optionText}`;
 
-export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcastId, filterLabel, scopeTooWide = false, selectedCount = 0, scopeLocked = false, initialShowUnpaid = true, onClose }: Props) {
+export default function LivePickingPanel({ broadcastRanges, orders, fullBroadcastOrders, broadcastId, filterLabel, scopeTooWide = false, selectedCount = 0, scopeLocked = false, initialShowUnpaid = true, onClose }: Props) {
   // [2026-11-05] 선택 모드 = 주문서에서 체크한 주문만(필터·기간 무관). 서버 «오늘 추가 작업»(범위 밖 늦은 입금·다시 챙기기)은 안 붙인다 — 고른 주문만 보이게.
   const selectionMode = selectedCount > 0 || scopeLocked;
   // Immutable explicit scope chosen before opening; no asynchronous period auto-switch.
@@ -427,7 +427,7 @@ export default function LivePickingPanel({ orders, fullBroadcastOrders, broadcas
         return items.length ? [{ ...o, items }] : [];
       });
       const extraIds = new Set(allRows.filter((r) => r.kind === "late" || r.kind === "repick").map((r) => r.id));
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${String(filterLabel || "").replace(/^방송:\s*/, "")} · 물건챙기기`, rowOrder: view === "product" ? "product" : "nickname", visibleItemIds: [...visible], attentionItemIds: [...extraIds], colorMultiBuyers: colorMulti, exceptions: p.exceptions, cancellations: p.cancellations }, new Set(picked));
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${String(filterLabel || "").replace(/^방송:\s*/, "")} · 물건챙기기`, rowOrder: view === "product" ? "product" : "nickname", visibleItemIds: [...visible], attentionItemIds: [...extraIds], colorMultiBuyers: colorMulti, broadcastRanges, exceptions: p.exceptions, cancellations: p.cancellations }, new Set(picked));
       const printed = eligibleRows.filter((r) => r.paid).map((r) => Number(r.id));
       const now = new Date().toISOString();
       for (let i = 0; i < printed.length; i += 500) {

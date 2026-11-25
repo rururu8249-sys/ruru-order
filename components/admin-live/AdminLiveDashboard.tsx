@@ -1357,6 +1357,9 @@ export default function AdminLiveDashboard() {
           id: broadcast.id,
           dateKey: getAlwaysOrderDateKey(broadcast.started_at || broadcast.created_at || ""),
           label: formatBroadcastDisplayTitle(broadcast),
+          title: stripExistingBroadcastPrefix(String(broadcast.public_title || broadcast.admin_subtitle || "").trim()) || "방송",
+          startedAt: broadcast.started_at,
+          endedAt: broadcast.ended_at,
         }))
         .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey)),
     [broadcasts]

@@ -725,6 +725,8 @@ export default function LiveOrderTable({
   }, [pickingSourceOrders, broadcastStartedAt, filters.broadcast, filters.date]);
   // 주문서 필터가 전체 방송·전체 기간이면 범위가 너무 넓다 → 창은 열리되 목록 대신 안내만.
   const pickingScopeTooWide = filters.broadcast === 'all' && filters.date === 'all';
+  // [2026-11-26] 물건챙기기 엑셀 「방송」 칸·방송별 시트 — 주문을 날짜가 아니라 방송으로 묶는 데 쓰는 방송 시작~종료 목록
+  const pickingBroadcastRanges = useMemo(() => broadcastCalendar.filter((b) => b.startedAt).map((b) => ({ id: b.id, title: b.title || b.label, startedAt: b.startedAt ?? null, endedAt: b.endedAt ?? null })), [broadcastCalendar]);
 
   // [㉕-B] 칩 숫자 기준 — countBaseOrders(상태 무관)가 있으면 목록과 같은 «방송 컷 + 취소보기» 처리 후 센다.
   //   없으면 기존과 동일하게 baseOrders 로 센다(동작 유지). 목록·페이지·엑셀·선택 로직은 orders 그대로.
@@ -1075,11 +1077,12 @@ export default function LiveOrderTable({
 
     {pickingOpen ? (
           pickingSelectedOrders ? (
-            <LivePickingPanel orders={pickingSelectedOrders} filterLabel={pickingChosenLabel||`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} scopeLocked initialShowUnpaid={pickingIncludeUnpaid} canceledCount={pickingCanceledCount} onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); setPickingChosenLabel(""); void onRefresh?.(); }} />
+            <LivePickingPanel orders={pickingSelectedOrders} broadcastRanges={pickingBroadcastRanges} filterLabel={pickingChosenLabel||`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} scopeLocked initialShowUnpaid={pickingIncludeUnpaid} canceledCount={pickingCanceledCount} onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); setPickingChosenLabel(""); void onRefresh?.(); }} />
           ) : (
             <LivePickingPanel
               orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))}
               fullBroadcastOrders={allBroadcastPickingOrders}
+              broadcastRanges={pickingBroadcastRanges}
               broadcastId={selectedPickingBroadcastId || null}
               filterLabel={pickingScopeLabel} scopeTooWide={pickingScopeTooWide}
               onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />

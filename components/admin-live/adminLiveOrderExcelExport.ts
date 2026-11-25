@@ -19,7 +19,57 @@ type ExportMeta = {
   cancellations?: import("@/lib/orderPickingExceptions").PickingCancellationRow[];
   /** [2026-11-25] 이벤트 선물 빼고 2개 이상(수량 포함) 산 손님 — 닉네임 칸을 손님마다 다른 연한 색으로 (표시 전용) */
   colorMultiBuyers?: boolean;
+  /** [2026-11-26] 방송 목록(시작~종료). 있으면 「방송」 칸을 붙이고, 방송이 2개 이상 섞이면 방송마다 시트를 따로 만든다 — 자정 넘긴 방송 대조용 */
+  broadcastRanges?: PickBroadcastRange[];
 };
+
+export type PickBroadcastRange = { id: string; title: string; startedAt: string | null; endedAt: string | null; deleted?: boolean };
+
+const KST_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+function kstDayLabel(iso: string | null | undefined): { key: string; label: string } {
+  const t = new Date(String(iso || "")).getTime();
+  if (!Number.isFinite(t)) return { key: "", label: "" };
+  const d = new Date(t + 9 * 3600_000);
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0"), dd = String(d.getUTCDate()).padStart(2, "0");
+  return { key: `${d.getUTCFullYear()}-${mm}-${dd}`, label: `${mm}.${dd}(${KST_WEEKDAYS[d.getUTCDay()]})` };
+}
+
+/**
+ * [2026-11-26 사장님 「방송이 자정 넘어가면 기간 엑셀에서 날짜로 거를 때 꼬인다」] 주문 → 어느 방송 몫인지.
+ *   관리자 방송별 보기와 같은 기준: ①다른 출고로 옮긴 줄이면 옮긴 곳 ②주문에 적힌 방송 ③방송 시간 안에 들어온 주문(방송 기록이 빈 주문)
+ *   ④그 밖은 주문 날짜의 쇼핑몰 주문. 날짜가 아니라 방송으로 묶으니 새벽 1시 주문도 전날 시작한 방송 몫이다.
+ */
+export function pickBroadcastGroup(order: Pick<LiveOrder, "broadcastId" | "createdAt" | "pickPull">, ranges: readonly PickBroadcastRange[]): { key: string; label: string; sort: string } {
+  const byId = (id: string) => ranges.find((r) => r.id === id);
+  const fromRange = (r: PickBroadcastRange) => { const day = kstDayLabel(r.startedAt); return { key: `b:${r.id}`, label: `${day.label} ${r.title}`.trim(), sort: `${r.startedAt || ""}` }; };
+  const pull = order.pickPull;
+  if (pull) {
+    const bid = String(pull.broadcastId ?? "").trim();
+    const r = bid ? byId(bid) : undefined;
+    if (r) return fromRange(r);
+    const day = kstDayLabel(`${pull.pulledFor}T12:00:00+09:00`);
+    return { key: `s:${day.key}`, label: `${day.label} 쇼핑몰 주문`, sort: `${day.key}T23:59` };
+  }
+  const own = order.broadcastId ? byId(String(order.broadcastId)) : undefined;
+  if (own) return fromRange(own);
+  const t = new Date(String(order.createdAt || "")).getTime();
+  if (Number.isFinite(t)) {
+    const inside = ranges.filter((r) => { const a = new Date(String(r.startedAt || "")).getTime(); const b = r.endedAt ? new Date(r.endedAt).getTime() : Date.now(); return Number.isFinite(a) && t >= a && t <= b; });
+    const pick = inside.find((r) => !r.deleted) || inside[0];
+    if (pick) return fromRange(pick);
+  }
+  const day = kstDayLabel(order.createdAt);
+  return { key: `s:${day.key}`, label: `${day.label} 쇼핑몰 주문`.trim(), sort: `${day.key}T23:59` };
+}
+
+/** 엑셀 시트 이름 — 31자·금지 글자(: \ / ? * [ ]) 빼고, 같은 이름이면 (2) */
+function safeSheetName(name: string, used: Set<string>): string {
+  const base = (name.replace(/[:\\/?*\[\]]/g, " ").replace(/\s+/g, " ").trim() || "방송").slice(0, 28);
+  let out = base; let n = 2;
+  while (used.has(out)) out = `${base.slice(0, 25)} (${n++})`;
+  used.add(out);
+  return out;
+}
 
 /** [2026-11-25] 이벤트 선물 줄 — 룰렛 당첨 연결이 있거나, 0원이면서 이름에 이벤트·선물·당첨·사은품. (최근 선물 줄은 연결 없이 0원 「이벤트 당첨자」 등으로 들어감 — 실데이터 확인) */
 export function isEventGiftItem(item: Pick<LiveOrderItem, "eventGiftWinnerId" | "productName"> & { amount?: number | null }): boolean {
@@ -452,6 +502,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   // [2026-09-01 사장님 지시] 첫 칸에 「날짜」(주문일 MM.DD) — 헤더 아래 데이터 줄부터 채움
   // [㉖] 맨 끝 「챙김」 칸 — 챙겼으면 ✓, 아니면 빈칸. pickedIds(창의 현재 챙김)가 있으면 그것, 없으면 주문의 picked_at(다시 챙기기 대기는 제외).
   const headers: WorkbookRow = ["날짜", "닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고", "챙김"];
+  // [2026-11-26] 방송 목록이 오면 맨 끝 「방송」 칸 — 엑셀에서 날짜 대신 이 칸으로 거르면 방송별 엑셀과 줄 수가 같다
+  const ranges = meta.broadcastRanges || null;
+  if (ranges) headers.push("방송");
   const orderDateLabel = (order: LiveOrder) => {
     const src = order.createdAt || order.submittedAt;
     if (!src) return "";
@@ -487,7 +540,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   const mainByItemId = new Map(builtRows.mainRows.map((row) => [row.itemId, row]));
   const attentionByItemId = new Map(builtRows.attentionRows.map((row) => [row.itemId, row]));
   const visible = meta.visibleItemIds ? new Set(meta.visibleItemIds.map(String)) : null;
-  type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number; orderKey: string; gift: boolean };
+  type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number; orderKey: string; gift: boolean; group: { key: string; label: string; sort: string } | null };
   const keyedRows: RowWithKey[] = [];
 
   orderedOrders.forEach((order) => {
@@ -507,7 +560,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
       row.push(pickedIds?.has(String(order.id)) ? "✓" : "");
-      keyedRows.push({ row, unpaid, attention: false, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order), orderKey: String(order.groupId || order.id), gift: false });
+      const groupNoItem = ranges ? pickBroadcastGroup(order, ranges) : null;
+      if (groupNoItem) row.push(groupNoItem.label);
+      keyedRows.push({ row, unpaid, attention: false, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order), orderKey: String(order.groupId || order.id), gift: false, group: groupNoItem });
       return;
     }
 
@@ -531,7 +586,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         : attention ? "결제 후 추가 챙기기" : pullKind);
       const picked = pickedIds ? pickedIds.has(String(item.id)) : Boolean(item.pickedAt) && built.kind !== "상품 변경 · 다시 챙기기";
       row.push(picked ? "✓" : "");
-      keyedRows.push({ row, unpaid, attention: built.kind !== "일반" && !pullKind, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order), orderKey: String(order.groupId || order.id), gift: isEventGiftItem(item) });
+      const group = ranges ? pickBroadcastGroup(order, ranges) : null;
+      if (group) row.push(group.label);
+      keyedRows.push({ row, unpaid, attention: built.kind !== "일반" && !pullKind, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order), orderKey: String(order.groupId || order.id), gift: isEventGiftItem(item), group });
     });
   });
 
@@ -541,9 +598,6 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   // Each pending item belongs to exactly one sheet. Changed/late-paid items
   // are actionable only in the separate attention sheet, never duplicated here.
   const ordinaryRows = keyedRows.filter((row) => !row.attention);
-  const itemRows: WorkbookRow[] = ordinaryRows.map((k) => k.row);
-  const unpaidRowFlags: boolean[] = ordinaryRows.map((k) => k.unpaid);
-  const attentionRowFlags: boolean[] = ordinaryRows.map((k) => k.attention);
   // [2026-11-25] 2개 이상 산 손님 색 — 이 시트 줄 기준·선물 빼고 수량 합. 색은 시트에 처음 나온 순서로 돌려 줘서 붙어 있는 손님끼리 다름
   const nickOf = (k: RowWithKey) => String(k.row[1] ?? "").trim() || "(닉네임 없음)";
   const multiBuyerColor = new Map<string, string>();
@@ -561,18 +615,23 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   const headerRowNumber = 1;
   void addSheetMetaRows; // 다른 엑셀(택배송장 확인용)에서 계속 사용 — 물건챙기기만 안 씀
 
+  const workbook = createWorkbook();
+  // [2026-11-26] 시트 쓰기를 함수로 — 「물건챙기기」(전체) 와 방송별 시트가 같은 모양·색
+  const writePickSheet = (sheetName: string, rowsK: RowWithKey[]) => {
+  const itemRows: WorkbookRow[] = rowsK.map((k) => k.row);
+  const unpaidRowFlags: boolean[] = rowsK.map((k) => k.unpaid);
+  const attentionRowFlags: boolean[] = rowsK.map((k) => k.attention);
   const rows: WorkbookRow[] = [
     headers,
     ...itemRows,
   ];
 
-  const workbook = createWorkbook();
-  const sheet = workbook.addWorksheet("물건챙기기");
+  const sheet = workbook.addWorksheet(sheetName);
   addRows(sheet, rows);
   // 필터 범위 = 헤더~마지막 데이터 줄까지만 (위 합계 3줄은 범위 밖 = 고정)
   styleFilterSheet(sheet, headerRowNumber, headerRowNumber + itemRows.length, headers.length);
   // Picking-only widths/alignment: the shared formatter also serves shipping exports.
-  setColumnWidths(sheet, [22, 18, 24, 30, 7, 14, 10, 52, 8]);
+  setColumnWidths(sheet, ranges ? [22, 18, 24, 30, 7, 14, 10, 52, 8, 28] : [22, 18, 24, 30, 7, 14, 10, 52, 8]);
   sheet.eachRow((row, rowNumber) => {
     row.eachCell({ includeEmpty: true }, (cell) => {
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
@@ -606,13 +665,29 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         if (colNumber === 8) cell.font = { bold: true, color: { argb: "FF9A3412" } };
       });
     }
-    const nickColor = multiBuyerColor.get(nickOf(ordinaryRows[index]));
+    const nickColor = multiBuyerColor.get(nickOf(rowsK[index]));
     if (nickColor) {
       const cell = row.getCell(2);
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: nickColor } };
       cell.font = { bold: true, color: { argb: "FF111111" } };
     }
   });
+  };
+  writePickSheet("물건챙기기", ordinaryRows);
+  // [2026-11-26] 방송이 2개 이상 섞이면 방송마다 시트 — 이름 「11.21(금) 해외명품고퀄의류14」, 방송 시작 순
+  if (ranges) {
+    const groups = new Map<string, { label: string; sort: string; rows: RowWithKey[] }>();
+    for (const k of ordinaryRows) {
+      if (!k.group) continue;
+      const g = groups.get(k.group.key) || { label: k.group.label, sort: k.group.sort, rows: [] };
+      g.rows.push(k);
+      groups.set(k.group.key, g);
+    }
+    if (groups.size > 1) {
+      const used = new Set<string>(["물건챙기기", "닉네임별 합계", "변경 및 추가", "고객이슈·특이사항"]);
+      for (const g of [...groups.values()].sort((a, b) => a.sort.localeCompare(b.sort))) writePickSheet(safeSheetName(g.label, used), g.rows);
+    }
+  }
 
   // [2026-11-25 사장님 「닉네임별 구매 개수 파악」] 두 번째 시트 「닉네임별 합계」 — 위 «물건챙기기» 시트 줄을 그대로 닉네임마다 묶은 것(표시 전용·재계산 없음).
   //   개수·금액은 위 시트의 수량·상품금액 칸 합. 미입금 줄은 따로 셈. 정렬 = 총 개수 많은 순.

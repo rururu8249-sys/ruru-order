@@ -6,6 +6,10 @@ export type BroadcastCalendarItem = {
   dateKey: string; // "YYYY-MM-DD" (KST 기준, 부모에서 변환해서 전달)
   label: string;
   count?: number;
+  /** [2026-11-26] 물건챙기기 엑셀 「방송」 칸·방송별 시트용(달력은 안 씀) */
+  title?: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
 };
 
 interface Props {
