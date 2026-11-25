@@ -25,7 +25,8 @@ assert.equal(typeof onResize,'function','memo must remeasure when viewport chang
 memoElement.scrollHeight=80;
 await act(async()=>onResize());
 assert(button('…더보기'),'desktop-clamped content retains a more action after resizing');
-await act(async()=>button('열기').props.onClick(event));
+assert.equal(button('열기'),undefined,'row-level open button removed — whole row opens');
+await act(async()=>row.props.onClick());
 assert.equal(opened,1); assert.equal(resolved,0,'opening details never resolves an issue');
 await act(async()=>tree.root.findByType('input').props.onChange());
 assert.equal(selected,1); assert.equal(resolved,0,'selection never resolves an issue');

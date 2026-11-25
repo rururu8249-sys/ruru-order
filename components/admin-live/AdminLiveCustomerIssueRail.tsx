@@ -70,8 +70,8 @@ type IssueTab = "open" | "all" | "resolved" | "deleted";
 
 
 // [2026-09-26] 고객이슈 표의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 어긋나지 않는다.
-// [2026-10-22] 처리 칸 142 → 224px: 「열기(64)·출고 넘기기(76)·해결완료(72)」 + 간격 6×2 — 세 버튼이 잘리지 않게
-const ISSUE_GRID = "grid-cols-[36px_minmax(0,1fr)] xl:grid-cols-[36px_60px_184px_1fr_124px_224px]";
+// [2026-11-26] 처리 칸 224 → 160px: 「열기」 삭제(줄 누르면 열림) → 출고 넘기기(76)·해결완료(72)
+const ISSUE_GRID = "grid-cols-[36px_minmax(0,1fr)] xl:grid-cols-[36px_60px_184px_1fr_124px_160px]";
 
 // [2026-09-26] 교환·환불 처리 대상인 이슈인가 — task_type(exchange/return/refund) 또는 유형 칩(교환/반품/환불).
 //   이 줄에만 「환불 처리」 버튼·장부 요약을 붙인다.
@@ -342,7 +342,6 @@ const SUB_BTN =
 const MAIN_BTN =
   "flex h-11 w-[72px] xl:h-9 shrink-0 items-center justify-center rounded-lg text-[13px] font-semibold transition hover:opacity-90 disabled:opacity-45";
 /** 버튼이 없는 칸 — 자리를 비워 두어 탭을 옮겨도 처리 칸이 안 흔들린다 */
-const SUB_BTN_SLOT = "h-8 w-[64px] shrink-0";
 
 export function IssueCard({
   task,
@@ -591,7 +590,7 @@ export function IssueCard({
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
               <span className="shrink-0 text-ink-mute" aria-hidden>메모</span>
               <div className="min-w-0 flex-1">
-                <div ref={memoRef} className="xl:line-clamp-2 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</div>
+                <div ref={memoRef} className="line-clamp-2 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</div>
                 {memoOverflow ? (
                   <button type="button" onClick={(e) => { e.stopPropagation(); onProcess(task); }} className="mt-0.5 text-[12px] font-semibold text-ink-soft hover:underline">…더보기</button>
                 ) : null}
@@ -638,8 +637,6 @@ export function IssueCard({
       <div className="col-span-2 flex flex-wrap justify-end gap-1.5 xl:col-span-1 xl:flex-nowrap xl:justify-start">
         {deleted ? (
           <>
-            <span className={SUB_BTN_SLOT} />
-            <span className="h-8 w-[76px] shrink-0" />
             <button
               type="button"
               onClick={() => onPurge?.(task)}
@@ -660,16 +657,7 @@ export function IssueCard({
           </>
         ) : (
           <>
-            {/* [② 2026-09-27] 행 버튼 = 「처리」(테두리) + 「해결완료/미해결로」 2개만. 수정·환불하기·삭제는 처리창 안으로. */}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onProcess(task); }}
-              disabled={busy}
-              title="열기 — 내용 보기·수정·환불/교환 기록·삭제"
-              className={`${SUB_BTN} text-ink hover:bg-surface-2`}
-            >
-              열기
-            </button>
+            {/* [11-26 리뉴얼] 「열기」 버튼 삭제 — 줄 아무 데나 누르면 열린다(같은 onProcess). 버튼 = 출고 넘기기(있을 때) + 해결완료 */}
             {onPull ? (
               <button
                 type="button"
