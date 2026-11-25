@@ -142,6 +142,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-26 **[설정 메뉴 4묶음 → 6묶음(입금·결제 / 배송 / 혜택 / 손님 안내 / 알림 / 상점·보안)]** 메뉴 배치·이름만(탭·저장 화면 무변경): 「수수료·배송비」→「배송비·카드수수료」(배송), 「구독 무료배송」 메뉴 신설(혜택 — 배송비 탭 맨 아래 카드로 바로 스크롤), 「손님 공지·구매동의」→「공지·구매동의」, 방송 화면=손님 안내, 방송 화면 권한=상점·보안. test-admin-settings-navigation 갱신 통과·tsc 0·guard 0·build(BANKDA 2). 배포 완료 — 실화면 확인 필요
 - 2026-11-26 **[고객이슈 목록 — 「열기」 버튼 삭제(줄 누르면 열림)·메모 2줄 고정(폰 포함, 넘치면 …더보기)·처리 칸 224→160px·삭제함 빈 자리 제거]** AdminLiveCustomerIssueRail 표시만·핸들러(onProcess/onResolve/onPull) 그대로. test-customer-issue-mobile 갱신(줄 클릭=열기)·issue-resolution-safety·filter-chips 통과·tsc 0·guard 0·build(BANKDA 2). 배포 완료 — 실화면 확인 필요
 - 2026-11-26 **[가위바위보 1초 시계 → 게임 있을 때만(사장님 「당장 해결」)]** cron ruru-rps-clock 이 게임 없이도 1초마다 rps_tick(9일 69만 번·cron 기록 56MB, DB 바쁨 원인). SQL supabase/sql/hotfix/rps_clock_on_demand_20261126.sql(클로드 SQL Editor 실행 완료): 방(rps_rooms) 생기거나 열리면 트리거가 시계 켬(rps_clock_ensure), rps_tick 이 «열린 방 없음 + 지급 대기 당첨자 없음»이면 스스로 끔(rps_clock_stop) — rps_tick 원문 문장 1개만 바꿈·게임/보상 계산 무변경. 운영 확인: 시계 0개·트리거 1·tick 수정됨·마지막 실행 23:31:23 이후 멈춤. 시뮬 test-rps-clock-on-demand 7가지(방 없음 끔·방 생기면 켬·지급 대기 있으면 유지·끝나면 끔·다시 만들면 켬) 통과
 - 2026-11-26 **[주문상세 «저절로 닫힘» 원인 수정(실측 재현)]** 주문상세 안에서 띄운 안쪽 창(고객이슈 등록·상품 고르기·출고 넘기기·카드 다시결제 등 fixed inset-0 덮개)이 열린 채 Esc 를 누르면 바깥 주문상세까지 통째로 닫혀 적던 내용이 날아감(운영 실측: 등록 창 열고 Esc → 주문상세·등록 창 모두 사라짐). useAdminModalFocus 의 Esc 처리: 창 안에 보이는 안쪽 덮개가 있으면 바깥 창은 닫지 않음. 표시·키 처리만. tsc·guard·build. 배포 완료

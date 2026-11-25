@@ -1,7 +1,7 @@
 "use client";
 import {useState} from "react";
-import {SETTINGS_NAV_GROUPS,searchSettingsNavigation,type SettingsDestination,type SettingsTab,type SettingsNavItem} from "./adminLiveSettingsNavigation";
-export default function AdminLiveSettingsNav({activeTab,section,onSelect}:{activeTab:SettingsTab;section?:"bank"|"payster";onSelect:(destination:SettingsDestination)=>void}) {
+import {SETTINGS_NAV_GROUPS,searchSettingsNavigation,type SettingsDestination,type SettingsTab,type SettingsNavItem,type SettingsSection} from "./adminLiveSettingsNavigation";
+export default function AdminLiveSettingsNav({activeTab,section,onSelect}:{activeTab:SettingsTab;section?:SettingsSection;onSelect:(destination:SettingsDestination)=>void}) {
   const [query,setQuery]=useState("");
   const selectedLabel=SETTINGS_NAV_GROUPS.flatMap(group=>group.items).find(item=>"tab" in item.destination && item.destination.tab===activeTab && item.destination.section===section)?.label ?? "상점 정보";
   const itemButton=(item:SettingsNavItem)=><button key={item.label} type="button" onClick={()=>onSelect(item.destination)} aria-current={"tab" in item.destination && item.destination.tab===activeTab && item.destination.section===section ? "page" : undefined} className={`min-h-11 w-full rounded-xl px-3 py-1.5 text-left text-xs font-bold md:min-h-9 ${"tab" in item.destination && item.destination.tab===activeTab && item.destination.section===section ? "bg-rose-soft text-rose-deep" : "text-ink-soft hover:bg-surface"}`}>{item.label}</button>;

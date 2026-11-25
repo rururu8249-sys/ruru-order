@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AdminLiveSettingsNavigation from "./AdminLiveSettingsNav";
 import AdminLiveNoticePanel from "./AdminLiveNoticePanel";
 import SettingsUnsavedChangesDialog from "./SettingsUnsavedChangesDialog";
-import {type SettingsTab,type SettingsDestination} from "./adminLiveSettingsNavigation";
+import {type SettingsTab,type SettingsDestination,type SettingsSection} from "./adminLiveSettingsNavigation";
 import {useSettingsDraft,type SettingsDraftState} from "./useSettingsDraft";
 import YoutubeNotifyCard from "./YoutubeNotifyCard";
 import TelegramNotifyCard from "./TelegramNotifyCard";
@@ -219,7 +219,10 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "shop");
-  const [focusSection,setFocusSection]=useState<"bank"|"payster"|undefined>(initialTab && initialTab !== "shop" ? undefined : "bank");   // [2026-10-21 a1-5] 설정 첫 화면 = 입금계좌
+  const [focusSection,setFocusSection]=useState<SettingsSection|undefined>(initialTab && initialTab !== "shop" ? undefined : "bank");   // [2026-10-21 a1-5] 설정 첫 화면 = 입금계좌
+  // [2026-11-26] 「혜택 › 구독 무료배송」 = 배송비 탭 맨 아래 카드 → 눌렀을 때 그 카드로 바로 내려감
+  const subscribeCardRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{if(activeTab==="payment" && focusSection==="subscribe") window.setTimeout(()=>subscribeCardRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),60);},[activeTab,focusSection]);
   const [childDraft,setChildDraft]=useState<SettingsDraftState|null>(null);
   const [globalDraftState,setGlobalDraftState]=useState<SettingsDraftState|null>(null);
   const [choiceOpen,setChoiceOpen]=useState(false);
@@ -437,7 +440,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div data-settings-scroll className="flex-1 space-y-4 overflow-y-auto p-3 md:p-5">
           {/* ── 상점 정보 (자체 저장: /api/admin-live/shop-info) ── */}
-          {activeTab === "shop" && <ShopInfoSettingsTab onDraftStateChange={setChildDraft} focusSection={focusSection} />}
+          {activeTab === "shop" && <ShopInfoSettingsTab onDraftStateChange={setChildDraft} focusSection={focusSection === "subscribe" ? undefined : focusSection} />}
 
           {/* ── 상품사진 문구 (자체 저장: /api/admin-live/product-image-notice) ── */}
           {activeTab === "photo" && <ProductImageNoticeSettingsTab onDraftStateChange={setChildDraft} />}
@@ -524,7 +527,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
               </div>
 
               {/* [2026-11-01] 구독 인증 무료배송 — 자체 저장(위 배송비 저장과 따로) */}
-              <SubscribeFreeShipSettingsCard />
+              <div ref={subscribeCardRef} className="scroll-mt-3"><SubscribeFreeShipSettingsCard /></div>
             </>
           )}
 
