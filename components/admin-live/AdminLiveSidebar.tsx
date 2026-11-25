@@ -3,6 +3,7 @@
 //   · 예외 배지(매칭필요·카드미결제)는 「주문·입금」에 붙는다.
 //   · 카톡 문의·카드결제는 어느 화면에서든 쓰므로 여기 고정. 알림음은 설정 › 알림음 탭으로 옮겼다(2026-09-08 사장님 요청).
 //   · 실시간 접속 위젯은 그대로(방송 중 바로 보는 숫자).
+import { ADMIN_VERSION, ADMIN_VERSION_NOTE } from "@/lib/adminVersion";
 import { useEffect, useState } from "react";
 import { ADMIN_LIVE_TOP_MENUS, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
@@ -134,7 +135,7 @@ export default function AdminLiveSidebar({
               <AdminLiveMenuIcon menu="broadcast" className="h-[17px] w-[17px]" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-baseline gap-1.5"><span className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</span><span className="shrink-0 rounded bg-ink px-1.5 py-0.5 text-[11px] font-bold leading-none tracking-wide text-white">VER 2.0</span></div>
+              <div className="flex items-baseline gap-1.5"><span className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</span><span className="shrink-0 rounded bg-ink px-1.5 py-0.5 text-[11px] font-bold leading-none tracking-wide text-white" title={ADMIN_VERSION_NOTE}>VER {ADMIN_VERSION}</span></div>
               <div className="flex items-center gap-1.5 text-[11px] font-bold text-ink-mute">
                 <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
                 {broadcastOn ? "방송 중" : "방송 대기"}

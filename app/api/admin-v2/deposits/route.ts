@@ -194,24 +194,23 @@ async function selectOrdersForDeposits(supabase: any, deposits: AnyRow[]) {
   const collected: AnyRow[] = [];
   const CHUNK = 150;
 
-  const runIn = async (column: string, values: Array<string | number>) => {
-    for (const part of chunkList(values, CHUNK)) {
-      const { data, error } = await supabase.from("orders").select("*").in(column, part);
-      // 향후 스키마 전환 중 컬럼이 사라져도 전체조회 폴백으로 이어질 수 있게 유지한다.
-      if (error) {
-        if (String((error as any)?.code || "") === "42703") return true;
-        throw error;
-      }
-      collected.push(...((data as AnyRow[]) || []));
+  // [2026-11-26 속도] 조각 조회를 하나씩 기다리던 것 → 최대 6개씩 동시에(읽기만·결과 동일, 합치는 순서 무관 — 아래에서 id 로 중복 제거).
+  const runPart = async (column: string, part: Array<string | number>) => {
+    const { data, error } = await supabase.from("orders").select("*").in(column, part);
+    // 향후 스키마 전환 중 컬럼이 사라져도 전체조회 폴백으로 이어질 수 있게 유지한다.
+    if (error) {
+      if (String((error as any)?.code || "") === "42703") return;
+      throw error;
     }
-    return true;
+    collected.push(...((data as AnyRow[]) || []));
   };
 
   try {
     const groupList = Array.from(groupKeys);
     const lookupPlan = buildDepositOrderLookupPlan(groupList, Array.from(orderIdKeys));
-    for (const query of lookupPlan) {
-      await runIn(query.column, query.values);
+    const jobs = lookupPlan.flatMap((query) => chunkList(query.values, CHUNK).map((part) => () => runPart(query.column, part)));
+    for (let i = 0; i < jobs.length; i += 6) {
+      await Promise.all(jobs.slice(i, i + 6).map((job) => job()));
     }
   } catch {
     // 타깃 조회가 실패하면 예전 전체조회로 폴백해서 화면이 비지 않게 한다.

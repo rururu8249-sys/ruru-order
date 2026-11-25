@@ -100,7 +100,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const initIssueType: IssueKind = issueKindFromTaskTypes(issueTypesInitial || [], item.kind);
   const [issueType, setIssueType] = useState<IssueKind>(initIssueType);
   const isShip = issueType === "ship";
-  // [2026-11-26 리뉴얼] 열면 «읽기 화면», 「고치기」를 눌러야 입력칸이 열린다. 등록(createMode)은 바로 입력.
+  // [2026-11-26 리뉴얼] 열면 «읽기 화면», 「정보 수정」를 눌러야 입력칸이 열린다. 등록(createMode)은 바로 입력.
   const [editing, setEditing] = useState(createMode);
   const isEtc = issueType === "etc" || isShip;
   const kind = issueType === "exchange" ? "교환" : "반품";
@@ -484,7 +484,10 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             </div>
             {openedFromOtherIssue ? <div className="mt-1 text-[12px] leading-5 text-ink-mute">같은 주문의 {repIssueDateMD ? `${repIssueDateMD} ` : ""}이슈 기록</div> : null}
           </div>
-          <button type="button" onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-lg text-[18px] text-ink-mute hover:bg-surface-2">×</button>
+          <div className="flex shrink-0 items-center gap-1">
+            {!editing ? <button type="button" onClick={() => setEditing(true)} className="h-9 whitespace-nowrap rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">정보 수정</button> : null}
+            <button type="button" onClick={onClose} aria-label="닫기" className="h-9 w-9 rounded-lg text-[18px] text-ink-mute hover:bg-surface-2">×</button>
+          </div>
         </div>
 
         {!editing ? (
@@ -882,21 +885,20 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         {/* 하단 고정 — [삭제] … [닫기] [저장]. 완료(이체·취소·지급 등)는 목록 「해결완료」에서. */}
         {saveError ? <div className="border-t border-line px-4 py-2 text-[12px] text-danger-tx">저장 실패: {saveError}</div> : null}
         <div className="flex items-center gap-2 border-t border-line px-4 py-3">
-          {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="h-9 rounded-lg px-2 text-[13px] font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50">삭제</button> : null}
+          {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="h-9 shrink-0 whitespace-nowrap rounded-lg px-2 text-[13px] font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50">삭제</button> : null}
           <span className="flex-1" />
           {!editing ? (
             <>
-              <button type="button" onClick={() => setEditing(true)} className="h-12 rounded-xl border border-line bg-surface px-5 text-[16px] font-bold text-ink hover:bg-surface-2">고치기</button>
               {onResolve ? (
-                <button type="button" disabled={saving} onClick={onResolve} className="h-12 min-w-[128px] rounded-xl bg-ink px-5 text-[16px] font-bold text-white disabled:opacity-50">{method === "계좌이체" && !isEtc && !isExchange ? "보냈어요 · 해결완료" : "해결완료"}</button>
+                <button type="button" disabled={saving} onClick={onResolve} className="h-12 min-w-0 flex-1 whitespace-nowrap rounded-xl bg-ink px-4 text-[16px] font-bold text-white disabled:opacity-50">{method === "계좌이체" && !isEtc && !isExchange ? "보냈어요 · 해결완료" : "해결완료"}</button>
               ) : (
                 <button type="button" onClick={onClose} className="h-12 rounded-xl bg-ink px-6 text-[16px] font-bold text-white">닫기</button>
               )}
             </>
           ) : (
             <>
-              <button type="button" onClick={onClose} className="h-12 rounded-xl border border-line bg-surface px-5 text-[16px] font-bold text-ink hover:bg-surface-2">{createMode ? "닫기" : "취소"}</button>
-              <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-12 min-w-[112px] rounded-xl bg-ink px-5 text-[16px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? "등록" : "저장"}</button>
+              <button type="button" onClick={onClose} className="h-12 shrink-0 whitespace-nowrap rounded-xl border border-line bg-surface px-4 text-[16px] font-bold text-ink hover:bg-surface-2">{createMode ? "닫기" : "취소"}</button>
+              <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-12 min-w-0 flex-1 whitespace-nowrap rounded-xl bg-ink px-4 text-[16px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? "등록" : "저장"}</button>
             </>
           )}
         </div>

@@ -124,6 +124,26 @@
       "regions": [
         "sin1"
       ]
+    },
+    "app/api/admin-v2/deposits/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/event-roulette/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/customer-list-extra/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/order-lines/route.ts": {
+      "regions": [
+        "sin1"
+      ]
     }
   },
   "crons": [
