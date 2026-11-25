@@ -117,7 +117,8 @@ function cleanBroadcastId(value: unknown) {
 }
 
 function getBroadcastTitle(row: RouletteBroadcastRow) {
-  return cleanText(row.title || row.broadcast_title || row.name || row.label || "방송");
+  // [2026-11-26] 실제 방송 표 이름 칸은 public_title — 예전엔 다 「방송」으로 나왔다
+  return cleanText(row.public_title || row.title || row.broadcast_title || row.name || row.label || row.admin_subtitle || "방송");
 }
 
 function getBroadcastStatus(row: RouletteBroadcastRow) {
@@ -266,7 +267,9 @@ async function fetchBroadcastRows(supabase: SupabaseAdminClient) {
     throw new Error(error.message || "방송리스트 조회 실패");
   }
 
-  return (Array.isArray(data) ? data : []) as RouletteBroadcastRow[];
+  // [2026-11-26] 숨긴 방송 빼고, 시작 시각 최신순(이벤트 「명단 기준」 기본값 = 맨 위 = 최근 방송)
+  const rows = ((Array.isArray(data) ? data : []) as RouletteBroadcastRow[]).filter((row) => row.is_deleted !== true);
+  return rows.sort((a, b) => (Date.parse(getBroadcastStart(b)) || 0) - (Date.parse(getBroadcastStart(a)) || 0));
 }
 
 async function fetchBroadcastById(supabase: SupabaseAdminClient, broadcastId: string) {
@@ -293,10 +296,23 @@ async function fetchOrderRowsForBroadcast(supabase: SupabaseAdminClient, broadca
   }
 
   const start = getBroadcastStart(broadcast);
-  const end = getBroadcastEnd(broadcast) || new Date().toISOString();
+  let end = getBroadcastEnd(broadcast);
 
   if (!start) {
     return [];
+  }
+  // [2026-11-26] 종료를 안 누르고 꺼진 방송(ended_at 없음·ON 아님)은 «지금까지»로 읽어 몇 주치 손님이 다 들어왔다
+  //   (실측 10/18 방송 → 492명). 끝 = 다음 방송 시작 또는 시작+18시간 중 빠른 쪽. 켜져 있는 방송은 지금까지 그대로.
+  if (!end) {
+    const isOn = String(broadcast.status || "").toUpperCase() === "ON";
+    if (isOn) {
+      end = new Date().toISOString();
+    } else {
+      const cap = Date.parse(start) + 18 * 3600 * 1000;
+      const next = await supabase.from("broadcasts").select("started_at").gt("started_at", start).order("started_at", { ascending: true }).limit(1);
+      const nextStart = Array.isArray(next.data) && next.data[0] ? Date.parse(String((next.data[0] as { started_at?: unknown }).started_at || "")) : NaN;
+      end = new Date(Math.min(cap, Number.isFinite(nextStart) ? nextStart : cap, Date.now())).toISOString();
+    }
   }
 
   const { data, error } = await supabase
