@@ -673,8 +673,8 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     }
   });
   };
-  writePickSheet("물건챙기기", ordinaryRows);
-  // [2026-11-26] 방송이 2개 이상 섞이면 방송마다 시트 — 이름 「11.21(금) 해외명품고퀄의류14」, 방송 시작 순
+  // [2026-11-26] 방송마다 묶기 — 이름 「11.21(토) 해외명품고퀄의류14」, 방송 시작 순
+  const groupList: { label: string; sort: string; rows: RowWithKey[] }[] = [];
   if (ranges) {
     const groups = new Map<string, { label: string; sort: string; rows: RowWithKey[] }>();
     for (const k of ordinaryRows) {
@@ -683,11 +683,17 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       g.rows.push(k);
       groups.set(k.group.key, g);
     }
-    if (groups.size > 1) {
-      const used = new Set<string>(["물건챙기기", "닉네임별 합계", "변경 및 추가", "고객이슈·특이사항"]);
-      for (const g of [...groups.values()].sort((a, b) => a.sort.localeCompare(b.sort))) writePickSheet(safeSheetName(g.label, used), g.rows);
-    }
+    groupList.push(...[...groups.values()].sort((a, b) => a.sort.localeCompare(b.sort)));
   }
+  // [2026-11-26 사장님 「첫 시트 제목 — 방송 하나면 방송 날짜·제목, 기간이면 기간」] 첫 시트(전부 쭉) 이름
+  //   방송 하나 = 「11.21(토) 해외명품고퀄의류14」 · 여럿 = 「11.06(금)~11.22(일) 전체」 · 방송 목록 없으면 예전 「물건챙기기」
+  const used = new Set<string>(["닉네임별 합계", "변경 및 추가", "고객이슈·특이사항"]);
+  const dayOf = (label: string) => label.split(" ")[0] || label;
+  const firstName = groupList.length === 1 ? groupList[0].label
+    : groupList.length > 1 ? `${dayOf(groupList[0].label)}~${dayOf(groupList[groupList.length - 1].label)} 전체`
+    : "물건챙기기";
+  writePickSheet(safeSheetName(firstName, used), ordinaryRows);
+  if (groupList.length > 1) for (const g of groupList) writePickSheet(safeSheetName(g.label, used), g.rows);
 
   // [2026-11-25 사장님 「닉네임별 구매 개수 파악」] 두 번째 시트 「닉네임별 합계」 — 위 «물건챙기기» 시트 줄을 그대로 닉네임마다 묶은 것(표시 전용·재계산 없음).
   //   개수·금액은 위 시트의 수량·상품금액 칸 합. 미입금 줄은 따로 셈. 정렬 = 총 개수 많은 순.

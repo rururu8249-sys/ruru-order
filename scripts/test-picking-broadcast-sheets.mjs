@@ -27,8 +27,8 @@ assert.equal(pickBroadcastGroup({createdAt:'2026-11-10T01:00:00Z',broadcastId:'X
 await exportLiveOrdersForPicking(orders,{filterLabel:'기간',rowOrder:'time',broadcastRanges:ranges});
 let wb=new ExcelJS.Workbook();await wb.xlsx.load(await blob.arrayBuffer());
 const names=wb.worksheets.map(w=>w.name);
-assert.deepEqual(names,['물건챙기기','11.21(토) 해외명품고퀄의류14','11.22(일) 해외일정종료','11.23(월) 쇼핑몰 주문','닉네임별 합계','변경 및 추가','고객이슈·특이사항']);
-const main=wb.getWorksheet('물건챙기기');
+assert.deepEqual(names,['11.21(토)~11.23(월) 전체','11.21(토) 해외명품고퀄의류14','11.22(일) 해외일정종료','11.23(월) 쇼핑몰 주문','닉네임별 합계','변경 및 추가','고객이슈·특이사항']);
+const main=wb.getWorksheet('11.21(토)~11.23(월) 전체');
 assert.equal(main.getRow(1).getCell(10).value,'방송');
 assert.equal(main.rowCount,6,'전체 시트 5줄');
 const nickOf=(ws)=>{const a=[];ws.eachRow((r,i)=>{if(i>1)a.push(r.getCell(2).value)});return a.sort();};
@@ -41,5 +41,5 @@ assert.deepEqual(byCol['11.21(토) 해외명품고퀄의류14'].sort(),['시크�
 // 방송 하나만이면 시트는 예전처럼(방송 칸만 붙음)
 await exportLiveOrdersForPicking(orders.slice(0,3),{filterLabel:'방송',rowOrder:'time',broadcastRanges:ranges});
 wb=new ExcelJS.Workbook();await wb.xlsx.load(await blob.arrayBuffer());
-assert.deepEqual(wb.worksheets.map(w=>w.name),['물건챙기기','닉네임별 합계','변경 및 추가','고객이슈·특이사항']);
+assert.deepEqual(wb.worksheets.map(w=>w.name),['11.21(토) 해외명품고퀄의류14','닉네임별 합계','변경 및 추가','고객이슈·특이사항']);
 console.log('test-picking-broadcast-sheets: ok');
