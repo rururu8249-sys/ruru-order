@@ -324,6 +324,12 @@ export default function AdminLiveEventRoulettePanel({
   const [sourceDate] = useState(todayText);
   const [broadcasts, setBroadcasts] = useState<RouletteBroadcast[]>([]);
   const [broadcastId, setBroadcastId] = useState("");
+  // [2026-11-26 사장님 「실시간 주문서 필터로 손님 목록 불러오는 게 연동 안 되고 느림 → 이벤트 자체 필터」]
+  //   명단 기준을 이벤트 화면에서 직접 고른다: 방송 하나(기본 = 지금/최근 방송) 또는 예전처럼 «주문서 화면 그대로»("").
+  //   방송을 고르면 서버가 그 방송 시간 주문만 읽는다(주문서 필터가 «전체»여도 수천 명을 끌어오지 않음 — 실측 2,130명·6.7초).
+  const [rosterScope, setRosterScope] = useState<string>("");
+  const rosterScopeRef = useRef("");
+  rosterScopeRef.current = rosterScope;
   const [title, setTitle] = useState("🎁 루루동이 선물 이벤트");
   const [winnerNote, setWinnerNote] = useState("이벤트 당첨");
   const [participants, setParticipants] = useState<RouletteParticipant[]>([]);
@@ -813,7 +819,7 @@ export default function AdminLiveEventRoulettePanel({
   // 참가자 기준 = 주문서 화면 필터로 보이는 주문(우선) / 없으면 현재 활성 방송.
   const liveBroadcastId = selectedBroadcastId != null ? String(selectedBroadcastId) : activeBroadcastId != null ? String(activeBroadcastId) : "";
   const hasFilteredOrders = Array.isArray(filteredOrderGroupIds) && filteredOrderGroupIds.length > 0;
-  const canLoadParticipants = hasFilteredOrders || !!liveBroadcastId;
+  const canLoadParticipants = !!rosterScope || hasFilteredOrders || !!liveBroadcastId;
 
   const changeParticipantSource = (source: "auto" | "paid" | "manual") => {
     setParticipantSource(source);
@@ -886,7 +892,7 @@ export default function AdminLiveEventRoulettePanel({
           winnerNote,
           mode: runMode,
           sourceDate,
-          broadcastId: liveBroadcastId || broadcastId,
+          broadcastId: rosterScope || liveBroadcastId || broadcastId,
           title,
           participantSource,
           participants: finalParticipants,
@@ -972,10 +978,11 @@ export default function AdminLiveEventRoulettePanel({
           action: "participants",
           mode: nextMode,
           sourceDate: nextSourceDate,
-          broadcastId: nextBroadcastId || undefined,
+          broadcastId: (rosterScopeRef.current || nextBroadcastId) || undefined,
           paidOnly: paidOnly || undefined,
           excludeDailyDup,
-          orderGroupIds: filteredIdsRef.current ?? undefined,
+          // 방송을 골랐으면 주문서 화면 목록은 안 보냄(서버가 그 방송 시간 주문만 읽음)
+          orderGroupIds: rosterScopeRef.current ? undefined : (filteredIdsRef.current ?? undefined),
           ...ticketRuleBody,
         }),
       });
@@ -1018,6 +1025,7 @@ export default function AdminLiveEventRoulettePanel({
       return; // 첫 마운트는 bootstrap 로드가 처리(중복 호출 방지)
     }
     if (participantSource !== "auto" && participantSource !== "paid") return;
+    if (rosterScopeRef.current) return; // 이벤트에서 방송을 직접 골랐으면 주문서 필터를 따라가지 않음
     void loadParticipants(mode, sourceDate, liveBroadcastId, participantSource === "paid");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredKey, liveBroadcastId]);
@@ -1045,6 +1053,11 @@ export default function AdminLiveEventRoulettePanel({
 
       if (nextBroadcastId) {
         setBroadcastId(nextBroadcastId);
+      }
+      // 명단 기준 기본값 = 지금/최근 방송(처음 한 번만). 사장님이 바꾼 값은 그대로 둔다.
+      if (!rosterScopeRef.current && nextBroadcastId) {
+        rosterScopeRef.current = nextBroadcastId;
+        setRosterScope(nextBroadcastId);
       }
 
       await loadParticipants(mode, sourceDate, nextBroadcastId);
@@ -1131,7 +1144,7 @@ export default function AdminLiveEventRoulettePanel({
           //   (기본 모드가 운영으로 바뀌면서 운영 대기 행이 쌓이는 걸 막음. 실제 추첨은 돌리기 때 새 이벤트를 만든다)
           mode: "test",
           sourceDate,
-          broadcastId: liveBroadcastId || broadcastId,
+          broadcastId: rosterScope || liveBroadcastId || broadcastId,
           participants: nextParticipants,
           eventKind: eventTab,
           excludeDailyDup,
@@ -1206,7 +1219,7 @@ export default function AdminLiveEventRoulettePanel({
           winnerNote,
           mode: runMode,
           sourceDate,
-          broadcastId: liveBroadcastId || broadcastId,
+          broadcastId: rosterScope || liveBroadcastId || broadcastId,
           title,
           participantSource,
           participants: finalParticipants,
@@ -1288,7 +1301,7 @@ export default function AdminLiveEventRoulettePanel({
           title,
           mode: runMode,
           sourceDate,
-          broadcastId: liveBroadcastId || broadcastId,
+          broadcastId: rosterScope || liveBroadcastId || broadcastId,
           participantSource,
           participants: finalParticipants,
           manualParticipantText,
@@ -1553,6 +1566,24 @@ export default function AdminLiveEventRoulettePanel({
                 </div>
 
                 <fieldset disabled={publishingRoster} style={{margin:0,padding:0,border:0,minWidth:0,flex: 0.95, display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div className="note">명단 기준</div>
+                  <select
+                    aria-label="이벤트 명단 기준"
+                    value={rosterScope}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      rosterScopeRef.current = next;
+                      setRosterScope(next);
+                      participantCacheRef.current = { auto: null, paid: null };
+                      if (participantSource === "auto" || participantSource === "paid") {
+                        void loadParticipants(mode, sourceDate, next || liveBroadcastId, participantSource === "paid");
+                      }
+                    }}
+                    style={{ width: "100%", height: "36px", border: "1px solid var(--bd)", borderRadius: "8px", padding: "0 8px", background: "var(--color-surface)", fontSize: "13px", fontWeight: 700 }}
+                  >
+                    {broadcasts.map((b) => <option key={b.id} value={b.id}>{b.label || b.title}</option>)}
+                    <option value="">주문서 화면 그대로(필터 따라감)</option>
+                  </select>
                   <div className="note">참가자 불러오기</div>
                   <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
                   <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
@@ -1565,7 +1596,7 @@ export default function AdminLiveEventRoulettePanel({
                   {!canLoadParticipants && participantSource !== "manual" ? (
                     <div className="note" style={{ color: "var(--amber)" }}>⚠ 불러올 주문 없음 — 방송 시작 또는 주문서에 주문이 보이면 명단을 불러올 수 있어요.</div>
                   ) : participantSource !== "manual" ? (
-                    <div className="note" style={{ color: "var(--mut2)" }}>※ 두 명단 모두 주문 화면 필터(기간·방송·상태) 기준입니다. 결제완료 명단은 그중 입금확인·카드결제완료한 손님만 포함하며, 같은 손님의 여러 주문은 한 명으로 합칩니다.</div>
+                    <div className="note" style={{ color: "var(--mut2)" }}>{rosterScope ? "고른 방송 시간의 주문 기준 · 같은 손님은 한 명" : "주문서 화면 필터 기준 · 같은 손님은 한 명"}</div>
                   ) : null}
                   <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setExcludeDailyDup((v) => !v)}>
                     <span style={{ fontSize: "11px" }}>당일 중복당첨 금지</span>

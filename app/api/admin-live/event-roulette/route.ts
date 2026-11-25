@@ -402,21 +402,25 @@ async function fetchOrderRowsByGroupIds(supabase: SupabaseAdminClient, groupIds:
     if (Array.isArray(rows)) for (const r of rows as EventRouletteOrderLike[]) byId.set(String((r as { id?: unknown }).id ?? ""), r);
   };
 
+  // [2026-11-26] 예전엔 200개씩 «줄줄이» 2번씩 기다려 주문서 필터가 «전체»(2천 명대)면 6초 넘게 걸렸다.
+  //   같은 조회를 6개씩 «동시에» 보낸다. id 로 합치므로 결과는 완전히 같다.
   const chunk = 200;
+  const tasks: Array<() => Promise<unknown>> = [];
   for (let i = 0; i < ids.length; i += chunk) {
     const slice = ids.slice(i, i + chunk);
-    const g = await supabase.from("orders").select(cols).in("order_group_id", slice).limit(2000);
-    if (g.error) throw new Error(g.error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
-    add(g.data);
-    const l = await supabase.from("orders").select(cols).in("order_lookup_code", slice).limit(2000);
-    if (l.error) throw new Error(l.error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
-    add(l.data);
+    tasks.push(async () => supabase.from("orders").select(cols).in("order_group_id", slice).limit(2000));
+    tasks.push(async () => supabase.from("orders").select(cols).in("order_lookup_code", slice).limit(2000));
   }
   for (let i = 0; i < numericIds.length; i += chunk) {
     const slice = numericIds.slice(i, i + chunk);
-    const d = await supabase.from("orders").select(cols).in("id", slice).limit(2000);
-    if (d.error) throw new Error(d.error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
-    add(d.data);
+    tasks.push(async () => supabase.from("orders").select(cols).in("id", slice).limit(2000));
+  }
+  for (let i = 0; i < tasks.length; i += 6) {
+    const results = await Promise.all(tasks.slice(i, i + 6).map((run) => run()));
+    for (const r of results as Array<{ data: unknown; error: { message?: string } | null }>) {
+      if (r.error) throw new Error(r.error.message || "필터 기준 룰렛 참여자 주문 조회 실패");
+      add(r.data);
+    }
   }
   return Array.from(byId.values());
 }
