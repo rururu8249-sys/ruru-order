@@ -29,7 +29,7 @@ export default function AdminLiveBottomNav({ activeMenu, onMenuChange, onOpenAss
   const cells: { key: string; label: string; icon: keyof typeof ICON; active: boolean; onClick: () => void; badge?: number }[] = [
     { key: "orders", label: "주문·입금", icon: "orders", active: !moreOpen && top === "orders", onClick: () => onMenuChange("orders"), badge },
     { key: "customers", label: "고객", icon: "customers", active: !moreOpen && top === "customers", onClick: () => onMenuChange("customers") },
-    { key: "assistant", label: "AI 비서", icon: "assistant", active: false, onClick: onOpenAssistant },
+    { key: "assistant", label: "메모장", icon: "assistant", active: false, onClick: onOpenAssistant },
     { key: "products", label: "상품", icon: "products", active: !moreOpen && top === "products", onClick: () => onMenuChange("products") },
     { key: "more", label: "더보기", icon: "more", active: moreOpen || top === "settings", onClick: onMore },
   ];

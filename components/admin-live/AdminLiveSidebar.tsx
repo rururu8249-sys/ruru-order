@@ -134,7 +134,7 @@ export default function AdminLiveSidebar({
               <AdminLiveMenuIcon menu="broadcast" className="h-[17px] w-[17px]" />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</div>
+              <div className="flex items-baseline gap-1.5"><span className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</span><span className="shrink-0 rounded bg-ink px-1.5 py-0.5 text-[11px] font-bold leading-none tracking-wide text-white">VER 2.0</span></div>
               <div className="flex items-center gap-1.5 text-[11px] font-bold text-ink-mute">
                 <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
                 {broadcastOn ? "방송 중" : "방송 대기"}
@@ -247,7 +247,7 @@ export default function AdminLiveSidebar({
               onClick={() => { onOpenAssistant(); onCloseNav?.(); }}
               className="mb-1.5 flex h-10 w-full items-center justify-center rounded-xl bg-ink text-[13px] font-bold text-white transition active:scale-[0.98]"
             >
-              AI 비서
+              AI 메모장
             </button>
           ) : null}
           {onOpenRail ? (

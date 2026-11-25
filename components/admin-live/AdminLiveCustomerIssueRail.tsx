@@ -1847,6 +1847,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             return patchIssueFields(processTask, key, memo, items, extraItems);
           } : undefined}
           onDelete={processTask ? () => { const t = processTask; setRefundModalItem(null); setProcessTask(null); void deleteIssueTask(t); } : undefined}
+          onResolve={processTask && !isResolved(processTask) && !isDeleted(processTask) ? () => { const t = processTask; setRefundModalItem(null); setProcessTask(null); void resolveIssueTask(t); } : undefined}
           onClose={() => { setRefundModalItem(null); setProcessTask(null); }}
           onSaved={() => { setRefundModalItem(null); setProcessTask(null); setRefundReloadTick((v) => v + 1); setReloadKey((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); }}
         />

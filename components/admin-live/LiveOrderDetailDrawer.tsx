@@ -14,7 +14,6 @@ import type { LiveOrderItemEditSaveResult } from "./useLiveOrderItemEdit";
 import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderItemAddForm, type LiveOrderRegisteredAddInput } from "./useLiveOrderItemAdd";
 import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
 import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
-import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
 import { buildCustomerOrderCopyText, buildOrderItemsCopyText, buildExtraDepositRequestNote, buildPaymentRequestNote, buildPaymentRequestKakao, paymentRequestToast } from "./liveOrderCustomerCopy";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
@@ -2172,8 +2171,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           <div className="px-1 text-[13px] font-semibold text-ink-soft">위험 작업</div>
           {dangerOpen ? (
             <div className="mt-2 space-y-2 rounded-lg border border-line p-3">
-              <div className="text-[11px] font-bold leading-4 text-ink-mute">되돌리기 어려운 작업이에요 — 꼭 필요할 때만 사용하세요.</div>
-
               {!isCanceled && canCancelPaymentConfirm ? (
                 <button
                   type="button"
@@ -2187,7 +2184,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
               {!isCanceled ? (
                 <>
-                  <LiveOrderDangerActionGuide />
                   <button
                     type="button"
                     onClick={cancelOrder}
@@ -2200,9 +2196,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               ) : null}
 
               {/* 이 손님 차단(또는 해제) — 조건·핸들러·확인창 그대로 */}
-              <div className="rounded-xl border border-line bg-surface p-3">
-                <div className="text-[12px] font-semibold text-ink-mute">이 손님</div>
-                {blockedNow === null ? (
+              <div>
+                                {blockedNow === null ? (
                   <div className="mt-2 flex h-10 w-full items-center justify-center rounded-xl bg-surface-2 text-[12px] font-bold text-ink-mute">
                     차단 여부 확인 중…
                   </div>
@@ -2247,11 +2242,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       onClick={() => { setBlockError(""); setBlockOpen(true); }}
                       className="mt-2 h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-semibold text-danger-tx hover:bg-surface-2"
                     >
-                      이 손님 차단 (거파 품목 고르기)
+                      이 손님 차단
                     </button>
-                    <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
-                      차단하면 이 손님은 주문서를 새로 쓸 수 없습니다. 이미 들어온 주문·입금·정산은 그대로 남습니다.
-                    </div>
                   </>
                 )}
               </div>

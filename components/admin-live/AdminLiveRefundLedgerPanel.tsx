@@ -93,13 +93,15 @@ const ISSUE_KINDS: readonly IssueKind[] = ["refund", "exchange", "ship", "etc"];
 const ISSUE_KIND_LABEL: Record<IssueKind, string> = { refund: "환불", exchange: "교환", ship: "출고", etc: "기타" };
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, extraInitial = [], onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: IssueKind; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }>; extraItems?: IssueExtraItem[] }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; extraInitial?: IssueExtraItem[]; onCreateIssue?: (d: { issueType: IssueKind; memo: string; selectedRowIds: number[]; rowQty: Record<string, number> }) => Promise<{ taskId: string } | null> }) {
+export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, extraInitial = [], onCreateIssue, onResolve }: { item: LedgerDetail; onResolve?: () => void; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: IssueKind; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }>; extraItems?: IssueExtraItem[] }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; extraInitial?: IssueExtraItem[]; onCreateIssue?: (d: { issueType: IssueKind; memo: string; selectedRowIds: number[]; rowQty: Record<string, number> }) => Promise<{ taskId: string } | null> }) {
   const orderCode = clean(item.order_lookup_code);
   // [2026-09-27 ②] 유형 칩(환불/교환/기타) — 이 하나가 kind·하단 전환을 정한다. 기타는 하단 없음(admin-tasks 만 저장).
   // [2026-10-25] 출고(ship) 추가 — 환불 기록 없는 유형(기타·출고)은 isEtc 로 같이 다룬다(금액·계좌 칸 없음).
   const initIssueType: IssueKind = issueKindFromTaskTypes(issueTypesInitial || [], item.kind);
   const [issueType, setIssueType] = useState<IssueKind>(initIssueType);
   const isShip = issueType === "ship";
+  // [2026-11-26 리뉴얼] 열면 «읽기 화면», 「고치기」를 눌러야 입력칸이 열린다. 등록(createMode)은 바로 입력.
+  const [editing, setEditing] = useState(createMode);
   const isEtc = issueType === "etc" || isShip;
   const kind = issueType === "exchange" ? "교환" : "반품";
   const isExchange = kind === "교환";
@@ -485,6 +487,94 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
           <button type="button" onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-lg text-[18px] text-ink-mute hover:bg-surface-2">×</button>
         </div>
 
+        {!editing ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
+            {/* 상품 · 사유 */}
+            <section className="border-b border-line py-3">
+              <div className="mb-2 flex items-center justify-between text-[13px] font-semibold text-ink-mute">
+                <span>{isShip ? "출고할 상품" : issueType === "etc" ? "관련 상품" : isExchange ? "교환할 상품" : "돌려받을 상품"}</span>
+                {issueType !== "etc" && (presetLabel || reasonChip) ? <span className="rounded-full bg-surface-2 px-2.5 py-1 text-[12px] font-bold text-ink">{presetLabel || reasonChip}</span> : null}
+              </div>
+              {!linesLoaded ? (
+                <div className="text-[13px] text-ink-mute">불러오는 중…</div>
+              ) : linesError ? (
+                <div className="text-[13px] text-danger-tx">주문 정보를 불러오지 못했어요.</div>
+              ) : (() => {
+                const picked = lines.filter((l) => (sel[l.id] || 0) > 0);
+                const extras = isEtc ? extra : [];
+                if (picked.length === 0 && extras.length === 0) return <div className="text-[14px] text-ink-mute">{matchFailed && !isEtc ? productText(item.product_snapshot) || "상품 정보 없음" : "지정한 상품 없음"}</div>;
+                return (
+                  <div className="space-y-2">
+                    {picked.map((l) => {
+                      const q = sel[l.id] || 0;
+                      return (
+                        <div key={l.id} className="flex items-center gap-3">
+                          {l.photo ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={l.photo} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-line object-cover" loading="lazy" />
+                          ) : <span className="h-12 w-12 shrink-0 rounded-lg bg-surface-2" />}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[16px] font-bold text-ink">{l.product_name}</span>
+                            <span className="block truncate text-[13px] text-ink-soft">{[optLabel(l.color, l.size), `${q}개`].filter(Boolean).join(" · ")}</span>
+                          </span>
+                          {!isEtc ? <span className="shrink-0 text-[16px] font-bold tabular-nums text-ink">{won(q === l.qty ? l.lineTotal : l.unit * q)}</span> : null}
+                        </div>
+                      );
+                    })}
+                    {extras.map((x, i) => (
+                      <div key={`x${i}`} className="text-[14px] text-ink">{[x.productName, optLabel(x.color, x.size), `${x.qty}개`].filter(Boolean).join(" · ")}</div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </section>
+
+            {/* 메모 */}
+            <section className="border-b border-line py-3">
+              <div className="mb-2 text-[13px] font-semibold text-ink-mute">메모</div>
+              <div className={`whitespace-pre-wrap rounded-xl bg-surface-2 px-3 py-2.5 text-[14px] leading-6 ${clean(issueMemo) ? "text-ink" : "text-ink-mute"}`}>{clean(issueMemo) || "메모 없음"}</div>
+            </section>
+
+            {/* 돈 (환불) / 바꿀 상품 (교환) */}
+            {!isEtc && !isExchange ? (
+              <section className="border-b border-line py-3">
+                <div className="mb-1 text-[13px] font-semibold text-ink-mute">{isCardCancel ? "카드 전체 취소" : method === "없음" ? "환불 없음" : "돌려줄 돈"}</div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[30px] font-extrabold tabular-nums text-ink">{won(isCardCancel ? cardTotalDisplay : amountFinal)}</span>
+                  <span className="text-[13px] text-ink-soft">{method === "없음" ? "" : method === "카드취소" ? "페이스터에서 취소" : method}</span>
+                </div>
+                {!isCardCancel && deductTotal > 0 ? <div className="mt-0.5 text-[13px] text-ink-mute">{deductRowLabel} {won(deductTotal)} 뺀 금액</div> : null}
+                {isCardCancel && cardRefundBack > 0 ? <div className="mt-0.5 text-[13px] text-ink-mute">반품비 {won(cardRefundBack)}은 손님에게 따로 받기</div> : null}
+                {method === "계좌이체" ? (
+                  account && !item.account_hidden ? (
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5">
+                      <span className="min-w-0 text-[14px] leading-5 text-ink"><b>{bankDisplayName(bank)}</b> {account}<span className="block text-[13px] text-ink-soft">예금주 {holder || "—"}</span></span>
+                      <button type="button" onClick={() => void copyTransferShort()} className="h-10 shrink-0 rounded-full bg-ink px-4 text-[13px] font-bold text-white">이체정보 복사</button>
+                    </div>
+                  ) : item.account_hidden ? (
+                    <div className="mt-2 text-[13px] text-ink-mute">{[bankDisplayName(bank), holder].filter(Boolean).join(" · ")} · 계좌번호는 30일이 지나 가려졌어요</div>
+                  ) : (
+                    <button type="button" onClick={() => setEditing(true)} className="mt-3 w-full rounded-xl border-[1.5px] border-dashed border-line px-3 py-3 text-left text-[14px] text-ink-mute">손님 계좌 넣기 (문자 그대로 붙여넣기)</button>
+                  )
+                ) : null}
+              </section>
+            ) : isExchange ? (
+              <section className="border-b border-line py-3">
+                <div className="mb-1 text-[13px] font-semibold text-ink-mute">무엇으로 바꾸나요</div>
+                <div className={`text-[16px] font-bold ${exchangeOption ? "text-ink" : "text-ink-mute"}`}>{exchangeOption || "아직 안 정했어요"}</div>
+              </section>
+            ) : null}
+
+            {/* 반품 날짜 */}
+            {!isEtc ? (
+              <section className="py-3 text-[13px] text-ink-soft">
+                반품 접수 <b className="text-ink">{returnRequestedOn ? dateShortKo(returnRequestedOn) : "—"}</b>
+                <span className="mx-2 text-line">|</span>
+                도착 <b className="text-ink">{returnReceivedOn ? dateShortKo(returnReceivedOn) : "—"}</b>
+              </section>
+            ) : null}
+          </div>
+        ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {/* 1. 유형 — [2026-10-25] 4칸 한 줄(환불·교환·출고·기타). 아래 칩(사유)과 모양을 달리해 «무엇을 할지»가 먼저 보이게 */}
           <div role="radiogroup" aria-label="유형" className="mb-5 grid grid-cols-4 gap-1 rounded-lg bg-surface-2 p-1">
@@ -787,13 +877,28 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
           {nextActionSaved ? <div className="mb-1 text-[12px] text-ink-mute">다음 할 일: {nextActionSaved}</div> : null}
         </div>
 
+        )}
+
         {/* 하단 고정 — [삭제] … [닫기] [저장]. 완료(이체·취소·지급 등)는 목록 「해결완료」에서. */}
         {saveError ? <div className="border-t border-line px-4 py-2 text-[12px] text-danger-tx">저장 실패: {saveError}</div> : null}
         <div className="flex items-center gap-2 border-t border-line px-4 py-3">
           {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="h-9 rounded-lg px-2 text-[13px] font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50">삭제</button> : null}
           <span className="flex-1" />
-          <button type="button" onClick={onClose} className="h-9 rounded-lg border border-line bg-surface px-4 text-[13px] font-semibold text-ink hover:bg-surface-2">닫기</button>
-          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-10 min-w-[112px] rounded-lg bg-ink px-5 text-[14px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? "등록" : "저장"}</button>
+          {!editing ? (
+            <>
+              <button type="button" onClick={() => setEditing(true)} className="h-12 rounded-xl border border-line bg-surface px-5 text-[16px] font-bold text-ink hover:bg-surface-2">고치기</button>
+              {onResolve ? (
+                <button type="button" disabled={saving} onClick={onResolve} className="h-12 min-w-[128px] rounded-xl bg-ink px-5 text-[16px] font-bold text-white disabled:opacity-50">{method === "계좌이체" && !isEtc && !isExchange ? "보냈어요 · 해결완료" : "해결완료"}</button>
+              ) : (
+                <button type="button" onClick={onClose} className="h-12 rounded-xl bg-ink px-6 text-[16px] font-bold text-white">닫기</button>
+              )}
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={onClose} className="h-12 rounded-xl border border-line bg-surface px-5 text-[16px] font-bold text-ink hover:bg-surface-2">{createMode ? "닫기" : "취소"}</button>
+              <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-12 min-w-[112px] rounded-xl bg-ink px-5 text-[16px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? "등록" : "저장"}</button>
+            </>
+          )}
         </div>
         {/* [2026-10-23] 교환 «바꿀 상품» 고르기 — 등록상품 창을 기록용으로만 재사용(재고·주문 무접촉, onAdd 는 글자만 만든다) */}
         {exPicker ? (
