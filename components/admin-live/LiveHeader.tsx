@@ -620,7 +620,7 @@ export default function LiveHeader({
         <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-danger-tx" : "bg-line"].join(" ")} />
         <span className="text-[16px] font-bold text-ink">{statusLabel === "방송중" ? "방송 중" : "방송 대기"}</span>
         <span className="text-[13px] text-ink-mute">
-          {activeBroadcast?.started_at ? `${formatBroadcastTime(activeBroadcast.started_at)} 시작` : "시작 전"} · 상품 {typeof productCount === "number" ? productCount : "—"}개
+          {activeBroadcast?.started_at ? `${formatBroadcastTime(activeBroadcast.started_at)} 시작` : "시작 전"}{typeof productCount === "number" ? ` · 상품 ${productCount}개` : ""}
         </span>
         {activeBroadcast ? (
           <button type="button" className={`${primaryCls} ml-auto`} onClick={openAlert} title="방송 알림톡을 보낼 손님을 고르고 발송">알림 보내기</button>

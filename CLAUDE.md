@@ -142,6 +142,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-26 **[방송 설정 창 「상품 —개」 → 숫자 모를 땐 숨김 + 채팅뷰어 테스트 현행화]** 방송 설정 창 머리 「시작 전 · 상품 —개」 → 개수를 알 때만 「· 상품 N개」. test-chat-view-tabs 를 지금 설계(알림 칸 최근 3개·봇 담음/결제/주문 알림은 알림 칸 제외)에 맞춤 — 통과. 배포 완료
 - 2026-11-26 **[손님 주문조회 빈 화면 문구]** 「전체」인데도 「선택한 상태의 주문내역이 없습니다 · 다른 상태를 눌러 확인해 주세요」 → 전체일 땐 「최근 주문내역이 없습니다.」(다른 상태 안내 숨김), 상태를 골랐을 때만 예전 문구. 주문조회 창·/myorder 같은 규칙. 표시만. 배포 완료
 - 2026-11-26 **[관리자 읽기 화면 서버 지역 sin1 13개]** 운영 실측: 상품 탭 widget-library 1초×2 등 미국 지역 함수가 싱가포르 DB 를 오가며 느림 → 관리자 전용·돈 무관 라우트만 vercel.json 지역 sin1(widget-library·product-brand-catalog·visit-stats(+exclude)·catalog-write·picking-workspace·broadcast-end-reports·repurchase-stats·stock-flow·customer-lifetime·ops-status·broadcast-flow·assistant-memos). 코드 무변경, 돈·입금·포인트·뱅크다·알림톡 라우트는 그대로. build 통과. 배포 완료
 - 2026-11-26 **[손님 주문서 — 방송 접수 후 구매 상품 확인(사장님 「손님이 제대로 확인을 못 함·주문 전에 반드시 확인」)]** 담은 상품에 «방송 접수 후 구매» 상품(바로구매 아님 — 카드·옵션창과 같은 isInstantOrderProduct)이 있으면 제출 버튼 위에 빨간 칸 「방송 접수 완료 후 구매 가능! 방송에서 접수하지 않았다면 빼 주세요 / 상품 이름(2개+외 N개)」, 최종 확인 체크 문구는 「배송지·상품·옵션·수량, 방송에서 접수한 상품인지 확인했습니다」. 체크 칸은 원래 설정(주문 전 최종 확인 체크 ON/OFF) 그대로, 새로 막는 규칙 없음 — 표시만·금액·제출 무변경. customer-ui-switch·detail-product-name·brand-linked-submit 통과·tsc 0·build(BANKDA 가드 통과). 배포 완료 — 실폰 확인 필요

@@ -25,13 +25,13 @@ try{
  assert.equal(tree.root.findAllByProps({'data-chat-id':3}).length,1,'snapshot cannot overwrite newer realtime');
  assert.equal(notices()[0].props['aria-label'],'사이트 새 글 1개 확인');
  await act(async()=>{onChat(row(4));onChat(row(5));onChat(row(5));});
- assert.equal(notices()[0].props['aria-label'],'사이트 새 글 3개 확인');assert.equal(tree.root.findAllByProps({className:'ruru-chat-notice-row'}).length,2);
+ assert.equal(notices()[0].props['aria-label'],'사이트 새 글 3개 확인');assert.equal(tree.root.findAllByProps({className:'ruru-chat-notice-row'}).length,3); // 알림 칸은 최근 3개(ChatViewNotice slice(-3))
  await act(async()=>tab('site').props.onClick());assert.equal(notices().length,0);assert.equal(tree.root.findByProps({id:'chat-panel-site'}).props.hidden,false);assert.equal(tree.root.findByType('iframe'),iframe,'iframe remains mounted across tabs');
  await act(async()=>onChat(row(6)));await act(async()=>tab('yt').props.onClick());assert.equal(notices().length,0,'messages seen in site tab are read');
  await act(async()=>onChat(row(7)));await act(async()=>notices()[0].props.onClick());assert.equal(tab('site').props['aria-selected'],true,'notice opens site');assert.equal(notices().length,0);
  await act(async()=>tab('yt').props.onClick());await act(async()=>{onChat(row(8));onChat({...row(8),hidden:true});});assert.equal(notices().length,0,'deleted message is removed from notice');
  await act(async()=>{onChat({...row(9,'장바구니 담음'),badge:'bot',bot_ref:'c:1'});onChat({...row(10,'결제 완료! 감사합니다'),badge:'bot',bot_ref:'paid:1'});onChat({...row(11,'주문 감사합니다!'),badge:'bot',bot_ref:'o:1'});});
- assert.equal(notices()[0].props['aria-label'],'사이트 새 글 1개 확인');
+ assert.equal(notices().length,0,'bot cart/paid/order notices are not alerts (chatViewFilter: c:/paid:/o: 제외)');
  await act(async()=>tab('site').props.onClick());assert.equal(tree.root.findAllByProps({'data-chat-id':9}).length,0);assert.equal(tree.root.findAllByProps({'data-chat-id':10}).length,0);assert.equal(tree.root.findAllByProps({'data-chat-id':11}).length,1);
  await act(async()=>tree.update(React.createElement(View)));
  assert.equal(tree.root.findAllByProps({'data-source':'youtube'}).length,0,'no YouTube notice (2026-11-13 removed)');
