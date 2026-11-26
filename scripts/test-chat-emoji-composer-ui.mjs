@@ -9,6 +9,8 @@ globalThis.document={addEventListener(){},removeEventListener(){},hidden:false};
 let desktop=true,greet=true,fail=false;
 const blank=()=>{};
 const load=createUiLoader({
+// [2026-11-26] LiveWatchView → useManualAutomationChat 가 진짜 supabase 를 불러 시험용 저장소('1')로 세션 검사를 끝없이 돌던 것 → 가짜 supabase
+ '@/lib/supabase':{supabase:{channel(){const c={on(){return c;},subscribe(){return c;}};return c;},removeChannel:async()=>{},from(){const q={select(){return q;},eq(){return q;},in(){return q;},order(){return q;},limit(){return q;},maybeSingle:async()=>({data:null}),then(r){return Promise.resolve({data:[]}).then(r);}};return q;}}},
  '@/components/customer/KakaoExternalOpen':{openOrderInExternalBrowser:blank},
  '@/lib/useIsDesktop':{useIsDesktop:()=>desktop},
  '@/lib/useLiveFeaturedProducts':{useLiveFeaturedProducts:()=>({products:[],current:null})},

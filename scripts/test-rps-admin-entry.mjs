@@ -10,6 +10,8 @@ globalThis.document={addEventListener:blank,removeEventListener:blank,hidden:fal
 let verifications=0;
 const game={state:null,player:null,admin:false,verified:false,winners:[],error:'',busy:false,now:0,action:async()=>{throw Error('unverified must not run an admin action');},verify:()=>verifications++,refresh:async()=>{}};
 const load=createUiLoader({
+// [2026-11-26] LiveWatchView → useManualAutomationChat 가 진짜 supabase 를 불러 시험용 저장소('1')로 세션 검사를 끝없이 돌던 것 → 가짜 supabase
+ '@/lib/supabase':{supabase:{channel(){const c={on(){return c;},subscribe(){return c;}};return c;},removeChannel:async()=>{},from(){const q={select(){return q;},eq(){return q;},in(){return q;},order(){return q;},limit(){return q;},maybeSingle:async()=>({data:null}),then(r){return Promise.resolve({data:[]}).then(r);}};return q;}}},
  '@/components/customer/KakaoExternalOpen':{openOrderInExternalBrowser:blank},
  '@/lib/useIsDesktop':{useIsDesktop:()=>false},
  '@/lib/useLiveFeaturedProducts':{useLiveFeaturedProducts:()=>({products:[],current:null})},
@@ -26,7 +28,7 @@ const load=createUiLoader({
 const View=load('components/customer/LiveWatchView.tsx').default;
 const props={videoId:'abcdefghijk',title:'test',broadcastId:'A',paused:false,pausedText:'',pinned:null,items:[],cartCount:0,cartTotalText:'0',orderToasts:[],onOpenProduct:blank,onOpenCart:blank,onSwitchToShop:blank,menu:[{key:'me',label:'내정보',onClick:blank}],chat:{messages:[],notice:'',canWrite:true,canModerate:true,canGrant:true,canPin:true,pinned:null,emojis:[],onVerifyIdentity:blank,onModerate:async()=>({ok:true}),onSend:async()=>({ok:true})}};
 const text=node=>typeof node==='string'?node:Array.isArray(node)?node.map(text).join(''):node?.children?.map(text).join('')??'';
-let tree;await act(async()=>{tree=Renderer.create(React.createElement(View,props));});
+let tree;await act(async()=>{tree=Renderer.create(React.createElement(View,props),{createNodeMock:el=>el.type==='iframe'?{clientWidth:390,clientHeight:700,offsetLeft:0,offsetTop:0}:null});});
 const button=label=>tree.root.findAllByType('button').find(b=>text(b)===label);
 await act(async()=>button('더보기').props.onClick());
 assert.ok(button('게임 · 가위바위보'),'existing owner must see game entry before separate verification');

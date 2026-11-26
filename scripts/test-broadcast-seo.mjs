@@ -7,6 +7,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake';
 process.env.GEMINI_API_KEY = 'test';
 
 const load = createUiLoader({
+ // [2026-11-13] Gemini 호출 전 한도 자리 받기(geminiGate, settings DB) → 시험에서는 늘 자리 있음
+ '@/lib/geminiGate': { acquireGemini: async () => true, blockGemini: async () => {}, GEMINI_DEFAULT_MODELS: ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'], GEMINI_FREE_LIMITS: { 'gemini-3.5-flash-lite': { rpm: 15, rpd: 500 }, 'gemini-3.1-flash-lite': { rpm: 15, rpd: 500 }, 'gemini-3.8-flash': { rpm: 5, rpd: 20 } } },
   '@supabase/supabase-js': { createClient: () => ({ from: query }) },
   'next/server': { NextResponse: { json: (body, init) => ({ status: init?.status ?? 200, body }) } },
   '@/lib/admin-auth': { verifyAdminSessionFromRequest: async () => ({ ok: true }) },

@@ -14,6 +14,8 @@ let current = products[0];
 let featured = products;
 let replay={replay:false,products:[],current:null};
 const load = createUiLoader({
+// [2026-11-26] LiveWatchView → useManualAutomationChat 가 진짜 supabase 를 불러 시험용 저장소('1')로 세션 검사를 끝없이 돌던 것 → 가짜 supabase
+ '@/lib/supabase':{supabase:{channel(){const c={on(){return c;},subscribe(){return c;}};return c;},removeChannel:async()=>{},from(){const q={select(){return q;},eq(){return q;},in(){return q;},order(){return q;},limit(){return q;},maybeSingle:async()=>({data:null}),then(r){return Promise.resolve({data:[]}).then(r);}};return q;}}},
  '@/components/customer/KakaoExternalOpen':{openOrderInExternalBrowser:blank},
  '@/lib/useIsDesktop':{useIsDesktop:()=>desktop},
  '@/lib/useLiveFeaturedProducts':{useLiveFeaturedProducts:()=>({products:featured,current})},
@@ -29,7 +31,7 @@ const props={videoId:'abcdefghijk',title:'시험 방송',broadcastId:'one',pause
 let tree;
 const text=node=>typeof node==='string'?node:Array.isArray(node)?node.map(text).join(''):node?.children?.map(text).join('')??'';
 const button=label=>tree.root.findAllByType('button').find(n=>text(n)===label);
-const click=async n=>act(async()=>n.props.onClick());
+const click=async n=>act(async()=>n.props.onClick({stopPropagation(){},preventDefault(){}}));
 await act(async()=>{tree=Renderer.create(React.createElement(View,props));});
 assert.equal(tree.root.findAllByProps({'data-featured-product-card':true}).length,1);
 assert.equal(tree.root.findByProps({'data-featured-product-card':true}).findAllByType('button').length,1,'no extra browse row consumes chat height');
@@ -56,6 +58,8 @@ assert.equal(tree.root.findAllByProps({'data-featured-product-card':true}).lengt
 await click(tree.root.findByProps({'aria-label':'가방 상품 선택'}));
 const rows=tree.root.findAllByProps({role:'dialog'})[0];
 await click(rows.findAllByType('button').find(n=>n.props['aria-label']?.includes('가방 상품 선택')));assert.deepEqual(calls.pop(),['20',undefined]);
+// [2026-11-13 사장님] 상품을 눌러도 상품 목록은 열린 채로 남음 → 다음 단계 전에 직접 닫음
+await click(tree.root.findByProps({'aria-label':'닫기'}));
 featured=[products[0]];current=products[0];
 await act(async()=>tree.update(React.createElement(View,props)));
 await click(tree.root.findByProps({'aria-label':'LOE-111 블랙 상품 선택'}));

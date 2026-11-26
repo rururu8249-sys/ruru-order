@@ -198,6 +198,10 @@ class FixtureDatabase {
       if (this.options.promoConsumed === true) return result({ kakao_id: OWNER });
     }
     if (query.table === "settings") {
+      // [2026-11-26] 구독 무배 혜택 방식(mode): 이 시험은 «한 계정 1번(once)» 규칙을 확인한다.
+      if (hasSteps(query, ["select", "eq", "maybeSingle"]) && columns(query) === "key,value" && eq(query, "key") === "subscribe_free_ship_v1") {
+        return result({ key: "subscribe_free_ship_v1", value: JSON.stringify({ enabled: true, mode: "once" }) });
+      }
       if (hasSteps(query, ["select", "eq", "maybeSingle"]) && columns(query) === "value") {
         const settings = { default_shipping_fee: 4000, vendor_shipping_fee: 4000, overseas_shipping_fee: 0, remote_area_shipping_fee: 6000, ...this.options.settings };
         const key = eq(query, "key");
