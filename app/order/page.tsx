@@ -1901,6 +1901,8 @@ export default function OrderPage() {
   const [subscribeAvailable, setSubscribeAvailable] = useState(false);
   // [2026-11-23] 1회 혜택을 이미 썼는지(서버 used) — 인증했는데 무료배송이 안 붙는 손님에게 이유 한 줄 보여 주기용(표시 전용)
   const [subscribeUsed, setSubscribeUsed] = useState(false);
+  // [2026-11-26] 서버가 알려 준 혜택 방식(1회면 true) — 「(1회)」 문구용(표시 전용)
+  const [subscribeOnce, setSubscribeOnce] = useState(false);
   const [subscribeStatusReload, setSubscribeStatusReload] = useState(0);
   const [subscribePromoEarnRate, setSubscribePromoEarnRate] = useState(0.5);
   const [subscribeNow, setSubscribeNow] = useState(() => Date.now());
@@ -2176,6 +2178,7 @@ export default function OrderPage() {
         setSubscribeVerified(j.verified === true);
         setSubscribeEverVerified(j.everVerified === true);
         setSubscribeUsed(j.used === true);
+        setSubscribeOnce(j.once === true);
         setSubscribeAvailable(j.available === true);
         setSubscribeStatusLoading(false);
       }).catch(() => { if (alive) { setSubscribeAvailable(false); setSubscribeStatusLoading(false); } });
@@ -7831,6 +7834,7 @@ export default function OrderPage() {
               channelName={subscribeConfig.channelName}
               exampleUrl={subscribeConfig.exampleUrl}
               groupsText={subscribeGroupsText}
+              once={subscribeConfig.mode === "once"}
               verified={subscribeVerified}
               kakaoId={subscribeKakaoId}
               onVerified={onSubscribeVerified}
@@ -7869,6 +7873,7 @@ export default function OrderPage() {
               channelName={subscribeConfig.channelName}
               exampleUrl={subscribeConfig.exampleUrl}
               groupsText={subscribeGroupsText}
+              once={subscribeConfig.mode === "once"}
               verified={subscribeVerified}
               kakaoId={subscribeKakaoId}
               customerPhone={customerPhone}
@@ -8817,6 +8822,7 @@ export default function OrderPage() {
                       channelName={subscribeConfig.channelName}
                       exampleUrl={subscribeConfig.exampleUrl}
                       groupsText={subscribeGroupsText}
+                      once={subscribeConfig.mode === "once"}
                       verified={subscribeVerified}
                       waivedAmount={subscribeWaivedAmount}
                       potentialAmount={subscribePotentialAmount}
@@ -8835,7 +8841,7 @@ export default function OrderPage() {
                       <span aria-hidden="true" style={{ flexShrink: 0, width: "26px", height: "26px", borderRadius: "50%", background: "#007D48", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800 }}>✓</span>
                       <span style={{ minWidth: 0 }}>
                         <span style={{ display: "block", fontSize: "16px", fontWeight: 700 }}>구독 인증 완료 · 배송비 {subscribeWaivedAmount > 0 ? `${subscribeWaivedAmount.toLocaleString()}원 ` : ""}무료</span>
-                        <span style={{ display: "block", marginTop: "2px", fontSize: "13px", fontWeight: 500, color: "#1F5C3F" }}>이 주문서를 제출하면 무료배송이 적용돼요 (1회)</span>
+                        <span style={{ display: "block", marginTop: "2px", fontSize: "13px", fontWeight: 500, color: "#1F5C3F" }}>이 주문서를 제출하면 무료배송이 적용돼요{subscribeOnce ? " (1회)" : ""}</span>
                       </span>
                     </div>
                   </div>
@@ -10320,7 +10326,8 @@ export default function OrderPage() {
                       style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(80px + env(safe-area-inset-bottom))", zIndex: 39, display: "inline-flex", alignItems: "center", gap: "8px", height: "48px", padding: "0 20px", borderRadius: "9999px", background: "#FFFFFF", border: "1px solid #E5E5E5", boxShadow: "0 4px 16px rgba(0,0,0,0.12)", color: "#111111", fontSize: "15px", fontWeight: 600, whiteSpace: "nowrap", fontFamily: "inherit", cursor: "pointer" }}>
                       <svg className="ruru-nudge-arrow" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", animation: isBroadcastOn ? "ruruNudge 1.2s ease-in-out infinite" : "none" }}><path d="M12 19V5" /><path d="M6 11l6-6 6 6" /></svg>
                       {/* [2026-11-05 20:14 사장님] 방송 중엔 «방송에서 주문 접수한 상품만» 담아야 함 → 문구 다르게 */}
-                      {isBroadcastOn ? "방송에서 주문한 상품을 담아주세요" : "마음에 드는 상품을 담아주세요"}
+                      {/* [2026-11-26 사장님] 기본은 «방송 접수 후 담기» — 바로 구매 상품만 있을 때만 「마음에 드는 상품」 */}
+                      {isBroadcastOn || instantReadyCount < quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p)).length ? "방송에서 접수한 상품을 담아주세요" : "마음에 드는 상품을 담아주세요"}
                     </button>
                   ) : (
                     <div style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>

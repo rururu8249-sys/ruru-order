@@ -25,6 +25,8 @@ type Props = {
   collapsible?: boolean;
   /** strip 을 눌렀을 때 — 부모가 카드 창을 연다 */
   onOpenDetail?: () => void;
+  /** 혜택 방식이 «한 계정 1번»이면 true — 안내 문구용 */
+  once?: boolean;
 };
 
 export const SUBSCRIBE_CARD_OPEN_EVENT = "ruru-subscribe-card-open";
@@ -225,7 +227,7 @@ export default function SubscribeFreeShipCard(props: Props) {
       </ol>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void upload(e.target.files?.[0])} />
 
-      <div style={{ marginTop: "12px", fontSize: "13px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>주문서 제출 전에 인증해야 배송비가 빠져요. 무료배송은 한 번만 돼요. 인증 안 해도 주문은 그대로 돼요.</div>
+      <div style={{ marginTop: "12px", fontSize: "13px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>주문서 제출 전에 인증해야 배송비가 빠져요. {props.once ? "무료배송은 한 번만 돼요. " : ""}인증 안 해도 주문은 그대로 돼요.</div>
 
       {zoom ? (
         <div role="dialog" aria-label="예시 사진" onClick={() => setZoom("")} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px" }}>

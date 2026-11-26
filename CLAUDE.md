@@ -142,6 +142,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-26 **[구독 무배 혜택 방식 고르기 + 빈 장바구니 문구(사장님 17:47·17:50, 17:55 배포 승인)]** 설정 › 구독 인증 무료배송 「혜택 방식」 [켜져 있는 동안 계속(기본) | 한 계정 1번만] = subscribe_free_ship_v1.mode(값 없으면 계속). 서버 판정(readSubscribeBenefitStatus·subscribe-verify 재인증 막기)은 once 일 때만 «이미 씀» 확인, 손님 「(1회)」·「한 번만 돼요」 문구도 once 일 때만. DB 판정 함수·주문 제출 RPC 의 1회 검사도 once 일 때만 = supabase/sql/hotfix/subscribe_mode_always_20261126.sql(실행 전엔 예전처럼 1회로 동작 — 안전 쪽). 배송비 계산식·포인트 0.5% 규칙 무변경. 빈 장바구니 알약: 방송 중이거나 «방송 접수 후 구매» 상품이 보이면 「방송에서 접수한 상품을 담아주세요」, 바로 구매 상품만 있을 때만 「마음에 드는 상품을 담아주세요」. test-subscribe-free-ship(계속/1회 3건)·tsc 0·guard 0·build(BANKDA)
 - 2026-11-26 **[유튜브 앱 바로 열기 다시 설계 + 금색 종(사장님 17:32~17:37)]** ①/youtube: 카톡 안 브라우저는 페이지가 앱을 직접 못 열어(카카오가 막음 — 11/01 「앱에서 열기」 버튼이 잘 안 되던 원인) → 카카오 공식 «밖으로 보내기»(kakaotalk://web/openExternal)로 유튜브 https 채널 주소를 폰에 넘김 → 안드로이드·아이폰 모두 유튜브 앱이 받음. 큰 검정 버튼 삭제, 2.5초 뒤 「안 넘어가면 여기를 눌러 주세요」 작은 글자만. 카톡 메시지 버튼: 모바일 = https://ruru-order.vercel.app/youtube · PC = https://www.youtube.com/@나야루루. ②손님 머리말 «알림 받는 중» 종 = 금색 종(빨간 리본)+금색 울림 선(겨울 초록 머리말에서 검정 선 종이 안 보이던 것). 표시만·알림 저장 무변경. 실폰 확인 필요
 - 2026-11-26 **[깨져 있던 테스트 준비물 보정 2]** live-seek·stats-moved-in(띠 문구 바뀜)·customer-product-loading(방송 종료 카운트다운 함수 대역) 통과
 - 2026-11-26 **[깨져 있던 테스트 3개 고침(테스트 준비물만·기대값/제품 코드 무변경)]** test-subscribe-free-ship(가짜 DB 에 in·order·rpc·1회 사용 표 추가 + «이미 한 번 씀» 확인 추가)·test-event-create-broadcast(명단 기준 rosterScope 빈값 준비)·test-admin-settings-drafts(메뉴 이름 「배송비·카드수수료」·새 설정 카드 5개 대역). 셋 다 통과

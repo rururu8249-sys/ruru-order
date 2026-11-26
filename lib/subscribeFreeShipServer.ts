@@ -72,10 +72,10 @@ export async function resolveSubscribeBenefitWindow(supabase: Db, now: Date = ne
   return { startAt: day.startAt, endAt: day.endAt, broadcastId: null };
 }
 
-export type SubscribeBenefitStatus = { verified: boolean; everVerified: boolean; used: boolean; available: boolean };
+export type SubscribeBenefitStatus = { verified: boolean; everVerified: boolean; used: boolean; available: boolean; once: boolean };
 export async function readSubscribeBenefitStatus(supabase: Db, kakaoId: string, now = new Date()): Promise<SubscribeBenefitStatus> {
   const kid = cleanKakaoId(kakaoId);
-  const none = { verified: false, everVerified: false, used: false, available: false };
+  const none = { verified: false, everVerified: false, used: false, available: false, once: false };
   if (!kid) return none;
   const { data: history, error: historyError } = await supabase.from("subscribe_verifications")
     .select("status,canceled_at")
@@ -84,17 +84,22 @@ export async function readSubscribeBenefitStatus(supabase: Db, kakaoId: string, 
   if (historyError) return none;
   const verified = (history || []).some((row: any) => row.status === "verified");
   const everVerified = verified || (history || []).some((row: any) => row.status === "canceled" || !!row.canceled_at);
-  const { data: redemption, error: redemptionError } = await supabase.from("subscribe_free_ship_redemptions")
-    .select("kakao_id").eq("kakao_id", kid).maybeSingle();
-  if (redemptionError) return { verified, everVerified, used: false, available: false };
-  const used = !!redemption;
-  if (!verified || used) return { verified, everVerified, used, available: false };
+  // [2026-11-26 사장님] 혜택 방식: once(한 계정 1번)일 때만 «이미 씀»을 본다. always(기본)는 켜져 있는 동안 계속.
   const config = await readSubscribeFreeShipConfig(supabase);
-  if (!isSubscribeFreeShipActive(config, now)) return { verified, everVerified, used, available: false };
+  const once = config.mode === "once";
+  let used = false;
+  if (once) {
+    const { data: redemption, error: redemptionError } = await supabase.from("subscribe_free_ship_redemptions")
+      .select("kakao_id").eq("kakao_id", kid).maybeSingle();
+    if (redemptionError) return { verified, everVerified, used: false, available: false, once };
+    used = !!redemption;
+  }
+  if (!verified || used) return { verified, everVerified, used, available: false, once };
+  if (!isSubscribeFreeShipActive(config, now)) return { verified, everVerified, used, available: false, once };
   const { data: eligible, error: eligibleError } = await supabase.rpc("ruru_subscribe_free_ship_eligible", {
     p_kakao_id: kid, p_at: now.toISOString(),
   });
-  return { verified, everVerified, used, available: !eligibleError && eligible === true };
+  return { verified, everVerified, used, available: !eligibleError && eligible === true, once };
 }
 
 /** Order-submit server gate: one-time benefit available + event ON + certificate valid. */

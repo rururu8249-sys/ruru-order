@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
     const config = await readSubscribeFreeShipConfig(supabase);
     if (!isSubscribeFreeShipActive(config)) return fail("지금은 구독 인증 무료배송 시간이 아니에요.");
     // [2026-11-23 사장님] 수동으로 무배 처리된 손님(redemptions)이 나중에 캡처를 올려도 «새 인증»이 되지 않게
-    {
+    // [2026-11-26] 1회 방식일 때만 막음 — 계속 방식(기본)은 받은 손님도 인증 가능.
+    if (config.mode === "once") {
       const { data: used } = await supabase.from("subscribe_free_ship_redemptions").select("kakao_id").eq("kakao_id", kakaoId).maybeSingle();
       if (used) return NextResponse.json({ ok: false, used: true, message: "구독 무료배송 혜택은 한 번만 드려요. 이미 받으신 계정이에요." }, { status: 400 });
     }

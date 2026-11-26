@@ -143,7 +143,7 @@ export default function SubscribeFreeShipSettingsCard() {
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-ink">구독 인증 무료배송</h2>
-          <p className="mt-1 text-xs text-ink-mute">손님이 「채널 이름 + 구독중」 캡처를 올리면 AI 가 확인해 고른 배송비를 0원으로 · 켠 시간에만 · 한 계정에 1번(켜져 있는 동안 아무 때나)</p>
+          <p className="mt-1 text-xs text-ink-mute">손님이 「채널 이름 + 구독중」 캡처를 올리면 AI 가 확인해 고른 배송비를 0원으로 · 켠 시간에만 · {cfg.mode === "once" ? "한 계정에 1번" : "켜져 있는 동안 인증한 손님 주문마다"}</p>
         </div>
         <button
           type="button"
@@ -171,6 +171,18 @@ export default function SubscribeFreeShipSettingsCard() {
           <span className={`text-xs font-semibold ${active ? "text-ok-tx" : "text-ink-mute"}`}>
             {active ? "지금 손님 화면에 보이는 중" : cfg.enabled ? "시간 밖이라 지금은 안 보여요" : "꺼져 있어요"}
           </span>
+        </div>
+
+        <div>
+          <span className="mb-1 block text-[13px] font-semibold text-ink">혜택 방식</span>
+          <div role="radiogroup" aria-label="혜택 방식" className="inline-flex rounded-full border border-line bg-surface p-1">
+            {([["always", "켜져 있는 동안 계속"], ["once", "한 계정 1번만"]] as const).map(([v, label]) => (
+              <button key={v} type="button" role="radio" aria-checked={cfg.mode === v} onClick={() => set({ mode: v })} className={`h-8 rounded-full px-4 text-sm font-semibold ${cfg.mode === v ? "bg-ink text-white" : "text-ink-soft"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-ink-mute">{cfg.mode === "once" ? "인증한 손님이 무료배송을 한 번 받으면 다음 주문부터는 배송비가 붙어요." : "인증한 손님은 이 기능이 켜져 있는 동안 주문할 때마다 무료배송이에요."}</p>
         </div>
 
         <div>

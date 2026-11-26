@@ -107,6 +107,8 @@ assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: on, verifiedKakao:
 assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: { ...on, enabled: false }, verifiedKakao: "k1" }), "k1", at), null); // 꺼짐
 assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: null, verifiedKakao: "k1" }), "k1", at), null); // 설정 없음
 assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: on, verifiedKakao: "k1", broken: true }), "k1", at), null); // 표 없음(SQL 전)
-assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: on, verifiedKakao: "k1", used: true }), "k1", at), null); // 이미 한 번 씀
+assert.ok(await activeSubscribeWaiverFor(fakeDb({ setting: on, verifiedKakao: "k1", used: true }), "k1", at)); // 기본(계속): 이미 받았어도 또 무료
+assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: { ...on, mode: "once" }, verifiedKakao: "k1", used: true }), "k1", at), null); // 1회 방식: 이미 한 번 씀
+assert.ok(await activeSubscribeWaiverFor(fakeDb({ setting: { ...on, mode: "once" }, verifiedKakao: "k1" }), "k1", at)); // 1회 방식: 처음은 무료
 
 console.log("test-subscribe-free-ship OK");

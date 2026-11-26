@@ -35,7 +35,10 @@ export type SubscribeFreeShipConfig = {
   channelName: string;
   /** 손님에게 보여 줄 예시 사진 주소 */
   exampleUrl: string;
+  /** [2026-11-26 사장님] 혜택 방식 — always = 켜져 있는 동안 인증한 손님 주문마다 무료(기본) / once = 한 계정 1번만 */
+  mode: SubscribeFreeShipMode;
 };
+export type SubscribeFreeShipMode = "always" | "once";
 
 export const DEFAULT_SUBSCRIBE_FREE_SHIP: SubscribeFreeShipConfig = {
   enabled: false,
@@ -45,6 +48,7 @@ export const DEFAULT_SUBSCRIBE_FREE_SHIP: SubscribeFreeShipConfig = {
   waiveRemote: false,
   channelName: DEFAULT_SUBSCRIBE_CHANNEL,
   exampleUrl: DEFAULT_SUBSCRIBE_EXAMPLE,
+  mode: "always",
 };
 
 const validTime = (v: unknown) => {
@@ -79,6 +83,8 @@ export function parseSubscribeFreeShip(input: unknown): SubscribeFreeShipConfig 
     waiveRemote: r.waiveRemote === true,
     channelName: String(r.channelName ?? "").trim().slice(0, 80) || DEFAULT_SUBSCRIBE_CHANNEL,
     exampleUrl: /^(https:\/\/|\/)/.test(exampleUrl) && exampleUrl !== OLD_DEFAULT_SUBSCRIBE_EXAMPLE ? exampleUrl : DEFAULT_SUBSCRIBE_EXAMPLE,
+    // 저장값이 정확히 "once" 일 때만 1회. 값이 없거나 이상하면 «계속»(사장님 기본값).
+    mode: r.mode === "once" ? "once" : "always",
   };
 }
 
