@@ -142,6 +142,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-26 **[VER 3 마무리 잔손질 4건]** ①정산 방송 이름: 숨긴 시험 방송이 같은 날 진짜 방송 이름을 덮던 것(11/17 「__UI_검증_…」) → 숨긴 방송 제외(settlementUtils buildBroadcastOptions), 운영 «해외명품고퀄의류10» 확인 ②판매 통계 집계 cron(한 번 약 15초, DB 바쁨 원인 5위): 지난 65분 새 주문·입금확인 없으면 건너뜀, 한국 0·6·12·18시·?force=1 은 무조건 ③이벤트 «명단 기준» 기본값이 아직 안 켠 준비 방송(0명)이던 것 → 실제로 시작한 최신 방송(서버 has_started), 운영 11/23 어그UGG 91명 확인 ④손님 «주문 단계 표시»가 기본 테마 켠 뒤 모든 손님에게 보이던 것(시안에 없고 사장님 결정 전) → ?preview 로 고른 브라우저만, 운영 확인. 돈·입금 무접촉. tsc 0·guard 0·build(BANKDA). 배포 완료 86789b2·e650aff·5201ed0
 - 2026-11-26 **[전면 리뉴얼 VER 3 ④ 정산 큰 숫자 — 입금가를 다 적으면 «진짜 남는 돈(입금가까지 뺌)», 아니면 «입금가 안 적은 주문 N건» 주황 안내]** 표시만·계산 무변경. settlement-product-cost 통과·tsc 0·guard 0·build(BANKDA). 운영 화면 확인(지금은 안 적은 주문이 있어 기존 숫자+안내). 방송 보며 주문은 이미 시안 구조(상품·채팅·주문서 + 지금 소개 카드)라 변경 없음. 배포 완료 841aa5f — VER 3 마무리
 - 2026-11-26 **[전면 리뉴얼 VER 3 ③ 주문서 «방송 접수 후 구매» 빨간 칸 — 상품마다 「빼기」]** 이름 나열 → 줄마다 「상품 · 옵션 × N개 [빼기]」, 빼기 = 담은 상품 삭제와 같은 guardChatItem→removeItem. 금액·제출·체크 규칙 무변경. tsc 0·guard UI 0·customer-ui-switch·brand-linked-submit·customer-theme 통과·build(BANKDA). 배포 완료 a1be51d(Vercel success) — 실폰 확인 필요
 - 2026-11-26 **[전면 리뉴얼 VER 3 ② 입금매칭 — 짝(연결 추천·추가 입금) 있는 입금을 맨 위 「짝을 찾았어요 · N건」 초록 묶음으로]** LiveFloatingMatchPanel grouped 순서만(주문을 골라 열지 않았을 때). findBestOrder·shortageFor 판정·연결/붙이기 버튼·manual-payment-match 서버 무변경. tsc 0·guard UI 0·build(BANKDA·입금매칭 528건 비교 통과)
