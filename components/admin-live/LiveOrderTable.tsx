@@ -1367,7 +1367,7 @@ export default function LiveOrderTable({
       ) : null}
       <div className={`mb-3 w-full flex-wrap items-center gap-2 ${isMobile && !mobileFiltersOpen ? "hidden" : "flex"}`}>
         {/* [1] 기간 */}
-        <select className="h-11 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[12px] font-black text-ink outline-none transition focus:border-info-tx focus:ring-4 focus:ring-info-bg sm:w-[120px]"
+        <select className="h-10 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[13px] font-bold text-ink outline-none transition focus:border-ink max-md:h-11 sm:w-[120px]"
           value={filters.date}
           onChange={(event) => updateFilter("date", event.target.value as LiveOrderDateFilter)}
         >
@@ -1398,7 +1398,7 @@ export default function LiveOrderTable({
         )}
 
         {/* [2] 범위 */}
-        <select className="h-11 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[12px] font-black text-ink outline-none transition focus:border-info-tx focus:ring-4 focus:ring-info-bg sm:w-[130px]"
+        <select className="h-10 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[13px] font-bold text-ink outline-none transition focus:border-ink max-md:h-11 sm:w-[130px]"
           value={filters.scope}
           onChange={(event) => {
             const next = event.target.value as LiveOrderScopeFilter;
@@ -1432,7 +1432,7 @@ export default function LiveOrderTable({
         )}
 
         {/* [3] 상태 */}
-        <select className="h-11 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[12px] font-black text-ink outline-none transition focus:border-info-tx focus:ring-4 focus:ring-info-bg sm:w-[128px]"
+        <select className="h-10 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[13px] font-bold text-ink outline-none transition focus:border-ink max-md:h-11 sm:w-[128px]"
           value={filters.status}
           onChange={(event) => updateFilter("status", event.target.value as LiveOrderStatusFilter)}
         >
@@ -1448,7 +1448,7 @@ export default function LiveOrderTable({
         </select>
 
         <div className={`flex w-full flex-nowrap items-center gap-2 sm:w-auto sm:flex-1 ${isMobile ? "hidden" : ""}`}>
-          <input className="h-11 min-w-[120px] flex-1 rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition focus:border-info-tx focus:ring-4 focus:ring-info-bg"
+          <input className="h-10 min-w-[120px] flex-1 rounded-xl border border-line bg-surface px-3 text-[13px] font-semibold text-ink outline-none transition focus:border-ink"
             value={pendingKeyword}
             onChange={(event) => setPendingKeyword(event.target.value)}
             onKeyDown={(event) => {
@@ -1457,19 +1457,22 @@ export default function LiveOrderTable({
             placeholder="닉네임·상품·금액 검색"
           />
 
-          <button className="h-11 flex-none rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white shadow-sm hover:opacity-90 active:opacity-80 active:scale-[0.95] transition-all duration-75 w-[64px] sm:w-[84px]"
+          <button className="h-10 flex-none rounded-xl bg-ink px-3 text-[13px] font-bold text-white hover:opacity-90 active:scale-[0.97] transition-all duration-75 w-[64px] sm:w-[72px]"
             type="button"
             onClick={applyKeyword}
           >
             검색
           </button>
 
-          <button className="h-11 flex-none rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink-soft shadow-sm hover:bg-surface-2 active:bg-surface-3 active:scale-[0.95] transition-all duration-75 w-[64px] sm:w-[84px]"
+          {/* [2026-11-26] 초기화는 필터·검색어를 바꿨을 때만(DESIGN-ADMIN §5) */}
+          {filters.date !== "all" || filters.scope !== "all" || filters.status !== "all" || filters.keyword || workFilter ? (
+          <button className="h-10 flex-none rounded-xl px-2 text-[13px] font-bold text-ink-soft underline underline-offset-2 hover:text-ink"
             type="button"
             onClick={resetFilters}
           >
-            초기화
+            필터 초기화
           </button>
+          ) : null}
         </div>
         {isMobile ? (
           <button type="button" onClick={() => { resetFilters(); setMobileFiltersOpen(false); }} className="h-11 w-full rounded-xl border border-line bg-surface text-[13px] font-bold text-ink-soft">필터 초기화</button>
@@ -1597,7 +1600,7 @@ export default function LiveOrderTable({
                   return (
                     <Fragment key={order.id}>
                     <div
-                      className={`grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_88px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
+                      className={`group grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_88px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
                     >
                       {/* 0. 선택 체크박스 */}
                       <div className="flex items-center justify-center py-3" onClick={(e) => e.stopPropagation()}>
@@ -1617,7 +1620,7 @@ export default function LiveOrderTable({
                             const wd = ["일","월","화","수","목","금","토"][d.getDay()];
                             const hh = String(d.getHours()).padStart(2, "0");
                             const mi = String(d.getMinutes()).padStart(2, "0");
-                            return <><div>{yy}.{mm}.{dd}</div><div className="text-ink-mute">({wd}) {hh}:{mi}</div></>;
+                            return <span className="whitespace-nowrap">{yy === new Date().getFullYear() ? "" : `${yy}.`}{mm}.{dd}<span className="text-ink-mute">({wd})</span> {hh}:{mi}</span>;
                           } catch { return <span className="text-[11px]">{src}</span>; }
                         })()}
                       </div>
@@ -1629,8 +1632,9 @@ export default function LiveOrderTable({
                           </button>
                         </div>
                         {/* [2026-10-22] 지난 주문 가상 묶음(가져온 줄만)은 금액이 주문서 전체가 아니므로 복사·쪽지는 원래 주문(상세)에서 */}
+                        {/* [2026-11-26] 복사 버튼은 줄에 마우스를 올리거나 키보드로 들어왔을 때만 — 평소엔 줄 높이를 줄여 한 화면에 주문을 더 많이 */}
                         {order.pickPull && !order.pickPull.whole ? null : (
-                        <div className="mt-0.5 flex flex-wrap gap-1">
+                        <div className="mt-0.5 hidden flex-wrap gap-1 group-hover:flex group-focus-within:flex">
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); void copyOrderItemsOnly([order]); }}

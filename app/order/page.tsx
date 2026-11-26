@@ -7808,7 +7808,7 @@ export default function OrderPage() {
             const step = items.some((item) => String(item.product_name || "").trim() && toNumber(item.qty) > 0) ? 2 : 1;
             return (
               <div data-theme-steps="true" aria-label={`주문 단계 ${step}/3`} style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
-                {["상품 고르기", "주문서 제출", "입금"].map((label, index) => (
+                {["상품 고르기", "주문서 제출", "결제"].map((label, index) => (
                   <span key={label} data-on={index + 1 === step ? "true" : undefined} style={{ flex: 1, textAlign: "center", padding: "7px 0", borderRadius: "999px", fontSize: "13px", fontWeight: 700, background: index + 1 === step ? "var(--theme-accent, #111111)" : "var(--theme-soft, #F5F5F5)", color: index + 1 === step ? "#FFFFFF" : "#707072" }}>
                     {index + 1}. {label}
                   </span>
