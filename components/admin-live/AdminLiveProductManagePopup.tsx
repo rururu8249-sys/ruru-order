@@ -2134,14 +2134,22 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
             {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
             <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: isNarrow ? "none" : "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
-                <span style={{ ...TAB_TITLE_STYLE, whiteSpace: "nowrap", flexBasis: isNarrow ? "100%" : undefined }}>방송 상품{bcProductsReady && !bcProductsError ? ` ${bcProducts.length}개` : ""}</span>
+              {/* [2026-11-26 VER3 시안] 머리 = 방송 이름 · N개 · 방송 중 + 「+ 담기」, 보기 도구(순서·재고 흐름·선택 복사)는 아래 작은 줄 */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)" }}>
+                <span style={{ ...TAB_TITLE_STYLE, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedBroadcastForEdit?.title || "방송 상품"}{bcProductsReady && !bcProductsError ? ` · ${bcProducts.length}개` : ""}</span>
+                {selectedBroadcastForEdit ? (
+                  <span style={{ flexShrink: 0, height: "24px", display: "inline-flex", alignItems: "center", padding: "0 8px", borderRadius: "999px", fontSize: "12px", fontWeight: 700, background: selectedBroadcastForEdit.status === "ON" ? "var(--color-ok-bg)" : "var(--color-surface-2)", color: selectedBroadcastForEdit.status === "ON" ? "var(--color-ok-tx)" : "var(--color-ink-mute)" }}>{selectedBroadcastForEdit.status === "ON" ? "방송 중" : selectedBroadcastForEdit.started_at ? "종료" : "시작 전"}</span>
+                ) : null}
+                <button type="button" disabled={!bcSelId || bcBusy || !bcProductsReady || !!bcProductsError} onClick={openBcPicker} style={{ marginLeft: "auto", height: "40px", fontSize: "14px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 16px", whiteSpace: "nowrap", cursor: !bcSelId || bcBusy || !bcProductsReady || bcProductsError ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy || !bcProductsReady || bcProductsError ? 0.5 : 1 }}>+ 담기</button>
+              </div>
+              {bcSelId && bcProducts.length > 0 ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", flexWrap: "wrap" }}>
                 {bcSelId && bcProducts.length > 0 ? (
                   <select
                     value={bcSort}
                     onChange={(e) => setBcSort(e.target.value as ProductSortKey)}
                     title="보기 순서만 바꿈(저장 안 됨)"
-                    style={{ ...TAB_SORT_STYLE, ...(isNarrow ? { flex: 1, minWidth: 0 } : { marginLeft: "auto" }) }}
+                    style={{ ...TAB_SORT_STYLE, ...(isNarrow ? { flex: 1, minWidth: 0 } : {}) }}
                   >
                     {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                   </select>
@@ -2152,13 +2160,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {bcSelId && bcProducts.length > 0 ? (
                   <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ height: "36px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", background: bcCopyMode ? "var(--color-surface-2)" : "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "선택 취소" : "선택 복사"}</button>
                 ) : null}
-                <button type="button" disabled={!bcSelId || bcBusy || !bcProductsReady || !!bcProductsError} onClick={openBcPicker} style={{ marginLeft: bcSelId && bcProducts.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy || !bcProductsReady || bcProductsError ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy || !bcProductsReady || bcProductsError ? 0.5 : 1 }}>+ 담기</button>
-              </div>
-              {selectedBroadcastForEdit ? (
+                </div>
+              ) : null}
+              {selectedBroadcastForEdit && selectedBroadcastForEdit.status === "OFF" && !selectedBroadcastForEdit.started_at ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
                   <div style={{ flex: 1, minWidth: "160px" }}>
-                    <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", fontWeight: 700 }}>현재 선택한 방송 · {selectedBroadcastForEdit.status === "ON" ? "진행 중" : selectedBroadcastForEdit.started_at ? "종료됨" : "시작 전"}</div>
-                    <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>{selectedBroadcastForEdit.title}</div>
+                    <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", fontWeight: 600 }}>아직 안 켠 방송이에요 · 이름을 바꿀 수 있어요</div>
                   </div>
                   {selectedBroadcastForEdit.status === "OFF" && !selectedBroadcastForEdit.started_at ? (
                     bcRenameOpen ? (

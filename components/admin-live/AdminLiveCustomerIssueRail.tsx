@@ -786,6 +786,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     return liveTasks;
   }, [activeTab, liveTasks, deletedTasks]);
 
+  // [2026-11-26 VER3] 유형 칩 숫자 — 지금 상태 칸(해야 할 일·끝난 일·삭제함) 안에서 센다(검색 무관).
+  const typeCounts = useMemo(() => {
+    const out: Record<string, number> = { all: tabTasks.length };
+    for (const [key] of ISSUE_FILTER_CHIPS) if (key) out[key] = tabTasks.filter((task) => matchesIssueFilterChip(task, key)).length;
+    return out;
+  }, [tabTasks]);
+
   // 검색은 «화면에 보이는 글자»를 전부 본다 — 닉네임·이름·전화·상품·주문번호·메모.
   //   띄어쓰기와 하이픈을 지우고 비교한다(010-1234 로도, 01012340 로도 찾힌다).
   const searchKey = (value: unknown) => clean(value).replace(/[\s-]/g, "").toLowerCase();
@@ -1171,7 +1178,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     if (items.length === 0) { showAdminToast("되살릴 건이 선택되지 않았어요."); return; }
     const fromReturnCancel = items.filter((t) => clean(t.resolved_note).startsWith("반품/교환 등록 취소")).length;
     const ok = await showAdminConfirm(
-      `선택한 ${items.length}건을 되살릴까요?\n「미해결」에서 다시 보입니다.` +
+      `선택한 ${items.length}건을 되살릴까요?\n「해야 할 일」에서 다시 보입니다.` +
         (fromReturnCancel > 0 ? `\n\n⚠ ${fromReturnCancel}건은 «반품 등록 취소»로 삭제된 건이라 손님께 돌려드린 포인트·반품기록은 돌아오지 않고 이슈 줄만 되살아납니다.` : ""),
       { title: "일괄 되살리기", confirmText: `${items.length}건 되살리기`, cancelText: "그만두기", tone: "warning" },
     );
@@ -1543,7 +1550,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     setReloadKey((value) => value + 1);
     window.dispatchEvent(new Event("ruru-admin-task-updated"));
     if (!silent) {
-      showAdminToast("고객이슈를 되돌렸습니다. 「미해결」에서 다시 보입니다.", "success");
+      showAdminToast("고객이슈를 되돌렸습니다. 「해야 할 일」에서 다시 보입니다.", "success");
     }
     return true;
   };
@@ -1617,12 +1624,11 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             (누르면 열리는 창 제목은 「고객이슈 메모 추가」다 — 버튼 이름이 창 이름과 달랐다)
             → 왼쪽에 이 화면이 뭘 하는 곳인지 한 줄, 버튼 이름도 창과 같게 맞춘다. */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          {/* [2026-10-21] 상태 칩(미해결·해결·전체·삭제함)을 머리줄로 — 큰 회색 탭 상자 삭제(탭 안 탭 금지) */}
+          {/* [2026-11-26 VER3 시안] 상태 칩 = 해야 할 일 · 끝난 일 · 삭제함, 검색·등록을 같은 줄로 */}
           <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="고객이슈 상태">
             {([
-              ["open", "미해결", openCount],
-              ["resolved", "해결", resolvedCount],
-              ["all", "전체", liveTasks.length],
+              ["open", "해야 할 일", openCount],
+              ["resolved", "끝난 일", resolvedCount],
               ["deleted", "삭제함", deletedTasks.length],
             ] as const).map(([key, label, count]) => (
               <button
@@ -1631,25 +1637,47 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 role="tab"
                 aria-selected={activeTab === key}
                 onClick={() => { setActiveTab(key as IssueTab); setIssuePage(1); }}
-                className={`h-9 rounded-full border px-3.5 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ink ${activeTab === key ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`}
+                className={`h-10 rounded-full border px-4 text-[14px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ink ${activeTab === key ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`}
               >
                 {label} <span className="tabular-nums">{count}</span>
               </button>
             ))}
           </div>
 
+          <label className="relative ml-auto flex h-10 min-w-[220px] flex-1 items-center gap-2 rounded-lg border border-line bg-surface px-3 focus-within:border-ink sm:max-w-[320px]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="shrink-0 text-ink-mute"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <input
+              type="text"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="닉네임 · 이름 · 주문번호 · 상품"
+              aria-label="고객이슈 찾기"
+              className="h-full min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-ink-mute"
+            />
+            {keyword ? (
+              <button
+                type="button"
+                onClick={() => setKeyword("")}
+                aria-label="검색어 지우기"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-line text-[13px] font-bold text-ink-soft"
+              >
+                ×
+              </button>
+            ) : null}
+          </label>
+
           <button
             type="button"
             onClick={() => setShowMemoAdd(true)}
-            className="ml-auto h-9 rounded-lg bg-ink px-3.5 text-[13px] font-bold text-white transition hover:opacity-90"
+            className="h-10 rounded-lg bg-ink px-4 text-[14px] font-bold text-white transition hover:opacity-90"
           >
-            + 고객이슈 등록
+            + 등록
           </button>
 
           <button
             type="button"
             onClick={() => setReloadKey((value) => value + 1)}
-            className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2"
+            className="h-10 rounded-lg px-2 text-[13px] font-semibold text-ink-soft hover:bg-surface-2"
           >
             새로고침
           </button>
@@ -1671,29 +1699,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         </div>
       ) : null}
 
-      {/* ── 찾기 줄 — 검색 한 칸 + 유형 칩. 켜져 있으면 「초기화」가 나타난다(NN/g) ── */}
+      {/* ── 유형 칩 (숫자 = 지금 칸 안 건수). 켜져 있으면 「초기화」 ── */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          
-          <input
-            type="text"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="닉네임 · 이름 · 전화 · 상품 · 주문번호 · 메모"
-            className="h-9 w-full rounded-lg border border-line bg-surface pl-3 pr-9 text-[13px] text-ink outline-none placeholder:text-ink-mute focus:border-ink"
-          />
-          {keyword ? (
-            <button
-              type="button"
-              onClick={() => setKeyword("")}
-              aria-label="검색어 지우기"
-              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-line text-[13px] font-black text-ink-soft"
-            >
-              ×
-            </button>
-          ) : null}
-        </div>
-
         <div className="flex flex-wrap items-center gap-1">
           {ISSUE_FILTER_CHIPS.map(([key, label]) => {
             const on = typeFilter === key;
@@ -1706,7 +1713,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                   on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"
                 }`}
               >
-                {label}
+                {label} <span className="tabular-nums">{typeCounts[key || "all"] ?? 0}</span>
               </button>
             );
           })}
@@ -1791,9 +1798,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               </label>
               <span className="xl:hidden">이 페이지 전체 선택</span>
               <div className="hidden xl:block">유형</div>
-              <div className="hidden xl:block">고객</div>
-              <div className="hidden xl:block">내용</div>
-              <div className="hidden text-right xl:block">금액</div>
+              <div className="hidden xl:block">손님</div>
+              <div className="hidden xl:block">무엇을</div>
+              <div className="hidden text-right xl:block">돌려줄 돈</div>
               <div className="hidden xl:block" />
             </div>
             {pageTasks.map((task, index) => (
