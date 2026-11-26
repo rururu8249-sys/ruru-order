@@ -8,8 +8,8 @@ const o = (id, totalAmount, paymentStatus = 'auto_paid', paymentMethod = '무통
 const orders = [o('A', 45360), o('B', 38000), o('C', 20000, 'unpaid')];
 const html = renderToStaticMarkup(React.createElement(Stats, { orders, movedInIds: new Set(['A', 'C']) }));
 const text = html.replace(/<[^>]+>/g, '');
-assert.match(text, /실제 받은 돈\(결제완료만 · 현재 조회범위\) 83,360원\(옮겨 온 주문 45,360원 포함\)/, '받은 돈 합계는 그대로 + 옮겨 온 금액 괄호');
-assert.match(text, /미결제 합계 20,000원\(옮겨 온 주문 20,000원 포함\)/);
+assert.match(text, /받은 돈 · 결제완료 · 지금 조회 범위83,360원[^]*?\(옮겨 온 주문 45,360원 포함\)/, '받은 돈 합계는 그대로 + 옮겨 온 금액 괄호');
+assert.match(text, /미결제 · 아직 못 받은 돈20,000원[^]*?\(옮겨 온 주문 20,000원 포함\)/);
 const none = renderToStaticMarkup(React.createElement(Stats, { orders })).replace(/<[^>]+>/g, '');
 assert.doesNotMatch(none, /옮겨 온 주문/, '옮겨 온 주문 없으면 괄호 없음');
 console.log('test-stats-moved-in: ok');

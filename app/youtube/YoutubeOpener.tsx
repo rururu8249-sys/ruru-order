@@ -13,50 +13,42 @@ import {
   YOUTUBE_CHANNEL_WEB_URL,
   detectYoutubeDevice,
   isKakaoInAppBrowser,
+  kakaoOpenExternalUrl,
+  YOUTUBE_CHANNEL_APP_LINK,
   youtubeChannelUrlFor,
   type YoutubeDevice,
 } from "@/lib/youtubeChannelLink";
 
-const btn = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: "100%",
-  maxWidth: "360px",
-  height: "52px",
-  borderRadius: "999px",
-  fontSize: "16px",
-  fontWeight: 700,
-  textDecoration: "none",
-} as const;
 
 export default function YoutubeOpener() {
   const [device, setDevice] = useState<YoutubeDevice | null>(null);
-  const [inKakao, setInKakao] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
     const ua = navigator.userAgent || "";
     const d = detectYoutubeDevice(ua, navigator.maxTouchPoints || 0);
-    setDevice(d);
-    setInKakao(isKakaoInAppBrowser(ua));
+    const fallbackTimer = window.setTimeout(() => { setDevice(d); setShowFallback(true); }, 2500);
     if (d === "pc") {
       window.location.replace(YOUTUBE_CHANNEL_WEB_URL);
-      return;
+      return () => window.clearTimeout(fallbackTimer);
+    }
+    // [2026-11-26 사장님 「버튼 만들지 말고 제대로」] 카톡 안 브라우저는 페이지가 앱을 직접 못 연다(카카오가 막음 — 11/01 실패 원인).
+    //   그래서 카카오가 공식으로 열어 주는 «밖으로 보내기» 주소로 유튜브 https 주소를 폰에 넘긴다 →
+    //   폰(안드로이드·아이폰 둘 다)이 유튜브 https 주소를 받으면 유튜브 앱이 연다. 버튼 누를 필요 없음.
+    if (isKakaoInAppBrowser(ua)) {
+      window.location.replace(kakaoOpenExternalUrl(YOUTUBE_CHANNEL_APP_LINK));
+      return () => window.clearTimeout(fallbackTimer);
     }
     if (d === "android") {
-      // 실패해도 인터넷 주소로 안 넘어가게(fallback 없음) — 버튼이 남아 있다
       window.location.href = YOUTUBE_ANDROID_INTENT_NO_FALLBACK;
-      return;
+      return () => window.clearTimeout(fallbackTimer);
     }
     window.location.href = youtubeChannelUrlFor(d);
-    // 아이폰: 앱이 열리면 화면이 가려져 타이머가 멈춤 → 그대로 보이면 앱이 없는 것.
-    // 카톡 안에서는 인터넷으로 넘기지 않고 버튼을 보여 준다.
-    if (!isKakaoInAppBrowser(ua)) {
-      const timer = window.setTimeout(() => {
-        if (document.visibilityState === "visible") window.location.href = YOUTUBE_CHANNEL_WEB_URL;
-      }, 1500);
-      return () => window.clearTimeout(timer);
-    }
+    // 아이폰(카톡 밖): 앱이 열리면 화면이 가려져 타이머가 멈춤 → 그대로 보이면 앱이 없는 것 → 웹으로
+    const webTimer = window.setTimeout(() => {
+      if (document.visibilityState === "visible") window.location.href = YOUTUBE_CHANNEL_WEB_URL;
+    }, 1500);
+    return () => { window.clearTimeout(webTimer); window.clearTimeout(fallbackTimer); };
   }, []);
 
   return (
@@ -78,27 +70,14 @@ export default function YoutubeOpener() {
         <path d="M20 17.5v13l11-6.5z" fill="#FFFFFF" />
       </svg>
       <h1 style={{ fontSize: "20px", fontWeight: 700, margin: "0 0 8px" }}>나야루루 유튜브 채널</h1>
-      <p style={{ fontSize: "15px", color: "#707072", margin: "0 0 28px", lineHeight: 1.5, wordBreak: "keep-all" }}>
-        {inKakao ? (
-          <>
-            카톡 안에서는 앱이 안 열릴 수 있어요.
-            <br />
-            아래 버튼을 눌러 주세요.
-          </>
-        ) : (
-          <>
-            유튜브 앱으로 넘어가는 중이에요.
-            <br />
-            안 넘어가면 아래 버튼을 눌러 주세요.
-          </>
-        )}
+      <p style={{ fontSize: "15px", color: "#707072", margin: "0 0 20px", lineHeight: 1.5, wordBreak: "keep-all" }}>
+        유튜브 앱으로 넘어가는 중이에요…
       </p>
-      <a href={device ? youtubeChannelUrlFor(device) : YOUTUBE_CHANNEL_WEB_URL} style={{ ...btn, background: "#111111", color: "#FFFFFF" }}>
-        유튜브 앱에서 열기
-      </a>
-      <a href={YOUTUBE_CHANNEL_WEB_URL} style={{ marginTop: "16px", fontSize: "14px", color: "#707072", textDecoration: "underline", padding: "12px" }}>
-        유튜브 웹으로 보기
-      </a>
+      {showFallback ? (
+        <a href={device && device !== "pc" ? YOUTUBE_CHANNEL_APP_LINK : YOUTUBE_CHANNEL_WEB_URL} style={{ fontSize: "15px", color: "#111111", textDecoration: "underline", padding: "12px" }}>
+          안 넘어가면 여기를 눌러 주세요
+        </a>
+      ) : null}
     </main>
   );
 }

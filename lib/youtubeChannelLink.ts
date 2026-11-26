@@ -5,6 +5,8 @@
 
 export const YOUTUBE_CHANNEL = "youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A?si=P8OAzC4y2XTFCgag";
 export const YOUTUBE_CHANNEL_WEB_URL = `https://${YOUTUBE_CHANNEL}`;
+/** [2026-11-26] 카톡 안에서 «폰에» 넘길 깨끗한 채널 주소(나야루루) — 폰이 이 https 주소를 받으면 유튜브 앱이 연다(안드로이드 앱 링크·아이폰 유니버설 링크). */
+export const YOUTUBE_CHANNEL_APP_LINK = "https://www.youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A";
 const ANDROID_URL = `intent://${YOUTUBE_CHANNEL}#Intent;package=com.google.android.youtube;scheme=https;S.browser_fallback_url=${encodeURIComponent(YOUTUBE_CHANNEL_WEB_URL)};end`;
 const IOS_URL = `youtube://${YOUTUBE_CHANNEL}`;
 /** [2026-11-01] 자동으로 넘길 때만 — 인터넷 주소 대신(fallback 없이) 실패하면 우리 안내 화면에 그대로 머문다.

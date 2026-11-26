@@ -6744,14 +6744,22 @@ export default function OrderPage() {
             {uiV2 ? (
               <button type="button" onClick={() => setAlertSheetOpen(true)} aria-label={liveAlertOptin ? "방송 알림 받는 중 · 끄기" : "방송 알림 꺼짐 · 켜기"} style={{ flexShrink: 0, width: "40px", height: "40px", marginLeft: "-4px", border: "none", borderRadius: "9999px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" }}>
                 {liveAlertOptin ? (
-                  /* [19:13 사장님] 알림 받는 손님 = 움직이지 않는 «울리는 종» 그림(선만, 양옆 울림 선 두 줄) */
-                  <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 10.5a5 5 0 0110 0v3.5l1.6 2.6H5.4L7 14z" />
-                    <path d="M10.3 19a1.8 1.8 0 003.4 0" />
-                    <path d="M3.6 8.2a7 7 0 012-3.4" />
-                    <path d="M2 10.6a9 9 0 011.2-3.9" />
-                    <path d="M20.4 8.2a7 7 0 00-2-3.4" />
-                    <path d="M22 10.6a9 9 0 00-1.2-3.9" />
+                  /* [2026-11-26 사장님 「종이 안 보임 — 골든벨 느낌, 크리스마스에도 딱」] 알림 받는 손님 = 금색 종(빨간 리본) + 양옆 금색 울림 선.
+                     흰 머리말·겨울 초록 머리말 어디서나 보이게 색을 채움. 움직이지 않는 그림(11/10 19:13 결정 유지). 표시만 */
+                  <svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none">
+                    <defs>
+                      <linearGradient id="ruruGoldBell" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stopColor="#FFE58A" />
+                        <stop offset="0.55" stopColor="#F5B820" />
+                        <stop offset="1" stopColor="#C98A0B" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M12 4.6c-3 0-5 2.3-5 5.4v3.6l-1.7 2.8h13.4L17 13.6V10c0-3.1-2-5.4-5-5.4z" fill="url(#ruruGoldBell)" stroke="#9A6A05" strokeWidth="0.9" strokeLinejoin="round" />
+                    <path d="M9.2 8.6c.4-1.2 1.3-2 2.4-2.2" stroke="#FFF6CF" strokeWidth="1" strokeLinecap="round" />
+                    <circle cx="12" cy="18.6" r="1.7" fill="#C98A0B" stroke="#9A6A05" strokeWidth="0.7" />
+                    <path d="M12 4.6l-2.3-1.6-.4 2 2.7-.4zM12 4.6l2.3-1.6.4 2-2.7-.4z" fill="#D7262E" />
+                    <circle cx="12" cy="4.4" r="0.9" fill="#B01E25" />
+                    <path d="M3.8 8.4a7 7 0 011.9-3.2M2.2 10.8a9 9 0 011.1-3.7M20.2 8.4a7 7 0 00-1.9-3.2M21.8 10.8a9 9 0 00-1.1-3.7" stroke="#F5B820" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                 ) : (
                   <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9E9EA0" strokeWidth="1.8"><path d="M6 10a6 6 0 0112 0v4l2 3H4l2-3z" /><path d="M10 20a2 2 0 004 0" /><path d="M3 3l18 18" /></svg>

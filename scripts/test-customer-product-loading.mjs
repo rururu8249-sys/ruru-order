@@ -30,7 +30,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
 function fixture({live=true,broadcastError=false,productOk=true,catalogOk=true}={}){
   const events=[];const catalog=deferred();const products=deferred();
   const context={
-    ...paused,...watch,setLiveWatchSetting:()=>{},setLivePausedText:()=>{},
+    ...paused,...watch,setLiveWatchSetting:()=>{},setLivePausedText:()=>{},LIVE_END_PLAN_KEY:'live_end_plan_v1',parseLiveEndPlan:()=>null,setLiveEndPlan:()=>{},
     supabase:{from:table=>{const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>table==='broadcasts'?{data:live?{id:7,status:'ON'}:null,error:broadcastError?{message:'offline'}:null}:{data:{value:''},error:null}};return q;}},
     console:{log:()=>{}},
     loadGroupBuyQuickProductsFromCatalog:async()=>{events.push('catalog-start');await catalog.promise;events.push('catalog-end');return catalogOk;},
