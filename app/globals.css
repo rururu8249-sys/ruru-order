@@ -518,3 +518,13 @@ html[data-ruru-theme="winter"] [data-theme-hd] { background: #173f2c !important;
 html[data-ruru-theme="winter"] [data-theme-hd] *:not(button):not(button *) { color: #ffffff !important; }
 html[data-ruru-theme="winter"] [data-theme-live-section] div:is([style*="background: rgb(245, 245, 245)"],[style*="background:#F5F5F5"],[style*="background: #F5F5F5"]) { background: #f1ece4 !important; border-top: 3px solid #c0262d !important; }
 html[data-ruru-theme="winter"] button:is([style*="background: rgb(17, 17, 17)"],[style*="background:#111111"],[style*="background: #111111"]) { background: #173f2c !important; }
+/* [2026-11-26] 겨울(크리스마스) 시안 장식 — 눈·반짝임·썰매·머리말 전구 줄(?preview=tc 에서만) */
+.ruru-xmas-flake { position: absolute; top: -12px; border-radius: 9999px; background: #ffffff; box-shadow: 0 0 4px rgba(255,255,255,0.8), 0 0 1px rgba(150,170,190,0.9); animation-name: ruruXmasFall; animation-timing-function: linear; animation-iteration-count: infinite; }
+@keyframes ruruXmasFall { 0% { transform: translate3d(0,-12px,0); } 100% { transform: translate3d(var(--drift, 0px), 105vh, 0); } }
+.ruru-xmas-twinkle { animation: ruruXmasTwinkle 1.6s ease-in-out infinite; }
+@keyframes ruruXmasTwinkle { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+.ruru-xmas-sleigh { animation: ruruXmasSleigh 3.2s ease-in-out infinite; }
+@keyframes ruruXmasSleigh { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+html[data-ruru-theme="winter"] [data-theme-hd] { position: sticky; }
+html[data-ruru-theme="winter"] [data-theme-hd]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 9px; pointer-events: none; background-image: radial-gradient(circle at 6px 4px, #ff4d4d 3px, transparent 3.5px), radial-gradient(circle at 18px 4px, #ffd34d 3px, transparent 3.5px), radial-gradient(circle at 30px 4px, #4aa3ff 3px, transparent 3.5px), radial-gradient(circle at 42px 4px, #5ee08a 3px, transparent 3.5px); background-size: 48px 9px; background-repeat: repeat-x; animation: ruruXmasTwinkle 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .ruru-xmas-flake, .ruru-xmas-twinkle, .ruru-xmas-sleigh, html[data-ruru-theme="winter"] [data-theme-hd]::after { animation: none !important; } .ruru-xmas-flake { display: none; } }

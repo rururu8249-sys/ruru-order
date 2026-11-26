@@ -176,6 +176,7 @@ import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { sameCartDraftItems } from "@/lib/cartDraftSync";
 import { CART_SEQ_NEW, readCartSeqField } from "@/lib/cartClearMarks";
+import { ChristmasBanner, ChristmasSnow } from "@/components/customer/ChristmasDecor";
 import {
   CUSTOMER_DETAIL_NAME_MAX_LENGTH,
   buildCustomerDetailProductName,
@@ -7661,6 +7662,7 @@ export default function OrderPage() {
           우리 페이지는 주문에만 집중: 방송 OFF=예고 배너 / 방송 ON=검은 스트립 2줄. */}
       {hasSavedInfo && broadcastLoaded ? (
         <section data-theme-live-section="true" style={{ margin: "8px auto 0", width: "100%", maxWidth: pageMax, padding: uiS7 ? "0 0 12px" : "0 14px 12px" }}>
+          {themePreview === "winter" ? <><ChristmasSnow /><div style={{ height: "6px" }} /><ChristmasBanner /></> : null}
           {!isBroadcastOn ? (
             /* [2026-09-20] 방송 전 카드 — 166px였다. 하는 일이 ①상태 알림 ②방송알림 신청 두 개인데,
                  이미 알림을 신청한 손님에게는 ②가 «알림 받는 중 ✓» 라는 40px짜리 표시로만 남아 자리만 먹었다.
