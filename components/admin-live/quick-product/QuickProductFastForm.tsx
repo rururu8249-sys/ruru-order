@@ -252,7 +252,7 @@ type ParsedProductNote = Record<string, unknown> & {
       // false여도 상품 자체는 '전체' 목록에서 정상 노출된다.
       customer_category_visible?: boolean;
       stock_mode?: "total" | "option";
-      stock_variants?: Array<{ color?: string; size?: string; stock?: number; manual_soldout?: boolean; limit_qty?: number | null }>;
+      stock_variants?: Array<{ color?: string; size?: string; stock?: number; manual_soldout?: boolean; limit_qty?: number | null; limit_qty_at?: string | null }>;
       stock_management_enabled?: boolean;
       registered_order_enabled?: boolean;
       name_suggestion_enabled?: boolean;
@@ -750,6 +750,12 @@ function ImagePicker({
   );
 }
 
+// [2026-11-26] 판매 가능 수량 줄 찾는 열쇠(불러온 값 ↔ 저장할 값). «없음»=빈칸, 한글 브랜드 이름 맞춤.
+const limitKeyOf = (color: unknown, size: unknown) => {
+  const nm = (v: unknown) => { const t = normalizeBrandKorean(String(v ?? "").trim()); return t === "없음" ? "" : t; };
+  return `${nm(color)}|${nm(size)}`;
+};
+
 export default function QuickProductFastForm({
   activeBroadcastId,
   initialProduct = null,
@@ -935,6 +941,7 @@ export default function QuickProductFastForm({
   // [2026-08-16 사장님 요청] 재고를 3가지로 나눠 보여준다 — 실재고 / 담김(주문서 제출 전 선점) / 지금 판매가능
   //   담김은 cart_reservations(표시용 선점)에서 읽는다. 읽기 전용 — 재고·주문·돈 로직 무접촉.
   const [heldByVariant, setHeldByVariant] = useState<Record<string, number>>({});
+  const limitLoadedRef = useRef<Record<string, { qty: number; at: string | null }>>({});
   const [heldTotal, setHeldTotal] = useState(0);
   useEffect(() => {
     if (!editingProductId) return;
@@ -960,30 +967,40 @@ export default function QuickProductFastForm({
   // [2026-11-24 사장님 「수량이 있는데 왜 품절이래?」] 판매 가능 수량(limit_qty)을 적은 옵션은 «몇 개 팔렸는지»가 폼에 안 보여
   //   한도가 찬 걸 재고가 남은 줄 알았음 → 주문 표에서 팔린 수를 읽어 「팔림 N / 수량 M」(DB 함수 ruru_option_limit_remaining 과 같은 제외 규칙). 표시 전용.
   const [soldByVariant, setSoldByVariant] = useState<Record<string, number>>({});
+  const [soldRows, setSoldRows] = useState<Array<{ key: string; qty: number; at: number }>>([]);
   useEffect(() => {
     if (!editingProductId || stockManagementEnabled) return;
     let stop = false;
     const load = async () => {
       try {
-        const { data, error } = await supabase.from("orders").select("product_name,color,size,qty,order_status,order_manage_status,admin_order_status_v2,is_deleted,is_test_order").eq("product_id", editingProductId).limit(5000);
+        const { data, error } = await supabase.from("orders").select("product_name,color,size,qty,order_status,order_manage_status,admin_order_status_v2,is_deleted,is_test_order,created_at").eq("product_id", editingProductId).limit(5000);
         if (stop || error || !Array.isArray(data)) return;
         const nm = (v: unknown) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
         const by: Record<string, number> = {};
+        const list: Array<{ key: string; qty: number; at: number }> = [];
         for (const o of data as Array<Record<string, unknown>>) {
           if (o.is_deleted === true || o.is_test_order === true) continue;
           if (/취소|환불|cancel|refund/i.test(`${o.order_status ?? ""} ${o.order_manage_status ?? ""} ${o.admin_order_status_v2 ?? ""}`)) continue;
           const key = `${nm(o.product_name)}|${nm(o.color)}|${nm(o.size)}`;
           by[key] = (by[key] || 0) + Math.max(1, Number(o.qty) || 1);
+          list.push({ key, qty: Math.max(1, Number(o.qty) || 1), at: Date.parse(String(o.created_at || "")) || 0 });
         }
         setSoldByVariant(by);
+        setSoldRows(list);
       } catch { /* 표시 전용 */ }
     };
     void load();
     const t = setInterval(load, 20000);
     return () => { stop = true; clearInterval(t); };
   }, [editingProductId, stockManagementEnabled]);
-  const soldOf = (detail: string, color: string, size: string) => {
+  const soldOf = (detail: string, color: string, size: string, sinceIso?: string | null) => {
     const nm = (v: unknown) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+    // 입력 시각이 있으면 그 뒤 주문만(DB 함수 ruru_option_limit_remaining 과 같은 기준)
+    const since = sinceIso ? Date.parse(sinceIso) : NaN;
+    if (Number.isFinite(since)) {
+      const tail = `|${nm(color)}|${nm(size)}`;
+      return soldRows.reduce((sum, r) => ((detail ? r.key === `${nm(detail)}${tail}` : r.key.endsWith(tail)) && r.at >= since ? sum + r.qty : sum), 0);
+    }
     // 브랜드 묶음(세부상품)은 product_name 이 세부상품명, 단품은 product_name 과 무관 → 단품은 색·사이즈만 합산
     if (detail) return Number(soldByVariant[`${nm(detail)}|${nm(color)}|${nm(size)}`] || 0);
     return Object.entries(soldByVariant).reduce((sum, [k, v]) => (k.endsWith(`|${nm(color)}|${nm(size)}`) ? sum + v : sum), 0);
@@ -1026,6 +1043,12 @@ export default function QuickProductFastForm({
     if (!initialProduct) return;
 
     const productNote = parseProductNote(initialProduct);
+    // [2026-11-26 사장님 긴급] 판매 가능 수량은 «입력한 시각»부터 센다 — 불러온 수량·입력 시각을 기억(저장 때 바뀐 줄만 새 시각)
+    limitLoadedRef.current = {};
+    for (const row of productNote?.stock_variants || []) {
+      if (typeof row?.limit_qty !== "number") continue;
+      limitLoadedRef.current[limitKeyOf(row.color, row.size)] = { qty: Math.floor(row.limit_qty), at: typeof row.limit_qty_at === "string" ? row.limit_qty_at : null };
+    }
     const noteVariants = (productNote?.stock_variants || []).map((row) => ({
       ...row,
       color: normalizeBrandKorean(String(row.color || "")),
@@ -1954,12 +1977,18 @@ export default function QuickProductFastForm({
     try {
       // [2026-08-10 옵션 통합] 저장 키는 항상 (color, size) 2칸 — 3단이면 color 칸에 "세부상품 / 색상"이 이미 합쳐져 있다.
       //   축1(세부상품만)·축2(색상+사이즈)는 기존과 완전히 동일한 형태로 저장된다(회귀 0).
+      const limitSavedAt = new Date().toISOString();
       const variantStockPayload = resolvedVariantRows.map((row) => ({
         color: row.color,
         size: row.size,
         stock: Number(row.stock || 0),
         manual_soldout: row.manual_soldout === true,
-        ...(typeof row.limit_qty === "number" && row.limit_qty >= 0 ? { limit_qty: Math.floor(row.limit_qty) } : {}),
+        ...(typeof row.limit_qty === "number" && row.limit_qty >= 0 ? (() => {
+          const qty = Math.floor(row.limit_qty);
+          const before = limitLoadedRef.current[limitKeyOf(row.color, row.size)];
+          const at = before && before.qty === qty ? before.at : limitSavedAt;
+          return at ? { limit_qty: qty, limit_qty_at: at } : { limit_qty: qty };
+        })() : {}),
       }));
 
       // 축 정의는 "세부상품 + (색상 또는 사이즈)" 3단 이상일 때만 기록 →
@@ -2362,11 +2391,13 @@ export default function QuickProductFastForm({
                                 </label>
                                 {!row.manual_soldout && stockManagementEnabled && sellable <= 0 ? <span style={{ gridColumn: "1 / -1", fontSize: "11px", color: "var(--color-danger-tx)" }}>재고 소진 · 자동 품절</span> : null}
                                 {!stockManagementEnabled && typeof row.limit_qty === "number" && editingProductId ? (() => {
-                                  const sold = soldOf(String(group.detail || ""), String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""));
+                                  const limitAt = limitLoadedRef.current[limitKeyOf(row.color, row.size)];
+                                  const sinceAt = limitAt && limitAt.qty === row.limit_qty ? limitAt.at : null;
+                                  const sold = soldOf(String(group.detail || ""), String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""), sinceAt);
                                   const left = Math.max(0, row.limit_qty - sold - heldQty);
                                   return (
                                     <span style={{ gridColumn: "1 / -1", fontSize: "11px", fontWeight: 700, color: left <= 0 ? "var(--color-danger-tx)" : "var(--color-ink-soft)", paddingLeft: group.detail ? "12px" : "2px" }}>
-                                      {left <= 0 ? `수량 ${row.limit_qty}개 다 팔림 · 자동 품절` : `팔림 ${sold} / 수량 ${row.limit_qty}${heldQty > 0 ? ` · 담김 ${heldQty}` : ""} · 남은 ${left}`}
+                                      {left <= 0 ? `수량 ${row.limit_qty}개 다 팔림 · 자동 품절` : `${sinceAt ? "입력 후 " : ""}팔림 ${sold} / 수량 ${row.limit_qty}${heldQty > 0 ? ` · 담김 ${heldQty}` : ""} · 남은 ${left}`}
                                       {left <= 0 ? " (더 팔려면 수량을 올려 주세요)" : ""}
                                     </span>
                                   );
