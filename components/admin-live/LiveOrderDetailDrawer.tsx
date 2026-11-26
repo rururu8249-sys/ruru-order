@@ -1547,41 +1547,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             <div className="min-w-0 flex-1 text-[12px] leading-4 text-ink-mute">
               {order.orderNo || "주문번호 없음"} · {formatFullDateTime(order.createdAt, orderForView.submittedAt)}
             </div>
-            <button
-              type="button"
-              title="상품·옵션·수량만 복사"
-              onClick={() => { void navigator.clipboard.writeText(buildOrderItemsCopyText(orderForView)).then(() => showAdminToast("주문내용이 복사됐어요.", "success"), () => showAdminToast("복사에 실패했어요. 다시 눌러 주세요.", "error")); }}
-              className="h-8 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
-            >
-              주문내용 복사
-            </button>
-            <button
-              type="button"
-              title="주소·금액·입금 안내까지 복사"
-              onClick={() => void copyCustomerOrderSummary()}
-              className="h-8 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
-            >
-              상세 복사
-            </button>
-            {["unpaid", "manual_match_needed", "card_unpaid"].includes(orderForView.paymentStatus) ? (
-              <button
-                type="button"
-                title="결제요청 쪽지 보내기"
-                aria-label="결제요청 쪽지 보내기"
-                disabled={payRequestSending}
-                onClick={() => void sendPaymentRequest()}
-                className="h-8 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-35"
-              >
-                쪽지
-              </button>
-            ) : null}
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className={`rounded-lg px-2 py-1 text-[13px] font-bold ${getPaymentStatusClass(orderForView)}`}>
-              {getPaymentStatusLabel(orderForView)}
+          {/* [2026-11-26 VER3 시안 AdminOrderDetail] 머리: 닉네임 22·이름·상태·총액 22 (표시만) */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <b className="max-w-full truncate text-[22px] font-bold text-ink">{clean((orderForView as any).nickname) || order.name || "-"}</b>
+            {order.name && clean((orderForView as any).nickname) && order.name !== clean((orderForView as any).nickname) ? <span className="text-[14px] text-ink-mute">{order.name}</span> : null}
+            <span className={`rounded-lg px-2 py-1 text-[12px] font-semibold ${getPaymentStatusClass(orderForView)}`}>
+              {getPaymentStatusLabel(orderForView)}{orderForView.paidAt ? ` ${orderForView.paidAt}` : ""}
             </span>
-            {orderForView.paidAt ? <span className="text-[12px] text-ink-mute">{orderForView.paidAt}</span> : null}
-            <span className="ml-auto text-[20px] font-bold tabular-nums text-ink">{money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}</span>
+            <span className="ml-auto text-[22px] font-bold tabular-nums text-ink">{money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}</span>
           </div>
         </section>
 
@@ -2115,13 +2089,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <section>
           <div className="mb-2 flex items-center gap-2">
             <h3 className="text-[13px] font-semibold text-ink-mute">고객이슈</h3>
-            <button
-              type="button"
-              onClick={() => void openIssueRegister()}
-              className="ml-auto h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
-            >
-              + 등록
-            </button>
+            {/* 등록 버튼은 아래 고정 줄 「고객이슈 등록」 하나 */}
           </div>
           {((order as any).returnStatus || issueLatest?.task) ? (() => {
             // [2026-10-21] 고객이슈 칸 — 베이지 경고상자 → 흰 카드(유형·상태·열기 한 줄 / 상품·메모 / 아래 작은 글자 버튼). 핸들러 그대로.
@@ -2167,7 +2135,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </div>
 
         {/* [E2] 위험 작업 — 항상 펼침(2026-10-23). 입금확인 취소·주문서 자체 취소·이 손님 차단(핸들러·조건·확인창 그대로). */}
-        <section className="mt-4">
+        <section id="order-detail-danger" className="mt-4 scroll-mt-2">
           <div className="px-1 text-[13px] font-semibold text-ink-soft">위험 작업</div>
           {dangerOpen ? (
             <div className="mt-2 space-y-2 rounded-lg border border-line p-3">
@@ -2250,8 +2218,55 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             </div>
           ) : null}
         </section>
-
       </div>
+
+      {/* [2026-11-26 VER3 시안 AdminOrderDetail] 아래 고정 줄 — 복사·쪽지·위험 작업(⋯ = 맨 아래로)·고객이슈 등록(주버튼). 핸들러 그대로 */}
+      <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line px-4 py-3">
+            <button
+              type="button"
+              title="상품·옵션·수량만 복사"
+              onClick={() => { void navigator.clipboard.writeText(buildOrderItemsCopyText(orderForView)).then(() => showAdminToast("주문내용이 복사됐어요.", "success"), () => showAdminToast("복사에 실패했어요. 다시 눌러 주세요.", "error")); }}
+              className="h-11 shrink-0 rounded-[10px] border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2"
+            >
+              주문내용 복사
+            </button>
+            <button
+              type="button"
+              title="주소·금액·입금 안내까지 복사"
+              onClick={() => void copyCustomerOrderSummary()}
+              className="h-11 shrink-0 rounded-[10px] border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2"
+            >
+              상세 복사
+            </button>
+            {["unpaid", "manual_match_needed", "card_unpaid"].includes(orderForView.paymentStatus) ? (
+              <button
+                type="button"
+                title="결제요청 쪽지 보내기"
+                aria-label="결제요청 쪽지 보내기"
+                disabled={payRequestSending}
+                onClick={() => void sendPaymentRequest()}
+                className="h-11 shrink-0 rounded-[10px] border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-35"
+              >
+                쪽지
+              </button>
+            ) : null}
+        <button
+          type="button"
+          aria-label="더보기 — 입금확인 취소·주문서 취소·차단"
+          title="위험 작업(입금확인 취소·주문서 취소·차단)으로 이동"
+          onClick={() => document.getElementById("order-detail-danger")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          className="h-11 w-11 shrink-0 rounded-[10px] border border-line bg-surface text-[18px] text-ink hover:bg-surface-2"
+        >
+          ⋯
+        </button>
+        <button
+          type="button"
+          onClick={() => void openIssueRegister()}
+          className="ml-auto h-11 shrink-0 rounded-[10px] bg-ink px-4 text-[14px] font-bold text-white hover:opacity-90"
+        >
+          고객이슈 등록
+        </button>
+      </footer>
 
       <AdminLiveCustomerBlockReasonModal
         open={blockOpen}
