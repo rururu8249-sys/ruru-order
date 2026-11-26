@@ -515,6 +515,6 @@ html[data-ruru-theme="b"] button:is([style*="background: rgb(17, 17, 17)"],[styl
 html[data-ruru-theme="winter"] { --theme-accent: #c0262d; --theme-soft: #f1ece4; }
 html[data-ruru-theme="winter"] body { background: #fbf8f3 !important; }
 html[data-ruru-theme="winter"] [data-theme-hd] { background: #173f2c !important; color: #ffffff !important; border-bottom: 3px solid #c0262d !important; }
-html[data-ruru-theme="winter"] [data-theme-hd] * { color: #ffffff !important; }
+html[data-ruru-theme="winter"] [data-theme-hd] *:not(button):not(button *) { color: #ffffff !important; }
 html[data-ruru-theme="winter"] [data-theme-live-section] div:is([style*="background: rgb(245, 245, 245)"],[style*="background:#F5F5F5"],[style*="background: #F5F5F5"]) { background: #f1ece4 !important; border-top: 3px solid #c0262d !important; }
 html[data-ruru-theme="winter"] button:is([style*="background: rgb(17, 17, 17)"],[style*="background:#111111"],[style*="background: #111111"]) { background: #173f2c !important; }
