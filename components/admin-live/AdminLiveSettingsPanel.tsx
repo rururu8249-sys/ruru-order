@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import AdminLiveSettingsNavigation from "./AdminLiveSettingsNav";
+import AdminLiveSettingsNavigation, { SettingsGroupChips } from "./AdminLiveSettingsNav";
 import AdminLiveNoticePanel from "./AdminLiveNoticePanel";
 import SettingsUnsavedChangesDialog from "./SettingsUnsavedChangesDialog";
 import {type SettingsTab,type SettingsDestination,type SettingsSection} from "./adminLiveSettingsNavigation";
@@ -439,6 +439,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
 
       {/* 우측 내용 */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <SettingsGroupChips activeTab={activeTab} section={focusSection} onSelect={destination=>void selectDestination(destination)} />
         <div data-settings-scroll className="flex-1 space-y-4 overflow-y-auto p-3 md:p-5">
           {/* ── 상점 정보 (자체 저장: /api/admin-live/shop-info) ── */}
           {activeTab === "shop" && <ShopInfoSettingsTab onDraftStateChange={setChildDraft} focusSection={focusSection === "subscribe" ? undefined : focusSection} />}

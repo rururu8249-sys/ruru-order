@@ -34,14 +34,12 @@ for(const item of menu.ADMIN_LIVE_TOP_MENUS){
 await act(async()=>tree.unmount());
 const SettingsNav=load('components/admin-live/AdminLiveSettingsNav.tsx').default;
 await act(async()=>{tree=Renderer.create(React.createElement(SettingsNav,{activeTab:'shop',onSelect:value=>selected=value}));});
-const mobileSelect=tree.root.findByProps({'aria-label':'설정 항목 선택'});
-assert.equal(mobileSelect.type,'select');
-// [2026-11-26] 설정 메뉴가 늘 수 있어 고정 숫자 대신 «설정 메뉴 전부»와 같은지 확인
-const navItemCount=load('components/admin-live/adminLiveSettingsNavigation.ts').SETTINGS_NAV_GROUPS.flatMap(g=>g.items).length;
-assert.ok(navItemCount>=16);
-assert.equal(tree.root.findAllByType('option').length,navItemCount,'all destinations remain available on small screens');
-await act(async()=>mobileSelect.props.onChange({target:{value:'합배송'}}));
-assert.deepEqual(selected,{tab:'combine'});
+// [2026-11-26 사장님] 왼쪽 메뉴 = 묶음 6개만(폰·PC 같은 버튼), 묶음 안 항목은 내용 위 칩
+const groups=load('components/admin-live/adminLiveSettingsNavigation.ts').SETTINGS_NAV_GROUPS;
+const groupButtons=tree.root.findAllByType('button');
+assert.deepEqual(groupButtons.map(b=>b.children.join('')),groups.map(g=>g.label),'left menu shows only the 6 groups');
+await act(async()=>groupButtons.find(b=>b.children.join('')==='배송').props.onClick());
+assert.deepEqual(selected,{tab:'payment'});
 await act(async()=>tree.unmount());
 const Tabs=load('components/admin-live/AdminLiveEventTabs.tsx').default;
 await act(async()=>{tree=Renderer.create(React.createElement(Tabs,{active:'survival',onSelect:key=>selected=key}));});

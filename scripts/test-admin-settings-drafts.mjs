@@ -58,7 +58,12 @@ for(const name of ['ShopInfoSettingsTab','ProductImageNoticeSettingsTab','Youtub
 const Panel=createUiLoader(panelOverrides)('components/admin-live/AdminLiveSettingsPanel.tsx').default;
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{onNavigationGuardChange:value=>guard=value}));});
 const button=label=>tree.root.findAllByType('button').find(node=>node.children.join('')===label);
-async function select(label){await act(async()=>{button(label).props.onClick();});}
+// [2026-11-26] 왼쪽 = 묶음 6개, 항목은 묶음 안 칩 → 항목이 안 보이면 그 묶음부터 누른다
+const {SETTINGS_NAV_GROUPS:NAV_GROUPS}=await import('../components/admin-live/adminLiveSettingsNavigation.ts');
+async function select(label){
+  if(!button(label)){const g=NAV_GROUPS.find(g=>g.items.some(i=>i.label===label));await act(async()=>{button(g.label).props.onClick();});}
+  if(button(label)) await act(async()=>{button(label).props.onClick();});
+}
 await select('배송비·카드수수료');
 await act(async()=>tree.root.findAllByType('input').find(node=>node.props.value==='10').props.onChange({target:{value:'12'}}));
 await select('포인트 적립');

@@ -16,3 +16,12 @@ assert.deepEqual(searchSettingsNavigation('구매동의').map(i=>[i.label,i.dest
 assert.ok(!items.some(i=>'menu' in i.destination));
 assert.ok(!items.some(i=>i.destination.menu==='audit'));
 console.log('PASS settings search destinations and preserved coverage');
+import {activeSettingsGroupId} from '../components/admin-live/adminLiveSettingsNavigation.ts';
+// [2026-11-26] 왼쪽은 묶음 6개, 어느 화면이든 정확히 한 묶음에 속함
+assert.equal(activeSettingsGroupId('shop','bank'),'money');
+assert.equal(activeSettingsGroupId('shop','payster'),'money');
+assert.equal(activeSettingsGroupId('shop',undefined),'shop');
+assert.equal(activeSettingsGroupId('payment','subscribe'),'benefit');
+assert.equal(activeSettingsGroupId('payment',undefined),'ship');
+assert.equal(activeSettingsGroupId('notes',undefined),'customer');
+console.log('PASS settings groups');
