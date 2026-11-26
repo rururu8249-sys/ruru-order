@@ -25,7 +25,7 @@ export const uiPreviewStorageKey = (stage: UiPreviewStage) => `ruru_preview_${st
 export function resolveCustomerUiPreview(want: string | null, saved: string | null, stage: UiPreviewStage, defaultOn: boolean): UiSwitchDecision {
   // 색 시안 tb·tc 는 둘 중 하나만 — 하나를 켜면 다른 하나는 꺼짐(2026-11-26)
   const rival = stage === "tb" ? "tc" : stage === "tc" ? "tb" : "";
-  const store = want === stage ? "1" : want === "off" || (rival && want === rival) ? "0" : null;
+  const store = want === stage ? "1" : want === "off" || (rival && (want === rival || want === "notheme")) ? "0" : null;
   const effective = store ?? saved;
   return { store, v2: effective === "1" ? true : effective === "0" ? false : defaultOn };
 }
