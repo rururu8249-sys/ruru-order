@@ -80,17 +80,23 @@ assert.equal(w2.endAt, "2026-11-02T14:59:00.000Z");
 
 // 서버 판단(가짜 DB): 혜택 켜짐 + 인증됨일 때만 설정을 돌려줌, 못 읽으면 null(배송비 그대로)
 const { activeSubscribeWaiverFor } = await import("../lib/subscribeFreeShipServer.ts");
-const fakeDb = ({ setting, verifiedKakao, broken = false }) => ({
+const fakeDb = ({ setting, verifiedKakao, broken = false, used = false }) => ({
   from(table) {
     const q = { filters: {} };
     const chain = {
       select() { return chain; },
       eq(k, v) { q.filters[k] = v; return chain; },
-      limit() { return Promise.resolve(broken ? { data: null, error: { message: "no table" } } : { data: table === "subscribe_verifications" && q.filters.kakao_id === verifiedKakao && q.filters.status === "verified" ? [{ id: 1 }] : [], error: null }); },
-      maybeSingle() { return Promise.resolve({ data: setting ? { key: "subscribe_free_ship_v1", value: JSON.stringify(setting) } : null, error: null }); },
+      in(k, v) { q.filters[k] = v; return chain; },
+      order() { return chain; },
+      limit() { return Promise.resolve(broken ? { data: null, error: { message: "no table" } } : { data: table === "subscribe_verifications" && q.filters.kakao_id === verifiedKakao ? [{ status: "verified", canceled_at: null }] : [], error: null }); },
+      maybeSingle() {
+        if (table === "subscribe_free_ship_redemptions") return Promise.resolve({ data: used ? { kakao_id: q.filters.kakao_id } : null, error: null });
+        return Promise.resolve({ data: setting ? { key: "subscribe_free_ship_v1", value: JSON.stringify(setting) } : null, error: null });
+      },
     };
     return chain;
   },
+  rpc() { return Promise.resolve({ data: true, error: null }); },
 });
 const on = { enabled: true, startAt: "2026-11-01T11:00:00Z", endAt: "2026-11-01T14:59:00Z", groups: ["normal"] };
 const at = new Date("2026-11-01T12:00:00Z");
@@ -101,5 +107,6 @@ assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: on, verifiedKakao:
 assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: { ...on, enabled: false }, verifiedKakao: "k1" }), "k1", at), null); // 꺼짐
 assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: null, verifiedKakao: "k1" }), "k1", at), null); // 설정 없음
 assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: on, verifiedKakao: "k1", broken: true }), "k1", at), null); // 표 없음(SQL 전)
+assert.equal(await activeSubscribeWaiverFor(fakeDb({ setting: on, verifiedKakao: "k1", used: true }), "k1", at), null); // 이미 한 번 씀
 
 console.log("test-subscribe-free-ship OK");
