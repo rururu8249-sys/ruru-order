@@ -80,7 +80,7 @@ import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, pro
 import { toOptionList } from "@/lib/optionSplit";
 import { widgetPinnedProductId } from "@/lib/widgetPinState";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문은 lib 한 곳에서만 정한다(관리자 설정과 같은 파일)
-import { resolveProductNoticePresentationFor, effectiveProductNoticeMode, isInstantOrderProduct, INSTANT_CARD_BADGE } from "@/lib/productOrderNotice";
+import { resolveProductNoticePresentationFor, effectiveProductNoticeMode, isInstantOrderProduct, INSTANT_CARD_BADGE, LIVE_ONLY_NOTICE_TEXT } from "@/lib/productOrderNotice";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -4343,6 +4343,22 @@ export default function OrderPage() {
       .slice(0, 6);
   }, [quickGroupBuyProducts, productSearchText]);
   // [㊺-3] 첫 화면 «지금 바로 주문 가능» 숫자 — 품절 아님 + 바로구매 기준(카드·옵션창과 같은 isInstantOrderProduct). 표시 전용.
+  // [2026-11-26 사장님 「방송 접수 후 구매 / 바로 구매 — 손님이 제대로 확인을 못 함, 주문 전에 반드시 확인하게」]
+  //   담은 상품 중 «방송 접수 후 구매» 상품(바로구매 아님 — 카드·옵션창과 같은 isInstantOrderProduct 기준)의 이름.
+  //   제출 버튼 위 확인 칸에 «방송 접수 여부»를 같이 묻고, 이름을 빨간 글로 보여 준다. 표시 전용(금액·제출 판정 무변경).
+  const liveOnlyCartNames = useMemo(() => {
+    const byId = new Map(quickGroupBuyProducts.map((p) => [String((p as any).id), p]));
+    const names: string[] = [];
+    for (const item of items) {
+      if (!String(item.product_name || "").trim() || toNumber(item.qty) <= 0) continue;
+      const product = byId.get(String(item.product_id || "").trim());
+      if (!product) continue;
+      const badges = Array.isArray((product as any).badge_types) && (product as any).badge_types.length ? (product as any).badge_types : [(product as any).badge_type];
+      const instant = isInstantOrderProduct((parseProductSuggestionNote((product as any).product_note) as Record<string, unknown> | null)?.order_notice_mode, badges, productNoticeGlobal.mode, (product as any).in_shop);
+      if (!instant && !names.includes(item.product_name)) names.push(item.product_name);
+    }
+    return names;
+  }, [items, quickGroupBuyProducts, productNoticeGlobal.mode]);
   const instantReadyCount = useMemo(() => quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p) && isInstantOrderProduct((parseProductSuggestionNote((p as any).product_note) as Record<string, unknown> | null)?.order_notice_mode, Array.isArray((p as any).badge_types) && (p as any).badge_types.length ? (p as any).badge_types : [(p as any).badge_type], productNoticeGlobal.mode, (p as any).in_shop)).length, [quickGroupBuyProducts, productNoticeGlobal.mode]);
 
   // ============ [재고 홀드] 담는 즉시 서버에 예약(15분) — 다른 고객 화면·품절 판정에 즉시 차감 반영 ============
@@ -8692,8 +8708,16 @@ export default function OrderPage() {
                 {!customerBlockStatus.blocked && finalSubmitConfirmationEnabled ? (
                   <label data-final-confirm="true" style={uiS3 ? { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px", minHeight: "52px", boxSizing: "border-box", borderRadius: "8px", border: finalSubmitAcknowledged ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", padding: finalSubmitAcknowledged ? "9px 13px" : "10px 14px", cursor: "pointer" } : s3s({ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", borderRadius: "12px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #E0A96D", background: finalSubmitAcknowledged ? "#F9EEF3" : "#FFF7ED", padding: "11px 12px", cursor: "pointer" })}>
                     <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={uiS3 ? { width: "22px", height: "22px", flexShrink: 0, accentColor: "#111111" } : { width: "21px", height: "21px", flexShrink: 0, accentColor: "#7A1E47" }} />
-                    <span style={uiS3 ? { fontSize: "15px", fontWeight: 600, lineHeight: 1.45, color: "#111111", wordBreak: "keep-all" } : { fontSize: "13px", fontWeight: 900, lineHeight: 1.45, color: "#4B3540", wordBreak: "keep-all" }}>배송지·상품·옵션·수량을 확인했습니다</span>
+                    <span style={uiS3 ? { fontSize: "15px", fontWeight: 600, lineHeight: 1.45, color: "#111111", wordBreak: "keep-all" } : { fontSize: "13px", fontWeight: 900, lineHeight: 1.45, color: "#4B3540", wordBreak: "keep-all" }}>{liveOnlyCartNames.length > 0 ? "배송지·상품·옵션·수량, 방송에서 접수한 상품인지 확인했습니다" : "배송지·상품·옵션·수량을 확인했습니다"}</span>
                   </label>
+                ) : null}
+                {!customerBlockStatus.blocked && liveOnlyCartNames.length > 0 ? (
+                  <div data-live-only-notice="true" style={{ marginBottom: "12px", borderRadius: "8px", background: "#FDECEC", padding: "10px 12px", fontSize: "14px", fontWeight: 700, lineHeight: 1.5, color: "#B3261E", wordBreak: "keep-all" }}>
+                    {LIVE_ONLY_NOTICE_TEXT} 방송에서 접수하지 않았다면 빼 주세요
+                    <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#7A2A24", overflowWrap: "anywhere" }}>
+                      {liveOnlyCartNames.slice(0, 2).join(", ")}{liveOnlyCartNames.length > 2 ? ` 외 ${liveOnlyCartNames.length - 2}개` : ""}
+                    </div>
+                  </div>
                 ) : null}
                 <button
                   type="button"
