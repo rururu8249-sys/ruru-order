@@ -142,6 +142,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-26 **[밤샘 작업 — 관리자 속도·설정 메뉴 6묶음·이벤트 명단 기준·손님 방송접수 안내·색 시안 미리보기]** 상세: 프로젝트 작업기록/2026-11-26_밤샘작업_아침보고.md. 색 시안은 ?preview=tb(B 흰+초록)/tc(겨울)/notheme(끄기), 손님 기본 꺼짐(UI_PREVIEW_DEFAULTS tb·tc false) + 미리보기에서만 주문 단계 표시. 돈 판정 무접촉. 배포 완료 a645034~61fb133
 - 2026-11-26 **[방송 설정 창 「상품 —개」 → 숫자 모를 땐 숨김 + 채팅뷰어 테스트 현행화]** 방송 설정 창 머리 「시작 전 · 상품 —개」 → 개수를 알 때만 「· 상품 N개」. test-chat-view-tabs 를 지금 설계(알림 칸 최근 3개·봇 담음/결제/주문 알림은 알림 칸 제외)에 맞춤 — 통과. 배포 완료
 - 2026-11-26 **[손님 주문조회 빈 화면 문구]** 「전체」인데도 「선택한 상태의 주문내역이 없습니다 · 다른 상태를 눌러 확인해 주세요」 → 전체일 땐 「최근 주문내역이 없습니다.」(다른 상태 안내 숨김), 상태를 골랐을 때만 예전 문구. 주문조회 창·/myorder 같은 규칙. 표시만. 배포 완료
 - 2026-11-26 **[관리자 읽기 화면 서버 지역 sin1 13개]** 운영 실측: 상품 탭 widget-library 1초×2 등 미국 지역 함수가 싱가포르 DB 를 오가며 느림 → 관리자 전용·돈 무관 라우트만 vercel.json 지역 sin1(widget-library·product-brand-catalog·visit-stats(+exclude)·catalog-write·picking-workspace·broadcast-end-reports·repurchase-stats·stock-flow·customer-lifetime·ops-status·broadcast-flow·assistant-memos). 코드 무변경, 돈·입금·포인트·뱅크다·알림톡 라우트는 그대로. build 통과. 배포 완료
