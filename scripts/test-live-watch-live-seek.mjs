@@ -64,6 +64,7 @@ const onMsg = vm.runInNewContext(ts.transpile(`const handle = ${listener.getText
   ccOffAt: {current: Date.now()}, captionsOff() {},
   LIVE_EDGE_TOLERANCE_SECONDS: liveModule.LIVE_EDGE_TOLERANCE_SECONDS,
   setBehindLive: update => { behind = update(behind); },
+  streamDelayFromIngestion: () => null, setStreamDelayMs() {},
 });
 function telemetry(t, d, live = true, state = 1) {
   playerInfo.current = {t: 0, d: 0, live: false, state: -1, d0: 0, d0at: 0, seekableEnd: null, atLiveHead: null};
