@@ -148,6 +148,8 @@ const IconGridDark = () => (
   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
 );
 const TOP_ICON_BTN = { width: "44px", height: "44px", padding: 0, border: "none", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } as const;
+// [2026-11-26 VER3 시안 LiveClean] 위 오른쪽 = 소리 · ⋯ · ✕ 만, 영상이 밝아도 보이게 반투명 검정 동그라미
+const TOP_ROUND_BTN = { ...TOP_ICON_BTN, position: "relative", width: "40px", height: "40px", borderRadius: "9999px", background: "rgba(0,0,0,0.35)" } as const;
 const IconSoundOff = () => (
   <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9l6 6M22 9l-6 6" /></svg>
 );
@@ -171,6 +173,8 @@ const MenuIcon = ({ k }: { k: string }) => {
   if (k === "close") return <svg aria-hidden="true" {...p}><path d="M5 15l7-7 7 7" /></svg>;
   if (k === "rps") return <svg aria-hidden="true" {...p}><rect x="3" y="7" width="18" height="11" rx="4" /><path d="M7.5 10.5v4M5.5 12.5h4M15 11.5h.01M18 13.5h.01" strokeLinecap="round" /></svg>;
   if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
+  if (k === "chathide") return <svg aria-hidden="true" {...p}><path d="M5 4h14a2 2 0 012 2v9a2 2 0 01-2 2h-8l-5 4v-4H5a2 2 0 01-2-2V6a2 2 0 012-2z" /><path d="M7.5 9h9M7.5 12.5h6" /></svg>;
+  if (k === "reload") return <svg aria-hidden="true" {...p}><path d="M20 11a8 8 0 00-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0014.3 4.9L20 16" /><path d="M20 20v-4h-4" /></svg>;
   return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
 };
 // 닉네임 뒤 표시 — 금색 왕관(총관리자) / 분홍 왕관 / R 동그라미(채팅 관리자). 우리 가게 표시라 직접 그림.
@@ -347,17 +351,6 @@ function readChatView(): ChatView {
 }
 
 // 맨 아래 동그란 버튼(그림 + 아래 글자) — 오늘만셀러처럼
-/** 가게 그림(차양 + 가게) — 하단 「상품」 버튼 */
-function IconStore() {
-  return (
-    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3.5 9.5 5 4.5h14l1.5 5" />
-      <path d="M3.5 9.5a2.8 2.8 0 0 0 5.67 0 2.8 2.8 0 0 0 5.66 0 2.8 2.8 0 0 0 5.67 0" />
-      <path d="M5 11.6V19.5h14v-7.9" />
-    </svg>
-  );
-}
-
 function BarBtn(props: { label: string; badge?: number; badgeRed?: boolean; onClick: () => void; children: ReactNode }) {
   const n = props.badge || 0;
   return (
@@ -577,6 +570,18 @@ export default function LiveWatchView(props: Props) {
   }, []);
   const [moreOpen, setMoreOpen] = useState(false);
   const [focus, setFocus] = useState(false);
+  // [2026-11-26 VER3 시안 LiveXmas] 손님 화면 테마가 겨울이면 아래 줄만 크리스마스 색(영상·채팅은 그대로)
+  const [xmas, setXmas] = useState(false);
+  useEffect(() => {
+    const root = typeof document !== "undefined" ? document.documentElement : null;
+    if (!root?.dataset) return;
+    const read = () => setXmas(root.dataset.ruruTheme === "winter");
+    read();
+    if (typeof MutationObserver === "undefined") return;
+    const mo = new MutationObserver(read);
+    mo.observe(root, { attributes: true, attributeFilter: ["data-ruru-theme"] });
+    return () => mo.disconnect();
+  }, []);
   const [chatViewOpen, setChatViewOpen] = useState(false);
   const [installHintOpen, setInstallHintOpen] = useState(false);
   // [2026-11-13] 폰 «뒤로» → 사이트에서 나가지 않고 열려 있는 창만 닫힘(상품 목록과 같은 규칙)
@@ -1354,19 +1359,16 @@ export default function LiveWatchView(props: Props) {
           {/* 소개영상 안내 띠가 뜰 땐 겹치지 않게 숨김(초 세기·상태는 유지) */}
           <span style={{ display: showIntroBanner ? "none" : "contents" }}><LiveWelcomeChip /></span>
         </div>
-          {/* 오른쪽 위 — 오늘만셀러처럼 그림만: 새로고침 · 소리 · 닫기(X = 상품 사진으로 보는 쇼핑몰 화면) */}
-          <div style={{ display: "flex", alignItems: "center", flexShrink: 0, pointerEvents: "auto", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
-            {/* 채팅 숨기기 — [2026-11-12] 왼쪽 위 시청자 수(눈)와 헷갈려 눈 그림 → 말풍선 그림 */}
-            <button type="button" onClick={() => { const next = !focus; setFocus(next); setChatHint(next ? "채팅을 숨겼어요. 말풍선을 다시 누르면 보여요." : "채팅을 다시 보여 드려요."); }} aria-label={focus ? "채팅 보이기" : "채팅 숨기기"} aria-pressed={focus} style={TOP_ICON_BTN}>
-              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h14a2 2 0 012 2v9a2 2 0 01-2 2h-8l-5 4v-4H5a2 2 0 01-2-2V6a2 2 0 012-2z" /><path d="M7.5 9h9M7.5 12.5h6" />{focus ? <path d="M3 3l18 18" /> : null}</svg>
-            </button>
-            <button type="button" onClick={reloadPlayer} aria-label="방송 새로고침" style={TOP_ICON_BTN}>
-              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0014.3 4.9L20 16" /><path d="M20 20v-4h-4" /></svg>
-            </button>
-            <button type="button" onClick={muted ? turnSoundOn : () => { sendToPlayer(youtubeCommand("mute")); setMuted(true); }} aria-label={muted ? "소리 켜기" : "소리 끄기"} aria-pressed={!muted} style={TOP_ICON_BTN}>
+          {/* 오른쪽 위 — [2026-11-26 VER3] 소리 · ⋮(더보기) · 닫기(X = 쇼핑몰 화면). 새로고침·채팅 숨기기는 더보기 안 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, pointerEvents: "auto" }}>
+            <button type="button" onClick={muted ? turnSoundOn : () => { sendToPlayer(youtubeCommand("mute")); setMuted(true); }} aria-label={muted ? "소리 켜기" : "소리 끄기"} aria-pressed={!muted} style={TOP_ROUND_BTN}>
               {muted ? <IconSoundOff /> : <IconSoundOn />}
             </button>
-            <button type="button" onClick={props.onSwitchToShop} aria-label="방송 화면 닫기" style={TOP_ICON_BTN}>
+            <button type="button" onClick={() => setMoreOpen(true)} aria-label={noticeBadge ? `더보기 · 새 글 ${noticeBadge}개` : "더보기"} style={TOP_ROUND_BTN}>
+              <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><circle cx="12" cy="5" r="1.9" /><circle cx="12" cy="12" r="1.9" /><circle cx="12" cy="19" r="1.9" /></svg>
+              {noticeBadge ? <span aria-hidden="true" style={{ position: "absolute", top: "-2px", right: "-2px", minWidth: "18px", height: "18px", padding: "0 4px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "11px", fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{noticeBadge > 99 ? "99+" : noticeBadge}</span> : null}
+            </button>
+            <button type="button" onClick={props.onSwitchToShop} aria-label="방송 화면 닫기" style={TOP_ROUND_BTN}>
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
           </div>
@@ -1639,18 +1641,10 @@ export default function LiveWatchView(props: Props) {
       {rpsActive && !focus && <div ref={rpsOverlayRef} data-live-rps-overlay className="rps-live-overlay" style={{left:isDesktop?16:12,right:isDesktop?videoAreaRight:12,paddingRight:isDesktop?16:0}}><RpsWidget key={rps.state?.id} game={rps} showSetup={rpsShowSetup} broadcastId={props.broadcastId} onAdmin={() => setRpsAdminOpen(true)}/></div>}
       {rpsAdminOpen && !viewerMode && (rps.admin || chat?.canGrant) && <RpsAdmin game={rps} broadcastId={props.broadcastId} onSaved={() => { if (!rps.state?.id || rps.state.status === 'closed') setRpsLaunchKey(rpsSetupKey); }} onClose={() => setRpsAdminOpen(false)}/>}
 
-      {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
-      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: isDesktop ? "8px 12px calc(8px + env(safe-area-inset-bottom))" : "6px 10px calc(6px + env(safe-area-inset-bottom))", display: "flex", flexWrap: isDesktop ? "wrap" : "nowrap", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: "#000000" }}>
-        {/* [2026-11-12 사장님 그립 참고] 폰 = 가게 그림 + 빨간 숫자 + 「상품」(옆 주문서·더보기와 같은 모양), PC = 예전 넓은 버튼 */}
-        {!isDesktop ? (
-          <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ flexShrink: 0, width: "44px", padding: 0, border: "none", background: "transparent", color: "#FFFFFF", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer" }}>
-            <span style={{ position: "relative", width: "40px", height: "40px", borderRadius: "9999px", background: "rgba(255,255,255,0.14)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-              <IconStore />
-              {totalCount > 0 ? <span aria-hidden="true" style={{ position: "absolute", top: "-6px", right: "-10px", minWidth: "20px", height: "20px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, lineHeight: "20px", textAlign: "center" }}>{totalCount > 99 ? "99+" : totalCount}</span> : null}
-            </span>
-            <span style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1 }}>상품</span>
-          </button>
-        ) : (
+      {/* 맨 아래 줄 — [2026-11-26 VER3 시안 LiveClean] 폰 = [채팅하기…][상품 N][주문서 N] 알약 3개(유튜브 앱처럼), 더보기는 위 오른쪽 ⋯ 로.
+          겨울 테마면 아래 줄만 짙은 초록 + 금색 선, 주문서 빨강(영상은 안 가림). PC 는 예전 넓은 상품 버튼 + 주문서. */}
+      <div ref={bottomBarRef} data-live-bottom-bar style={{ position: "absolute", left: 0, right: isDesktop ? videoAreaRight : 0, bottom: 0, padding: isDesktop ? "8px 12px calc(8px + env(safe-area-inset-bottom))" : "10px 12px calc(10px + env(safe-area-inset-bottom))", display: "flex", flexWrap: isDesktop ? "wrap" : "nowrap", alignItems: "center", justifyContent: isDesktop ? "center" : undefined, gap: isDesktop ? "16px" : "8px", background: xmas ? "#123A2C" : isDesktop ? "#000000" : "#0F0F0F", borderTop: xmas ? "2px solid #C9A24A" : undefined }}>
+        {isDesktop ? (
         <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: isDesktop ? "208px" : "52px", height: "52px", padding: isDesktop ? "4px 12px 4px 4px" : 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer", ...(isDesktop ? { display: "flex", alignItems: "center", gap: "10px", color: "#111111" } : {}) }}>
           {thumbUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -1663,28 +1657,34 @@ export default function LiveWatchView(props: Props) {
             <span style={{ marginLeft: "auto", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" }}>{totalCount > 999 ? "999+" : totalCount}개</span>
           </> : <span aria-hidden="true" style={{ position: "absolute", top: "-8px", right: "-8px", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "24px", textAlign: "center", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }}>{totalCount > 999 ? "999+" : totalCount}</span>}
         </button>
-        )}
-        {!isDesktop && chat && chat.canWrite && !focus ? (
-          <div style={{ flex: 1, minWidth: 0, height: "52px", boxSizing: "border-box", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "9999px", background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", overflow: "hidden" }}>
-            <button type="button" onClick={() => openCompose(false)} style={{ flex: 1, minWidth: 0, height: "100%", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: canEmoji ? "0 0 0 14px" : "0 14px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>채팅 입력</span>
+        ) : (
+          <>
+            {chat && chat.canWrite && !focus ? (
+              <div style={{ flex: 1, minWidth: 0, height: "44px", borderRadius: "9999px", background: xmas ? "rgba(255,255,255,0.14)" : "#272727", display: "flex", alignItems: "center", overflow: "hidden" }}>
+                <button type="button" onClick={() => openCompose(false)} style={{ flex: 1, minWidth: 0, height: "100%", border: "none", background: "transparent", color: "#AAAAAA", fontSize: "14px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: canEmoji ? "0 0 0 16px" : "0 16px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>채팅하기…</span>
+                </button>
+                {canEmoji ? (
+                  <button type="button" onClick={() => openCompose(true)} aria-label="이모티콘" style={{ flexShrink: 0, width: "44px", height: "100%", border: "none", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+                    <IconSmile color="#FFFFFF" />
+                  </button>
+                ) : null}
+              </div>
+            ) : <span style={{ flex: 1 }} />}
+            <button type="button" data-live-catalog-button onClick={() => openProductList("all")} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: xmas ? "rgba(255,255,255,0.14)" : "#272727", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", whiteSpace: "nowrap" }}>
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M6 7h12l-1 13H7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>
+              {totalCount > 999 ? "999+" : totalCount}
             </button>
-            {canEmoji ? (
-              // 이모티콘을 쓸 수 있는 손님만 — 입력칸 맨 오른쪽 웃는 얼굴(유튜브 멤버십처럼)
-              <button type="button" onClick={() => openCompose(true)} aria-label="이모티콘" style={{ flexShrink: 0, width: "44px", height: "100%", border: "none", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
-                <IconSmile color="#FFFFFF" />
-              </button>
-            ) : null}
-          </div>
-        ) : !isDesktop ? <span style={{ flex: 1 }} /> : null}
-        <BarBtn label="주문서" badge={cartCount} badgeRed onClick={props.onOpenCart}>
-          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M6 8h12l1 13H5zM9 8V7a3 3 0 016 0v1" stroke="#FFFFFF" strokeWidth="1.6" strokeLinejoin="round" /></svg>
-        </BarBtn>
-        {focus ? null : (
-        <BarBtn label="더보기" badge={noticeBadge} badgeRed onClick={() => setMoreOpen(true)}>
-          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
-        </BarBtn>
+            <button type="button" onClick={props.onOpenCart} aria-label={cartCount > 0 ? `주문서 ${cartCount}개` : "주문서"} style={{ flexShrink: 0, height: "44px", padding: "0 16px", border: "none", borderRadius: "9999px", background: xmas ? "#C0262D" : "#FFFFFF", color: xmas ? "#FFFFFF" : "#111111", fontSize: "14px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>
+              주문서{cartCount > 0 ? ` ${cartCount > 99 ? "99+" : cartCount}` : ""}
+            </button>
+          </>
         )}
+        {isDesktop ? (
+          <BarBtn label="주문서" badge={cartCount} badgeRed onClick={props.onOpenCart}>
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M6 8h12l1 13H5zM9 8V7a3 3 0 016 0v1" stroke="#FFFFFF" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+          </BarBtn>
+        ) : null}
       </div>
 
       {/* 더보기 — [2026-11-12 23:29 사장님 「더보기 메뉴도 그렇고」] 영상 위에 글자만 떠 있어 뒤 화면·인사하기 줄과 겹쳐 읽기 어려웠음
@@ -1711,6 +1711,8 @@ export default function LiveWatchView(props: Props) {
                 return [
                   ...base.slice().sort((x, y) => rank(x.key) - rank(y.key)),
                   { key: "guide", label: "주문 방법", onClick: () => setGuideOpen(true), badge: 0 },
+                  ...(chat ? [{ key: "chathide", label: focus ? "채팅 보이기" : "채팅 숨기기", onClick: () => { const next = !focus; setFocus(next); setChatHint(next ? "채팅을 숨겼어요. 더보기에서 다시 켤 수 있어요." : "채팅을 다시 보여 드려요."); }, badge: 0 }] : []),
+                  { key: "reload", label: "방송 새로고침", onClick: reloadPlayer, badge: 0 },
                   ...(chat ? [{ key: "chatview", label: "채팅 글자 크기", onClick: () => setChatViewOpen(true), badge: 0 }] : []),
                   ...(chat?.canManage ? [{ key: "operator-mode", label: operatorMode ? "시청자 모드" : "관리자 복귀", onClick: () => { setOperatorMode(v => !v); setQuickOpen(false); setModTarget(null); setChatMenu(null); }, badge: 0 }] : []),
                   { key: "share", label: "방송 공유", onClick: shareLive, badge: 0 },
@@ -1921,7 +1923,7 @@ export default function LiveWatchView(props: Props) {
           <div style={{ width: "100%", maxWidth: "360px", background: "#FFFFFF", color: "#111111", borderRadius: "16px", padding: "24px 20px 20px" }}>
             <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>방송 보면서 바로 담아요</div>
             {([
-              ["1", <>방송에서 마음에 드는 상품이 나오면 왼쪽 아래 <b>「상품」</b>을 눌러요</>],
+              ["1", <>방송에서 마음에 드는 상품이 나오면 아래 <b>가방 그림(상품 수)</b>을 눌러요</>],
               ["2", <>그 상품의 <b>「상품 선택」</b>을 누르고 원하는 옵션을 고르거나 직접 작성하여 담아요</>],
               ["3", <>다 담았으면 오른쪽 아래 <b>「주문서」</b>를 눌러 제출하고 입금하면 끝</>],
             ] as [string, ReactNode][]).map(([n, t]) => (
@@ -1930,7 +1932,7 @@ export default function LiveWatchView(props: Props) {
                 <span style={{ fontSize: "16px", lineHeight: 1.5, paddingTop: "2px", wordBreak: "keep-all" }}>{t}</span>
               </div>
             ))}
-            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>소리가 안 나면 오른쪽 위 스피커, 화면이 멈추면 그 옆 둥근 화살표를 눌러요. ✕ 는 방송을 닫고 상품만 봐요.</div>
+            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>소리가 안 나면 오른쪽 위 스피커, 화면이 멈추면 ⋮ 의 「방송 새로고침」을 눌러요. ✕ 는 방송을 닫고 상품만 봐요.</div>
             <button type="button" onClick={closeGuide} style={{ width: "100%", height: "52px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>시작하기</button>
           </div>
         </div>

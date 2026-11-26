@@ -30,7 +30,7 @@ const props={videoId:'abcdefghijk',title:'test',broadcastId:'A',paused:false,pau
 const text=node=>typeof node==='string'?node:Array.isArray(node)?node.map(text).join(''):node?.children?.map(text).join('')??'';
 let tree;await act(async()=>{tree=Renderer.create(React.createElement(View,props),{createNodeMock:el=>el.type==='iframe'?{clientWidth:390,clientHeight:700,offsetLeft:0,offsetTop:0}:null});});
 const button=label=>tree.root.findAllByType('button').find(b=>text(b)===label);
-await act(async()=>button('더보기').props.onClick());
+await act(async()=>tree.root.findAllByType('button').find(b=>/^더보기/.test(b.props['aria-label']||'')).props.onClick()); // [2026-11-26 VER3] 더보기 = 위 오른쪽 ⋮(글자 없음)
 assert.ok(button('게임 · 가위바위보'),'existing owner must see game entry before separate verification');
 assert.ok(button('내정보'));
 assert.ok(!button('내 채팅 본인 확인'),'remove duplicate identity item from More');
@@ -45,7 +45,7 @@ assert.ok(!button('카카오로 관리자 확인'),'successful verification open
 await act(async()=>tree.root.findByProps({'aria-label':'관리 설정 닫기'}).props.onClick());
 game.admin=false;
 await act(async()=>tree.update(React.createElement(View,{...props,chat:{...props.chat,canGrant:false}})));
-await act(async()=>button('더보기').props.onClick());
+await act(async()=>tree.root.findAllByType('button').find(b=>/^더보기/.test(b.props['aria-label']||'')).props.onClick()); // [2026-11-26 VER3] 더보기 = 위 오른쪽 ⋮(글자 없음)
 assert.ok(!button('게임 · 가위바위보'),'ordinary customer or chat-only moderator has no game admin entry');
 await act(async()=>tree.update(React.createElement(View,{...props,paused:true,pausedText:'방송 휴식 안내'})));
 assert.ok(text(tree.toJSON()).includes('방송 휴식 안내'));
@@ -58,7 +58,7 @@ game.admin=true;game.setup={revision:2,config:{title:'가위바위보',winners:1
 game.state={...game.state,status:'closed',revision:4};
 await act(async()=>tree.update(React.createElement(View,props)));
 assert.equal(tree.root.findAllByProps({'data-live-rps-overlay':true}).length,0,'closed game hides admin overlay despite saved setup');
-await act(async()=>button('더보기').props.onClick());
+await act(async()=>tree.root.findAllByType('button').find(b=>/^더보기/.test(b.props['aria-label']||'')).props.onClick()); // [2026-11-26 VER3] 더보기 = 위 오른쪽 ⋮(글자 없음)
 game.action=async()=>true;
 await act(async()=>button('게임 · 가위바위보').props.onClick());
 await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
