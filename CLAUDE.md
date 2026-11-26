@@ -142,6 +142,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-26 **[관리자 읽기 화면 서버 지역 sin1 13개]** 운영 실측: 상품 탭 widget-library 1초×2 등 미국 지역 함수가 싱가포르 DB 를 오가며 느림 → 관리자 전용·돈 무관 라우트만 vercel.json 지역 sin1(widget-library·product-brand-catalog·visit-stats(+exclude)·catalog-write·picking-workspace·broadcast-end-reports·repurchase-stats·stock-flow·customer-lifetime·ops-status·broadcast-flow·assistant-memos). 코드 무변경, 돈·입금·포인트·뱅크다·알림톡 라우트는 그대로. build 통과. 배포 완료
 - 2026-11-26 **[손님 주문서 — 방송 접수 후 구매 상품 확인(사장님 「손님이 제대로 확인을 못 함·주문 전에 반드시 확인」)]** 담은 상품에 «방송 접수 후 구매» 상품(바로구매 아님 — 카드·옵션창과 같은 isInstantOrderProduct)이 있으면 제출 버튼 위에 빨간 칸 「방송 접수 완료 후 구매 가능! 방송에서 접수하지 않았다면 빼 주세요 / 상품 이름(2개+외 N개)」, 최종 확인 체크 문구는 「배송지·상품·옵션·수량, 방송에서 접수한 상품인지 확인했습니다」. 체크 칸은 원래 설정(주문 전 최종 확인 체크 ON/OFF) 그대로, 새로 막는 규칙 없음 — 표시만·금액·제출 무변경. customer-ui-switch·detail-product-name·brand-linked-submit 통과·tsc 0·build(BANKDA 가드 통과). 배포 완료 — 실폰 확인 필요
 - 2026-11-26 **[관리자 「지금 접속」·고객이슈 목록 서버 지역 sin1]** 운영 실측: /api/admin-live/presence(사이드바가 주기적으로 읽음) 2.8초·/api/admin-v2/admin-tasks 0.9초 — 미국 지역에서 싱가포르 DB 를 여러 번 오감 → vercel.json 지역만 sin1(코드 무변경). 배포 완료
 - 2026-11-26 **[실시간 주문서 위 장바구니 숫자 — 10초마다 2초씩 걸리던 것]** 운영 실측: /api/admin-live/cart-holds?summary=1 이 10초마다 «만료 정리(쓰기)→방송 상품→담김 줄→자동 테스트 활동»을 차례로 하고 미국 지역에서 돌아 약 2초. → summary 땐 만료 정리 생략(숫자는 원래 안 끝난 줄만 셈 — 값 같음, 정리는 창 열 때·5분 cron 그대로), 세 읽기 동시에, 함수 지역 sin1(DB 와 같은 곳). 담김 현황 창·비우기·알림 무변경. cart-hold 테스트 5종 통과·tsc 0·build(BANKDA 가드 통과). 배포 완료 — 실화면 확인 필요

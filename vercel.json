@@ -159,6 +159,71 @@
       "regions": [
         "sin1"
       ]
+    },
+    "app/api/admin-live/widget-library/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/product-brand-catalog/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/visit-stats/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/visit-stats-exclude/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/catalog-write/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/picking-workspace/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/broadcast-end-reports/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/repurchase-stats/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/stock-flow/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/customer-lifetime/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/ops-status/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/broadcast-flow/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "app/api/admin-live/assistant-memos/route.ts": {
+      "regions": [
+        "sin1"
+      ]
     }
   },
   "crons": [
