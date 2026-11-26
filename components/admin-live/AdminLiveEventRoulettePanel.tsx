@@ -1506,6 +1506,17 @@ export default function AdminLiveEventRoulettePanel({
   // [2026-07-26] K명 당첨 방식(서바이벌·달리기 공용) 판정 — UI 게이팅에 사용.
   const isKWinnerTab = eventTab === "survival" || eventTab === "race";
   const widgetUrl = eventTab === "roulette" ? overlayUrl : eventTab === "survival" ? survivalOverlayUrl : eventTab === "race" ? raceOverlayUrl : clawOverlayUrl;
+  const historyRef = useRef<HTMLDetailsElement | null>(null);
+  // [2026-11-27 VER3] 오늘 당첨 요약(표시만) — 운영 기록만, 포인트는 당첨 내용 「포인트 N P」 글자에서
+  const todaySummary = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const list = recentWinners.filter((w) => !w.is_test && new Date(String(w.winner_at || "")).getTime() >= start.getTime());
+    let points = 0;
+    for (const w of list) { const m = String(w.winner_note || "").match(/포인트\s*([\d,]+)\s*P/); if (m) points += Number(m[1].replace(/,/g, "")) || 0; }
+    const hm = (v: string) => { const d = new Date(v); return Number.isFinite(d.getTime()) ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : ""; };
+    const names = list.slice(0, 6).map((w) => `${w.nickname}${hm(String(w.winner_at || "")) ? ` (${hm(String(w.winner_at || ""))})` : ""}`).join(" · ") + (list.length > 6 ? ` 외 ${list.length - 6}명` : "");
+    return { count: list.length, points, names };
+  }, [recentWinners]);
   const periodChips: { key: "today" | "week" | "month" | "date"; label: string }[] = [
     { key: "today", label: "오늘" },
     { key: "week", label: "이번주" },
@@ -1524,18 +1535,16 @@ export default function AdminLiveEventRoulettePanel({
       {open ? (
         <div style={embedded ? { width: "100%", height: "100%" } : { position: "fixed", inset: 0, zIndex: 130, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.55)", padding: "12px" }}>
           <div className="ruru-event-sian" style={embedded ? { width: "100%", height: "100%", overflowY: "auto", overflowX: "auto" } : { width: "680px", maxWidth: "100%", flexShrink: 0, height: "88vh", overflowY: "auto", overflowX: "auto" }}>
-            <div className="body" style={{ minHeight: "100%", boxSizing: "border-box" }}>
+            <div className="body" style={{ minHeight: "100%", boxSizing: "border-box", background: "#F5F5F5", border: 0, padding: "24px", color: "#111111" }}>
 
-              {/* 헤더 */}
-              <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
-                {/* [2026-09-20 폰 화면 깨짐] 「◆ 이\n벤트」로 잘렸다 → 줄바꿈 금지 */}
-                <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>이벤트</span>
-                <span style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
-                  {/* [2026-09-08] 탭 순서 = 실제 쓰는 순서(서바이벌·달리기 최다). 테스트/운영 토글은 삭제 — 「테스트로 해보기」 버튼으로 */}
-                  <AdminLiveEventTabs active={eventTab} disabled={publishingRoster || spinning} onSelect={(tab) => { setEventTab(tab); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }} />
-                  <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 4px" }} />
-                  <button className="btn" disabled={publishingRoster || spinning} style={{ height: "auto", padding: "4px 8px" }} onClick={() => { void resetEvent(); }}>초기화</button>
-                  {embedded ? null : <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={closePanel}>✕</button>}
+              {/* [2026-11-27 VER3 시안 «이벤트»] 머리 = 제목 + 게임 칩 + 초기화 · 지난 당첨 기록 */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+                <h2 style={{ margin: "0 8px 0 0", fontSize: "22px", fontWeight: 800, whiteSpace: "nowrap", color: "var(--color-ink)" }}>이벤트</h2>
+                <AdminLiveEventTabs active={eventTab} disabled={publishingRoster || spinning} onSelect={(tab) => { setEventTab(tab); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }} />
+                <span style={{ marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }}>
+                  <button type="button" disabled={publishingRoster || spinning} onClick={() => { void resetEvent(); }} style={{ height: "40px", border: "1px solid #CACACB", borderRadius: "999px", background: "#FFFFFF", padding: "0 16px", fontSize: "14px", color: "#111111" }}>초기화</button>
+                  <button type="button" onClick={() => { const el = historyRef.current; if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "start" }); } }} style={{ height: "40px", border: "1px solid #CACACB", borderRadius: "999px", background: "#FFFFFF", padding: "0 16px", fontSize: "14px", color: "#111111" }}>지난 당첨 기록</button>
+                  {embedded ? null : <button type="button" aria-label="닫기" onClick={closePanel} style={{ height: "40px", width: "40px", border: "1px solid #CACACB", borderRadius: "999px", background: "#FFFFFF", fontSize: "16px", color: "#111111" }}>✕</button>}
                 </span>
               </div>
 
@@ -1543,190 +1552,214 @@ export default function AdminLiveEventRoulettePanel({
                 <AdminLiveMissionPanel />
               ) : (
               <>
-              <style>{` .event-work-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; margin-bottom:12px; } @media(max-width:720px){ .event-work-grid { grid-template-columns:minmax(0,1fr); } } `}</style>
-              <div className="event-work-grid">
-                <div style={{ minWidth: 0, background: "var(--color-surface-2)", borderRadius: "8px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", paddingBottom: 12 }}>
-                  <AdminEventWidgetPreview kind={eventTab} eventId={currentEvent?.status === 'result' || currentEvent?.status === 'spinning' ? currentEvent.id : undefined} participants={finalParticipants.map(p=>p.nickname)} />
-                  <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-                    <button className="btn" style={{height:'auto',padding:'8px 12px'}} onClick={()=>void ensureRoulettePreviewEvent(finalParticipants)} disabled={spinning || publishingRoster || finalParticipants.length===0}>{publishingRoster?'명단 표시 중…':'방송에 명단 표시'}</button>
-                    <button className="btn rose" style={{ height: "auto", padding: "8px 32px" }} onClick={() => void startSpin(false)} disabled={spinning || publishingRoster || finalParticipants.length === 0}>
-                      {spinning ? "진행중..." : giftType === "point" && Number(giftPointAmount || 0) > 0 ? `시작 · ${isKWinnerTab ? `${survivorCount}명에게 ` : "당첨자에게 "}${Number(giftPointAmount).toLocaleString("ko-KR")}P 지급` : "시작"}
-                    </button>
-                    <button className="btn" style={{ height: "auto", padding: "8px 12px" }} onClick={() => void startSpin(true)} disabled={spinning || publishingRoster || finalParticipants.length === 0} title="포인트가 나가지 않고 테스트 기록으로만 남습니다">
-                      테스트로 해보기 · 포인트 안 나감
-                    </button>
+              <style>{` .event-v3-wrap { container-type: inline-size; } .event-v3-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; margin-bottom:16px; } @container (min-width: 900px) { .event-v3-grid { grid-template-columns:minmax(0,1fr) 440px; } } .event-v3-names { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; align-content:start; } @container (min-width: 640px) { .event-v3-names { grid-template-columns:repeat(6,minmax(0,1fr)); } } `}</style>
+              <div className="event-v3-wrap">
+              <div className="event-v3-grid">
+                {/* 왼쪽 검정 판 — 참가자 명단(방송 화면에 이대로) · 게임 중엔 방송 위젯 화면 */}
+                <section style={{ minWidth: 0, background: "#111111", borderRadius: "16px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px", color: "#FFFFFF" }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap" }}>
+                    <h3 style={{ margin: 0, fontSize: "22px", fontWeight: 800 }}>참가자 명단</h3>
+                    <span style={{ fontSize: "14px", color: "#CACACB" }}>방송 화면에 이대로 보여요</span>
+                    <b style={{ marginLeft: "auto", fontSize: "24px", color: "#FFD76A" }}>{loading && participantSource !== "manual" ? "…" : `${finalParticipants.length}명`}</b>
                   </div>
+                  {currentEvent ? (
+                    <div style={{ background: "#FFFFFF", borderRadius: "12px", display: "flex", justifyContent: "center", padding: "8px 0" }}>
+                      <AdminEventWidgetPreview kind={eventTab} eventId={currentEvent?.status === 'result' || currentEvent?.status === 'spinning' ? currentEvent.id : undefined} participants={finalParticipants.map(p=>p.nickname)} />
+                    </div>
+                  ) : finalParticipants.length === 0 ? (
+                    <div style={{ flex: 1, minHeight: "160px", display: "flex", alignItems: "center", justifyContent: "center", color: "#CACACB", fontSize: "14px", textAlign: "center" }}>
+                      {canLoadParticipants || participantSource === "manual" ? "오른쪽에서 누가 참가하는지 골라 주세요" : "불러올 주문이 없어요 · 방송을 시작하거나 주문서에 주문이 보여야 해요"}
+                    </div>
+                  ) : (
+                    <div className="event-v3-names" style={{ flex: 1 }}>
+                      {(finalParticipants.length > 36 ? finalParticipants.slice(0, 35) : finalParticipants).map((p, i) => (
+                        <div key={`nm-${p.nickname}-${i}`} title={p.nickname} style={{ background: "#2A2A2C", borderRadius: "8px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", padding: "0 4px", minWidth: 0 }}>{p.nickname}</div>
+                      ))}
+                      {finalParticipants.length > 36 ? <div style={{ background: "#2A2A2C", borderRadius: "8px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, color: "#CACACB" }}>외 {finalParticipants.length - 35}명</div> : null}
+                    </div>
+                  )}
 
                   {/* 결과는 공간을 차지하는 별도 행. 긴 이름도 시작 버튼 위에 겹치지 않는다. */}
                   {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
-                    <div role="status" aria-live="polite" style={{ width: "calc(100% - 24px)", minWidth: 0, borderRadius: "12px", border: "1px solid var(--bd)", background: "var(--color-surface)", padding: "12px", textAlign: "center" }}>
-                      <div style={{ color: "var(--color-cardpay)", fontSize: "12px", fontWeight: 900 }}>당첨자</div>
-                      <div style={{ marginTop: "4px", color: "var(--color-ink)", fontSize: "24px", fontWeight: 950, lineHeight: 1.2, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
-                      <div style={{ marginTop: "4px", color: "var(--color-ink-soft)", fontSize: "12px", fontWeight: 700, overflowWrap: "anywhere" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
+                    <div role="status" aria-live="polite" style={{ minWidth: 0, borderRadius: "12px", background: "#FFFFFF", color: "#111111", padding: "12px", textAlign: "center" }}>
+                      <div style={{ color: "#707072", fontSize: "13px", fontWeight: 700 }}>당첨자</div>
+                      <div style={{ marginTop: "4px", fontSize: "24px", fontWeight: 800, lineHeight: 1.2, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
+                      <div style={{ marginTop: "4px", color: "#39393B", fontSize: "13px", fontWeight: 700, overflowWrap: "anywhere" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
                     </div>
                   ) : null}
-                </div>
 
-                <fieldset disabled={publishingRoster} style={{margin:0,padding:0,border:0,minWidth:0,flex: 0.95, display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div className="note">명단 기준</div>
-                  <select
-                    aria-label="이벤트 명단 기준"
-                    value={rosterScope}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      rosterScopeRef.current = next;
-                      setRosterScope(next);
-                      participantCacheRef.current = { auto: null, paid: null };
-                      if (participantSource === "auto" || participantSource === "paid") {
-                        void loadParticipants(mode, sourceDate, next || liveBroadcastId, participantSource === "paid");
-                      }
-                    }}
-                    style={{ width: "100%", height: "36px", border: "1px solid var(--bd)", borderRadius: "8px", padding: "0 8px", background: "var(--color-surface)", fontSize: "13px", fontWeight: 700 }}
-                  >
-                    {broadcasts.map((b) => <option key={b.id} value={b.id}>{b.label || b.title}</option>)}
-                    <option value="">주문서 화면 그대로(필터 따라감)</option>
-                  </select>
-                  <div className="note">참가자 불러오기</div>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "manual" ? "var(--rose)" : "var(--bd)", color: participantSource === "manual" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("manual")}>수동 입력 (쉼표로 자동분리) <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "manual" ? `${manualParticipantCount}명` : ""}</span></button>
-                  {participantSource === "manual" ? (
-                    <textarea value={manualParticipantText} onChange={(e) => setManualParticipantText(e.target.value)} onPaste={handleManualPaste}
-                      placeholder={"닉네임/쉼표 구분. 채팅 붙여넣으면 @닉네임만 자동 추출."}
-                      style={{ width: "100%", height: "70px", resize: "none", fontSize: "11px", border: "1px solid var(--bd)", borderRadius: "8px", padding: "8px", background: "var(--color-surface)" }} />
-                  ) : null}
-                  {!canLoadParticipants && participantSource !== "manual" ? (
-                    <div className="note" style={{ color: "var(--amber)" }}>⚠ 불러올 주문 없음 — 방송 시작 또는 주문서에 주문이 보이면 명단을 불러올 수 있어요.</div>
-                  ) : participantSource !== "manual" ? (
-                    <div className="note" style={{ color: "var(--mut2)" }}>{rosterScope ? "고른 방송 시간의 주문 기준 · 같은 손님은 한 명" : "주문서 화면 필터 기준 · 같은 손님은 한 명"}</div>
-                  ) : null}
-                  <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setExcludeDailyDup((v) => !v)}>
-                    <span style={{ fontSize: "11px" }}>당일 중복당첨 금지</span>
-                    <span className={`tog ${excludeDailyDup ? "on" : "off"}`}><i /></span>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                    <button type="button" onClick={()=>void ensureRoulettePreviewEvent(finalParticipants)} disabled={spinning || publishingRoster || finalParticipants.length===0} style={{ height: "52px", border: "1px solid #707072", borderRadius: "12px", background: "transparent", color: "#FFFFFF", padding: "0 16px", fontSize: "14px", opacity: spinning || publishingRoster || finalParticipants.length===0 ? 0.45 : 1 }}>{publishingRoster?'명단 표시 중…':'방송에 명단 표시'}</button>
+                    <button type="button" onClick={() => void startSpin(true)} disabled={spinning || publishingRoster || finalParticipants.length === 0} title="포인트가 나가지 않고 테스트 기록으로만 남습니다" style={{ height: "52px", border: "1px solid #707072", borderRadius: "12px", background: "transparent", color: "#FFFFFF", padding: "0 16px", fontSize: "14px", opacity: spinning || publishingRoster || finalParticipants.length === 0 ? 0.45 : 1 }}>시험으로 해보기 · 포인트 안 나감</button>
+                    <button type="button" onClick={() => void startSpin(false)} disabled={spinning || publishingRoster || finalParticipants.length === 0} style={{ marginLeft: "auto", height: "52px", border: 0, borderRadius: "12px", background: "#FFFFFF", color: "#111111", padding: "0 32px", fontSize: "18px", fontWeight: 800, opacity: spinning || publishingRoster || finalParticipants.length === 0 ? 0.45 : 1 }}>
+                      {spinning ? "진행중..." : giftType === "point" && Number(giftPointAmount || 0) > 0 ? `시작 · ${isKWinnerTab ? `${survivorCount}명에게 ` : "당첨자에게 "}${Number(giftPointAmount).toLocaleString("ko-KR")}P 지급` : "시작"}
+                    </button>
                   </div>
-                  {/* [2026-09-08] 구매 응모권 — 실제로 서버에 전달되어 추첨 확률이 된다 */}
-                  <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px 12px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => { ticketTouchedRef.current = true; setTicketEnabled((v) => !v); }}>
-                      <span style={{ fontSize: "11px", fontWeight: 600 }}>많이 산 손님 · 단골 당첨확률 올리기 <span style={{ color: "var(--mut2)", fontWeight: 400 }}>(자동)</span></span>
-                      <span className={`tog ${ticketEnabled ? "on" : "off"}`}><i /></span>
+                </section>
+
+                {/* 오른쪽 흰 판 — ① 누가 참가 ② 선물 · 더 보기 · 오늘 당첨 */}
+                <fieldset disabled={publishingRoster} style={{ margin: 0, minWidth: 0, border: 0, background: "#FFFFFF", borderRadius: "16px", padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#707072" }}>① 누가 참가해요?</div>
+                    <label style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px", color: "#39393B" }}>명단 기준 방송
+                      <select
+                        aria-label="이벤트 명단 기준"
+                        value={rosterScope}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          rosterScopeRef.current = next;
+                          setRosterScope(next);
+                          participantCacheRef.current = { auto: null, paid: null };
+                          if (participantSource === "auto" || participantSource === "paid") {
+                            void loadParticipants(mode, sourceDate, next || liveBroadcastId, participantSource === "paid");
+                          }
+                        }}
+                        style={{ width: "100%", height: "44px", border: "1px solid #CACACB", borderRadius: "8px", padding: "0 12px", background: "#FFFFFF", fontSize: "16px", color: "#111111" }}
+                      >
+                        {broadcasts.map((b) => <option key={b.id} value={b.id}>{b.label || b.title}</option>)}
+                        <option value="">주문서 화면 그대로(필터 따라감)</option>
+                      </select>
+                    </label>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      {([["auto", "주문한 사람"], ["paid", "결제완료만"], ["manual", "직접 적기"]] as const).map(([key, label]) => {
+                        const on = participantSource === key;
+                        const count = on ? (key === "manual" ? manualParticipantCount : loading ? "…" : autoParticipantCount) : null;
+                        return (
+                          <button key={key} type="button" aria-pressed={on} onClick={() => changeParticipantSource(key)} disabled={key !== "manual" && !canLoadParticipants}
+                            style={{ height: "40px", border: on ? 0 : "1px solid #CACACB", borderRadius: "999px", background: on ? "#111111" : "#FFFFFF", color: on ? "#FFFFFF" : "#111111", padding: "0 16px", fontSize: "14px", fontWeight: on ? 700 : 400, opacity: key !== "manual" && !canLoadParticipants ? 0.45 : 1 }}>
+                            {label}{count != null ? ` ${count}` : ""}
+                          </button>
+                        );
+                      })}
                     </div>
-                    {ticketEnabled ? (
-                      <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--mut2)", lineHeight: 1.6 }}>
-                        {/* [2026-09-09 사장님 지시] 숫자 입력칸 삭제 — 사이트가 그날 명단을 보고 알아서 정한다 */}
-                        사이트가 <b>오늘 명단을 보고 알아서</b> 응모권을 나눠줍니다. 사장님이 정할 숫자는 없습니다.
-                        <br />· <b>오늘 많이 산 손님</b> — 오늘 명단 안에서 비교(평균 이상 +1장, 특히 많이 샀으면 +1장 더)
-                        <br />· <b>자주 오는 단골</b> — 예전에 산 날 수(2번 이상 +1장, 5번 이상 +1장 더)
-                        <br />기본 1장 · 한 사람 최대 5장. <b>미입금 주문은 장수가 안 늘어요</b>(참가는 됨). 수동 입력 명단은 전원 1장.
-                        {ticketPreview.total > 0 ? (
-                          <div style={{ marginTop: "6px", padding: "6px 8px", borderRadius: "8px", background: "var(--color-surface)", border: "1px solid var(--bd)", color: "var(--ink)", fontWeight: 700 }}>
-                            지금 명단 기준 → {ticketPreview.rows.map((r) => `${r.tickets}장 ${r.count}명`).join(" · ")}
-                            <span style={{ color: "var(--mut2)", fontWeight: 400 }}>{loading ? " (계산 중…)" : ""}</span>
-                          </div>
-                        ) : null}
-                      </div>
+                    {participantSource === "manual" ? (
+                      <textarea value={manualParticipantText} onChange={(e) => setManualParticipantText(e.target.value)} onPaste={handleManualPaste}
+                        placeholder={"닉네임을 쉼표로 나눠 적어 주세요. 채팅을 붙여넣으면 @닉네임만 골라요."}
+                        style={{ width: "100%", height: "80px", resize: "none", fontSize: "16px", border: "1px solid #CACACB", borderRadius: "8px", padding: "8px", background: "#FFFFFF", boxSizing: "border-box" }} />
                     ) : (
-                      <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--mut2)" }}>지금은 <b>꺼짐</b> — 61명이든 1명이든 <b>전원 똑같은 확률</b>입니다. 켜면 많이 산 손님·단골에게 응모권이 더 갑니다.</div>
+                      <div style={{ fontSize: "12px", color: "#707072" }}>{rosterScope ? "고른 방송 시간의 주문 기준 · 같은 손님은 한 명" : "주문서 화면 필터 기준 · 같은 손님은 한 명"}</div>
                     )}
                   </div>
-                  {isKWinnerTab ? (
-                    <div style={{ background: "var(--rose-bg)", border: "1px solid var(--rose-bd)", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>{eventTab === "race" ? "당첨자(등수) 수" : "생존자(당첨자) 수"}</span>
-                      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        <button className="btn" style={{ height: "auto", padding: "2px 8px" }} onClick={() => setSurvivorCount((v) => Math.max(1, v - 1))}>−</button>
-                        <input className="ipt" style={{ width: "48px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={survivorCount}
-                          onChange={(e) => { const d = Number(e.target.value.replace(/[^0-9]/g, "")) || 1; setSurvivorCount(Math.min(Math.max(1, d), Math.max(1, finalParticipants.length - 1))); }} />
-                        <button className="btn" style={{ height: "auto", padding: "2px 8px" }} onClick={() => setSurvivorCount((v) => Math.min(v + 1, Math.max(1, finalParticipants.length - 1)))}>+</button>
-                        <span style={{ fontSize: "11px", color: "var(--mut2)" }}>명</span>
-                      </span>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", borderTop: "1px solid #E5E5E5", paddingTop: "16px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#707072" }}>② 선물</div>
+                    {isKWinnerTab ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ flex: 1, fontSize: "16px" }}>{eventTab === "race" ? "당첨자(등수) 수" : "당첨자 수"}</span>
+                        <button type="button" aria-label="줄이기" onClick={() => setSurvivorCount((v) => Math.max(1, v - 1))} style={{ width: "44px", height: "44px", border: "1px solid #CACACB", borderRadius: "8px", background: "#FFFFFF", fontSize: "20px" }}>−</button>
+                        <input aria-label="당첨자 수" inputMode="numeric" value={survivorCount}
+                          onChange={(e) => { const d = Number(e.target.value.replace(/[^0-9]/g, "")) || 1; setSurvivorCount(Math.min(Math.max(1, d), Math.max(1, finalParticipants.length - 1))); }}
+                          style={{ width: "48px", height: "44px", border: 0, textAlign: "center", fontSize: "20px", fontWeight: 700, background: "transparent" }} />
+                        <button type="button" aria-label="늘리기" onClick={() => setSurvivorCount((v) => Math.min(v + 1, Math.max(1, finalParticipants.length - 1)))} style={{ width: "44px", height: "44px", border: "1px solid #CACACB", borderRadius: "8px", background: "#FFFFFF", fontSize: "20px" }}>+</button>
+                      </div>
+                    ) : null}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <span style={{ flex: 1, fontSize: "16px" }}>선물</span>
+                      {([["point", "포인트"], ["custom", "상품·직접 적기"]] as const).map(([key, label]) => {
+                        const on = giftType === key;
+                        return (
+                          <button key={key} type="button" aria-pressed={on} onClick={() => { setGiftType(key); if (key === "point") setWinnerNote(`포인트 ${Number(giftPointAmount || 0).toLocaleString("ko-KR")}P`); }}
+                            style={{ height: "40px", border: on ? 0 : "1px solid #CACACB", borderRadius: "999px", background: on ? "#111111" : "#FFFFFF", color: on ? "#FFFFFF" : "#111111", padding: "0 16px", fontSize: "14px", fontWeight: on ? 700 : 400 }}>{label}</button>
+                        );
+                      })}
                     </div>
-                  ) : null}
+                    {giftType === "point" ? (
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#39393B" }}>
+                        <input placeholder="당첨 내용(포인트)" inputMode="numeric" value={giftPointAmount ? Number(giftPointAmount).toLocaleString("ko-KR") : ""}
+                          onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ""); setGiftPointAmount(d); setWinnerNote(`포인트 ${Number(d || 0).toLocaleString("ko-KR")}P`); }}
+                          style={{ flex: 1, minWidth: 0, height: "44px", border: "1px solid #CACACB", borderRadius: "8px", padding: "0 12px", fontSize: "16px", textAlign: "right" }} />
+                        P · 한 명당
+                      </label>
+                    ) : (
+                      <input placeholder="당첨 내용" value={winnerNote} maxLength={40} onChange={(e) => setWinnerNote(e.target.value)}
+                        style={{ width: "100%", height: "44px", border: "1px solid #CACACB", borderRadius: "8px", padding: "0 12px", fontSize: "16px", boxSizing: "border-box" }} />
+                    )}
+                    <EventCustomGiftStatus states={customGifts.states} retry={customGifts.retry} />
+                    <button type="button" role="switch" aria-checked={excludeDailyDup} onClick={() => setExcludeDailyDup((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "8px", border: 0, background: "transparent", padding: 0, fontSize: "16px", color: "#111111", textAlign: "left", minHeight: "44px" }}>
+                      <span style={{ flex: 1 }}>오늘 당첨된 사람 빼기</span>
+                      <span style={{ width: "48px", height: "28px", borderRadius: "999px", background: excludeDailyDup ? "#007D48" : "#CACACB", position: "relative", display: "inline-block", flexShrink: 0 }}><span style={{ position: "absolute", left: excludeDailyDup ? "23px" : "3px", top: "3px", width: "22px", height: "22px", borderRadius: "50%", background: "#FFFFFF" }} /></span>
+                    </button>
+                  </div>
+
+                  <details style={{ borderTop: "1px solid #E5E5E5", paddingTop: "16px" }}>
+                    <summary style={{ fontSize: "14px", fontWeight: 700, cursor: "pointer", minHeight: "32px" }}>더 보기 · 단골 확률 · 당첨 고정 · 효과음 · 위젯 주소</summary>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px", color: "#39393B" }}>이벤트 제목 (방송 화면에 보여요)
+                        <input placeholder="이벤트 제목" value={title} maxLength={30} onChange={(e) => setTitle(e.target.value)} style={{ height: "44px", border: "1px solid #CACACB", borderRadius: "8px", padding: "0 12px", fontSize: "16px" }} />
+                      </label>
+                      {/* [2026-09-08] 구매 응모권 — 실제로 서버에 전달되어 추첨 확률이 된다 */}
+                      <div style={{ background: "#F5F5F5", borderRadius: "8px", padding: "12px" }}>
+                        <button type="button" role="switch" aria-checked={ticketEnabled} onClick={() => { ticketTouchedRef.current = true; setTicketEnabled((v) => !v); }} style={{ display: "flex", width: "100%", alignItems: "center", gap: "8px", border: 0, background: "transparent", padding: 0, fontSize: "14px", fontWeight: 700, color: "#111111", textAlign: "left" }}>
+                          <span style={{ flex: 1 }}>많이 산 손님 · 단골 당첨 확률 올리기</span>
+                          <span style={{ width: "40px", height: "24px", borderRadius: "999px", background: ticketEnabled ? "#007D48" : "#CACACB", position: "relative", display: "inline-block", flexShrink: 0 }}><span style={{ position: "absolute", left: ticketEnabled ? "19px" : "3px", top: "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#FFFFFF" }} /></span>
+                        </button>
+                        <div style={{ marginTop: "8px", fontSize: "12px", color: "#707072", lineHeight: 1.6 }}>
+                          {ticketEnabled ? <>오늘 많이 산 손님·자주 오는 단골에게 응모권을 더 줘요(한 사람 최대 5장, 미입금 주문은 안 늘어요).{ticketPreview.total > 0 ? <><br /><b style={{ color: "#111111" }}>지금 명단 → {ticketPreview.rows.map((r) => `${r.tickets}장 ${r.count}명`).join(" · ")}</b>{loading ? " (계산 중…)" : ""}</> : null}</> : "꺼짐 — 모두 같은 확률이에요."}
+                        </div>
+                      </div>
+                      {/* 당첨 고정 */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "14px", fontWeight: 700 }}>당첨 고정{isKWinnerTab ? ` · 최대 ${survivorCount}명` : ""}</span>
+                          <input placeholder="닉네임 찾기" value={nickFilter} onChange={(e) => setNickFilter(e.target.value)} style={{ marginLeft: "auto", width: "140px", height: "36px", border: "1px solid #CACACB", borderRadius: "8px", padding: "0 8px", fontSize: "14px" }} />
+                          {nickFilter ? <button type="button" onClick={() => setNickFilter("")} style={{ height: "36px", border: "1px solid #CACACB", borderRadius: "8px", background: "#FFFFFF", padding: "0 8px", fontSize: "13px" }}>지우기</button> : null}
+                        </div>
+                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxHeight: "160px", overflowY: "auto" }}>
+                          {finalParticipants.length === 0 ? (
+                            <span style={{ fontSize: "13px", color: "#707072" }}>참가자를 먼저 골라 주세요.</span>
+                          ) : pickList.length === 0 ? (
+                            <span style={{ fontSize: "13px", color: "#707072" }}>「{nickFilter}」와 맞는 닉네임이 없어요.</span>
+                          ) : (
+                            pickList.map((p, i) => {
+                              const on = isKWinnerTab ? fixedSurvivorNicknames.includes(p.nickname) : fixedWinnerNickname === p.nickname;
+                              const myTickets = Math.max(1, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1);
+                              const ticketTail = ticketEnabled && totalTickets > 0 ? ` ×${myTickets}장 · ${Math.round((myTickets / totalTickets) * 1000) / 10}%` : "";
+                              const toggleFixed = () => {
+                                if (isKWinnerTab) {
+                                  setFixedSurvivorNicknames((prev) =>
+                                    prev.includes(p.nickname)
+                                      ? prev.filter((n) => n !== p.nickname)
+                                      : prev.length >= survivorCount
+                                        ? prev
+                                        : [...prev, p.nickname]
+                                  );
+                                } else {
+                                  setFixedWinnerNickname(on ? "" : p.nickname);
+                                }
+                              };
+                              // [2026-09-13] 같은 닉네임으로 «서로 다른 손님»이 주문하면 한 칸으로 합쳐진다. 표시만 해서 알려준다.
+                              const mixed = Number(p.person_count || 0) >= 2;
+                              return (
+                                <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={mixed ? `⚠ 이 이름으로 주문한 손님이 ${p.person_count}명입니다(번호가 다름). 당첨되면 자동지급이 멈추고 수동지급 안내가 뜹니다.` : (ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined)}>{on ? "고정 · " : ""}{p.nickname}{mixed ? <span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 700 }}> ⚠{p.person_count}명</span> : null}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "11px" }}>{ticketTail}</span> : null}</span>
+                              );
+                            })
+                          )}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#707072" }}>{isKWinnerTab
+                            ? (fixedSurvivorNicknames.length > 0 ? `고정 ${fixedSurvivorNicknames.length}/${survivorCount}명 — ${fixedSurvivorNicknames.join(", ")}` : "아무도 고정 안 함 (전원 추첨)")
+                            : (fixedWinnerNickname ? `고정: ${fixedWinnerNickname}` : "아무도 고정 안 함 (전원 추첨)")}</div>
+                      </div>
+                      {/* [2026-08-12] 효과음 사운드보드 — 서바이벌/달리기 탭에서만. 재생 전용(추첨·지급 무관) */}
+                      {isKWinnerTab && <AdminLiveEventSoundboard kind={eventTab === "race" ? "race" : "survival"} />}
+                      {/* 위젯주소 */}
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <span style={{ fontSize: "13px", color: "#707072", flexShrink: 0 }}>방송 위젯 주소</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: "12px", color: "#707072", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{widgetUrl || "준비중"}</span>
+                        <button type="button" onClick={() => void copyText(widgetUrl)} disabled={!widgetUrl} style={{ height: "36px", border: "1px solid #CACACB", borderRadius: "8px", background: "#FFFFFF", padding: "0 12px", fontSize: "13px" }}>복사</button>
+                      </div>
+                    </div>
+                  </details>
+
+                  <div style={{ marginTop: "auto", background: "#F5F5F5", borderRadius: "12px", padding: "12px 16px", fontSize: "13px", color: "#39393B", lineHeight: 1.6 }}>
+                    {todaySummary.count > 0 ? <>오늘 당첨 <b>{todaySummary.count}명</b>{todaySummary.points > 0 ? <> · 포인트 <b>{todaySummary.points.toLocaleString("ko-KR")}P</b></> : null}<br /><span style={{ color: "#707072" }}>{todaySummary.names}</span></> : <span style={{ color: "#707072" }}>오늘 당첨 기록 없음</span>}
+                  </div>
                 </fieldset>
               </div>
-
-              {/* 당첨 고정 */}
-              <div style={{ border: "1px solid var(--rose-bd)", background: "var(--rose-bg)", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-                  <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>당첨 고정 (닉네임 클릭){isKWinnerTab ? ` · 최대 ${survivorCount}명` : ""}</span>
-                  <span style={{ fontSize: "11px", color: "var(--mut2)" }}>ㄱㄴㄷ 순 · 안 고르면 전원 추첨</span>
-                  {/* [2026-09-08] 61명 중에서 눈으로 찾기 어렵다 → 검색칸. 찾는 즉시 걸러진다. */}
-                  <input
-                    className="ipt"
-                    style={{ marginLeft: "auto", width: "150px", height: "26px", padding: "0 8px", fontSize: "11px" }}
-                    placeholder="닉네임 찾기"
-                    value={nickFilter}
-                    onChange={(e) => setNickFilter(e.target.value)}
-                  />
-                  {nickFilter ? (
-                    <button className="btn" style={{ height: "26px", padding: "0 8px", fontSize: "11px" }} onClick={() => setNickFilter("")}>지우기</button>
-                  ) : null}
-                  <span style={{ fontSize: "11px", color: "var(--mut2)", minWidth: "62px", textAlign: "right" }}>
-                    {nickFilter ? `${pickList.length}/${finalParticipants.length}명` : `${finalParticipants.length}명`}
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxHeight: "150px", overflowY: "auto" }}>
-                  {finalParticipants.length === 0 ? (
-                    <span className="note">참가자를 먼저 불러오세요.</span>
-                  ) : pickList.length === 0 ? (
-                    <span className="note">「{nickFilter}」와 맞는 닉네임이 없어요.</span>
-                  ) : (
-                    pickList.map((p, i) => {
-                      const on = isKWinnerTab ? fixedSurvivorNicknames.includes(p.nickname) : fixedWinnerNickname === p.nickname;
-                      const myTickets = Math.max(1, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1);
-                      const ticketTail = ticketEnabled && totalTickets > 0 ? ` ×${myTickets}장 · ${Math.round((myTickets / totalTickets) * 1000) / 10}%` : "";
-                      const toggleFixed = () => {
-                        if (isKWinnerTab) {
-                          setFixedSurvivorNicknames((prev) =>
-                            prev.includes(p.nickname)
-                              ? prev.filter((n) => n !== p.nickname)
-                              : prev.length >= survivorCount
-                                ? prev
-                                : [...prev, p.nickname]
-                          );
-                        } else {
-                          setFixedWinnerNickname(on ? "" : p.nickname);
-                        }
-                      };
-                      // [2026-09-13] 같은 닉네임으로 «서로 다른 손님»이 주문하면 한 칸으로 합쳐진다. 표시만 해서 알려준다.
-                      const mixed = Number(p.person_count || 0) >= 2;
-                      return (
-                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={mixed ? `⚠ 이 이름으로 주문한 손님이 ${p.person_count}명입니다(번호가 다름). 당첨되면 자동지급이 멈추고 수동지급 안내가 뜹니다.` : (ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined)}>{on ? "고정 · " : ""}{p.nickname}{mixed ? <span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 700 }}> ⚠{p.person_count}명</span> : null}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "11px" }}>{ticketTail}</span> : null}</span>
-                      );
-                    })
-                  )}
-                </div>
-                <div className="note" style={{ marginTop: "8px" }}>{isKWinnerTab
-                    ? (fixedSurvivorNicknames.length > 0 ? `고정 ${fixedSurvivorNicknames.length}/${survivorCount}명 — ${fixedSurvivorNicknames.join(", ")}` : "아무도 고정 안 함 (전원 추첨)")
-                    : (fixedWinnerNickname ? `고정: ${fixedWinnerNickname}` : "아무도 고정 안 함 (전원 추첨)")}</div>
               </div>
-
-              {/* 제목 + 당첨 내용(선물) */}
-              <EventCustomGiftStatus states={customGifts.states} retry={customGifts.retry} />
-              <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
-                <input className="ipt" style={{ flex: 1 }} placeholder="이벤트 제목" value={title} maxLength={30} onChange={(e) => setTitle(e.target.value)} />
-                <select className="ipt" style={{ flex: "0 0 84px" }} value={giftType} onChange={(e) => { const next = e.target.value as "point" | "custom"; setGiftType(next); if (next === "point") setWinnerNote(`포인트 ${Number(giftPointAmount || 0).toLocaleString("ko-KR")}P`); }}>
-                  <option value="point">포인트</option>
-                  <option value="custom">직접입력</option>
-                </select>
-                {giftType === "point" ? (
-                  <input className="ipt" style={{ flex: 1, textAlign: "right" }} placeholder="당첨 내용(포인트)" inputMode="numeric" value={giftPointAmount ? Number(giftPointAmount).toLocaleString("ko-KR") : ""}
-                    onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ""); setGiftPointAmount(d); setWinnerNote(`포인트 ${Number(d || 0).toLocaleString("ko-KR")}P`); }} />
-                ) : (
-                  <input className="ipt" style={{ flex: 1 }} placeholder="당첨 내용" value={winnerNote} maxLength={40} onChange={(e) => setWinnerNote(e.target.value)} />
-                )}
-              </div>
-
-              {/* 위젯주소 */}
-              <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px" }}>
-                <span className="note" style={{ flexShrink: 0 }}>방송 위젯주소</span>
-                <span className="note" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{widgetUrl || "준비중"}</span>
-                <button className="btn rose" style={{ height: "auto", padding: "4px 12px" }} onClick={() => void copyText(widgetUrl)} disabled={!widgetUrl}>복사</button>
-              </div>
-
-              {/* [2026-08-12] 효과음 사운드보드 — 서바이벌/달리기 탭에서만. 재생 전용(추첨·지급 무관) */}
-              {isKWinnerTab && <AdminLiveEventSoundboard kind={eventTab === "race" ? "race" : "survival"} />}
-
               {/* 이벤트 목록 */}
-              <div style={{ borderTop: "1px solid var(--bd)", paddingTop: "12px" }}>
+              <details ref={historyRef} style={{ background: "#FFFFFF", borderRadius: "16px", padding: "16px 20px" }}>
+                <summary style={{ fontSize: "16px", fontWeight: 700, cursor: "pointer", minHeight: "32px" }}>지난 당첨 기록</summary>
+              <div style={{ paddingTop: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
                   <span className="seclabel" style={{ margin: 0 }}>이벤트 목록 <span className="note">지난 기록</span></span>
                   {periodChips.map((chip) => (
@@ -1774,6 +1807,7 @@ export default function AdminLiveEventRoulettePanel({
                   ))
                 )}
               </div>
+              </details>
               </>
               )}
 

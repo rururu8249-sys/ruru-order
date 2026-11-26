@@ -35,17 +35,17 @@ async function run(kind,runMode='live',gift='point',visual=true,settingsRace=fal
  const button=prefix=>tree.root.findAllByType('button').find(n=>n.children.join('').startsWith(prefix));
  const labels={roulette:'룰렛',claw:'인형뽑기',survival:'서바이벌',race:'달리기'};
  await act(async()=>button(labels[kind]).props.onClick());
- await act(async()=>button('수동 입력').props.onClick());
+ await act(async()=>button('직접 적기').props.onClick());
  await act(async()=>tree.root.findByType('textarea').props.onChange({target:{value:'A,B,C'}}));
- if(gift==='custom')await act(async()=>tree.root.findAllByType('select').find(n=>n.props.value==='point').props.onChange({target:{value:'custom'}}));
+ if(gift==='custom')await act(async()=>button('상품·직접 적기').props.onClick());
  else await act(async()=>tree.root.findAllByType('input').find(n=>n.props.placeholder==='당첨 내용(포인트)').props.onChange({target:{value:'2000'}}));
  if(settingsRace){
   await act(async()=>{resolveAction=button('시작').props.onClick();});
   assert.equal(typeof releaseResult,'function');
-  await act(async()=>tree.root.findAllByType('select').find(n=>n.props.value==='custom').props.onChange({target:{value:'point'}}));
+  await act(async()=>button('포인트').props.onClick());
   await act(async()=>tree.root.findAllByType('input').find(n=>n.props.placeholder==='당첨 내용(포인트)').props.onChange({target:{value:'2000'}}));
   await act(async()=>{releaseResult();await resolveAction;});
- }else await act(async()=>button(runMode==='test'?'테스트로 해보기':'시작').props.onClick());
+ }else await act(async()=>button(runMode==='test'?'시험으로 해보기':'시작').props.onClick());
  const multi=kind==='survival'||kind==='race';
  if(!multi)assert.equal(grants.length,0,'single payout keeps completion delay');
  if(visual&&raf)await act(async()=>raf(performance.now()+10000));
