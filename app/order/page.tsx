@@ -1573,6 +1573,14 @@ export default function OrderPage() {
   const uiS6 = uiV2 && previewS6;
   // [㊶ 7단계] 첫 화면 다듬기(좌우 여백 16px 한 줄·포인트 칩·작게/크게·정렬 테두리·낱말 줄바꿈) — ?preview=s7 (기본값 UI_PREVIEW_DEFAULTS.s7)
   const [previewS7, setPreviewS7] = useState<boolean>(UI_PREVIEW_DEFAULTS.s7);
+  // [2026-11-26] 색 시안 미리보기 — ?preview=tb(B 따뜻한 흰+초록) / ?preview=tc(C 겨울) 브라우저만. 손님 기본 꺼짐. 색·장식만(동작 무변경).
+  const [themePreview, setThemePreview] = useState<"" | "b" | "winter">("");
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (themePreview) root.dataset.ruruTheme = themePreview; else delete root.dataset.ruruTheme;
+    return () => { delete root.dataset.ruruTheme; };
+  }, [themePreview]);
   const uiS7 = uiV2 && previewS7;
   // [2026-10-25 사장님 「PC로 들어오면 PC 모양」] 화면 폭 1024px 이상 + ?preview=pc(기본값 UI_PREVIEW_DEFAULTS.pc)일 때만 PC 모양.
   //   폰(폭 1024 미만)은 이 값과 무관하게 지금 화면 그대로. 모양만 — 담기·장바구니·금액·주문 제출 무관.
@@ -1597,6 +1605,7 @@ export default function OrderPage() {
     setPreviewS5(readCustomerUiPreview("s5"));
     setPreviewS6(readCustomerUiPreview("s6"));
     setPreviewS7(readCustomerUiPreview("s7"));
+    { const tb = readCustomerUiPreview("tb"); const tc = readCustomerUiPreview("tc"); setThemePreview(tc ? "winter" : tb ? "b" : ""); }
     setPreviewPc(readCustomerUiPreview("pc"));
   }, []);
   // [㉜ 2단계] 옵션 창 등 스타일이 많은 화면의 새 모양 정리(로즈→흑백·13px 미만→13px) — 스위치 꺼지면 원래 스타일 그대로.
@@ -6677,7 +6686,7 @@ export default function OrderPage() {
     ).length;
 
     return (
-      <header style={uiS7 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px", margin: "0 -16px" } : uiV2 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px" } : { position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
+      <header data-theme-hd="true" style={uiS7 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px", margin: "0 -16px" } : uiV2 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px" } : { position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
         <div style={{ margin: "0 auto", width: "100%", maxWidth: pageMax, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
             {/* [2026-08-12 리뉴얼 1단계] 로고 — 집(대문) 아이콘 + 「루루동이 / 집구석 LIVE」 워드마크.
@@ -7651,7 +7660,7 @@ export default function OrderPage() {
           손님이 유튜브 앱에서 방송을 보다 이 페이지로 오면 폰이 알아서 미니플레이어(PIP)를 띄운다.
           우리 페이지는 주문에만 집중: 방송 OFF=예고 배너 / 방송 ON=검은 스트립 2줄. */}
       {hasSavedInfo && broadcastLoaded ? (
-        <section style={{ margin: "8px auto 0", width: "100%", maxWidth: pageMax, padding: uiS7 ? "0 0 12px" : "0 14px 12px" }}>
+        <section data-theme-live-section="true" style={{ margin: "8px auto 0", width: "100%", maxWidth: pageMax, padding: uiS7 ? "0 0 12px" : "0 14px 12px" }}>
           {!isBroadcastOn ? (
             /* [2026-09-20] 방송 전 카드 — 166px였다. 하는 일이 ①상태 알림 ②방송알림 신청 두 개인데,
                  이미 알림을 신청한 손님에게는 ②가 «알림 받는 중 ✓» 라는 40px짜리 표시로만 남아 자리만 먹었다.
@@ -7792,6 +7801,19 @@ export default function OrderPage() {
               onOpenDetail={() => setSubscribeDetailOpen(true)}
             />
           ) : null}
+          {/* [2026-11-26] 주문 단계 표시(마켓오리진 참고) — 색 시안 미리보기에서만. 지금 어디쯤인지만 보여 줌(누르는 기능 없음) */}
+          {themePreview ? (() => {
+            const step = items.some((item) => String(item.product_name || "").trim() && toNumber(item.qty) > 0) ? 2 : 1;
+            return (
+              <div data-theme-steps="true" aria-label={`주문 단계 ${step}/3`} style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
+                {["상품 고르기", "주문서 제출", "입금"].map((label, index) => (
+                  <span key={label} data-on={index + 1 === step ? "true" : undefined} style={{ flex: 1, textAlign: "center", padding: "7px 0", borderRadius: "999px", fontSize: "13px", fontWeight: 700, background: index + 1 === step ? "var(--theme-accent, #111111)" : "var(--theme-soft, #F5F5F5)", color: index + 1 === step ? "#FFFFFF" : "#707072" }}>
+                    {index + 1}. {label}
+                  </span>
+                ))}
+              </div>
+            );
+          })() : null}
         </section>
       ) : null}
 
