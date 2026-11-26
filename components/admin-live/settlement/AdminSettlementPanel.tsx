@@ -15,7 +15,7 @@ import {
   toNumber,
   won,
 } from "./settlementUtils";
-import SettlementMoneyFlowDashboard from "./SettlementMoneyFlowDashboard";
+import SettlementOnePage from "./SettlementOnePage";
 import SettlementManualEntryPanel from "./SettlementManualEntryPanel";
 
 type Props = {
@@ -519,36 +519,21 @@ export default function AdminSettlementPanel({
 
   return (
     <section className="grid min-w-0 grid-cols-1 gap-5">
-      <SettlementMoneyFlowDashboard
-        onGoToUnpaidOrders={onGoToUnpaidOrders}
+      <SettlementOnePage
         stats={stats}
         actualCardFeeRate={actualCardFeeRate}
         startDate={startDate}
         endDate={endDate}
-        paymentFilter={paymentFilter}
         broadcastOptions={broadcastOptions}
         selectedBroadcastKeys={selectedBroadcastKeys}
         broadcastRows={broadcastRows}
-        trend={trend}
-        effectivePeriodLabel={effectivePeriod.label}
-        broadcastEndReportsInScope={broadcastEndReportsInScope}
-        broadcastEndReportsLoading={broadcastEndReportsLoading}
-        broadcastEndReportsReady={broadcastEndReportsReady}
-        settlementDetailOpen={settlementDetailOpen}
-        availableSettlementYears={availableSettlementYears}
-        selectedSettlementYear={selectedSettlementYear}
-        selectedSettlementMonth={selectedSettlementMonth}
-        onOpenManualPanel={() => setManualPanelOpen(true)}
-        onExportSummaryCsv={exportSummaryCsv}
+        onQuickRange={applyQuickRange}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
-        onPaymentFilterChange={setPaymentFilter}
         onSelectedBroadcastKeysChange={setSelectedBroadcastKeys}
-        onResetFilters={resetFilters}
-        onQuickRange={applyQuickRange}
-        onYearFilter={applyYearFilter}
-        onMonthFilter={applyMonthFilter}
-        onToggleSettlementDetail={() => setSettlementDetailOpen((current) => !current)}
+        onOpenManualPanel={() => setManualPanelOpen(true)}
+        onExportSummaryCsv={exportSummaryCsv}
+        onGoToUnpaidOrders={onGoToUnpaidOrders}
       />
 
       {/* [2026-09-08 사장님 지적] 「추가 정산 클릭했을 때 디자인도 이상하고 세로px도 이상하다」
