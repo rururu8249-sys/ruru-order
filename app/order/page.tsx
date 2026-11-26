@@ -4383,6 +4383,18 @@ export default function OrderPage() {
     }
     return names;
   }, [items, quickGroupBuyProducts, productNoticeGlobal.mode]);
+  // [2026-11-26 VER 3] 빨간 안내 칸 줄마다 「빼기」 — 같은 판정(liveOnlyCartNames 와 같은 상품 이름)으로 장바구니 줄 번호만 찾는다.
+  //   빼기는 담은 상품 «삭제» 버튼과 같은 guardChatItem → removeItem(금액·제출 판정 무변경).
+  const liveOnlyCartEntries = useMemo(() => {
+    const nameSet = new Set(liveOnlyCartNames);
+    const out: { index: number; item: OrderItem; option: string }[] = [];
+    items.forEach((item, index) => {
+      if (!nameSet.has(item.product_name) || toNumber(item.qty) <= 0) return;
+      const option = [normalizeEmptyProductOptionValue(item.color), normalizeEmptyProductOptionValue(item.size)].filter(Boolean).join(" / ");
+      out.push({ index, item, option });
+    });
+    return out;
+  }, [items, liveOnlyCartNames]);
   const instantReadyCount = useMemo(() => quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p) && isInstantOrderProduct((parseProductSuggestionNote((p as any).product_note) as Record<string, unknown> | null)?.order_notice_mode, Array.isArray((p as any).badge_types) && (p as any).badge_types.length ? (p as any).badge_types : [(p as any).badge_type], productNoticeGlobal.mode, (p as any).in_shop)).length, [quickGroupBuyProducts, productNoticeGlobal.mode]);
 
   // ============ [재고 홀드] 담는 즉시 서버에 예약(15분) — 다른 고객 화면·품절 판정에 즉시 차감 반영 ============
@@ -8752,9 +8764,17 @@ export default function OrderPage() {
                 {!customerBlockStatus.blocked && liveOnlyCartNames.length > 0 ? (
                   <div data-live-only-notice="true" style={{ marginBottom: "12px", borderRadius: "8px", background: "#FDECEC", padding: "10px 12px", fontSize: "14px", fontWeight: 700, lineHeight: 1.5, color: "#B3261E", wordBreak: "keep-all" }}>
                     {LIVE_ONLY_NOTICE_TEXT} 방송에서 접수하지 않았다면 빼 주세요
-                    <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#7A2A24", overflowWrap: "anywhere" }}>
-                      {liveOnlyCartNames.slice(0, 2).join(", ")}{liveOnlyCartNames.length > 2 ? ` 외 ${liveOnlyCartNames.length - 2}개` : ""}
-                    </div>
+                    {liveOnlyCartEntries.map(({ index, item, option }) => (
+                      <div key={`${index}-${item.product_name}`} style={{ marginTop: "6px", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 600, color: "#7A2A24", overflowWrap: "anywhere" }}>
+                          {item.product_name}{option ? ` · ${option}` : ""} × {toNumber(item.qty)}개
+                        </span>
+                        <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 빼기`, "뺄게요", () => removeItem(index))} aria-label={`${item.product_name} 빼기`}
+                          style={{ flexShrink: 0, height: "36px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #B3261E", background: "#FFFFFF", color: "#B3261E", fontSize: "13px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                          빼기
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
                 <button

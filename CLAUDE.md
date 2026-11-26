@@ -142,6 +142,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 ## ★ 현재 진행 중 작업 (있으면 여기 기록, 끝나면 지움)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-26 **[전면 리뉴얼 VER 3 ③ 주문서 «방송 접수 후 구매» 빨간 칸 — 상품마다 「빼기」]** 이름 나열 → 줄마다 「상품 · 옵션 × N개 [빼기]」, 빼기 = 담은 상품 삭제와 같은 guardChatItem→removeItem. 금액·제출·체크 규칙 무변경. tsc 0·guard UI 0·customer-ui-switch·brand-linked-submit·customer-theme 통과·build(BANKDA)
 - 2026-11-26 **[전면 리뉴얼 VER 3 ② 입금매칭 — 짝(연결 추천·추가 입금) 있는 입금을 맨 위 「짝을 찾았어요 · N건」 초록 묶음으로]** LiveFloatingMatchPanel grouped 순서만(주문을 골라 열지 않았을 때). findBestOrder·shortageFor 판정·연결/붙이기 버튼·manual-payment-match 서버 무변경. tsc 0·guard UI 0·build(BANKDA·입금매칭 528건 비교 통과)
 - 2026-11-26 **[전면 리뉴얼 VER 3 ① 손님 기본 색 = 따뜻한 흰+초록 · 관리자 «손님 화면 테마» 기본/겨울]** UI_PREVIEW_DEFAULTS.tb true(손님 전원 B 색). 설정 › 주문서 표시 맨 위 CustomerThemeSettingsCard — settings customer_theme(basic/winter) 한 칸만 바로 저장, 손님 /order 가 설정과 같이 읽어 data-ruru-theme(b/winter), ?preview 로 직접 고른 브라우저는 그 값 우선(lib/customerTheme resolveCustomerThemeAttr). 색·장식만·담기·금액·제출 무관. test-customer-theme 신규·customer-ui-switch·settings-navigation 통과(settings-drafts 는 HEAD 부터 실패 동일)·tsc 0·guard UI 0·build(BANKDA). 시안 https://claude.ai/artifact/XJx3xymBLP91ZPkzA8YLW3 · 전후 캡처 작업기록/2026-11-26_전면리뉴얼_VER3_적용기록.md
 - 2026-11-26 **[밤샘 작업 — 관리자 속도·설정 메뉴 6묶음·이벤트 명단 기준·손님 방송접수 안내·색 시안 미리보기]** 상세: 프로젝트 작업기록/2026-11-26_밤샘작업_아침보고.md. 색 시안은 ?preview=tb(B 흰+초록)/tc(겨울)/notheme(끄기), 손님 기본 꺼짐(UI_PREVIEW_DEFAULTS tb·tc false) + 미리보기에서만 주문 단계 표시. 돈 판정 무접촉. 배포 완료 a645034~61fb133
