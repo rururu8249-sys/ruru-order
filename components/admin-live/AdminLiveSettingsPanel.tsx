@@ -12,6 +12,7 @@ import KakaoNotifyCard from "./KakaoNotifyCard";
 import MemberRolesCard from "./MemberRolesCard";
 import LiveAlertTemplateCard from "./LiveAlertTemplateCard";
 import SubscribeFreeShipSettingsCard from "./SubscribeFreeShipSettingsCard";
+import CustomerThemeSettingsCard from "./CustomerThemeSettingsCard";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문·기본값은 한 곳(lib)에서만 정한다
@@ -586,6 +587,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
           {activeTab === "order" && (
             <div className={cardClass}>
               {sectionTitle("주문서 표시")}
+              <CustomerThemeSettingsCard />
 
               {/* [2026-07-13 사장님 지침] 장바구니 선점 유지시간 — 담는 순간 다른 고객 화면 남은 수량에서
                   빠져 보이는 시간. 지나면 자동 해제(표시용 예약만 — 진짜 재고/주문/차감 로직 무관). */}

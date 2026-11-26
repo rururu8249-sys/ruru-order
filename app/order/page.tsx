@@ -145,6 +145,7 @@ import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
 import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/colorNameSwatch";
 import { restyleV2 } from "@/lib/customerUiV2Restyle";
 import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS, UI_V2_DEFAULT, UI_V2_STORAGE_KEY } from "@/lib/customerUiSwitch";
+import { CUSTOMER_THEME_KEY, parseCustomerTheme, resolveCustomerThemeAttr, type CustomerTheme } from "@/lib/customerTheme";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyle";
 import { CUSTOMER_ORDER_FILTERS, cleanCustomerOptionValue, orderLookupStatusView } from "@/lib/customerOrderStatusView";
@@ -1576,6 +1577,9 @@ export default function OrderPage() {
   const [previewS7, setPreviewS7] = useState<boolean>(UI_PREVIEW_DEFAULTS.s7);
   // [2026-11-26] 색 시안 미리보기 — ?preview=tb(B 따뜻한 흰+초록) / ?preview=tc(C 겨울) 브라우저만. 손님 기본 꺼짐. 색·장식만(동작 무변경).
   const [themePreview, setThemePreview] = useState<"" | "b" | "winter">("");
+  // [2026-11-26 VER 3] 관리자 설정 «손님 화면 테마»(customer_theme) — ?preview 로 직접 고른 브라우저는 그 값 우선(lib/customerTheme).
+  const themeSettingRef = useRef<CustomerTheme>("basic");
+  const themePickRef = useRef<{ explicit: boolean; tb: boolean; tc: boolean } | null>(null);
   useEffect(() => {
     if (typeof document === "undefined") return;
     const root = document.documentElement;
@@ -1606,7 +1610,10 @@ export default function OrderPage() {
     setPreviewS5(readCustomerUiPreview("s5"));
     setPreviewS6(readCustomerUiPreview("s6"));
     setPreviewS7(readCustomerUiPreview("s7"));
-    { const tb = readCustomerUiPreview("tb"); const tc = readCustomerUiPreview("tc"); setThemePreview(tc ? "winter" : tb ? "b" : ""); }
+    { const tb = readCustomerUiPreview("tb"); const tc = readCustomerUiPreview("tc");
+      let explicit = false; try { explicit = window.localStorage.getItem("ruru_preview_tb") != null || window.localStorage.getItem("ruru_preview_tc") != null; } catch { /* 기본 */ }
+      themePickRef.current = { explicit, tb, tc };
+      setThemePreview(resolveCustomerThemeAttr(themeSettingRef.current, explicit, tb, tc)); }
     setPreviewPc(readCustomerUiPreview("pc"));
   }, []);
   // [㉜ 2단계] 옵션 창 등 스타일이 많은 화면의 새 모양 정리(로즈→흑백·13px 미만→13px) — 스위치 꺼지면 원래 스타일 그대로.
@@ -2803,6 +2810,7 @@ export default function OrderPage() {
         "howto_enabled",
         "howto_steps",
         "howto_audience",
+        CUSTOMER_THEME_KEY,
         "popup_notice_enabled",
         CUSTOMER_NOTICE_ID_KEY,
         "popup_notice_title",
@@ -2882,6 +2890,12 @@ export default function OrderPage() {
     setHowToSteps(howtoCfg.steps);
     setHowToWarn(howtoCfg.warn);
     // [2026-11-10] 대상(howto_audience): new(기본) = 처음 온 손님만 — 한 번 닫으면 그 폰에선 다시 안 뜸 / all = 닫으면 24시간 안 뜸
+    {
+      const themeSetting = parseCustomerTheme((data || []).find((i: any) => i.key === CUSTOMER_THEME_KEY)?.value);
+      themeSettingRef.current = themeSetting;
+      const pick = themePickRef.current;
+      if (pick) setThemePreview(resolveCustomerThemeAttr(themeSetting, pick.explicit, pick.tb, pick.tc));
+    }
     const howtoNewOnly = String((data || []).find((i: any) => i.key === "howto_audience")?.value || "new").trim() !== "all";
     setHowToNewOnly(howtoNewOnly);
     if (howtoOn) {
