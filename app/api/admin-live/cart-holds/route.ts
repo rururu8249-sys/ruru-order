@@ -58,21 +58,25 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ ok: false, error: { message: "관리자 인증이 필요합니다." } }, { status: 401 });
   try {
     const supabase = getSupabaseAdmin();
-    // [㉛] 담김 현황을 볼 때마다 만료 줄을 먼저 서버에서 정리(비움 기록 expired + 삭제). 실패해도 목록은 정상.
-    try { await sweepExpiredCartHolds(supabase); } catch { /* 무시 */ }
     const searchParams = new URL(request.url).searchParams;
     const scopeAll = searchParams.get("scope") === "all";
     const summaryOnly = searchParams.get("summary") === "1";
+    // [㉛] 담김 현황을 볼 때마다 만료 줄을 먼저 서버에서 정리(비움 기록 expired + 삭제). 실패해도 목록은 정상.
+    // [2026-11-26] 실시간 주문서 위 숫자(summary)는 10초마다 와서 매번 정리까지 하면 2초씩 걸렸다(운영 실측).
+    //   숫자는 아래에서 «아직 안 끝난 줄(expires_at > 지금)»만 세므로 정리 없이도 같은 값 → summary 땐 정리 생략
+    //   (정리는 담김 현황 창을 열 때·5분 cron 이 그대로 함).
+    if (!summaryOnly) {
+      try { await sweepExpiredCartHolds(supabase); } catch { /* 무시 */ }
+    }
     let broadcastTitle = "";
     let allowedProductIds: Set<string> | null = null;
-    if (!scopeAll) {
-      const active = await activeBroadcastProductIds(supabase);
-      broadcastTitle = active.title;
-      allowedProductIds = active.ids;
-    }
+    // [2026-11-26] 방송 상품·담김 줄·자동 테스트 활동을 «동시에» 읽음(서로 안 기다림, 결과 같음)
+    const activePromise = scopeAll ? null : activeBroadcastProductIds(supabase);
+    const automationPromise = readAutomationAdminActivity(supabase);
+    automationPromise.catch(() => {}); // 일찍 return 할 때 «처리 안 된 실패» 경고 방지(아래 await 에서는 그대로 실패)
 
     const nowIso = new Date().toISOString();
-    const result = summaryOnly
+    const resultPromise = summaryOnly
       ? await supabase
           .from("cart_reservations")
           .select("session_key,product_id,qty")
@@ -85,10 +89,15 @@ export async function GET(request: NextRequest) {
           .gt("expires_at", nowIso)
           .order("expires_at", { ascending: true })
           .limit(2000);
+    const [result, active] = await Promise.all([resultPromise, activePromise]);
+    if (active) {
+      broadcastTitle = active.title;
+      allowedProductIds = active.ids;
+    }
     const { data, error } = result;
     if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
 
-    const automation = await readAutomationAdminActivity(supabase);
+    const automation = await automationPromise;
     let rows = [...(data || []), ...automation.holds] as Record<string, unknown>[];
     if (allowedProductIds) rows = rows.filter((r) => allowedProductIds!.has(String(r.product_id ?? "")));
 

@@ -144,6 +144,11 @@
       "regions": [
         "sin1"
       ]
+    },
+    "app/api/admin-live/cart-holds/route.ts": {
+      "regions": [
+        "sin1"
+      ]
     }
   },
   "crons": [
