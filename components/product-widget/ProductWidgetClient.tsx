@@ -792,8 +792,18 @@ export default function ProductWidgetClient() {
   const releaseIdxRef = useRef<number | null>(null);
   // [2026-11-15 08:37 사장님 «알림 보여주는 게 우선»] 알림이 끝나도 바로 다음 상품으로 넘기지 않음 —
   //   남은 순환 몇 초 동안 다음 상품이 잠깐 떴다 바로 흐려지던 것. 알림 끝난 뒤 «다음 순환 차례»가 올 때까지 같은 상품 그대로.
+  // [2026-11-26 20:23 사장님 «위젯이 안 바뀜» — 순환을 단톤 가디건 하나로 바꿨는데 UGG 가 계속 떠 있음]
+  //   알림이 줄줄이 이어지면(주문·장바구니 알림이 계속 옴) «알림 동안 붙잡기»가 끝나지 않아 옛 상품이 계속 남았다.
+  //   → ①붙잡은 상품이 지금 순환·고정 목록에서 빠졌으면 바로 놓음 ②한 번 붙잡으면 최대 15초까지만.
+  const heldKey = (p: AnyProduct | null) => { if (!p) return ""; const t = widgetTargetFromProduct(p); return `${t.productId}|${t.detailName}`; };
+  const heldSinceRef = useRef(0);
+  if (heldRef.current) {
+    const k = heldKey(heldRef.current);
+    const stillListed = (pinned && heldKey(pinned) === k) || rotation.some((p) => heldKey(p) === k);
+    if (!stillListed || Date.now() - heldSinceRef.current > 15000) { heldRef.current = null; releaseIdxRef.current = null; }
+  }
   if (toastActive) {
-    if (!heldRef.current && liveCurrent) heldRef.current = liveCurrent;
+    if (!heldRef.current && liveCurrent && Date.now() - heldSinceRef.current > 15000) { heldRef.current = liveCurrent; heldSinceRef.current = Date.now(); }
     releaseIdxRef.current = null;
   } else if (heldRef.current) {
     // [08:47 사장님 «떴다 사라졌다 다시 보였다»] 같은 상품이어도 순환 중이면 다음 차례까지 그대로(중간에 풀면 순환 흐려짐 한가운데로 튀어 깜박였음)
