@@ -45,6 +45,9 @@ function chatViewSoftNickColor(hex: string): string {
   return `rgb(${pastel((rgb >> 16) & 255)}, ${pastel((rgb >> 8) & 255)}, ${pastel(rgb & 255)})`;
 }
 
+// 유튜브 채팅 맨 아래 «로그인해서 채팅하기» 줄 높이(유튜브 쪽 px) — 이만큼 칸 밖으로 잘라 숨김
+const YT_LOGIN_BAR_CROP = 100;
+
 export default function ChatViewClient() {
   const [bc, setBc] = useState<Bc | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -341,7 +344,10 @@ export default function ChatViewClient() {
       {tab === "yt" && <ChatViewNotice messages={unreadMessages.map(m=>(testMessageIds.has(m.id)||m.avatar==='autotest')&&m.badge!=='bot'&&!m.nickname.startsWith('[테스트]')?{...m,nickname:`[테스트]${m.nickname}`}:m)} emojis={emojiMap} onOpen={()=>openTab("site")}/>}
           {ytSrc ? (
             <iframe title="유튜브 채팅" src={ytSrc}
-              style={{ position: "absolute", top: 0, left: 0, width: `${100 / ytScale}%`, height: `${100 / ytScale}%`, transform: `scale(${ytScale})`, transformOrigin: "0 0", border: 0, display: "block" }} />
+              // [2026-11-26 사장님 「채팅창 아래 유튜브 로그인 버튼이 거슬림·눌러도 구글 설명 페이지로 감」]
+              //   남의 사이트 안 유튜브 채팅은 구글이 로그인을 막는다(제3자 쿠키) → 강제 로그인 불가.
+              //   이 화면은 «보기 전용»이라 맨 아래 «채팅하려면 로그인» 줄(실측 약 93px)을 칸 밖으로 밀어 잘라 보인다.
+              style={{ position: "absolute", top: 0, left: 0, width: `${100 / ytScale}%`, height: `calc(${100 / ytScale}% + ${YT_LOGIN_BAR_CROP}px)`, transform: `scale(${ytScale})`, transformOrigin: "0 0", border: 0, display: "block" }} />
           ) : (
             <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", textAlign: "center", fontSize: "18px", color: C.mute, lineHeight: 1.5 }}>
               {!loaded ? "불러오는 중…" : bc ? "방송 관리 창에 유튜브 라이브 주소를 넣으면 여기 나와요." : "지금 켜진 방송이 없어요. 방송을 켜면 저절로 나와요."}

@@ -277,6 +277,15 @@ export default function AdminLiveSidebar({
             >
               카드결제
             </button>
+            {/* [2026-11-26 사장님 「관리자페이지에서 손님이 보는 주문서 페이지를 볼 수 있는 메뉴」] 같은 창 이름으로 열어 여러 번 눌러도 탭 하나 */}
+            <button
+              type="button"
+              onClick={() => { const w = window.open("/order", "ruru-customer-order"); w?.focus(); }}
+              title="손님이 보는 주문서 페이지를 새 탭으로 엽니다(관리자 계정이면 관리자용 화면 그대로)"
+              className="col-span-2 flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2 active:scale-[0.98]"
+            >
+              손님 주문서 열기
+            </button>
           </div>
         </section>
 
