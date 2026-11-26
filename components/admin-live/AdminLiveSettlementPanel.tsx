@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminSettlementPanel from "./settlement/AdminSettlementPanel";
+import { buildAdminLiveOrderGroups, sortLiveOrdersByCreatedDesc, toAdminLiveOrder } from "./liveOrderAdapter";
 
 type LooseRow = Record<string, any>;
 
@@ -166,11 +167,72 @@ function readSettingNumber(rows: LooseRow[], key: string, fallback: number) {
   return value > 0 || String(row?.value ?? "").trim() === "0" ? value : fallback;
 }
 
-export default function AdminLiveSettlementPanel({ orders, onGoToUnpaidOrders }: Props) {
+// [2026-11-26] 정산은 주문서 화면이 지금 불러 둔 주문(방송 중엔 최근 500줄 + 그 방송)만 받아서,
+//   방송 중에 열면 이번 달 합계가 모자랐다(운영 실측 361건 → 336건). 정산은 자기 주문을 따로 «전부» 읽는다.
+//   읽기 방식은 주문서 «전체보기»와 같음(삭제 제외·1,000줄씩·4장씩 동시). 다 읽기 전엔 받은 주문을 그대로 쓴다.
+async function loadAllOrders(): Promise<LooseRow[] | null> {
+  const pageSize = 1000;
+  const fetchPage = (from: number, withCount = false) =>
+    supabase
+      .from("orders")
+      .select("*", withCount ? { count: "exact" } : undefined)
+      .neq("is_deleted", true)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
+  const first = await fetchPage(0, true);
+  if (first.error) return null;
+  const all: LooseRow[] = [...((first.data || []) as LooseRow[])];
+  const total = typeof first.count === "number" ? first.count : null;
+  let from = pageSize;
+  if (total !== null) {
+    const starts: number[] = [];
+    for (let f = pageSize; f < total; f += pageSize) starts.push(f);
+    for (let i = 0; i < starts.length; i += 4) {
+      const pages = await Promise.all(starts.slice(i, i + 4).map((f) => fetchPage(f)));
+      for (const page of pages) {
+        if (page.error) return null;
+        all.push(...((page.data || []) as LooseRow[]));
+      }
+    }
+    from = pageSize * (starts.length + 1);
+  }
+  while (all.length >= from) {
+    const page = await fetchPage(from);
+    if (page.error) return null;
+    const rows = (page.data || []) as LooseRow[];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  const seen = new Set<string>();
+  return all.filter((row) => {
+    const id = String(row.id ?? "");
+    if (!id || seen.has(id)) return !id;
+    seen.add(id);
+    return true;
+  });
+}
+
+export default function AdminLiveSettlementPanel({ orders: dashboardOrders, onGoToUnpaidOrders }: Props) {
+  const [ownOrders, setOwnOrders] = useState<LooseRow[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadAllOrders().then((rows) => {
+      if (!alive) return;
+      // 주문서 화면과 똑같이 묶어서(주문서 단위) 넘긴다 — 계산 입력 모양이 예전과 같아야 숫자가 같다.
+      if (rows) setOwnOrders(sortLiveOrdersByCreatedDesc(buildAdminLiveOrderGroups(rows as any)).map(toAdminLiveOrder) as unknown as LooseRow[]);
+      else showAdminToast("정산 주문 전체 불러오기 실패 — 주문서 화면에 불러온 주문으로만 계산했어요", "error");
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const orders = ownOrders ?? dashboardOrders;
   const [deposits, setDeposits] = useState<LooseRow[]>([]);
   const [broadcasts, setBroadcasts] = useState<LooseRow[]>([]);
   const [settings, setSettings] = useState<LooseRow[]>([]);
-  const [loadingMeta, setLoadingMeta] = useState(false);
+  const [, setLoadingMeta] = useState(false);
 
   useEffect(() => {
     let alive = true;
