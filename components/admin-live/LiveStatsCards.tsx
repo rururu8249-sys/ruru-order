@@ -166,27 +166,39 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
   const movedNote = (sum: number) => (sum > 0 ? <span className="ml-1 text-[11px] font-bold text-ink-mute">(옮겨 온 주문 {money(sum)} 포함)</span> : null);
   const unpaidTotal = bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0);
   return (
-    <div className="mb-1 rounded-2xl border border-rose-line bg-surface md:mb-4 md:border-0 md:p-0">
+    <div className="mb-1 rounded-2xl border border-rose-line bg-surface md:mb-4 md:border-0 md:bg-transparent md:p-0">
     <button type="button" onClick={() => setMobileOpen((v) => !v)} aria-expanded={mobileOpen}
       className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-[13px] font-bold md:hidden">
       <span className="text-ink-soft">받은 돈 <span className="text-ink tabular-nums">{money(paidAmount)}</span>{movedNote(movedPaidSum)}</span>
       <span className="text-ink-soft">미결제 <span className="text-danger-tx tabular-nums">{money(unpaidTotal)}</span>{movedNote(movedUnpaidSum)}</span>
       <span className="ml-auto text-[12px] text-ink-mute">{mobileOpen ? "접기" : "펼치기"}</span>
     </button>
-    <div className={`${mobileOpen ? "flex" : "hidden"} flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border-rose-line bg-surface px-4 py-2.5 text-[13px] font-black max-md:border-t md:flex md:gap-y-1 md:border md:text-[12px] [&>span]:max-w-full [&>span>span]:inline-block [&>span>span]:whitespace-nowrap [&>span>span]:tabular-nums`}>
-      {/* [UI 2026-07-06] 기준 명시 — 정산 팝업(이번달 자동조회)과 숫자가 달라 헷갈리던 것 방지 */}
-      {/* [2026-08-31 사장님 요청] 유치원생 기준 — 상품값과 실제 받은 돈을 나란히 크게 */}
-      <span className="text-ink-soft" title="결제완료 주문의 순수 상품금액만 합친 것 — 카드수수료·배송비·포인트 반영 전">상품값 <span className="text-ink text-[13px]">{money(goodsPaid)}</span></span>
-      {/* [2026-10-27 사장님 요청] 포인트 사용금액 — 결제완료 주문에서 손님이 쓴 포인트 합(실제 받은 돈은 이만큼 빠져 있음) */}
-      <span className="text-ink-soft" title="결제완료 주문에서 손님이 쓴 포인트 합계 — 실제 받은 돈은 이 금액만큼 빠진 금액이에요">포인트 사용 <span className="text-ink text-[13px]">{money(pointUsedActual)}</span></span>
-      <span className="text-ink-soft" title="손님이 실제로 낸 돈 — 상품값 + 카드수수료 + 배송비 − 포인트 (결제완료 건만, 미입금·취소·정산제외 미포함)">실제 받은 돈<span className="ml-1 text-[11px] font-bold text-ink-mute">(결제완료만 · 현재 조회범위)</span> <span className="text-ink text-[13px]">{money(paidAmount)}</span>{movedNote(movedPaidSum)}</span>
-      <span className="text-line">|</span>
-      <span className="text-ink-soft" title="무통장 주문 중 입금확인된 금액">무통장 입금확인 <span className="text-ok-tx">{money(bankPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
-      <span className="text-ink-soft" title="카드 주문 중 결제완료된 금액">카드결제완료 <span className="text-ok-tx">{money(cardPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
-      <span className="text-line">|</span>
-      <span className="text-ink-soft" title="무통장 주문 중 미입금·매칭필요 금액">미입금 <span className="text-warn-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
-      <span className="text-ink-soft">카드미결제 <span className="text-warn-tx">{money(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
-      <span className="text-ink-soft" title="미입금 + 카드미결제 — 아직 못 받은 돈 전체">미결제 합계 <span className="text-danger-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span>{movedNote(movedUnpaidSum)}</span>
+    {/* [2026-11-26 리뉴얼] 숫자 띠 → 카드 3장(받은 돈 / 미결제 / 상품값·포인트). 같은 숫자·같은 계산, 보이는 모양만 */}
+    <div className={`${mobileOpen ? "grid" : "hidden"} grid-cols-1 gap-2 p-2 max-md:border-t max-md:border-rose-line md:grid md:grid-cols-[1.3fr_1.3fr_1fr_auto] md:gap-3 md:p-0`}>
+      <div className="rounded-2xl border border-line bg-surface px-4 py-3" title="손님이 실제로 낸 돈 — 상품값 + 카드수수료 + 배송비 − 포인트 (결제완료 건만, 미입금·취소·정산제외 미포함)">
+        <div className="text-[12px] font-bold text-ink-mute">받은 돈 <span className="font-semibold">· 결제완료 · 지금 조회 범위</span></div>
+        <div className="mt-0.5 text-[22px] font-bold leading-tight text-ink tabular-nums">{money(paidAmount)}</div>
+        <div className="mt-1 flex flex-wrap gap-x-3 text-[12px] font-semibold text-ink-soft tabular-nums">
+          <span>무통장 {money(bankPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span>
+          <span>카드 {money(cardPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span>
+          {movedNote(movedPaidSum)}
+        </div>
+      </div>
+      <div className="rounded-2xl border border-line bg-surface px-4 py-3" title="미입금 + 카드미결제 — 아직 못 받은 돈 전체">
+        <div className="text-[12px] font-bold text-ink-mute">미결제 <span className="font-semibold">· 아직 못 받은 돈</span></div>
+        <div className={`mt-0.5 text-[22px] font-bold leading-tight tabular-nums ${unpaidTotal > 0 ? "text-danger-tx" : "text-ink"}`}>{money(unpaidTotal)}</div>
+        <div className="mt-1 flex flex-wrap gap-x-3 text-[12px] font-semibold text-ink-soft tabular-nums">
+          <span>미입금 {money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span>
+          <span>카드미결제 {money(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span>
+          {movedNote(movedUnpaidSum)}
+        </div>
+      </div>
+      <div className="rounded-2xl border border-line bg-surface px-4 py-3">
+        <div className="text-[12px] font-bold text-ink-mute" title="결제완료 주문의 순수 상품금액만 합친 것 — 카드수수료·배송비·포인트 반영 전">상품값</div>
+        <div className="mt-0.5 text-[18px] font-bold leading-tight text-ink tabular-nums">{money(goodsPaid)}</div>
+        <div className="mt-1 text-[12px] font-semibold text-ink-soft tabular-nums" title="결제완료 주문에서 손님이 쓴 포인트 합계 — 실제 받은 돈은 이 금액만큼 빠진 금액이에요">포인트 사용 {money(pointUsedActual)}</div>
+      </div>
+      <div className="flex items-start justify-end md:items-center">
       {tgModalOpen ? (
         <TelegramReportSendModal
           title="텔레그램 보고"
@@ -202,10 +214,11 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
         disabled={tgSending}
         onClick={() => setTgModalOpen(true)}
         title="지금 화면(현재 조회범위·필터) 숫자 그대로 텔레그램으로 — 매출·상품값·포인트·미결제·상품별 판매개수"
-        className="ml-auto shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
+        className="shrink-0 rounded-xl border border-line bg-surface px-3 py-2 text-[12px] font-bold text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
       >
         {tgSending ? "전송 중…" : "텔레그램"}
       </button>
+      </div>
     </div>
     </div>
   );
