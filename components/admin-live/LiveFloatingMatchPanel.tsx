@@ -69,6 +69,13 @@ function depNameScore(dep: any, order: LiveOrder): number {
   );
 }
 
+// [2026-11-26 VER3] 입금 시각 「11.25 06:31」(표시만)
+function depShortTime(dep: any) {
+  const d = resolveLiveDepositDate(dep).date;
+  if (!d) return String(dep?.deposited_time ?? "");
+  return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export default function LiveFloatingMatchPanel({
   deposits, orders, onMatched, onSearchFilter,
   selectedOrderForMatch, onClearSelectedOrder,
@@ -216,11 +223,13 @@ export default function LiveFloatingMatchPanel({
       if (!map.has(label)) map.set(label, []);
       map.get(label)!.push(dep);
     }
-    const rest = Array.from(map.entries());
-    return pairs.length > 0 ? [[`짝을 찾았어요 · ${pairs.length}건`, pairs] as [string, any[]], ...rest] : rest;
+    // [2026-11-26 VER3 시안 AdminDeposit] 주문을 고르지 않았을 땐 날짜 머리 없이 두 묶음(짝을 찾았어요 / 주문 없는 입금)
+    const rest: [string, any[]][] = matchMode ? Array.from(map.entries()) : (() => { const all = Array.from(map.values()).flat(); return all.length ? [[`주문 없는 입금 · ${all.length}건`, all] as [string, any[]]] : []; })();
+    return pairs.length > 0 ? [[`짝을 찾았어요 — 눌러서 연결 · ${pairs.length}건`, pairs] as [string, any[]], ...rest] : rest;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, matchMode, orders, allOrders, shortages]);
 
+  const pairCount = !matchMode && grouped.length > 0 && String(grouped[0][0]).startsWith("짝을 찾았어요") ? grouped[0][1].length : 0;
   // (미매칭 건수는 창 위 「입금매칭 N」 칩이 보여준다 — 대시보드에서 같은 판정 isUnmatchedLiveDeposit 으로 센다)
 
   // 브라우징 모드: 전체 orders 기준 추천 (금액 정확일치 + 이름점수≥80)
@@ -423,42 +432,39 @@ export default function LiveFloatingMatchPanel({
     { key: "all",     label: "전체" },
   ];
 
-  // [2026-10-21 입금 통합] 모양만 DESIGN-ADMIN 기준(칩 36·검정 선택·주버튼 1개). 위 판정·API 호출 줄은 그대로.
-  const chip = (on: boolean) =>
-    `h-9 shrink-0 rounded-full border px-3 text-[13px] font-semibold transition ${on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`;
-
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
 
-      {/* 기간 · 검색 */}
-      <div className="shrink-0 space-y-2 border-b border-line px-3 py-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {PERIOD_TABS.map(t => (
-            <button key={t.key} type="button" aria-pressed={period === t.key && !calOpen}
-              onClick={() => { setPeriod(t.key); setCalOpen(false); }}
-              className={chip(period === t.key && !calOpen)}>{t.label}</button>
-          ))}
-          <div className="relative">
-            <button type="button" aria-pressed={calOpen || period === "custom"} onClick={() => setCalOpen(v => !v)}
-              className={chip(calOpen || period === "custom")}>기간 선택</button>
-            {calOpen && (
-              <div className="absolute right-0 top-[calc(100%+4px)] z-30 w-64 rounded-xl border border-line bg-surface p-3 shadow-[0_8px_24px_rgba(0,0,0,.08)]">
-                <div className="flex items-center gap-1.5">
-                  <input type="date" aria-label="시작일" value={calFrom} onChange={e => setCalFrom(e.target.value)}
-                    className="h-9 min-w-0 flex-1 rounded-lg border border-line px-2 text-[13px]" />
-                  <span className="text-[13px] text-ink-mute">~</span>
-                  <input type="date" aria-label="종료일" value={calTo} onChange={e => setCalTo(e.target.value)}
-                    className="h-9 min-w-0 flex-1 rounded-lg border border-line px-2 text-[13px]" />
-                </div>
-                <button type="button" onClick={() => { setPeriod("custom"); setCalOpen(false); }}
-                  className="mt-2 h-9 w-full rounded-lg bg-ink text-[13px] font-bold text-white">적용</button>
-              </div>
-            )}
-          </div>
+      {/* 검색 · 요약 · 기간 — [2026-11-26 VER3 시안 AdminDeposit] 기간 칩 5개 → 작은 고르기 하나 */}
+      <div className="shrink-0 space-y-2.5 border-b border-line px-5 py-3.5">
+        <label className="flex h-11 items-center gap-2 rounded-[10px] border border-line bg-surface px-3 focus-within:border-ink">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-mute"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} aria-label="입금자명 또는 금액 검색"
+            placeholder="입금자명 · 금액"
+            className="min-w-0 flex-1 border-0 bg-transparent text-[16px] text-ink outline-none" />
+        </label>
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-mute">
+          {!matchMode ? (
+            <span className="min-w-0 flex-1">짝 찾은 입금 <b className="text-ok-tx">{pairCount}</b> · 주문 없는 입금 <b className="text-warn-tx">{Math.max(0, filtered.filter((d: any) => isUnmatchedLiveDeposit(d)).length - pairCount)}</b></span>
+          ) : <span className="min-w-0 flex-1" />}
+          <select aria-label="입금 기간" value={period === "custom" ? "custom" : period}
+            onChange={e => { const v = e.target.value as Period; if (v === "custom") { setCalOpen(true); } else { setPeriod(v); setCalOpen(false); } }}
+            className="h-9 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink outline-none focus:border-ink">
+            {PERIOD_TABS.map(t => <option key={t.key} value={t.key}>{t.key === "all" ? "전체 기간" : t.label}</option>)}
+            <option value="custom">기간 선택</option>
+          </select>
         </div>
-        <input value={search} onChange={e => setSearch(e.target.value)} aria-label="입금자명 또는 금액 검색"
-          placeholder="입금자명 · 금액 검색"
-          className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-[13px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
+        {calOpen && (
+          <div className="flex items-center gap-1.5">
+            <input type="date" aria-label="시작일" value={calFrom} onChange={e => setCalFrom(e.target.value)}
+              className="h-9 min-w-0 flex-1 rounded-lg border border-line px-2 text-[13px]" />
+            <span className="text-[13px] text-ink-mute">~</span>
+            <input type="date" aria-label="종료일" value={calTo} onChange={e => setCalTo(e.target.value)}
+              className="h-9 min-w-0 flex-1 rounded-lg border border-line px-2 text-[13px]" />
+            <button type="button" onClick={() => { setPeriod("custom"); setCalOpen(false); }}
+              className="h-9 shrink-0 rounded-lg bg-ink px-3 text-[13px] font-bold text-white">적용</button>
+          </div>
+        )}
       </div>
 
       {/* 주문을 골라서 열었을 때: 연결할 주문 + 확정 버튼(스크롤해도 항상 보임) */}
@@ -517,7 +523,7 @@ export default function LiveFloatingMatchPanel({
 
       {/* [2026-10-27] 전체 정리 — 주문을 고르지 않았을 때만 */}
       {!matchMode && filtered.length > 0 && (
-        <div className="shrink-0 border-b border-line px-3 py-2">
+        <div className="shrink-0 border-b border-line px-5 py-2">
           <div className="flex items-center gap-2">
             <span className="min-w-0 flex-1 text-[12px] text-ink-mute">
               {bulkTargets.length > 0
@@ -553,10 +559,11 @@ export default function LiveFloatingMatchPanel({
         )}
         {grouped.map(([dateLabel, deps]) => (
           <div key={dateLabel}>
-            <div className={`sticky top-0 z-[1] border-b border-line px-3 py-1.5 text-[12px] font-semibold ${dateLabel.startsWith("짝을 찾았어요") ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-mute"}`}>
+            <div className="sticky top-0 z-[1] bg-surface px-5 pb-2 pt-4 text-[12px] font-bold text-ink-mute">
               {dateLabel}
             </div>
             {deps.map((dep: any) => {
+              const pairCard = !matchMode && dateLabel.startsWith("짝을 찾았어요");
               const isMatched = !isUnmatchedLiveDeposit(dep);
               const depId = Number(dep.id);
               const checked = selectedDepIds.has(depId);
@@ -573,7 +580,7 @@ export default function LiveFloatingMatchPanel({
                   aria-checked={selectable ? checked : undefined}
                   tabIndex={selectable ? 0 : undefined}
                   onKeyDown={selectable ? (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleDep(depId); } } : undefined}
-                  className={`flex flex-wrap items-center gap-2.5 border-b border-line px-3 py-2 ${selectable ? "cursor-pointer" : ""} ${checked ? "bg-surface-2" : ""} ${isMatched ? "opacity-50" : ""}`}>
+                  className={`flex flex-wrap items-center gap-2.5 ${pairCard ? "mx-5 mb-2 rounded-xl border border-line px-3.5 py-3" : "mx-5 border-t border-line py-3"} ${selectable ? "cursor-pointer" : ""} ${checked ? "bg-surface-2" : ""} ${isMatched ? "opacity-50" : ""}`}>
 
                   {/* 체크 (주문을 골라 열었을 때 + 미매칭만) */}
                   {selectable && (
@@ -582,8 +589,9 @@ export default function LiveFloatingMatchPanel({
 
                   {/* 입금 정보 */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-baseline gap-1.5">
                       <span className="truncate text-[14px] font-bold text-ink">{dep.depositor_name ?? "-"}</span>
+                      <span className="shrink-0 text-[12px] text-ink-mute tabular-nums">{depShortTime(dep)}</span>
                       {isMatched && (
                         <span className="shrink-0 rounded px-1.5 text-[11px] font-semibold text-ok-tx bg-ok-bg">매칭완료</span>
                       )}
@@ -591,7 +599,6 @@ export default function LiveFloatingMatchPanel({
                         <span className="shrink-0 rounded px-1.5 text-[11px] font-semibold text-ok-tx bg-ok-bg">추천</span>
                       )}
                     </div>
-                    <div className="text-[12px] text-ink-mute">{dep.deposited_time ?? ""}</div>
                     {/* 추천 연결 대상 — 누르기 전에 어느 주문에 붙는지 보이게(표시만) */}
                     {extraTarget && (
                       <div className="mt-0.5 truncate text-[12px] font-semibold text-warn-tx">
@@ -599,15 +606,15 @@ export default function LiveFloatingMatchPanel({
                       </div>
                     )}
                     {bestOrder && !isMatched && (
-                      <div className="mt-0.5 truncate text-[12px] font-semibold text-ink-soft">
-                        → {bestOrder.nickname || bestOrder.name || "-"}{bestOrder.name && bestOrder.nickname && bestOrder.name !== bestOrder.nickname ? ` (${bestOrder.name})` : ""} 주문
+                      <div className="mt-1 truncate text-[13px] text-ink-soft">
+                        주문 → <b className="text-ink">{bestOrder.nickname || bestOrder.name || "-"}</b>{bestOrder.name && bestOrder.nickname && bestOrder.name !== bestOrder.nickname ? ` · ${bestOrder.name}` : ""}
                       </div>
                     )}
                   </div>
 
                   {/* 금액 · 버튼 */}
-                  <div className="shrink-0 text-right">
-                    <div className="text-[14px] font-bold tabular-nums text-ink">{won(Number(dep.amount ?? 0))}</div>
+                  <div className={`shrink-0 ${matchMode ? "text-right" : "flex items-center gap-2"}`}>
+                    <div className={`font-bold tabular-nums text-ink ${pairCard ? "text-[16px]" : "text-[14px]"}`}>{won(Number(dep.amount ?? 0))}</div>
                     {matchMode && !isMatched && diff !== 0 && (
                       <div className="text-[12px] font-semibold tabular-nums text-danger-tx">
                         {diff > 0 ? "+" : ""}{Number(diff).toLocaleString("ko-KR")}
@@ -619,23 +626,23 @@ export default function LiveFloatingMatchPanel({
                     {!matchMode && !isMatched && bestOrder && (
                       <button type="button" onClick={e => { e.stopPropagation(); confirmDepositToOrder(dep, bestOrder); }}
                         disabled={matchSaving}
-                        className="mt-1 h-8 rounded-lg bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50">연결</button>
+                        className="h-11 rounded-[10px] bg-ok-tx px-4 text-[14px] font-bold text-white disabled:opacity-50">연결</button>
                     )}
                     {extraTarget && (
                       <button type="button" onClick={e => { e.stopPropagation(); void linkExtraDeposit(dep, extraTarget); }}
                         disabled={matchSaving}
-                        className="mt-1 h-8 rounded-lg bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50">붙이기</button>
+                        className="h-11 rounded-[10px] bg-ok-tx px-4 text-[14px] font-bold text-white disabled:opacity-50">붙이기</button>
                     )}
                     {!matchMode && !isMatched && !bestOrder && !extraTarget && (
                       <button type="button" onClick={e => { e.stopPropagation(); onSearchFilter(dep.depositor_name ?? ""); }}
                         title="뒤 주문표를 이 입금자명으로 검색해요"
-                        className="mt-1 h-8 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">주문 찾기</button>
+                        className="h-10 rounded-[10px] border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">주문 찾기</button>
                     )}
                     {!matchMode && !isMatched && (
                       <button type="button" onClick={e => { e.stopPropagation(); setSettleOpenId(settleOpenId === depId ? null : depId); }}
                         aria-expanded={settleOpenId === depId}
                         title="주문과 상관없는 입금(인증·중복·환불 끝)을 목록에서 빼요"
-                        className="ml-1 mt-1 h-8 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2 hover:text-ink">정리</button>
+                        className="h-10 rounded-lg px-2 text-[13px] text-ink-mute hover:bg-surface-2 hover:text-ink">정리</button>
                     )}
                   </div>
                   {settleOpenId === depId && !matchMode && !isMatched && (

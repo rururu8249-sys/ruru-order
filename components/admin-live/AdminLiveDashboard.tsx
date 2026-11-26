@@ -2159,7 +2159,7 @@ export default function AdminLiveDashboard() {
           {/* 주문상세 / 입금매칭 — 우측 오버레이 드로어(슬라이드인, 위로 떠서 표를 밀지 않음). 단일 슬롯. */}
           {drawer.kind !== "closed" ? (
               <AdminLiveSideDrawer title={depositDrawerOpen ? "입금" : "주문상세"}
-                width={depositDrawerOpen ? 480 : 420}
+                width={depositDrawerOpen ? 560 : 420}
                 onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); setMatchInitial(null); }}>
                 {drawer.kind === "deposits" ? <>{depositModeChips}<div className="p-3"><AdminLivePaymentPanel presentation="drawer" deposits={deposits} orderGroups={orderGroups} onRefresh={loadDepositsFromServer} onBankdaSync={syncBankdaDepositsOnly}
                   onOpenMatch={(row) => {
