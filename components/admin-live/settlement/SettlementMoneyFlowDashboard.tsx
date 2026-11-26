@@ -387,15 +387,35 @@ export default function SettlementMoneyFlowDashboard({
       <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line bg-surface-2 px-5 py-4">
           <div className="min-w-0">
-            <div className="text-sm font-black text-ink-soft">지금 남는 돈</div>
-            <div className="mt-0.5 text-[36px] font-black leading-none tracking-[-0.05em] text-ok-tx">
-              {won(stats.netAmount)}
-            </div>
-            <div className="mt-2 text-xs font-bold text-ink-mute">
-              받은 돈 {won(stats.paidAmount)}
-              {numberValue(stats.manualIncomeAmount) > 0 ? ` + 추가수익 ${won(stats.manualIncomeAmount)}` : ""}
-              {" − 빠지는 돈 "}{won(stats.totalExpense)}
-            </div>
+            {/* [VER3 2026-11-26] 입금가를 모든 결제 주문에 적었을 때만 큰 숫자 = 입금가까지 뺀 돈(표시만·계산 무변경). */}
+            {stats.productCostRowCount > 0 && stats.productCostMissingCount === 0 ? (
+              <>
+                <div className="text-sm font-black text-ink-soft">진짜 남는 돈 (입금가까지 뺌)</div>
+                <div className="mt-0.5 text-[36px] font-black leading-none tracking-[-0.05em] text-ok-tx">
+                  {won(stats.netAfterProductCost)}
+                </div>
+                <div className="mt-2 text-xs font-bold text-ink-mute">
+                  지금 남는 돈 {won(stats.netAmount)} − 상품 입금가 {won(stats.productCostAmount)}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-black text-ink-soft">지금 남는 돈</div>
+                <div className="mt-0.5 text-[36px] font-black leading-none tracking-[-0.05em] text-ok-tx">
+                  {won(stats.netAmount)}
+                </div>
+                <div className="mt-2 text-xs font-bold text-ink-mute">
+                  받은 돈 {won(stats.paidAmount)}
+                  {numberValue(stats.manualIncomeAmount) > 0 ? ` + 추가수익 ${won(stats.manualIncomeAmount)}` : ""}
+                  {" − 빠지는 돈 "}{won(stats.totalExpense)}
+                </div>
+                {stats.productCostMissingCount > 0 ? (
+                  <div className="mt-2 inline-flex rounded-lg bg-warn-bg px-3 py-1.5 text-xs font-black text-warn-tx">
+                    입금가 안 적은 주문 {countText(stats.productCostMissingCount)} — 다 적으면 여기 «입금가까지 뺀 돈»이 나와요
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
 
           {numberValue(stats.unpaidAmount) > 0 ? (
