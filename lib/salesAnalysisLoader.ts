@@ -15,21 +15,43 @@ export type SalesAnalysisSnapshot = {
 /** Read-only, request-local snapshot. Never return a successful partial page set. */
 export async function loadSalesAnalysisSnapshot(db: SupabaseClient, isCurrent: () => boolean): Promise<SalesAnalysisSnapshot> {
   const check = () => { if (!isCurrent()) throw new Error('Sales request superseded'); };
+  // [2026-11-26] 1,000줄씩 «차례로» 읽던 것(운영 실측 판매분석 약 4초) → 첫 장에서 전체 줄 수를 받고 나머지는 4장씩 동시에.
+  //   id 순 정렬이라 장 순서대로 이어 붙이면 예전과 같은 결과. 줄 수를 못 받으면 예전처럼 차례로.
   async function pages(table: string, fields: string) {
     const rows: Array<Record<string, unknown>> = [];
-    for (let offset=0; ; offset+=1000) {
+    const read = async (offset: number, withCount = false) => {
       check();
-      const {data,error}=await db.from(table).select(fields).order('id').range(offset,offset+999);
+      const res = await db.from(table).select(fields, withCount ? { count: 'exact' } : undefined).order('id').range(offset, offset + 999);
       check();
-      if(error) throw error;
-      if(!Array.isArray(data)) throw new Error('Incomplete sales response');
-      rows.push(...(data as unknown as Array<Record<string,unknown>>));
-      if(data.length<1000) return rows;
+      if (res.error) throw res.error;
+      if (!Array.isArray(res.data)) throw new Error('Incomplete sales response');
+      return { data: res.data as unknown as Array<Record<string, unknown>>, count: res.count };
+    };
+    const first = await read(0, true);
+    rows.push(...first.data);
+    if (first.data.length < 1000) return rows;
+    let offset = 1000;
+    if (typeof first.count === 'number') {
+      const starts: number[] = [];
+      for (let o = 1000; o < first.count; o += 1000) starts.push(o);
+      for (let i = 0; i < starts.length; i += 4) {
+        const batch = await Promise.all(starts.slice(i, i + 4).map((o) => read(o)));
+        for (const page of batch) rows.push(...page.data);
+      }
+      offset = 1000 * (starts.length + 1);
+      if (rows.length < offset) return rows;
+    }
+    for (; ; offset += 1000) {
+      const page = await read(offset);
+      rows.push(...page.data);
+      if (page.data.length < 1000) return rows;
     }
   }
-  const broadcastRows=await pages('broadcasts','id,public_title,started_at,ended_at');
-  // Keep all statuses until grouping: removing an individual row can change a mixed legacy group.
-  const orders=await pages('orders',SALES_FIELDS);
+  const [broadcastRows, orders] = await Promise.all([
+    pages('broadcasts','id,public_title,started_at,ended_at'),
+    // Keep all statuses until grouping: removing an individual row can change a mixed legacy group.
+    pages('orders',SALES_FIELDS),
+  ]);
   const truthy=(value:unknown)=>[true,'true','t',1,'1'].includes(value as never);
   const salesStatuses=new Set(['입금확인','자동입금확인','수동입금확인','카드결제완료','결제완료','출고대기','출고완료','킵','픽업','픽업예정']);
   const visible=orders.filter(row=>!['is_deleted','is_permanently_deleted','is_test_order','exclude_from_settlement'].some(key=>truthy(row[key])) && row.event_gift_winner_id==null && ![row.admin_order_status_v2,row.order_manage_status,row.order_status].some(status=>['주문취소','주문서취소'].includes(String(status||'').trim())));
@@ -49,13 +71,18 @@ export async function loadSalesAnalysisSnapshot(db: SupabaseClient, isCurrent: (
   });
   const ids=[...new Set(eligible.map(row=>String(row.product_id||'')).filter(id=>/^[1-9][0-9]*$/.test(id)))];
   const products:Array<Record<string,unknown>>=[];
-  for(let offset=0;offset<ids.length;offset+=100) {
+  // [2026-11-26] 상품 사진 100개씩도 동시에(순서대로 이어 붙임)
+  const chunks:string[][]=[];
+  for(let offset=0;offset<ids.length;offset+=100) chunks.push(ids.slice(offset,offset+100));
+  for(let i=0;i<chunks.length;i+=4) {
     check();
-    const {data,error}=await db.from('products').select('id,product_name,image_url,product_note').in('id',ids.slice(offset,offset+100));
+    const results=await Promise.all(chunks.slice(i,i+4).map(chunk=>db.from('products').select('id,product_name,image_url,product_note').in('id',chunk)));
     check();
-    if(error) throw error;
-    if(!Array.isArray(data)) throw new Error('Incomplete product response');
-    products.push(...data);
+    for(const {data,error} of results) {
+      if(error) throw error;
+      if(!Array.isArray(data)) throw new Error('Incomplete product response');
+      products.push(...data);
+    }
   }
   return {broadcasts:broadcastRows.map(row=>({id:String(row.id),title:String(row.public_title||'제목 없음'),started_at:String(row.started_at||''),ended_at:row.ended_at?String(row.ended_at):null})).sort((a,b)=>(Date.parse(b.started_at)||0)-(Date.parse(a.started_at)||0)),orders:orders as unknown as OrderRow[],products};
 }
