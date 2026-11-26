@@ -9,6 +9,7 @@ import type {WorkScopeChoice,WorkScopeKind} from "@/lib/adminWorkScope";
 import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import LiveCartHoldsModal from "./LiveCartHoldsModal";
 import { supabase } from "@/lib/supabase";
+import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { showAdminToast } from "@/lib/adminToast";
 type LiveOrderCancelViewFilterValue = "all" | "active" | "canceled"; // 취소보기 필터 UI는 제거됨(항상 "all"). 표시 로직 무변경.
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
@@ -53,7 +54,8 @@ export type LiveOrderStatusFilter =
   | "card_unpaid"
   | "card_paid"
   | "canceled"
-  | "shipped";
+  | "shipped"
+  | "ready";
 
 export type LiveOrderFilters = {
   broadcast: string;
@@ -141,6 +143,32 @@ function getVisibleOrderSummaryParts(order: LiveOrder) {
     parts: visible,
     hiddenCount: itemTexts.length - visible.length,
   };
+}
+
+// [2026-11-26 VER3 시안] 시각 = 오늘이면 「09:04」, 올해 다른 날 「11.25 09:04」, 다른 해 「2025.11.25 09:04」
+function orderTimeText(src?: string | null) {
+  if (!src) return "-";
+  const d = new Date(src);
+  if (isNaN(d.getTime())) return src;
+  const now = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  if (d.toDateString() === now.toDateString()) return `${hh}:${mi}`;
+  const md = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear() === now.getFullYear() ? "" : `${d.getFullYear()}.`}${md} ${hh}:${mi}`;
+}
+// 첫 상품 이름 + 「외 N개」(옵션은 아래 줄)
+function firstItemNameText(order: LiveOrder) {
+  const items = order.items || [];
+  const name = String(items[0]?.productName || order.orderSummary || "-").trim();
+  return items.length > 1 ? `${name} 외 ${items.length - 1}개` : name;
+}
+// 첫 상품 옵션(「없음」 빼고 「블랙 / 240」)
+function firstOptionText(order: LiveOrder) {
+  const it = order.items?.[0];
+  if (!it) return "";
+  const parts = [it.color, it.size].map((v) => String(v ?? "").trim()).filter((v) => v && v !== "없음");
+  return parts.length ? parts.join(" / ") : String(it.optionText || "").replace(/없음/g, "").replace(/^[\s/·]+|[\s/·]+$/g, "").trim();
 }
 
 function renderOrderSummary(order: LiveOrder, wrap = false) {
@@ -768,7 +796,14 @@ export default function LiveOrderTable({
       return /출고|발송|배송/.test(ship) && !/대기/.test(ship);
     }).length;
 
+    // [2026-11-26 VER3 시안] 출고대기 = 결제완료인데 아직 택배출고 아님(표시 필터)
+    const ready = countSource.filter((order) => {
+      if (!["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus)) return false;
+      const ship = String((order as { shippingStatus?: unknown }).shippingStatus || "").trim();
+      return !(/출고|발송|배송/.test(ship) && !/대기/.test(ship));
+    }).length;
     return {
+      ready,
       // 'Normal orders' never includes cancelled forms; the canceled chip is separate.
       total: countSource.filter((order) => order.paymentStatus !== "canceled").length,
       paid,
@@ -840,6 +875,36 @@ export default function LiveOrderTable({
   const totalPages = Math.max(1, Math.ceil(workFilteredOrders.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleOrders = workFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
+  // [2026-11-26 VER3 시안 Main] 주문 줄 사진 — 이 화면에 보이는 주문의 첫 상품만, 주문상세와 같은 규칙(resolveOrderItemPhoto). 상품 행은 한 번 읽으면 기억. 표시 전용.
+  const [orderPhotos, setOrderPhotos] = useState<Record<string, string>>({});
+  const productRowCache = useRef<Map<string, Record<string, unknown> | null>>(new Map());
+  const visiblePhotoKey = visibleOrders.map((o) => `${o.id}:${o.items?.[0]?.productId ?? ""}`).join(",");
+  useEffect(() => {
+    if (isMobile) return;
+    let stop = false;
+    const firsts = visibleOrders.map((o) => ({ id: String(o.id), it: o.items?.[0] })).filter((x) => x.it && String(x.it.productId || "").trim());
+    const need = Array.from(new Set(firsts.map((x) => String(x.it!.productId).trim()))).filter((pid) => !productRowCache.current.has(pid));
+    (async () => {
+      try {
+        if (need.length) {
+          const { data } = await supabase.from("products").select("*").in("id", need);
+          for (const pid of need) productRowCache.current.set(pid, null);
+          for (const row of (data || []) as Record<string, unknown>[]) productRowCache.current.set(String(row.id ?? ""), row);
+        }
+        if (stop) return;
+        const next: Record<string, string> = {};
+        for (const x of firsts) {
+          const row = productRowCache.current.get(String(x.it!.productId).trim());
+          if (!row) continue;
+          const r = resolveOrderItemPhoto(row, { productName: x.it!.productName, color: x.it!.color });
+          if (r.url) next[x.id] = r.url;
+        }
+        setOrderPhotos(next);
+      } catch { /* 사진은 보조 표시 */ }
+    })();
+    return () => { stop = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visiblePhotoKey, isMobile]);
 
   const exportableOrders = useMemo(
     () => workFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
@@ -997,6 +1062,7 @@ export default function LiveOrderTable({
 
     const statusLabelMap: Record<LiveOrderStatusFilter, string> = {
       all: "상태: 전체보기",
+    ready: "출고대기",
       paid: "결제완료",
       unpaid: "미결제",
       manual_match_needed: "매칭필요",
@@ -1162,77 +1228,140 @@ export default function LiveOrderTable({
       </div>
     ) : null}
     <section className="ru-screen rounded-2xl border border-line bg-surface p-4 shadow-sm max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none">
-      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-        <h2 className="ru-t-title mr-2 max-md:hidden">실시간 주문서</h2>
-        {/* [안내 2026-07-06] 방송묶음 컷이 걸려 있을 때 뭘 보고 있는지 명시 — 지난 주문 찾다가 헤매는 것 방지 */}
-        {broadcastStartedAt && filters.broadcast === "current" && filters.date === "all" ? (
-          <span className="rounded-full bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep" title="지난 주문을 보려면 기간이나 방송 필터를 바꿔주세요">
-            이번 방송 주문만 표시 중 · 지난 주문은 기간/방송 필터 변경
-          </span>
-        ) : null}
-
-        {/* [2026-10-22 폰] 상태 칩은 한 줄 가로 스크롤(DESIGN-ADMIN §13). PC 는 줄바꿈 그대로 */}
-        <div className="flex flex-wrap items-center gap-2 max-md:w-full max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>button]:whitespace-nowrap">
-        {[
-          ["정상 주문서", counts.total, "all", "rose"],
-          ["결제완료", counts.paid, "paid", "green"],
-          ["미결제", counts.unpaid, "unpaid", "red"],
-          // [2026-08-31 사장님 지시] 매칭필요·입금확인 배지 삭제 — 입금대기가 매칭필요를 포함하고(보조텍스트로 표시),
-          //   입금확인은 결제완료의 하위 단계라 배지가 겹쳤다. 상태 드롭다운에서는 여전히 고를 수 있다.
-          ["주문서 취소", counts.canceled, "canceled", "muted"],
-          ["택배출고", counts.shipped, "shipped", "blue"],
-        ].map(([label, count, status, tone]) => {
-          const active = filters.status === status;
-          const toneStyle: Record<string, { bg: string; text: string; inactiveBg: string; inactiveText: string }> = {
-            rose:  { bg: "var(--color-rose-deep)", text: "#fff", inactiveBg: "var(--color-rose-soft)", inactiveText: "var(--color-rose-deep)" },
-            green: { bg: "var(--color-ok-tx)", text: "#fff", inactiveBg: "var(--color-ok-bg)", inactiveText: "var(--color-ok-tx)" },
-            red:   { bg: "var(--color-danger-tx)", text: "#fff", inactiveBg: "var(--color-danger-bg)", inactiveText: "var(--color-danger-tx)" },
-            amber: { bg: "var(--color-warn-tx)", text: "#fff", inactiveBg: "var(--color-warn-bg)", inactiveText: "var(--color-warn-tx)" },
-            blue:  { bg: "var(--color-info-tx)", text: "#fff", inactiveBg: "var(--color-info-bg)", inactiveText: "var(--color-info-tx)" },
-            muted: { bg: "var(--color-ink-soft)", text: "#fff", inactiveBg: "var(--color-surface-3)", inactiveText: "var(--color-ink-soft)" },
-          };
-          const t = toneStyle[tone as string] ?? toneStyle.muted;
-          // 보조텍스트(표시용) — 기존 counts 값 조합만 사용. 결제완료=무통장/카드 분해, 입금대기=매칭필요 포함.
-          const sub =
-            status === "paid"
-              ? `무통장 ${counts.bankPaid}·카드 ${Math.max(0, counts.paid - counts.bankPaid)}`
-              : status === "unpaid"
-                ? [
-                    counts.pureUnpaid ? `미입금 ${counts.pureUnpaid}` : "",
-                    counts.manual ? `매칭필요 ${counts.manual}` : "",
-                    counts.cardUnpaid ? `카드미결제 ${counts.cardUnpaid}` : "",
-                  ].filter(Boolean).join("·")
-                : "";
-
-          return (
-            <button
-              key={label as string}
-              type="button"
-              onClick={() => updateFilter("status", status as LiveOrderStatusFilter)}
-              className="max-md:min-h-10"
-              style={{
-                borderRadius: "999px",
-                padding: "4px 12px",
-                fontSize: "12px",
-                fontWeight: 800,
-                border: "none",
-                cursor: "pointer",
-                transition: "all 0.15s",
-                background: active ? t.bg : t.inactiveBg,
-                color: active ? t.text : t.inactiveText,
-                boxShadow: active ? "0 1px 4px rgba(0,0,0,0.13)" : "none",
+      <div className="mb-3 flex shrink-0 flex-col gap-3">
+        {/* [2026-11-26 VER3 시안 Main] PC 첫 줄 = 검색 · 방송 · 필터 · 물건챙기기 · 송장 출력(+장바구니). 폰은 아래 예전 배치 */}
+        {!isMobile ? (
+          <div className="flex flex-wrap items-center gap-2 [&>button]:h-11 [&>button]:rounded-[10px] [&>button]:px-3.5 [&>button]:text-[14px] [&>button]:font-semibold [&>button]:text-ink">
+            <label className="flex h-11 min-w-[280px] flex-[1_1_320px] items-center gap-2 rounded-[10px] border border-line bg-surface px-3 focus-within:border-ink">
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-mute"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <input
+                aria-label="주문 검색"
+                className="min-w-0 flex-1 border-0 bg-transparent text-[14px] text-ink outline-none"
+                value={pendingKeyword}
+                onChange={(event) => setPendingKeyword(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") applyKeyword(); }}
+                onBlur={() => { if (pendingKeyword !== filters.keyword) applyKeyword(); }}
+                placeholder="닉네임 · 이름 · 전화 · 상품번호"
+              />
+            </label>
+            <select aria-label="주문 범위" className="h-11 rounded-[10px] border border-line bg-surface px-3 text-[14px] font-semibold text-ink outline-none focus:border-ink"
+              value={filters.scope}
+              onChange={(event) => {
+                const next = event.target.value as LiveOrderScopeFilter;
+                onFiltersChange({ ...filters, scope: next, broadcast: next === "broadcast" ? filters.broadcast : "all" });
               }}
             >
-              {label} <span style={{ opacity: 0.85 }}>{count}</span>
-              {sub ? <span style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 700, opacity: 0.6 }}>{sub}</span> : null}
+              <option value="all">전체 주문</option>
+              <option value="broadcast">방송 주문</option>
+              <option value="shop">쇼핑몰 주문</option>
+            </select>
+            {filters.scope === "broadcast" && (
+              <BroadcastCalendarPicker items={broadcastCalendar} value={filters.broadcast} onPick={(broadcastId) => onFiltersChange({ ...filters, scope: "broadcast", broadcast: broadcastId })} />
+            )}
+            {filters.scope === "shop" && (
+              <BroadcastCalendarPicker items={shopOrderCalendar} value={filters.broadcast} allLabel="쇼핑몰 전체" onPick={(dateFilter) => onFiltersChange({ ...filters, scope: "shop", broadcast: dateFilter })} />
+            )}
+            <button type="button" onClick={() => setMobileFiltersOpen((v) => !v)} aria-expanded={mobileFiltersOpen}
+              className={`border ${mobileFiltersOpen || workFilter || filters.date !== "all" ? "border-ink !bg-ink !text-white" : "border-line bg-surface hover:bg-surface-2"}`}>
+              필터{filters.date !== "all" || workFilter ? " ●" : ""}
+            </button>
+            <button
+              type="button"
+              onClick={() => setWorkPickerKind("picking")}
+              disabled={(allWorkOrders||pickingSourceOrders).length===0}
+              aria-label={pickingSelectedFromTable.length > 0 ? `물건챙기기 — 선택한 주문 ${pickingSelectedFromTable.length}건` : "물건챙기기 — 주문서 범위"}
+              className={pickingSelectedFromTable.length > 0
+                ? "rounded-xl border-2 border-ink bg-surface px-3 py-2 text-xs font-black text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                : "rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"}
+              title={pickingSelectedFromTable.length > 0 ? "체크한 주문만 챙겨요(필터·기간과 상관없이)" : "주문서 필터 범위를 챙겨요 · 주문을 체크하면 그 주문만"}
+            >
+              {pickingSelectedFromTable.length > 0 ? `물건챙기기 · 선택 ${pickingSelectedFromTable.length}건` : "물건챙기기"}
+            </button>
+  
+          <button
+              type="button"
+              onClick={() => setWorkPickerKind("invoice")}
+              disabled={exporting !== "" || (allWorkOrders||pickingSourceOrders).length === 0}
+              className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+              title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
+            >
+              {exporting === "rozen" ? "내보내는중..." : "송장 출력"}
+            </button>
+  
+            <button
+              type="button"
+              onClick={() => { setCartHoldsOpen(true); setCartHoldCountChanged(false); }}
+              className={`relative inline-flex items-center gap-1.5 rounded-xl border bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 ${cartHoldCountChanged ? "border-danger-tx ring-2 ring-danger-tx/30" : "border-line"}`}
+              title={cartHoldSummaryReady
+                ? `주문서 제출 전 장바구니 ${cartHoldSummary.cartCount}명 · 상품 ${cartHoldSummary.totalQty}개`
+                : "장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"}
+            >
+              <span>장바구니</span>
+              <span className="whitespace-nowrap text-[11px] text-ink-mute">
+                {cartHoldSummaryReady ? `${cartHoldSummary.cartCount}명` : "확인 중"}
+              </span>
+              {cartHoldSummaryReady && cartHoldSummary.totalQty > 0 ? (
+                <span
+                  aria-label={`담긴 상품 ${cartHoldSummary.totalQty}개`}
+                  className={`absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger-tx px-1 text-[11px] font-black leading-none text-white shadow ${cartHoldCountChanged ? "animate-pulse" : ""}`}
+                >
+                  {cartHoldSummary.totalQty > 99 ? "99+" : cartHoldSummary.totalQty}
+                </span>
+              ) : null}
+            </button>
+  
+              
+  
+            <button
+              type="button"
+              onClick={toggleNicknameSort}
+              className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
+            >
+              {sortLabel}
+            </button>
+  
+            <button
+              type="button"
+              onClick={refreshOrders}
+              disabled={!onRefresh || refreshing}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-ink-soft hover:opacity-90 active:bg-surface-2 active:scale-[0.94] transition-all duration-75 disabled:opacity-40"
+              title="주문 새로고침"
+            >
+              {refreshing ? "…" : "↻"}
+            </button>
+          </div>
+        ) : null}
+        {/* [2026-10-22 폰] 상태 칩은 한 줄 가로 스크롤(DESIGN-ADMIN §13). PC 는 줄바꿈 그대로 */}
+        <div className="flex flex-wrap items-center gap-2 max-md:w-full max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>button]:whitespace-nowrap">
+        {([
+          ["전체", counts.total, "all"],
+          ["미입금", counts.unpaid, "unpaid"],
+          ["매칭필요", counts.manual, "manual_match_needed"],
+          ["결제완료", counts.paid, "paid"],
+          ["출고대기", counts.ready, "ready"],
+          ["택배출고", counts.shipped, "shipped"],
+          ["취소", counts.canceled, "canceled"],
+        ] as [string, number, LiveOrderStatusFilter][]).map(([label, count, status]) => {
+          // [2026-11-26 VER3 시안] 칩 = 36px 알약, 고른 것 검정·나머지 흰 바탕 회색 선. 미입금은 매칭필요·카드미결제 포함(아래 숫자 겹침 = 원래 설계)
+          const active = filters.status === status;
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => updateFilter("status", status)}
+              aria-pressed={active}
+              className={`h-9 whitespace-nowrap rounded-full px-3.5 text-[13px] ${active ? "bg-ink font-bold text-white" : "border border-line bg-surface text-ink hover:bg-surface-2"}`}
+            >
+              {label} <b className="tabular-nums">{count.toLocaleString("ko-KR")}</b>
             </button>
           );
         })}
         </div>
 
-        <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:h-10 max-md:[&>button]:shrink-0 max-md:[&>button]:whitespace-nowrap">
+        {selectedOrderIds.size > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-ink px-3 py-2 text-white [&>button]:h-9">
           {selectedOrderIds.size > 0 && (
-            <span className="text-[12px] font-black text-[var(--color-rose-deep)]">{selectedOrderIds.size}건 선택됨</span>
+            <span className="text-[14px] font-bold text-white">{selectedOrderIds.size}건 선택</span>
           )}
           {selectedOrderIds.size > 0 && (
             <>
@@ -1284,16 +1413,11 @@ export default function LiveOrderTable({
               )}
             </>
           )}
-          <button
-            type="button"
-            onClick={() => setWorkPickerKind("invoice")}
-            disabled={exporting !== "" || (allWorkOrders||pickingSourceOrders).length === 0}
-            className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
-            title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
-          >
-            {exporting === "rozen" ? "내보내는중..." : "송장 출력"}
-          </button>
-
+            <button type="button" onClick={() => setSelectedOrderIds(new Set())} className="ml-auto rounded-xl px-2 text-[13px] font-semibold text-white/80 hover:text-white">선택 해제</button>
+          </div>
+        ) : null}
+        {isMobile ? (
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:h-10 max-md:[&>button]:shrink-0 max-md:[&>button]:whitespace-nowrap">
           <button
             type="button"
             onClick={() => setWorkPickerKind("picking")}
@@ -1305,6 +1429,16 @@ export default function LiveOrderTable({
             title={pickingSelectedFromTable.length > 0 ? "체크한 주문만 챙겨요(필터·기간과 상관없이)" : "주문서 필터 범위를 챙겨요 · 주문을 체크하면 그 주문만"}
           >
             {pickingSelectedFromTable.length > 0 ? `물건챙기기 · 선택 ${pickingSelectedFromTable.length}건` : "물건챙기기"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setWorkPickerKind("invoice")}
+            disabled={exporting !== "" || (allWorkOrders||pickingSourceOrders).length === 0}
+            className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+            title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
+          >
+            {exporting === "rozen" ? "내보내는중..." : "송장 출력"}
           </button>
 
           <button
@@ -1349,6 +1483,7 @@ export default function LiveOrderTable({
             {refreshing ? "…" : "↻"}
           </button>
         </div>
+        ) : null}
       </div>
 
 
@@ -1365,7 +1500,7 @@ export default function LiveOrderTable({
           </button>
         </div>
       ) : null}
-      <div className={`mb-3 w-full flex-wrap items-center gap-2 ${isMobile && !mobileFiltersOpen ? "hidden" : "flex"}`}>
+      <div className={`mb-3 w-full flex-wrap items-center gap-2 ${!mobileFiltersOpen ? "hidden" : "flex"} ${isMobile ? "" : "rounded-xl bg-surface-2 p-3"}`}>
         {/* [1] 기간 */}
         <select className="h-10 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[13px] font-bold text-ink outline-none transition focus:border-ink max-md:h-11 sm:w-[120px]"
           value={filters.date}
@@ -1397,6 +1532,7 @@ export default function LiveOrderTable({
           </>
         )}
 
+        {isMobile ? (<>
         {/* [2] 범위 */}
         <select className="h-10 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[13px] font-bold text-ink outline-none transition focus:border-ink max-md:h-11 sm:w-[130px]"
           value={filters.scope}
@@ -1431,6 +1567,7 @@ export default function LiveOrderTable({
           />
         )}
 
+        </>) : null}
         {/* [3] 상태 */}
         <select className="h-10 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[13px] font-bold text-ink outline-none transition focus:border-ink max-md:h-11 sm:w-[128px]"
           value={filters.status}
@@ -1445,9 +1582,13 @@ export default function LiveOrderTable({
           <option value="card_paid">카드결제완료</option>
           <option value="canceled">주문서취소</option>
           <option value="shipped">택배출고</option>
+          <option value="ready">출고대기</option>
         </select>
 
-        <div className={`flex w-full flex-nowrap items-center gap-2 sm:w-auto sm:flex-1 ${isMobile ? "hidden" : ""}`}>
+        {!isMobile && (filters.date !== "all" || filters.status !== "all" || filters.keyword || workFilter || filters.scope !== "all") ? (
+          <button className="h-10 flex-none rounded-xl px-2 text-[13px] font-bold text-ink-soft underline underline-offset-2 hover:text-ink" type="button" onClick={resetFilters}>필터 초기화</button>
+        ) : null}
+        <div className={`hidden w-full flex-nowrap items-center gap-2 sm:w-auto sm:flex-1`}>
           <input className="h-10 min-w-[120px] flex-1 rounded-xl border border-line bg-surface px-3 text-[13px] font-semibold text-ink outline-none transition focus:border-ink"
             value={pendingKeyword}
             onChange={(event) => setPendingKeyword(event.target.value)}
@@ -1481,7 +1622,7 @@ export default function LiveOrderTable({
 
       {/* [㉕-C] 작업 현황 줄 — 결제완료 기준 챙김/송장출력/출고 진행. 숫자 누르면 그 상태만 걸러 보기(토글). */}
       {/* [10-25 폰] 첫 주문이 화면 중간에서 시작하던 것 — 폰에선 「필터」를 열었거나 작업 현황으로 거르는 중일 때만 보임 */}
-      <div className={`mb-2 ${isMobile && !mobileFiltersOpen && !workFilter ? "hidden" : "flex"} flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-[12px] font-black text-ink-soft max-md:flex-nowrap max-md:overflow-x-auto max-md:whitespace-nowrap max-md:[scrollbar-width:none]`}>
+      <div className={`mb-2 ${!mobileFiltersOpen && !workFilter ? "hidden" : "flex"} flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-[12px] font-black text-ink-soft max-md:flex-nowrap max-md:overflow-x-auto max-md:whitespace-nowrap max-md:[scrollbar-width:none]`}>
         <span className="text-ink-mute">작업 현황</span>
         <span>결제완료 {workCounts.paid.toLocaleString()}</span>
         {([
@@ -1511,21 +1652,17 @@ export default function LiveOrderTable({
             /* [2026-08-29] 방송 중 아래로 스크롤하면 제목줄이 사라져 어느 칸이 금액인지 헷갈리던 문제.
                제목줄을 맨 위에 고정한다. 배경을 불투명으로 바꿔야 주문 행이 비쳐 보이지 않는다.
                표시 전용 — 주문·금액·입금 데이터와 무관. */
-            <div className="sticky top-0 z-20 grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_88px] gap-0 border-b border-rose-line bg-rose-soft text-[12px] font-black text-ink-soft shadow-sm">
+            <div className="sticky top-0 z-20 grid min-w-[900px] grid-cols-[40px_88px_168px_minmax(0,1fr)_120px_132px_120px] gap-0 border-b border-line bg-surface-2 text-[12px] font-semibold text-ink-mute">
               <span className="flex items-center justify-center py-2.5">
-                <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
+                <input type="checkbox" aria-label="이 페이지 전체 선택" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[var(--color-ink)]" />
               </span>
-              {/* [2026-09-20 Polaris 대조] 글 칸은 왼쪽(start) · 숫자 칸은 오른쪽(end) · 배지 칸만 가운데. 숫자는 tabular-nums 로 자릿수 정렬. 표시 전용 */}
-              <span className="whitespace-nowrap px-3 py-2.5 text-left">주문일</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-left">닉네임</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-left">이름</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-left">주문내용</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-right">수량</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-right">상품금액</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-right">택배비</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-right">총금액</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">입금</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">작업</span>
+              {/* [2026-11-26 VER3 시안 Main] 시각 · 닉네임(이름) · 주문(사진·상품·옵션) · 금액 · 결제 · 출고 */}
+              <span className="whitespace-nowrap px-2 py-2.5 text-left">시각</span>
+              <span className="whitespace-nowrap px-2 py-2.5 text-left">닉네임</span>
+              <span className="whitespace-nowrap px-2 py-2.5 text-left">주문</span>
+              <span className="whitespace-nowrap px-2 py-2.5 text-right">금액</span>
+              <span className="whitespace-nowrap px-2 py-2.5 text-left">결제</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-left">출고</span>
             </div>
             )}
 
@@ -1600,39 +1737,19 @@ export default function LiveOrderTable({
                   return (
                     <Fragment key={order.id}>
                     <div
-                      className={`group grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_88px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
+                      className={`group grid min-h-[60px] min-w-[900px] grid-cols-[40px_88px_168px_minmax(0,1fr)_120px_132px_120px] gap-0 items-center text-[14px] transition ${selected ? "bg-surface-2" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "shadow-[inset_3px_0_0_var(--color-warn-tx)]" : ""}`}
                     >
-                      {/* 0. 선택 체크박스 */}
-                      <div className="flex items-center justify-center py-3" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
+                      <div className="flex items-center justify-center py-2" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" aria-label={`${order.nickname} 주문 선택`} checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} className="h-4 w-4 cursor-pointer accent-[var(--color-ink)]" />
                       </div>
-                      {/* 1. 주문일 */}
-                      <div className="px-3 py-3 text-left text-[11px] leading-tight text-ink-soft tabular-nums">
-                        {(() => {
-                          const src = order.createdAt || order.submittedAt;
-                          if (!src) return <span>-</span>;
-                          try {
-                            const d = new Date(src);
-                            if (isNaN(d.getTime())) return <span className="text-[11px]">{src}</span>;
-                            const yy = d.getFullYear();
-                            const mm = String(d.getMonth() + 1).padStart(2, "0");
-                            const dd = String(d.getDate()).padStart(2, "0");
-                            const wd = ["일","월","화","수","목","금","토"][d.getDay()];
-                            const hh = String(d.getHours()).padStart(2, "0");
-                            const mi = String(d.getMinutes()).padStart(2, "0");
-                            return <span className="whitespace-nowrap">{yy === new Date().getFullYear() ? "" : `${yy}.`}{mm}.{dd}<span className="text-ink-mute">({wd})</span> {hh}:{mi}</span>;
-                          } catch { return <span className="text-[11px]">{src}</span>; }
-                        })()}
-                      </div>
-                      {/* 2. 닉네임 */}
-                      <div className="min-w-0 px-3 py-3 text-left">
-                        <div className="mb-0.5">
-                          <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[13px]">
-                            {order.isTestOrder ? "[테스트]" : ""}{order.nickname}
-                          </button>
-                        </div>
-                        {/* [2026-10-22] 지난 주문 가상 묶음(가져온 줄만)은 금액이 주문서 전체가 아니므로 복사·쪽지는 원래 주문(상세)에서 */}
-                        {/* [2026-11-26] 복사 버튼은 줄에 마우스를 올리거나 키보드로 들어왔을 때만 — 평소엔 줄 높이를 줄여 한 화면에 주문을 더 많이 */}
+                      {/* 시각 — 오늘이면 시:분만 */}
+                      <div className="whitespace-nowrap px-2 py-2 text-[13px] text-ink-mute tabular-nums">{orderTimeText(order.createdAt || order.submittedAt)}</div>
+                      {/* 닉네임 · 이름 */}
+                      <div className="min-w-0 px-2 py-2 text-left">
+                        <button type="button" onClick={() => onSelectOrder(order)} className="max-w-full truncate text-left text-[14px] font-bold text-ink underline-offset-2 hover:underline">
+                          {order.isTestOrder ? "[테스트]" : ""}{order.nickname}
+                        </button>
+                        {order.name ? <div className="truncate text-[12px] text-ink-mute">{order.name}</div> : null}
                         {order.pickPull && !order.pickPull.whole ? null : (
                         <div className="mt-0.5 hidden flex-wrap gap-1 group-hover:flex group-focus-within:flex">
                           <button
@@ -1663,29 +1780,19 @@ export default function LiveOrderTable({
                           </div>
                         )}
                       </div>
-                      {/* 3. 이름 */}
-                      <div className="min-w-0 truncate px-3 py-3 text-left text-[13px] text-ink-soft">{order.name || "-"}</div>
-                      {/* 4. 주문내용 */}
-                      <div className="min-w-0 truncate px-3 py-3 text-left text-[13px] font-black text-ink-soft">{renderOrderSummary(order)}</div>
-                      {/* 4. 수량 */}
-                      <div className="px-3 py-3 text-right tabular-nums">
-                        <span className="inline-flex min-w-[34px] items-center justify-center rounded-lg bg-surface-2 px-1 py-0.5 text-[13px] font-black text-ink">
-                          {getTotalQty(order)}
-                        </span>
+                      {/* 주문 — 사진 · 첫 상품(외 N개) · 옵션 · 개수 */}
+                      <div className="flex min-w-0 items-center gap-2.5 px-2 py-2">
+                        {orderPhotos[String(order.id)] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={orderPhotos[String(order.id)]} alt="" className="h-9 w-9 shrink-0 rounded-lg bg-surface-2 object-cover" loading="lazy" />
+                        ) : <span aria-hidden="true" className="h-9 w-9 shrink-0 rounded-lg bg-surface-2" />}
+                        <div className="min-w-0">
+                          <div className="min-w-0 truncate text-[14px] font-medium text-ink">{(order as any).returnStatus ? renderOrderSummary(order) : firstItemNameText(order)}</div>
+                          <div className="truncate text-[12px] text-ink-mute">{firstOptionText(order)}{firstOptionText(order) ? " · " : ""}{getTotalQty(order)}개</div>
+                        </div>
                       </div>
-                      {/* 5. 상품금액 */}
-                      <div className="px-3 py-3 text-right text-[13px] font-black text-ink tabular-nums">
-                        <div>{money(order.productAmount)}</div>
-                        {Number(order.pointUsedAmount || 0) > 0 ? (
-                          <div className="text-[11px] text-ok-tx">포인트 -{money(Number(order.pointUsedAmount || 0))}</div>
-                        ) : null}
-                      </div>
-                      {/* 6. 택배비 */}
-                      <div className="px-3 py-3 text-right text-[13px] text-ink-mute tabular-nums">
-                        {Number(order.shippingFee || 0) > 0 ? money(order.shippingFee) : "0"}
-                      </div>
-                      {/* 7. 총금액 */}
-                      <div className="px-3 py-3 text-right text-[14px] font-black text-ink tabular-nums">
+                      {/* 금액 */}
+                      <div className="px-2 py-2 text-right text-[14px] font-bold text-ink tabular-nums">
                         {money(displayPayableAmount(order))}
                         {(() => {
                           // [2026-08-31 사장님 지적] 보라 줄이 위 총금액과 같은 값을 반복했음 → 카드라서 더 붙은 추가금(+)만 작게 표시
@@ -1695,9 +1802,10 @@ export default function LiveOrderTable({
                           if (extra <= 0) return null;
                           return <div className="text-[11px] font-black text-[var(--color-cardpay)]">+{money(extra)}</div>;
                         })()}
+                        {Number(order.pointUsedAmount || 0) > 0 ? <div className="text-[11px] font-normal text-ok-tx">포인트 -{money(Number(order.pointUsedAmount || 0))}</div> : null}
                       </div>
-                      {/* 8. 입금 */}
-                      <div className="px-3 py-3 text-center">
+                      {/* 결제 */}
+                      <div className="px-2 py-2 text-left">
                         <div>{statusBadge(order, {
                           onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
                           onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
@@ -1709,24 +1817,12 @@ export default function LiveOrderTable({
                           </button>
                         ) : null}
                       </div>
-                      {/* 9. 작업 — 챙김 / 송장출력 / 엑셀 / 출고 */}
-                      <div className="flex flex-col items-center gap-1 px-1 py-3 text-center">
-                        <PickChip order={order} />
-                        <InvoiceChip order={order} />
-                        <PickingListChip order={order} />
+                      {/* 출고 — 출고 상태 + 챙김·송장 */}
+                      <div className="flex flex-col items-start gap-1 px-3 py-2">
                         {(order as any).shippingStatus ? (
-                          <span
-                            className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${
-                              String((order as any).shippingStatus) === "출고완료"
-                                ? "bg-info-bg text-[var(--color-info-tx)]"
-                                : "bg-surface-2 text-ink-soft"
-                            }`}
-                          >
-                            {shippingStatusLabel((order as any).shippingStatus)}
-                          </span>
-                        ) : (
-                          <span className="text-ink-mute">-</span>
-                        )}
+                          <span className={`inline-flex items-center whitespace-nowrap rounded-lg px-2 py-1 text-[12px] font-semibold leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
+                        ) : <span className="text-ink-mute">-</span>}
+                        <span className="flex flex-wrap gap-1"><PickChip order={order} /><InvoiceChip order={order} /><PickingListChip order={order} /></span>
                       </div>
                     </div>
                     </Fragment>
