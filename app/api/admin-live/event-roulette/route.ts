@@ -155,6 +155,8 @@ function sanitizeBroadcast(row: RouletteBroadcastRow) {
     status: getBroadcastStatus(row),
     started_at: getBroadcastStart(row) || null,
     ended_at: getBroadcastEnd(row) || null,
+    // 실제로 켠 적 있는 방송인지(준비만 한 방송은 created_at 이 시작처럼 보여 기본값이 되던 것 구분용)
+    has_started: Boolean(cleanText(row.started_at || row.start_at || row.start_time)),
   };
 }
 

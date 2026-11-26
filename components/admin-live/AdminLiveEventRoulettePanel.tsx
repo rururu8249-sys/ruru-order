@@ -84,6 +84,7 @@ type RouletteBroadcast = {
   status?: string;
   started_at?: string | null;
   ended_at?: string | null;
+  has_started?: boolean;
 };
 
 type RouletteParticipant = {
@@ -1049,7 +1050,8 @@ export default function AdminLiveEventRoulettePanel({
 
     const bootstrap = async () => {
       const list = await loadBroadcasts();
-      const nextBroadcastId = liveBroadcastId || broadcastId || list[0]?.id || "";
+      // [2026-11-26] 아직 안 켠 준비 방송(주문 0명)이 맨 위로 와 기본값이 되던 것 → 실제로 시작한 방송 중 최신을 기본으로.
+      const nextBroadcastId = liveBroadcastId || broadcastId || list.find((b) => b.has_started)?.id || list[0]?.id || "";
 
       if (nextBroadcastId) {
         setBroadcastId(nextBroadcastId);
