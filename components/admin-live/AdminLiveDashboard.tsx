@@ -734,7 +734,11 @@ export default function AdminLiveDashboard() {
   const [broadcastStartDraft, setBroadcastStartDraft] = useState<{ title: string; youtubeUrl?: string } | null>(null);
 
   // [2026-08-11 부하개선] 기본은 최근 90일만(서버 스캔량 감소). 옛 입금 확인은 allPeriod=true(전체 기간 버튼).
+  // [2026-11-26] 뱅크다 1분 동기화마다 onSynced 가 입금내역을 읽은 «직후» 같은 창의 동기화 이벤트가 또 읽어
+  //   2번씩(각 2초·0.5MB) 받던 것(운영 실측) → 이벤트 쪽만 «방금(5초 안) 읽었으면» 건너뜀. onSynced·수동 새로고침은 그대로.
+  const depositsLoadedAtRef = useRef(0);
   const loadDepositsFromServer = async (allPeriod?: boolean) => {
+    depositsLoadedAtRef.current = Date.now();
     const response = await fetch(allPeriod ? "/api/admin-v2/deposits?days=all" : "/api/admin-v2/deposits", {
       method: "GET",
       cache: "no-store",
@@ -835,21 +839,57 @@ export default function AdminLiveDashboard() {
     let error: any = null;
 
     if (needsFullLoad) {
+      // [2026-11-26] 예전: 1,000줄씩 «차례로» 7번 기다림(운영 실측 약 5.4초). 첫 장에서 전체 줄 수를 받고
+      //   나머지 장은 4개씩 «동시에». 장 순서대로 이어 붙이므로 결과는 예전과 같다.
       const pageSize = 1000;
-      let from = 0;
+      const fetchPage = (from: number, withCount = false) => supabase
+        .from("orders")
+        .select("*", withCount ? { count: "exact" } : undefined)
+        .neq("is_deleted", true)
+        .order("created_at", { ascending: false })
+        .range(from, from + pageSize - 1);
       const all: any[] = [];
-      while (true) {
-        const page = await supabase
-          .from("orders")
-          .select("*")
-          .neq("is_deleted", true)
-          .order("created_at", { ascending: false })
-          .range(from, from + pageSize - 1);
-        if (page.error) { error = page.error; break; }
-        const rows = page.data || [];
-        all.push(...rows);
-        if (rows.length < pageSize) break;
-        from += pageSize;
+      const first = await fetchPage(0, true);
+      if (first.error) {
+        error = first.error;
+      } else {
+        const firstRows = first.data || [];
+        all.push(...firstRows);
+        const total = typeof first.count === "number" ? first.count : null;
+        if (firstRows.length >= pageSize) {
+          if (total !== null) {
+            const starts: number[] = [];
+            for (let from = pageSize; from < total; from += pageSize) starts.push(from);
+            for (let i = 0; i < starts.length && !error; i += 4) {
+              const pages = await Promise.all(starts.slice(i, i + 4).map((from) => fetchPage(from)));
+              for (const page of pages) {
+                if (page.error) { error = page.error; break; }
+                all.push(...(page.data || []));
+              }
+            }
+            // 세는 사이 새 주문이 들어와 마지막 장이 꽉 찼으면 끝날 때까지 이어서(예전 방식)
+            let from = pageSize * (starts.length + 1);
+            while (!error && all.length >= from) {
+              const page = await fetchPage(from);
+              if (page.error) { error = page.error; break; }
+              const rows = page.data || [];
+              all.push(...rows);
+              if (rows.length < pageSize) break;
+              from += pageSize;
+            }
+          } else {
+            // 줄 수를 못 받으면 예전처럼 차례로
+            let from = pageSize;
+            while (true) {
+              const page = await fetchPage(from);
+              if (page.error) { error = page.error; break; }
+              const rows = page.data || [];
+              all.push(...rows);
+              if (rows.length < pageSize) break;
+              from += pageSize;
+            }
+          }
+        }
       }
       if (!error) data = all;
     } else {
@@ -1037,6 +1077,7 @@ export default function AdminLiveDashboard() {
     // ※ BANKDA 입금확인 setInterval(useAutoBankdaPaymentSync.ts)은 그대로 유지 — 건드리지 않음.
     const handleAutoBankdaSynced = () => {
       if (!LIVE_ORDER_BANKDA_EVENT_REFRESH_ENABLED) return;
+      if (Date.now() - depositsLoadedAtRef.current < 5000) return;
 
       // 입금내역만 갱신. 주문목록은 onSynced(매칭 성공 시)+realtime 구독이 담당 → 매 폴링 새로고침 방지.
       void loadDepositsFromServer();
