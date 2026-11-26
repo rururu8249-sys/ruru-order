@@ -9,7 +9,7 @@ const base={now:Date.parse('2026-11-18T01:00:00+09:00'),actorId:'a',recent:[],cu
 for(const text of ['지금 유튜브 라이브 보고 넘어왔어요','유튜브 방송 보다가 넘어왔어요']){
  assert.equal(judgeTestChat({...base,mode:'replay',text}).ok,false,'off-air current claim '+text);
 }
-assert.equal(judgeTestChat({...base,mode:'replay',text:'어제 유튜브 보고 구독했어요'}).ok,true);
+assert.equal(judgeTestChat({...base,mode:'replay',text:'어제 유튜브 보고 구독했어요',replyingToHuman:true,replySourceIsHuman:true}).ok,true);
 assert.equal(judgeTestChat({...base,mode:'live',text:'유튜브 방송 보다가 넘어왔어요'}).ok,true);
 const off=greetingPool({live:false,sinceStartMs:500000,kstHour:1,visitRecently:false,weekend:false});
 assert.ok(!off.some(x=>/유튜브 방송 보다가 넘어왔어요/.test(x.text)));

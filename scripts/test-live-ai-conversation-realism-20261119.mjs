@@ -21,7 +21,7 @@ for(let a=0;a<180;a++)for(let m=0;m<4;m++){
  assert.ok(!/[가-힣]{18,}/.test(styled),`비정상 장문 붙여쓰기: ${styled}`);
 }
 const prompt=buildCompactConversationPrompt({mode:'paused',cardText:'PD-529 아이보리',messages:[],actors:[{nickname:'모모'},{nickname:'나비'}],styleSummary:'한두 마디 짧음'});
-assert.ok(prompt.includes('정확한 #번호')&&prompt.includes('고민한다고')&&prompt.includes('통째로 붙여 쓰면 안 된다'));
+assert.ok(prompt.includes('정확한 #번호')&&prompt.includes('고민한다고')&&prompt.includes('기본 띄어쓰기와 상품명을 유지한다'));
 assert.ok(prompt.includes('상품을 찾지도 않고')&&prompt.includes('정형화')===false);
 assert.ok(prompt.length<5200, 'prompt budget exceeded');
 const focus=buildFocusedProductPrompt({productName:'PD-529 아이보리',colors:['아이보리','블랙'],candidates:['모모'],recentAi:['고민되네요']});

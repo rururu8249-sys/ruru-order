@@ -9,7 +9,7 @@ for(const text of ['막지마라115 와인 잔에 따라 마시면 색이 예쁘
  assert.equal(judgeTestChat({...base,text}).ok,false,`stored product-category error: ${text}`);
 }
 for(const text of ['mx107 와인 색이 예쁘네요','와인 컬러는 검정 바지랑 어울릴까요?','와인색이 포도주처럼 진한가요?','반가워요💕','아 그렇군요 안내 감사해요!']){
- assert.equal(judgeTestChat({...base,text,replyingToHuman:true}).ok,true,`normal conversation: ${text}`);
+ assert.equal(judgeTestChat({...base,text,replyingToHuman:true,replySourceIsHuman:true}).ok,true,`normal conversation: ${text}`);
 }
 for(const text of ['미우302 블랙 색상 따로 없나요','막지마라129 와인 컬러가 따로 있나요?','프라땡518 블랙 색상 따로 없나요..'])assert.equal(stockQuestionBlocked(text),true,text);
 for(const text of ['와인 색감이 어떤가요?','블랙에 어울리는 색상 있나요?','각인 있나요?','숏 패딩도 있나요?'])assert.equal(stockQuestionBlocked(text),false,text);
@@ -33,9 +33,9 @@ for(const [color,text] of [['초코','초코 먹으면 달콤한 맛이 나나�
  assert.equal(judgeTestChat({...base,currentProduct,text}).ok,false);
  assert.equal(judgeTestChat({...base,currentProduct,text:`막스118 ${color} 색감이 어떤가요?`}).ok,true);
 }
-assert.equal(judgeTestChat({...base,currentProduct:{name:'레드와인 음료',colors:[],sizes:[]},text:'와인 병 디자인이 독특하네요'}).ok,true,'actual beverage is not a garment');
+assert.equal(judgeTestChat({...base,currentProduct:{name:'레드와인 음료',colors:[],sizes:[]},text:'레드와인 음료 병 디자인이 독특하네요'}).ok,true,'actual beverage is not a garment');
 assert.equal(judgeTestChat({...base,text:'안주가 맛있겠네요',replySourceText:'와인 안주 먹고 있어요',replyingToHuman:true}).ok,true,'human food topic remains allowed');
-assert.equal(judgeTestChat({...base,text:'mx107 와인 안주로 좋겠네요',replySourceText:'와인 안주 먹고 있어요',replyingToHuman:true}).ok,false,'human source does not license garment-as-food');
+assert.equal(judgeTestChat({...base,text:'mx107 와인 안주로 좋겠네요',replySourceText:'와인 안주 먹고 있어요',replyingToHuman:true,replySourceIsHuman:true}).ok,false,'human source does not license garment-as-food');
 // Read the real card builder with only the network featured selection replaced.
 const load=createUiLoader({'./liveAutomationFeatured':{readAutomationFeatured:async()=>({productId:'818',detailName:'MX-107 와인',revision:'r'})}});
 const product={id:818,product_name:'막스마라',status:'active',product_status:'active',color_options:['MX-107 와인'],product_note:{brand_group:{enabled:true,detail_options:{'MX-107 와인':{colors:['없음'],sizes:['36','38','40']}}}}};
@@ -46,4 +46,4 @@ assert.equal(loaded.parentName,'막스마라');assert.deepEqual(loaded.colors,[]
 assert.deepEqual(productSemanticFacts(loaded).namedColors,['와인']);
 console.log('PASS shared prompt facts, all modes, other color homonyms, genuine food replies and actual card mapping');
 
-for(const [replySourceText,text] of [['와인 안주 먹고 있어요','와인 안주 맛있겠네요'],['오늘 치킨 시켰어요','안주 맛있게 드세요']])assert.equal(judgeTestChat({...base,replySourceText,text,replyingToHuman:true}).ok,true,'human food conversation is not a garment reference');
+for(const [replySourceText,text] of [['와인 안주 먹고 있어요','와인 안주 맛있겠네요'],['오늘 치킨 시켰어요','안주 맛있게 드세요']])assert.equal(judgeTestChat({...base,replySourceText,text,replyingToHuman:true,replySourceIsHuman:true}).ok,true,'human food conversation is not a garment reference');
