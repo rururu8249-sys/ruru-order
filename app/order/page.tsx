@@ -8282,7 +8282,7 @@ export default function OrderPage() {
                                 onClick={(event) => { event.stopPropagation(); selectQuickGroupBuyProduct(product as BroadcastProduct); }}
                                 style={{ position: "absolute", right: "6px", bottom: "6px", pointerEvents: "auto", padding: "2px", border: "none", background: "transparent", cursor: sold ? "not-allowed" : "pointer", fontFamily: "inherit" }}
                               >
-                                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "40px", padding: "0 16px", boxSizing: "border-box", borderRadius: "9999px", border: "1.5px solid #FFFFFF", background: sold ? "#F5F5F5" : "#111111", color: sold ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "40px", padding: "0 16px", boxSizing: "border-box", borderRadius: "9999px", border: "1.5px solid #FFFFFF", background: sold ? "#F5F5F5" : "var(--theme-accent, #111111)", color: sold ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
                                   {sold ? "품절" : brandGroup ? "상품 선택" : (
                                     <>
                                       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v11M1.5 7h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
