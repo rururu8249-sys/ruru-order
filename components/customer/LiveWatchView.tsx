@@ -1265,6 +1265,7 @@ export default function LiveWatchView(props: Props) {
       data-live-watch-root="1"
       // [07:32 사장님] 채팅 그림(이모티콘·프로필)을 꾹 눌러도 «이미지 저장» 창이 안 뜨게 — 그림에서만 막음(글자 입력칸 붙여넣기는 그대로)
       onContextMenu={(e) => { if ((e.target as HTMLElement | null)?.tagName === "IMG") e.preventDefault(); }}
+      data-live-watch="true"
       style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: LIVE_FONT, textRendering: "optimizeLegibility", overscrollBehavior: "none", outline: "none" }}
     >
       {/* PC 영상 영역 / 폰은 기존 화면 전체 배치 */}

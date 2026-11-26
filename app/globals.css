@@ -517,7 +517,8 @@ html[data-ruru-theme="winter"] body { background: #fbf8f3 !important; }
 html[data-ruru-theme="winter"] [data-theme-hd] { background: #173f2c !important; color: #ffffff !important; border-bottom: 3px solid #c0262d !important; }
 html[data-ruru-theme="winter"] [data-theme-hd] *:not(button):not(button *) { color: #ffffff !important; }
 html[data-ruru-theme="winter"] [data-theme-live-section] div:is([style*="background: rgb(245, 245, 245)"],[style*="background:#F5F5F5"],[style*="background: #F5F5F5"]) { background: #f1ece4 !important; border-top: 3px solid #c0262d !important; }
-html[data-ruru-theme="winter"] button:is([style*="background: rgb(17, 17, 17)"],[style*="background:#111111"],[style*="background: #111111"]) { background: #173f2c !important; }
+/* [2026-11-26 사장님] 방송 보며 주문 화면(data-live-watch)은 겨울 색을 안 씀 — 영상 위가 정신없지 않게 */
+html[data-ruru-theme="winter"] button:is([style*="background: rgb(17, 17, 17)"],[style*="background:#111111"],[style*="background: #111111"]):not([data-live-watch] button) { background: #173f2c !important; }
 /* [2026-11-26] 겨울(크리스마스) 시안 장식 — 눈·반짝임·썰매·머리말 전구 줄(?preview=tc 에서만) */
 .ruru-xmas-flake { position: absolute; top: -12px; border-radius: 9999px; background: #ffffff; box-shadow: 0 0 4px rgba(255,255,255,0.8), 0 0 1px rgba(150,170,190,0.9); animation-name: ruruXmasFall; animation-timing-function: linear; animation-iteration-count: infinite; }
 @keyframes ruruXmasFall { 0% { transform: translate3d(0,-12px,0); } 100% { transform: translate3d(var(--drift, 0px), 105vh, 0); } }
