@@ -503,7 +503,7 @@ export default function MyOrderPage() {
             ) : (
               <div className={v2 ? "rounded-[8px] bg-[#F5F5F5] p-5 text-center" : "rounded-[20px] bg-white p-4 text-center ring-1 ring-slate-200"}>
                 <p className={v2 ? "text-[15px] font-normal text-[#39393B]" : "text-[14px] font-black tracking-[-0.04em] text-slate-700"}>
-                  선택한 상태의 주문내역이 없습니다.
+                  {orderFilter === "전체" ? "최근 주문내역이 없습니다." : "선택한 상태의 주문내역이 없습니다."}
                 </p>
               </div>
             )}
