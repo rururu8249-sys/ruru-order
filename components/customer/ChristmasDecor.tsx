@@ -98,8 +98,8 @@ function Santa({ x }: { x: number }) {
 /** 방송 상자 위 크리스마스 띠(높이 96). */
 export function ChristmasBanner() {
   return (
-    <div data-xmas-banner="true" aria-hidden="true" style={{ position: "relative", height: 96, borderRadius: 14, overflow: "hidden", marginBottom: 10, background: "linear-gradient(180deg,#0f2f22 0%,#173f2c 70%,#1d4a34 100%)" }}>
-      <svg viewBox="0 0 360 96" width="100%" height="96" preserveAspectRatio="xMidYMax slice" style={{ display: "block" }}>
+    <div data-xmas-banner="true" aria-hidden="true" style={{ position: "relative", height: 112, borderRadius: 14, overflow: "hidden", marginBottom: 10, background: "linear-gradient(180deg,#0f2f22 0%,#173f2c 70%,#1d4a34 100%)" }}>
+      <svg viewBox="0 -18 360 114" width="100%" height="112" preserveAspectRatio="xMidYMax slice" style={{ display: "block" }}>
         {/* 별·달 */}
         <circle cx="268" cy="20" r="9" fill="#fff6cf" />
         <circle cx="272" cy="17" r="8" fill="#173f2c" />
@@ -119,7 +119,7 @@ export function ChristmasBanner() {
         </g>
         <Tree x={300} s={0.85} />
       </svg>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 6, textAlign: "center", color: "#ffffff", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 8, textAlign: "center", color: "#ffffff", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}>
         🎄 Merry Christmas 🎅
       </div>
     </div>
