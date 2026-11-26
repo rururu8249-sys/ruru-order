@@ -7830,7 +7830,8 @@ export default function OrderPage() {
             />
           ) : null}
           {/* [2026-11-26] 주문 단계 표시(마켓오리진 참고) — 색 시안 미리보기에서만. 지금 어디쯤인지만 보여 줌(누르는 기능 없음) */}
-          {themePreview ? (() => {
+          {/* [VER3 2026-11-26] 손님 기본 테마가 켜진 뒤 단계 표시가 모든 손님에게 보이던 것 → 시안에 없고 사장님 결정 전이라 ?preview 로 직접 고른 브라우저만 */}
+          {themePreview && themePickRef.current?.explicit ? (() => {
             const step = items.some((item) => String(item.product_name || "").trim() && toNumber(item.qty) > 0) ? 2 : 1;
             return (
               <div data-theme-steps="true" aria-label={`주문 단계 ${step}/3`} style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
