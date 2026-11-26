@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import YoutubeOpener from "./YoutubeOpener";
 
 export const metadata: Metadata = {
-  title: "루루동이 유튜브 채널",
+  title: "나야루루 유튜브 채널",
   description: "루루동이 유튜브 라이브 채널로 이동합니다.",
   robots: { index: false, follow: false },
 };

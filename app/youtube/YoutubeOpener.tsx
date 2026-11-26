@@ -77,7 +77,7 @@ export default function YoutubeOpener() {
         <rect x="4" y="10" width="40" height="28" rx="9" fill="#FF0000" />
         <path d="M20 17.5v13l11-6.5z" fill="#FFFFFF" />
       </svg>
-      <h1 style={{ fontSize: "20px", fontWeight: 700, margin: "0 0 8px" }}>루루동이 유튜브 채널</h1>
+      <h1 style={{ fontSize: "20px", fontWeight: 700, margin: "0 0 8px" }}>나야루루 유튜브 채널</h1>
       <p style={{ fontSize: "15px", color: "#707072", margin: "0 0 28px", lineHeight: 1.5, wordBreak: "keep-all" }}>
         {inKakao ? (
           <>
