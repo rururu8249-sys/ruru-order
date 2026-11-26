@@ -77,7 +77,7 @@ export default function SettlementOnePage(props: Props) {
   const isLastMonth = !pickedBroadcast && !customOpen && startDate === lastMonth.start && endDate === lastMonth.end;
 
   const scopeLabel = pickedBroadcast
-    ? pickedBroadcast.label
+    ? pickedBroadcast.label.replace(/방송없음$/, "쇼핑몰 주문")
     : isThisMonth
       ? `${thisMonth.month}월`
       : isLastMonth
@@ -145,7 +145,7 @@ export default function SettlementOnePage(props: Props) {
             <option value="">방송별</option>
             {broadcastOptions.map((o) => (
               <option key={o.key} value={o.key}>
-                {o.label}
+                {o.label.replace(/방송없음$/, "쇼핑몰 주문")}
               </option>
             ))}
           </select>
@@ -220,7 +220,7 @@ export default function SettlementOnePage(props: Props) {
 
           {costMissing > 0 ? (
             <div className="mt-5 rounded-[10px] bg-warn-bg px-3.5 py-3 text-sm text-warn">
-              입금가 안 적은 주문 {costMissing.toLocaleString("ko-KR")}건 — 이만큼 덜 빠졌어요 (상품 수정에서 입금가를 적으면 다음 주문부터 빠져요)
+              입금가 안 적은 상품 {costMissing.toLocaleString("ko-KR")}개 — 그만큼 덜 빠졌어요 (상품 수정에서 입금가를 적으면 다음 주문부터 빠져요)
             </div>
           ) : null}
         </section>
@@ -231,7 +231,7 @@ export default function SettlementOnePage(props: Props) {
           {lives.map((row) => {
             const on = selectedBroadcastKeys.length === 1 && selectedBroadcastKeys[0] === row.key;
             const [date, ...rest] = row.label.split(" · ");
-            const name = rest.length ? rest.join(" · ") : row.label;
+            const name = (rest.length ? rest.join(" · ") : row.label).replace(/^방송없음$/, "쇼핑몰 주문");
             return (
               <button
                 type="button"
