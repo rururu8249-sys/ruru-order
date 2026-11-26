@@ -205,15 +205,21 @@ export default function LiveFloatingMatchPanel({
 
   // 날짜 그룹핑
   const grouped = useMemo(() => {
+    // [2026-11-26 VER 3] 주문을 골라 열지 않았을 때: 짝(연결 추천·추가 입금)이 있는 입금을 맨 위 「짝을 찾았어요」 묶음으로.
+    //   표시 순서만 — 추천 판정(findBestOrder·shortageFor)·연결/붙이기 버튼·서버 매칭 그대로.
+    const pairs: any[] = [];
     const map = new Map<string, any[]>();
     for (const dep of filtered) {
+      if (!matchMode && isUnmatchedLiveDeposit(dep) && (findBestOrder(dep) || shortageFor(dep))) { pairs.push(dep); continue; }
       // [2026-10-21 입금 통합] 날짜(요일)까지만 묶음 머리로 — 시각은 줄마다 이미 보인다(표시만)
       const label = (liveDepositDateLabel(dep) ?? "날짜 미상").replace(/^(\d{4}\.\d{2}\.\d{2}\([^)]+\)).*$/, "$1");
       if (!map.has(label)) map.set(label, []);
       map.get(label)!.push(dep);
     }
-    return Array.from(map.entries());
-  }, [filtered]);
+    const rest = Array.from(map.entries());
+    return pairs.length > 0 ? [[`짝을 찾았어요 · ${pairs.length}건`, pairs] as [string, any[]], ...rest] : rest;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, matchMode, orders, allOrders, shortages]);
 
   // (미매칭 건수는 창 위 「입금매칭 N」 칩이 보여준다 — 대시보드에서 같은 판정 isUnmatchedLiveDeposit 으로 센다)
 
@@ -547,7 +553,7 @@ export default function LiveFloatingMatchPanel({
         )}
         {grouped.map(([dateLabel, deps]) => (
           <div key={dateLabel}>
-            <div className="sticky top-0 z-[1] border-b border-line bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-mute">
+            <div className={`sticky top-0 z-[1] border-b border-line px-3 py-1.5 text-[12px] font-semibold ${dateLabel.startsWith("짝을 찾았어요") ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-mute"}`}>
               {dateLabel}
             </div>
             {deps.map((dep: any) => {
