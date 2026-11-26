@@ -1232,7 +1232,7 @@ export default function LiveOrderTable({
         {/* [2026-11-26 VER3 시안 Main] PC 첫 줄 = 검색 · 방송 · 필터 · 물건챙기기 · 송장 출력(+장바구니). 폰은 아래 예전 배치 */}
         {!isMobile ? (
           <div className="flex flex-wrap items-center gap-2 [&>button]:h-11 [&>button]:rounded-[10px] [&>button]:px-3.5 [&>button]:text-[14px] [&>button]:font-semibold [&>button]:text-ink">
-            <label className="flex h-11 min-w-[280px] flex-[1_1_320px] items-center gap-2 rounded-[10px] border border-line bg-surface px-3 focus-within:border-ink">
+            <label className="flex h-11 min-w-[180px] flex-[1_1_200px] items-center gap-2 rounded-[10px] border border-line bg-surface px-3 focus-within:border-ink">
               <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-mute"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
               <input
                 aria-label="주문 검색"
