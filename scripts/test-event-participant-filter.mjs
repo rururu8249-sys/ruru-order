@@ -10,7 +10,7 @@ for(const groups of [['past-order-1','past-order-2'],[],null]){
  for(const paidOnly of [false,true]){
   let request;
   let savedBroadcast;
-  const context={mode:'live',sourceDate:'2026-10-01',broadcastId:'past-broadcast',filteredIdsRef:{current:groups},excludeDailyDup:false,ticketRuleBody:{},participantCacheRef:{current:{}},setBroadcastId(id){savedBroadcast=id;},setLoading(){},setParticipants(){},showAdminToast(){throw new Error('unexpected failure');},requestJson:async(_url,opts)=>{request=JSON.parse(opts.body);return {ok:true,participants:[]};}};
+  const context={rosterScopeRef:{current:''},mode:'live',sourceDate:'2026-10-01',broadcastId:'past-broadcast',filteredIdsRef:{current:groups},excludeDailyDup:false,ticketRuleBody:{},participantCacheRef:{current:{}},setBroadcastId(id){savedBroadcast=id;},setLoading(){},setParticipants(){},showAdminToast(){throw new Error('unexpected failure');},requestJson:async(_url,opts)=>{request=JSON.parse(opts.body);return {ok:true,participants:[]};}};
   vm.createContext(context);
   const js=ts.transpileModule(source.slice(start,end)+'\nglobalThis.run=loadParticipants;', {compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
   vm.runInContext(js,context);

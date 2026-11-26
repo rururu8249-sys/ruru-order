@@ -16,7 +16,7 @@ const scope=new Proxy({
   ...helpers,ORDER_PURCHASE_CONSENT_KEYS:[],COMBINE_SHIPPING_SETTING_KEYS:[],FINAL_SUBMIT_CONFIRMATION_KEY:'confirmation',
   supabase:{from(table){const q={select(){return this;},in(){return Promise.resolve({data:rows,error:null});},eq(){return this;},maybeSingle(){return pending;}};return q;}},
   localStorage:{getItem(){return null;},setItem(){}},
-},{has:()=>true,get(target,key){if(key===Symbol.unscopables)return undefined;if(key in target)return target[key];if(String(key).startsWith('set'))return value=>{calls[key]=value;};if(String(key).startsWith('parse'))return ()=>({steps:[],warn:'',verified:true});return globalThis[key];}});
+},{has:()=>true,get(target,key){if(key===Symbol.unscopables)return undefined;if(key in target)return target[key];if(String(key).startsWith('set'))return value=>{calls[key]=value;};if(/Ref$/.test(String(key)))return (target[key]={current:null});if(String(key).startsWith('parse'))return ()=>({steps:[],warn:'',verified:true});return globalThis[key];}});
 const fnText=ts.transpileModule(`const fn=${expression('loadOrderSettings')};`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
 const run=Function('scope',`with(scope){${fnText};return fn;}`)(scope);
 const promise=run();await new Promise(r=>setImmediate(r));

@@ -74,7 +74,8 @@ t('연결: 손님 화면·서버·관리자 설정이 같은 키를 쓴다', () 
   assert.match(route, /resolveSubmitShippingGroup\(product, overseasShippingFee > 0\)/);
   assert.match(page, /select\("id, shipping_type, combine_shipping, product_type, badge_type, badge_types"\)/); // 합배송 판정도 배지를 읽어야
   assert.doesNotMatch(page, /resolveShippingGroupFromValue\(item\)/); // 장바구니 줄은 모두 shippingGroupOf 로
-  assert.match(page, /overseas: paidShippingGroupsBeforeSubmit\.overseas \|\| appliedShippingFeeBreakdown\.overseasShippingFee > 0/);
+  // [2026-11-22] 합배송 출발점 = 배송비 낸 여부가 아니라 같은 주소로 제출한 유효 상품 주문(구독 무배 0원 첫 주문 포함)
+  assert.match(page, /overseas: paidShippingGroupsBeforeSubmit\.overseas \|\| newlyCombinedShippingGroups\.has\("overseas"\)/);
 });
 
 console.log(`shipping-overseas tests passed (${n})`);

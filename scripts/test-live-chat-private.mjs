@@ -45,9 +45,9 @@ assert.deepEqual(body.ownIds,[1]);assert.deepEqual(body.deletedMessages,[]);asse
 assert.ok(!JSON.stringify(body).includes('original-'));assert.ok(!readTables.includes('customers'),'editable profile phone must never authorize originals');
 const modToken = auth.signChatIdentity({...identity,phone:'01099999999'});
 res=await route.GET(request({token:modToken}));body=await res.json();
-assert.equal(body.canReviewDeleted,true);assert.equal(body.testMessages['7'].body,'💗 [테스트]가상닉님 카드결제 확인! 감사합니다');assert.equal(body.testMessages['2'],undefined,'real customer has no test label');assert.equal(body.avatars['1'],'https://private.example/1');assert.equal(body.deletedMessages.length,1);assert.equal(body.deletedMessages[0].body,'original-3');assert.equal(body.deletedMessages[0].deletedByAuthor,true);
+assert.equal(body.canReviewDeleted,true);assert.deepEqual(body.testMessages,{},'2026-11-13 채팅 관리자(R)는 테스트 표시 못 봄');assert.deepEqual(body.avatars,{},'2026-11-13 채팅 관리자(R)는 프로필 사진 못 봄');assert.equal(body.deletedMessages.length,1);assert.equal(body.deletedMessages[0].body,'original-3');assert.equal(body.deletedMessages[0].deletedByAuthor,true);
 assert.ok(!JSON.stringify(body).includes('kakao_id'));assert.match(res.headers.get('cache-control'),/private, no-store/);
-admin=true;res=await route.GET(request({noAuth:true}));assert.equal((await res.json()).canReviewDeleted,true);admin=false;
+admin=true;res=await route.GET(request({noAuth:true}));{const b=await res.json();assert.equal(b.canReviewDeleted,true);assert.equal(b.testMessages['7'].body,'💗 [테스트]가상닉님 카드결제 확인! 감사합니다');assert.equal(b.testMessages['2'],undefined,'real customer has no test label');assert.equal(b.avatars['1'],'https://private.example/1');}admin=false;
 rows.push(row(5,'123456','command'),row(6,'999999','command'));
 res=await route.GET(request());body=await res.json();
 assert.deepEqual(body.commandMessages.map(m=>m.id),[5],'only the verified author recovers command history');

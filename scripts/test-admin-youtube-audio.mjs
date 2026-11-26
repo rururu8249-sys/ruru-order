@@ -6,7 +6,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 // Removing the ready-time mute must leave the external player audible, and fail.
 // Only the external YouTube/network boundaries are doubled; render the real panel.
 const players=[];
-globalThis.window={location:{hostname:'localhost',origin:'http://localhost:3000'},addEventListener(){},removeEventListener(){},YT:{Player:class {
+globalThis.window={location:{hostname:'localhost',origin:'http://localhost:3000'},addEventListener(){},removeEventListener(){},setTimeout:(...a)=>setTimeout(...a),clearTimeout:(t)=>clearTimeout(t),setInterval:(...a)=>setInterval(...a),clearInterval:(t)=>clearInterval(t),YT:{Player:class {
  constructor(node,options){this.options=options;this.muted=false;this.volume=100;players.push(this);}
  mute(){this.muted=true;} unMute(){this.muted=false;} setVolume(v){this.volume=v;}
  destroy(){this.destroyed=true;} getIframe(){return {setAttribute(){}};}
@@ -46,6 +46,8 @@ await act(async()=>tree.unmount());assert.equal(players[1].destroyed,true);
 console.log('PASS real broadcast video ready/mute/volume/replacement/cleanup; no production writes');
 
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{videoRatio:'vertical',youtubeUrl:'https://youtu.be/abcdefghijk',hideProducts:true}),{createNodeMock:()=>host});});
+// [2026-11-10] 기본 탭은 사이트 채팅 — 유튜브 채팅 탭을 눌러야 다시 연결 버튼이 보임
+await act(async()=>tree.root.findAllByType('button').find(n=>n.props.role==='tab'&&n.props.children==='유튜브 채팅').props.onClick());
 const oldChat=tree.root.findByProps({title:'YouTube live chat'});
 const reconnect=tree.root.findAllByType('button').find(node=>node.props['aria-label']==='YouTube 채팅 다시 연결');
 assert(reconnect,'external iframe failure needs a usable reconnect action');

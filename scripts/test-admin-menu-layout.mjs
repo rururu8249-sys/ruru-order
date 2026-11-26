@@ -36,7 +36,10 @@ const SettingsNav=load('components/admin-live/AdminLiveSettingsNav.tsx').default
 await act(async()=>{tree=Renderer.create(React.createElement(SettingsNav,{activeTab:'shop',onSelect:value=>selected=value}));});
 const mobileSelect=tree.root.findByProps({'aria-label':'설정 항목 선택'});
 assert.equal(mobileSelect.type,'select');
-assert.equal(tree.root.findAllByType('option').length,16,'all destinations remain available on small screens'); // +공지사항·쪽지(2026-10-21)
+// [2026-11-26] 설정 메뉴가 늘 수 있어 고정 숫자 대신 «설정 메뉴 전부»와 같은지 확인
+const navItemCount=load('components/admin-live/adminLiveSettingsNavigation.ts').SETTINGS_NAV_GROUPS.flatMap(g=>g.items).length;
+assert.ok(navItemCount>=16);
+assert.equal(tree.root.findAllByType('option').length,navItemCount,'all destinations remain available on small screens');
 await act(async()=>mobileSelect.props.onChange({target:{value:'합배송'}}));
 assert.deepEqual(selected,{tab:'combine'});
 await act(async()=>tree.unmount());

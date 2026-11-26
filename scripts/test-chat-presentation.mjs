@@ -12,7 +12,8 @@ assert.equal(P.notificationPresentation({...cart,badge:null}),null);
 assert.equal(new Set(Array.from({length:5000},(_,i)=>JSON.stringify(P.avatarVariant('public:'+i)))).size,5000);
 assert.equal(P.avatarVariant('https://private/photo.jpg'),null);
 assert.equal(P.avatarVariant('public:5000'),null);
-assert.ok(P.NOTIFICATION_NAMES.order.includes('품절임박'));
+// [2026-11-13 23:15 사장님] 알림 닉네임은 종류마다 하나씩
+assert.deepEqual(P.NOTIFICATION_NAMES.order,['주문알림']);
 assert.deepEqual(P.avatarVariant('public2:7:00000000-0000-4000-8000-000000000001'),{index:7,key:'00000000-0000-4000-8000-000000000001',version:2});
 assert.equal(P.publicChatRow({public_avatar_id:7,public_avatar_version:2,avatar_url:'https://private/photo'}).avatar_url,'public2:7');
 console.log('PASS event identity, stable palette, versioned public photo references and original-photo redaction');

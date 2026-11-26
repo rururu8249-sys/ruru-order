@@ -41,7 +41,9 @@ assert.equal(activeBroadcastMissingTime.mainRows[0].kind, '일반', 'a selected 
 assert.equal(activeBroadcastMissingTime.attentionRows.length, 0, 'selected-broadcast work never leaks into the additional-work sheets');
 
 const workbookSource = fs.readFileSync(path.resolve('components/admin-live/adminLiveOrderExcelExport.ts'), 'utf8');
-for (const sheetName of ['물건챙기기', '변경 및 추가']) {
+// [2026-11-26 사장님] 첫 시트 이름 = 방송/기간 이름(writePickSheet) — 고정 이름 「물건챙기기」 아님
+assert.ok(/writePickSheet\(/.test(workbookSource), 'main picking sheet must be created');
+for (const sheetName of ['변경 및 추가']) {
   assert.ok(workbookSource.includes(`addWorksheet("${sheetName}")`) || workbookSource.includes(`appendAttentionSheet("${sheetName}"`), `${sheetName} sheet must be created`);
 }
 

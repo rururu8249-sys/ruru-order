@@ -4,7 +4,7 @@ import Renderer,{act} from 'react-test-renderer';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 let pathname='/event-survival/live',calls=[],timers=new Map(),id=0,storageReads=0;
-globalThis.window={localStorage:{getItem(){storageReads++;return 'visitor-fixture-key';},setItem(){}},setInterval(fn,ms){const key=++id;timers.set(key,{fn,ms});return key;},clearInterval:key=>timers.delete(key)};
+globalThis.document={visibilityState:'visible',addEventListener(){},removeEventListener(){}};globalThis.window={localStorage:{getItem(){storageReads++;return 'visitor-fixture-key';},setItem(){}},setInterval(fn,ms){const key=++id;timers.set(key,{fn,ms});return key;},clearInterval:key=>timers.delete(key),addEventListener(){},removeEventListener(){}};
 globalThis.fetch=async(url,init)=>{calls.push({url,init});return {ok:true};};
 const noop={default:()=>null};
 const Layout=createUiLoader({'next/navigation':{usePathname:()=>pathname},'./globals.css':{},'@/components/admin-live/AdminConfirmHost':noop,'@/components/DeployChunkReloadGuard':noop,'@/components/customer/CustomerAccessBlockGuard':noop,'@/components/customer/CustomerSiteAlertPopup':noop})('app/layout.tsx').default;

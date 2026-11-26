@@ -13,6 +13,7 @@ export function createUiLoader(overrides = {}) {
     const source = ts.transpileModule(fs.readFileSync(filename,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
     const localRequire = spec => {
       if (spec in overrides) return overrides[spec];
+      if (/\.css$/.test(spec)) return {}; // 스타일 파일은 테스트에서 무시
       if (spec.startsWith('@/') || spec.startsWith('.')) {
         const base = spec.startsWith('@/') ? path.resolve(spec.slice(2)) : path.resolve(path.dirname(filename),spec);
         const target = [base,base+'.ts',base+'.tsx'].find(p=>fs.existsSync(p)&&fs.statSync(p).isFile());

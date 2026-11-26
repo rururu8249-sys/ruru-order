@@ -22,6 +22,7 @@ let broken=[];
 const react={useEffect(){},useState(){return [broken,()=>{}]},useSyncExternalStore(_sub,get){return get()}};
 const render=createUiLoader({'react':react,'@/lib/chatAvatarCatalog':{...A,avatarCatalogSnapshot:()=>c,subscribeAvatarCatalog(){},loadAvatarCatalog(){}}});
 const C=render('components/chat/ChatProfileAvatar.tsx').ChatProfileAvatar;
-let el=C({src:'public2:0',nick:'첫손님',size:24});assert.equal(el.props.src,guests[0]);
-broken=[guests[0]];el=C({src:'public2:0',nick:'첫손님',size:24});assert.equal(el.type,'span');assert.equal(el.props.children,'첫손님','failed image retains its own identity, never borrows a different photo');
+// [2026-11-14 20:06 사장님] 채팅 프로필은 사진 대신 모두 닉네임 첫 글자 — 다른 사진을 빌려 오는 일이 없다
+let el=C({src:'public2:0',nick:'첫손님',size:24});assert.equal(el.type,'span');assert.equal(el.props.src,undefined);
+broken=[guests[0]];el=C({src:'public2:0',nick:'첫손님',size:24});assert.equal(el.type,'span');
 console.log('PASS public2 transport, shared renderer, no wraparound and no borrowed-image fallback');

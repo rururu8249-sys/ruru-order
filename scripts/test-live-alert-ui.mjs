@@ -10,7 +10,7 @@ const blockCalls=[];let blockList=[];
 globalThis.fetch=async(url,options)=>{if(String(url).includes('live-alert-block')){const b=options?.body?JSON.parse(options.body):null;blockCalls.push({url,b});if(b?.action==='add')blockList=[{id:'h1',customerId:b.customerIds[0],name:'김차단',nickname:'차단닉',phone:'010-****-1111',at:'2026-11-01T12:00:00Z'}];if(b?.action==='remove')blockList=[];return {json:async()=>({ok:true,items:blockList,results:String(url).includes('q=')?[{customerId:'c9',name:'김차단',nickname:'차단닉',phone:'010-****-1111',optin:false,blocked:blockList.length>0}]:[]})}}const body=JSON.parse(options.body);calls.push(body);const count=body.limit||25;
  if(body.dryRun){const included=body.includeIds||[],excluded=body.excludeIds||[];const base=body.selectionToken?current:members.slice(0,count);current=[...new Map([...included.map(id=>members.find(m=>m.id===id)),...base].filter(m=>m&&!excluded.includes(m.id)).map(m=>[m.id,{...m,manual:included.includes(m.id)}])).values()];}
  return {json:async()=>body.dryRun?{ok:true,targetCount:current.length,candidateCount:500,receivedCount:10,selectionToken:'fixed',selectionGroups:{frequent:count===300?200:16,newBuyer:count===300?85:8,noRecentOrders:count===300?15:1,noRecentOrdersMax:count===300?15:1},sample:current,members}:{ok:true,successCount:25,failCount:0}}};
-const Header=createUiLoader({'@/lib/supabase':{supabase:{}},'@/lib/adminConfirm':{showAdminConfirm:async()=>true},'@/lib/adminToast':{showAdminToast(){}}})('components/admin-live/LiveHeader.tsx').default;
+const Header=createUiLoader({'@/lib/supabase':{supabase:{from(){const q={select:()=>q,eq:()=>q,in:()=>q,order:()=>q,limit:()=>q,maybeSingle:()=>Promise.resolve({data:null,error:null}),then:(r)=>Promise.resolve({data:[],error:null}).then(r)};return q;}}},'@/lib/adminConfirm':{showAdminConfirm:async()=>true},'@/lib/adminToast':{showAdminToast(){}}})('components/admin-live/LiveHeader.tsx').default;
 let tree;
 const props={videoRatio:'auto',activeBroadcast:{id:'broadcast',status:'ON'},title:'방송',youtubeUrl:'',onTitleChange(){},onYoutubeUrlChange(){},onVideoRatioChange(){},onStartBroadcast(){},onEndBroadcast(){},onSaveBroadcast(){}};
 const text=node=>node.children.map(c=>typeof c==='string'?c:text(c)).join('');
@@ -54,8 +54,10 @@ assert.ok(calls.length>before,'preview refreshed after block');
 await act(async()=>{await dialog.findByProps({'aria-label':'계속 제외 명단'}).findAllByType('button').find(n=>text(n)==='해제').props.onClick()});
 assert.deepEqual(blockCalls.at(-1).b,{action:'remove',ids:['h1']});
 await act(async()=>{await button('25명에게 발송').props.onClick()});
-assert.equal(calls.at(-1).selectionToken,'fixed');assert.equal(calls.filter(c=>!c.dryRun).length,1);
-assert.ok(text(dialog).includes('발송 접수 25명'));
-assert.equal(text(dialog).split('발송 접수 25명').length-1,1,'submission result is displayed once, not in both summary and result');
+// [2026-11-09] 발송 뒤 명단을 저절로 다시 불러오므로 «발송 요청»(dryRun 아님)으로 확인
+assert.equal(calls.filter(c=>!c.dryRun).at(-1).selectionToken,'fixed');assert.equal(calls.filter(c=>!c.dryRun).length,1);
+// [2026-11-09] 결과는 「방금 발송 결과」 상자 하나(보내려던/보냄/못 보냄)
+assert.ok(text(dialog).includes('방금 발송 결과'));
+assert.equal(text(dialog).split('방금 발송 결과').length-1,1,'submission result is displayed once');
 await act(async()=>tree.unmount());
 console.log('PASS enlarged responsive dialog, 300 visible recipient rows, settings invalidate preview, exact signed preview sent, result remains visible (mock fetch only)');

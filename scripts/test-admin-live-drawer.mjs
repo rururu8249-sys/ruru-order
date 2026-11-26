@@ -26,7 +26,7 @@ const listeners=new Map();
 class Element {isConnected=true; focus(){document.activeElement=this;} getClientRects(){return [{}];} closest(){return null;}}
 globalThis.HTMLElement=Element;
 const opener=new Element(), first=new Element(), last=new Element(), panel=new Element();
-panel.querySelectorAll=()=>[first,last];
+panel.querySelectorAll=(sel)=>sel===".fixed.inset-0"?[]:[first,last]; // 안쪽 덮개 창 없음(2026-11-26 Esc 규칙)
 globalThis.document={activeElement:opener,body:{style:{overflow:'auto'}},addEventListener:(key,fn)=>listeners.set(key,fn),removeEventListener:key=>listeners.delete(key)};
 const Drawer=createUiLoader()('components/admin-live/AdminLiveSideDrawer.tsx').default;
 let closed=0, tree;
@@ -53,7 +53,7 @@ document.addEventListener=(_key,fn)=>keyboard.add(fn);
 document.removeEventListener=(_key,fn)=>keyboard.delete(fn);
 globalThis.window={addEventListener:(key,fn)=>confirmEvents.set(key,fn),removeEventListener:key=>confirmEvents.delete(key)};
 const confirmPanel=new Element(), cancel=new Element(), confirm=new Element();
-confirmPanel.querySelectorAll=()=>[cancel,confirm];
+confirmPanel.querySelectorAll=(sel)=>sel===".fixed.inset-0"?[]:[cancel,confirm];
 const sharedLoad=createUiLoader();
 const RealDrawer=sharedLoad('components/admin-live/AdminLiveSideDrawer.tsx').default;
 const Host=sharedLoad('components/admin-live/AdminConfirmHost.tsx').default;

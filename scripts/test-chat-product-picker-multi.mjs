@@ -5,7 +5,7 @@ import {createUiLoader} from './admin-ui-test-loader.mjs';
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.localStorage={getItem:()=>null};
 const keys=new Set();globalThis.window={addEventListener:(_,f)=>keys.add(f),removeEventListener:(_,f)=>keys.delete(f)};
-globalThis.HTMLInputElement=class{hasAttribute(){return true;}};
+globalThis.HTMLElement=class{hasAttribute(){return true;}};globalThis.HTMLInputElement=class extends globalThis.HTMLElement{}; // 2026-11-13 채팅 입력칸이 contenteditable 로 바뀌어 HTMLElement 로 검사
 const item=(id,name,soldOut=false)=>({productId:id,detailName:'',texts:[name],line:name,sizes:[],soldOut,imageUrl:'/photo-'+id+'.png'});
 const items=[item('1','PD-509 블랙'),item('2','BB-307 화이트'),item('3','MC-333 핑크'),item('4','PD-333 블랙'),item('5','MC-335',true),item('6','BB-30 블랙')];
 let reads=0;globalThis.fetch=async()=>{reads++;return{json:async()=>({ok:true,items})};};
