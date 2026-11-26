@@ -145,7 +145,9 @@ function CalcRow({
         {emphasis ? "=" : sign}
       </span>
 
-      <span className="min-w-0 flex-1">
+      {/* [2026-11-26] 폰 폭에서 금액칸 최소폭(150·200px)+버튼칸(86px)이 자리를 다 먹어 «실/제/로/받/은/돈» 한 글자씩 꺾이던 것 →
+          이름칸은 최소 7rem 확보·넘치면 금액이 다음 줄로, 최소폭은 sm 이상에서만 */}
+      <span className="min-w-[7rem] flex-1">
         <span className={emphasis === "total" ? "text-[14px] font-black text-ink" : "text-sm font-black text-ink"}>{label}</span>
         {hint ? <span className="ml-2 text-xs font-bold text-ink-mute">{hint}</span> : null}
       </span>
@@ -155,15 +157,14 @@ function CalcRow({
       <span
         className={[
           "shrink-0 text-right tabular-nums",
-          emphasis === "total" ? "text-[24px] font-black tracking-[-0.04em]" : "text-[14px] font-black",
+          emphasis === "total" ? "text-[24px] font-black tracking-[-0.04em] sm:min-w-[200px]" : "text-[14px] font-black sm:min-w-[150px]",
           amountTx,
         ].join(" ")}
-        style={{ minWidth: emphasis === "total" ? 200 : 150 }}
       >
         {sign === "−" && !zero ? "−" : ""}{won(Math.abs(numberValue(amount)))}
       </span>
 
-      <span className="w-[86px] shrink-0 text-right">
+      <span className={`${action ? "" : "max-sm:hidden"} shrink-0 text-right sm:w-[86px]`}>
         {action ? (
           <button
             type="button"
@@ -523,7 +524,27 @@ export default function SettlementMoneyFlowDashboard({
           </div>
         </div>
 
-        <div className="overflow-auto rounded-xl border border-line-soft bg-surface">
+        {/* [2026-11-26] 폰에선 표가 옆으로 넘쳐 날짜·이름만 보이고 금액이 화면 밖이었다 → 폰은 카드(같은 값), PC 는 표 그대로 */}
+        <div className="space-y-2 sm:hidden">
+          {visibleBroadcastRows.length === 0 ? (
+            <div className="rounded-xl border border-line-soft bg-surface px-4 py-8 text-center text-sm font-bold text-ink-mute">표시할 방송별 정산 내역이 없습니다. 위에서 기간·방송을 바꿔 보세요.</div>
+          ) : (
+            visibleBroadcastRows.map((row) => (
+              <div key={row.key} className="rounded-xl border border-line-soft bg-surface px-4 py-3 tabular-nums">
+                <div className="truncate text-sm font-black text-ink">{row.label}</div>
+                <div className="mt-0.5 text-xs font-bold text-ink-mute">{row.dateKey} · 주문서 {countText(row.count)}</div>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs font-bold text-ink-soft">
+                  <span>결제완료 매출</span><span className="text-right text-sm font-black text-info-tx">{won(row.paidAmount)}</span>
+                  {numberValue(row.unpaidAmount) !== 0 ? (<><span>아직 못 받은 금액</span><span className="text-right text-sm font-black text-warn-tx">{won(row.unpaidAmount)}</span></>) : null}
+                  <span>빠지는 돈</span><span className="text-right text-sm font-black text-ink">{outflowText(row.totalExpense)}</span>
+                  <span>현재 실수익</span><span className="text-right text-sm font-black text-ink">{won(row.netAmount)}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="overflow-auto rounded-xl border border-line-soft bg-surface max-sm:hidden">
           <table className="min-w-[920px] w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-surface-3 text-xs font-black text-ink-soft">
