@@ -285,6 +285,8 @@ export function buildBroadcastOptions(rows: AnyRow[], broadcasts?: AnyRow[]): Se
 
   if (Array.isArray(broadcasts)) {
     broadcasts.forEach((broadcast) => {
+      // [2026-11-26] 숨긴 방송(시험용 등)이 같은 날 진짜 방송 이름을 덮던 것(11/17 「__UI_검증_…」) — 이름 고르기에서만 뺌.
+      if (broadcast?.is_deleted === true) return;
       const dateKey = toDateKey(broadcast.started_at || broadcast.created_at || broadcast.date);
       if (!dateKey) return;
 

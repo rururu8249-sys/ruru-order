@@ -48,6 +48,22 @@ async function run(request: NextRequest) {
 
   const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const startedAt = Date.now();
+
+  // [2026-11-26 DB 바쁨 줄이기] 한 번에 약 15초 걸리는 집계라, 지난 65분 동안 새 주문·입금확인이 없으면 건너뜀.
+  // 취소·30일 창 이동도 반영되게 6시간마다(한국 0·6·12·18시)는 무조건 돌림. 수동 호출(?force=1)도 늘 돌림.
+  const kstHour = (new Date().getUTCHours() + 9) % 24;
+  const forced = request.nextUrl.searchParams.get("force") === "1" || kstHour % 6 === 0;
+  if (!forced) {
+    const since = new Date(Date.now() - 65 * 60 * 1000).toISOString();
+    const [created, paid] = await Promise.all([
+      supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", since),
+      supabase.from("orders").select("id", { count: "exact", head: true }).gte("deposit_confirmed_at", since),
+    ]);
+    // 확인 자체가 실패하면 예전처럼 돌림(배지가 멈추지 않게).
+    if (!created.error && !paid.error && (created.count ?? 0) === 0 && (paid.count ?? 0) === 0) {
+      return NextResponse.json({ ok: true, skipped: true, reason: "지난 65분 새 주문·입금확인 없음" });
+    }
+  }
   const { data, error } = await supabase.rpc("refresh_product_sales_stats");
 
   if (error) {
