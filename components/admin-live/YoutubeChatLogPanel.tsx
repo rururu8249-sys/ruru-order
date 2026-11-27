@@ -55,6 +55,7 @@ export default function YoutubeChatLogPanel({ initialNick = "", initialBroadcast
   const [view, setView] = useState<View>("all");
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [orders, setOrders] = useState<OrderGroup[] | null>(null);
+  const [bcNames, setBcNames] = useState<Record<string, { title: string; startedAt: string | null }>>({});
   const [suspects, setSuspects] = useState<Suspect[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -89,6 +90,7 @@ export default function YoutubeChatLogPanel({ initialNick = "", initialBroadcast
       if (!j?.ok) throw new Error(j?.message || "불러오지 못했어요");
       setMsgs(j.messages || []);
       setOrders(q ? j.orders || [] : null);
+      setBcNames(j.broadcasts || {});
     } catch (e) {
       if (id === reqRef.current) setErr(String((e as Error).message || e));
     } finally {
@@ -117,7 +119,12 @@ export default function YoutubeChatLogPanel({ initialNick = "", initialBroadcast
 
   const shown = useMemo(() => (view === "order" ? msgs.filter((m) => m.order_like) : msgs), [msgs, view]);
   const orderLikeN = useMemo(() => msgs.filter((m) => m.order_like).length, [msgs]);
-  const bcTitle = useMemo(() => new Map((bcs || []).map((b) => [b.id, bcLabel(b)])), [bcs]);
+  const bcTitle = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [id, b] of Object.entries(bcNames)) m.set(id, `${md(b.startedAt)} ${b.title || "방송"}`);
+    for (const b of bcs || []) m.set(b.id, bcLabel(b));
+    return m;
+  }, [bcs, bcNames]);
 
   // 방송 안 고르고 닉네임만 찾으면 방송별로 묶음
   const groups = useMemo(() => {

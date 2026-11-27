@@ -116,7 +116,14 @@ export async function GET(request: NextRequest) {
           orders = groupOrders(data || []).reverse();
         }
       }
-      return NextResponse.json({ ok: true, messages: rows, orders, truncated: rows.length >= (q ? 3000 : 6000) });
+      // 방송 이름표(목록 30개 밖 옛 방송도 이름이 나오게)
+      const bcIds = [...new Set(rows.map((m: any) => String(m.broadcast_id || "")).filter(Boolean))].slice(0, 200);
+      const broadcasts: Record<string, { title: string; startedAt: string | null }> = {};
+      if (bcIds.length) {
+        const { data: bs } = await sb.from("broadcasts").select("id,public_title,started_at").in("id", bcIds);
+        for (const b of bs || []) broadcasts[String(b.id)] = { title: String(b.public_title || ""), startedAt: b.started_at || null };
+      }
+      return NextResponse.json({ ok: true, messages: rows, orders, broadcasts, truncated: rows.length >= (q ? 3000 : 6000) });
     }
 
     if (mode === "around") {

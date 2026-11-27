@@ -64,6 +64,7 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
     { key: "customers", label: "회원", custTab: "members" },
     { key: "customers", label: "AI 회원", custTab: "ai-members" },
     { key: "customers", label: "고객이슈", custTab: "issues" },
+    { key: "customers", label: "채팅 기록", custTab: "chatlog" },
     { key: "customers", label: "단골", custTab: "loyalty" },
     { key: "visits", label: "접속 기록" },
     { key: "customers", label: "계정 잇기", custTab: "link" },
