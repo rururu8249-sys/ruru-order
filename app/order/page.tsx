@@ -20,7 +20,6 @@
 // - 상품금액 1원 미만 제출 금지
 
 "use client";
-import OrderHowtoImages from "@/components/customer/OrderHowtoImages";
 import ProductDiscountLabel from '@/components/order/ProductDiscountLabel';
 import CustomerPressButton from '@/components/customer/CustomerPressButton';
 import ProductColorSwatches, {ColorSwatch} from '@/components/customer/ProductColorSwatches';
@@ -10486,10 +10485,8 @@ export default function OrderPage() {
             bodyPadding="4px 0 16px"
             footer={<button type="button" onClick={() => closeHowTo(false)} style={s5s(csPrimaryButtonStyle(true))}>확인</button>}
           >
-              {/* [2026-11-27 사장님] 새 모양 손님 = 주문 방법 그림 3장(1번 = 방송 채팅 «저요!» 접수 먼저). 예전 모양은 아래 글 */}
-              {uiS5 ? <div style={{ padding: "0 16px" }}><OrderHowtoImages /></div> : null}
               {/* [2026-07-10] 3단계 내용은 관리자 설정(howto_steps)에서 수정. 설정이 없으면 기본 문구. */}
-              {uiS5 ? null : <div style={s5s({ padding: "0 20px" })}>
+              <div style={s5s({ padding: "0 20px" })}>
                 {howToSteps.map((step, i) => {
                   const last = i === howToSteps.length - 1;
                   return (
@@ -10505,7 +10502,7 @@ export default function OrderPage() {
                     </div>
                   );
                 })}
-              </div>}
+              </div>
 
               {/* [2026-09-20] 「확인」은 푸터(풀폭 1개)로. 「오늘 하루 열지 않기」는 본문 끝 글자 버튼. */}
               {howToNewOnly ? null : (

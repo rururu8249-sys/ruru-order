@@ -1,5 +1,4 @@
 "use client";
-import OrderHowtoImages from "./OrderHowtoImages";
 import {ChatProfileAvatar} from "@/components/chat/ChatProfileAvatar";
 import {notificationPresentation,staffAvatarFrame} from "@/lib/chatPresentation";
 // [2026-11-09] 「방송 보며 주문」 ②단계 화면 — 주문서 위에 덮는 방송 화면(손님용).
@@ -1921,10 +1920,18 @@ export default function LiveWatchView(props: Props) {
       {/* 처음 한 번만 — 쓰는 법 */}
       {guideOpen ? (
         <div role="dialog" aria-modal="true" aria-label="방송 보며 주문하는 법" style={{ position: "fixed", inset: 0, zIndex: SHEET_Z + 1, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-          <div style={{ width: "100%", maxWidth: "360px", background: "#FFFFFF", color: "#111111", borderRadius: "16px", padding: "24px 20px 20px", maxHeight: "calc(100dvh - 32px)", overflowY: "auto" }}>
-            <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>주문 방법</div>
-            {/* [2026-11-27 사장님] 쇼핑몰 「주문 방법」과 같은 그림 3장(1번 = 방송 채팅 «저요!» 접수 먼저) */}
-            <div style={{ margin: "0 -8px 8px" }}><OrderHowtoImages /></div>
+          <div style={{ width: "100%", maxWidth: "360px", background: "#FFFFFF", color: "#111111", borderRadius: "16px", padding: "24px 20px 20px" }}>
+            <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>방송 보면서 바로 담아요</div>
+            {([
+              ["1", <>방송에서 마음에 드는 상품이 나오면 아래 <b>가방 그림(상품 수)</b>을 눌러요</>],
+              ["2", <>그 상품의 <b>「상품 선택」</b>을 누르고 원하는 옵션을 고르거나 직접 작성하여 담아요</>],
+              ["3", <>다 담았으면 오른쪽 아래 <b>「주문서」</b>를 눌러 제출하고 입금하면 끝</>],
+            ] as [string, ReactNode][]).map(([n, t]) => (
+              <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                <span aria-hidden="true" style={{ width: "28px", height: "28px", flexShrink: 0, borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{n}</span>
+                <span style={{ fontSize: "16px", lineHeight: 1.5, paddingTop: "2px", wordBreak: "keep-all" }}>{t}</span>
+              </div>
+            ))}
             <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>소리가 안 나면 오른쪽 위 스피커, 화면이 멈추면 ⋮ 의 「방송 새로고침」을 눌러요. ✕ 는 방송을 닫고 상품만 봐요.</div>
             <button type="button" onClick={closeGuide} style={{ width: "100%", height: "52px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>시작하기</button>
           </div>
