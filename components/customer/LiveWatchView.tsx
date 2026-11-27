@@ -548,7 +548,8 @@ export default function LiveWatchView(props: Props) {
   const [chatHint, setChatHint] = useState("");
   const [cardOffLocal, setCardOffLocal] = useState<{ bc: string; off: boolean } | null>(null);
   const [cardBusy, setCardBusy] = useState(false);
-  const rps = useRpsGame();
+  // [2026-11-27 사장님] 가위바위보 게임 뺌(11/12 이후 사용 0) — 방송 보는 손님마다 10초마다 묻던 게임 상태 조회도 끔
+  const rps = useRpsGame(false, false);
   const [rpsAdminOpen, setRpsAdminOpen] = useState(false);
   const [rpsLaunchKey, setRpsLaunchKey] = useState<string | null>(null);
   const rpsSetupKey = `${rps.state?.id ?? 'none'}:${rps.state?.revision ?? 0}`;
@@ -1717,7 +1718,6 @@ export default function LiveWatchView(props: Props) {
                   ...(chat?.canManage ? [{ key: "operator-mode", label: operatorMode ? "시청자 모드" : "관리자 복귀", onClick: () => { setOperatorMode(v => !v); setQuickOpen(false); setModTarget(null); setChatMenu(null); }, badge: 0 }] : []),
                   { key: "share", label: "방송 공유", onClick: shareLive, badge: 0 },
                   ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp, badge: 0 }]),
-                  ...((!viewerMode && (rps.admin || chat?.canGrant)) ? [{ key: "rps", label: "게임 · 가위바위보", onClick: () => setRpsAdminOpen(true), badge: 0 }] : []),
                 ];
               })().map((m) => (
                 <button key={m.key} type="button" onClick={() => { setMoreOpen(false); m.onClick(); }} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "56px", padding: "0 12px", border: "none", borderRadius: "12px", background: "#2C2C2E", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>

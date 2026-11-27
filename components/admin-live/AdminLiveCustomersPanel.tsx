@@ -1994,7 +1994,6 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           <div ref={tabBarRef} className={hideTabBar ? "hidden" : "flex gap-1 overflow-x-auto border-b border-rose-line"}>
             {([
               ["members", "회원 목록", 0],
-              ["ai-members", "AI 회원", 0],
               ["issues", "고객이슈", openIssueCount],
               ["chatlog", "채팅 기록", 0],
               ["loyalty", "단골 리포트", 0],

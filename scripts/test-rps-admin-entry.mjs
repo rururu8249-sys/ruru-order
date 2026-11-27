@@ -7,7 +7,7 @@ const blank=()=>{};
 const store={getItem:()=> '1',setItem:blank,removeItem:blank};
 globalThis.window={location:{origin:'https://example.com'},innerHeight:844,innerWidth:390,localStorage:store,sessionStorage:store,addEventListener:blank,removeEventListener:blank,setTimeout:()=>1,clearTimeout:blank,setInterval:()=>1,clearInterval:blank};
 globalThis.document={addEventListener:blank,removeEventListener:blank,hidden:false};globalThis.localStorage=store;
-let verifications=0;
+let verifications=0;const rpsArgs=[];
 const game={state:null,player:null,admin:false,verified:false,winners:[],error:'',busy:false,now:0,action:async()=>{throw Error('unverified must not run an admin action');},verify:()=>verifications++,refresh:async()=>{}};
 const load=createUiLoader({
 // [2026-11-26] LiveWatchView → useManualAutomationChat 가 진짜 supabase 를 불러 시험용 저장소('1')로 세션 검사를 끝없이 돌던 것 → 가짜 supabase
@@ -22,7 +22,7 @@ const load=createUiLoader({
  '@/lib/useProductIntroPlayer':{useProductIntroPlayer:()=>({})},
  '@/lib/productIntroCatalogClient':{loadProductIntroCatalog:async()=>[],invalidateProductIntroCatalog:blank},
  '@/components/rps/RpsWidget':{RpsWidget:()=>React.createElement('div',{'data-test-rps':true},'game')},
- '@/components/rps/useRpsGame':{useRpsGame:()=>game},
+ '@/components/rps/useRpsGame':{useRpsGame:(...args)=>{rpsArgs.push(args);return game;}},
  './rps.css':{},
 });
 const View=load('components/customer/LiveWatchView.tsx').default;
@@ -31,43 +31,28 @@ const text=node=>typeof node==='string'?node:Array.isArray(node)?node.map(text).
 let tree;await act(async()=>{tree=Renderer.create(React.createElement(View,props),{createNodeMock:el=>el.type==='iframe'?{clientWidth:390,clientHeight:700,offsetLeft:0,offsetTop:0}:null});});
 const button=label=>tree.root.findAllByType('button').find(b=>text(b)===label);
 await act(async()=>tree.root.findAllByType('button').find(b=>/^더보기/.test(b.props['aria-label']||'')).props.onClick()); // [2026-11-26 VER3] 더보기 = 위 오른쪽 ⋮(글자 없음)
-assert.ok(button('게임 · 가위바위보'),'existing owner must see game entry before separate verification');
+// [2026-11-27 사장님 결정] 가위바위보 게임 뺌 — 더보기에 게임 메뉴 없음, 방송 화면은 게임 상태를 묻지 않음(useRpsGame enabled=false)
+assert.ok(!button('게임 · 가위바위보'),'game entry removed from More');
 assert.ok(button('내정보'));
 assert.ok(!button('내 채팅 본인 확인'),'remove duplicate identity item from More');
-await act(async()=>button('게임 · 가위바위보').props.onClick());
-assert.ok(button('카카오로 관리자 확인'));
-assert.ok(!button('참가자 모집 시작'),'client owner hint must never expose admin controls');
-await act(async()=>button('카카오로 관리자 확인').props.onClick());assert.equal(verifications,1);
-game.admin=true;game.verified=true;
-await act(async()=>tree.update(React.createElement(View,{...props})));
-assert.equal(tree.root.findAllByProps({'aria-label':'가위바위보 관리자'}).length,1);
-assert.ok(!button('카카오로 관리자 확인'),'successful verification opens settings in place');
-await act(async()=>tree.root.findByProps({'aria-label':'관리 설정 닫기'}).props.onClick());
-game.admin=false;
-await act(async()=>tree.update(React.createElement(View,{...props,chat:{...props.chat,canGrant:false}})));
-await act(async()=>tree.root.findAllByType('button').find(b=>/^더보기/.test(b.props['aria-label']||'')).props.onClick()); // [2026-11-26 VER3] 더보기 = 위 오른쪽 ⋮(글자 없음)
-assert.ok(!button('게임 · 가위바위보'),'ordinary customer or chat-only moderator has no game admin entry');
-await act(async()=>tree.update(React.createElement(View,{...props,paused:true,pausedText:'방송 휴식 안내'})));
-assert.ok(text(tree.toJSON()).includes('방송 휴식 안내'));
-game.state={id:'room',broadcastId:'A',status:'lobby'};
-await act(async()=>tree.update(React.createElement(View,{...props,paused:true,pausedText:'방송 휴식 안내'})));
-assert.ok(!text(tree.toJSON()).includes('방송 휴식 안내'),'central notice cannot bleed through game');
-assert.equal(tree.root.findAllByProps({'aria-label':'방송 소리 켜기'}).length,0,'central sound prompt hidden behind game');
-assert.equal(tree.root.findAllByProps({'aria-label':'소리 켜기'}).length,1,'top sound control remains available');
-game.admin=true;game.setup={revision:2,config:{title:'가위바위보',winners:1,rewardKind:'none',points:1000,gift:'',joinSeconds:300,pickSeconds:5,auto:true}};
-game.state={...game.state,status:'closed',revision:4};
-await act(async()=>tree.update(React.createElement(View,props)));
-assert.equal(tree.root.findAllByProps({'data-live-rps-overlay':true}).length,0,'closed game hides admin overlay despite saved setup');
-await act(async()=>tree.root.findAllByType('button').find(b=>/^더보기/.test(b.props['aria-label']||'')).props.onClick()); // [2026-11-26 VER3] 더보기 = 위 오른쪽 ⋮(글자 없음)
-game.action=async()=>true;
-await act(async()=>button('게임 · 가위바위보').props.onClick());
-await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));
-assert.equal(tree.root.findAllByProps({'data-live-rps-overlay':true}).length,1,'saving settings explicitly shows launch screen');
-game.state={...game.state,status:'lobby',revision:5};
-await act(async()=>tree.update(React.createElement(View,props)));
-assert.equal(tree.root.findAllByProps({'data-live-rps-overlay':true}).length,1);
-game.state={...game.state,status:'closed',revision:6};
-await act(async()=>tree.update(React.createElement(View,props)));
-assert.equal(tree.root.findAllByProps({'data-live-rps-overlay':true}).length,0,'close after launch does not resurrect setup card');
+assert.ok(rpsArgs.length>0 && rpsArgs.every(a=>a[1]===false),'LiveWatchView must call useRpsGame with enabled=false');
 await act(async()=>tree.unmount());
-console.log('PASS owner menu, gated verification, automatic admin view, ordinary/mod hidden, duplicate identity removed');
+
+// 실제 useRpsGame: enabled=false 면 /api/rps 요청·실시간 구독 0, enabled=true(위젯 등)는 예전처럼 요청
+const fetched=[];let channels=0;
+globalThis.fetch=async(url)=>{fetched.push(String(url));return {ok:true,headers:{get:()=>null},json:async()=>({ok:false})};};
+const hookLoad=createUiLoader({
+ '@/lib/supabase':{supabase:{channel(){channels++;const c={on(){return c;},subscribe(){return c;}};return c;},removeChannel:async()=>{}}},
+ '@/lib/useLiveChatPrivate':{chatIdentityHeaders:()=>({})},
+});
+const {useRpsGame}=hookLoad('components/rps/useRpsGame.ts');
+function Probe({enabled}){useRpsGame(false,enabled);return null;}
+let probe;await act(async()=>{probe=Renderer.create(React.createElement(Probe,{enabled:false}));});
+await act(async()=>{await new Promise(r=>setTimeout(r,20));});
+assert.equal(fetched.length,0,'disabled hook must not fetch');assert.equal(channels,0,'disabled hook must not subscribe');
+await act(async()=>probe.unmount());
+await act(async()=>{probe=Renderer.create(React.createElement(Probe,{enabled:true}));});
+await act(async()=>{await new Promise(r=>setTimeout(r,20));});
+assert.ok(fetched.some(u=>u.includes('/api/rps/state')),'enabled hook still loads state (widget)');assert.equal(channels,1);
+await act(async()=>probe.unmount());
+console.log('PASS game entry removed, live view does not poll rps, widget hook unchanged');

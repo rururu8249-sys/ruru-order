@@ -65,7 +65,6 @@ import type { DepositRow, OrderGroup, OrderRow } from "@/lib/admin-v2/types";
 import { ADMIN_LIVE_SUB_TABS, getAdminLiveTopMenu, isAdminLiveMenuKey, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 // [2026-09-08 5단계 · 레이아웃 B] 오른쪽 접이식 방송 레일
 import AdminLiveBroadcastRail from "./AdminLiveBroadcastRail";
-import VoiceBudgetPanel from "./VoiceBudgetPanel";
 import AdminLiveBottomNav from "./AdminLiveBottomNav";
 import VisitStatsView from "./VisitStatsView";
 import type { LiveOrder } from "./types";
@@ -80,9 +79,7 @@ import AdminLiveProductManagePopup, { type ProductManageTab } from "./AdminLiveP
 import AdminLiveCardPayPopup from "./AdminLiveCardPayPopup";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import type { EventWinnerCustomerRef } from "@/lib/eventCustomGift";
-import ChatOrderQueuePopup from "./ChatOrderQueuePopup";
 import { ADMIN_PREVIEW_DEFAULTS, readAdminUiPreview } from "@/lib/adminUiSwitch";
-import ChatOrderReaderLoop from "./ChatOrderReaderLoop";
 import {
   alwaysOrderFilterValue,
   buildAlwaysOrderOptions,
@@ -328,13 +325,14 @@ function readMenuFromUrl(): AdminLiveMenuKey {
   if (!isMenuKeyForUrl(panel)) {
     try {
       const saved = window.sessionStorage.getItem(ADMIN_SCREEN_KEY);
-      if (saved && isAdminLiveMenuKey(saved)) return saved;
+      if (saved && isAdminLiveMenuKey(saved) && saved !== "chatorder") return saved;
     } catch {}
     return "orders";
   }
   // [2026-10-21] 시스템 점검 화면은 메뉴에서 뺐다 → 옛 주소 ?panel=audit 는 설정으로
   if (panel === "audit") return "settings";
   if (panel === "broadcast") return "orders";
+  if (panel === "chatorder") return "orders"; // [2026-11-27] 채팅주문 대기열 뺌
   return panel;
 }
 
@@ -598,7 +596,7 @@ export default function AdminLiveDashboard() {
     if (typeof window === "undefined") return "members";
     try {
       const t = window.sessionStorage.getItem(ADMIN_CUST_TAB_KEY);
-      if (t === "members" || t === "ai-members" || t === "issues" || t === "chatlog" || t === "loyalty" || t === "link") return t;
+      if (t === "members" || t === "issues" || t === "chatlog" || t === "loyalty" || t === "link") return t;
     } catch {}
     return "members";
   });
@@ -630,8 +628,8 @@ export default function AdminLiveDashboard() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("ruru_admin_theme");
-      if (saved === "dark" || saved === "light") setTheme(saved);
+      // [2026-11-27 사장님] 다크 모드 버튼 뺌 — 예전에 다크로 저장한 브라우저도 밝은 화면으로 되돌림
+      if (localStorage.getItem("ruru_admin_theme") === "dark") localStorage.removeItem("ruru_admin_theme");
     } catch { /* 무시 */ }
   }, []);
   const toggleTheme = () => {
@@ -1901,7 +1899,7 @@ export default function AdminLiveDashboard() {
         />
 
         <main className="flex min-w-0 flex-1 flex-col px-4 pb-20 pt-3 md:px-4 md:py-3">
-          {activeBroadcast?.id && <VoiceBudgetPanel key={activeBroadcast.id} broadcastId={activeBroadcast.id} onProducts={()=>setActiveMenu("products")} />}
+          {/* [2026-11-27 사장님] 음성 자동화(예산) 띠 뺌 — 기록 0건·방송 중 10초마다 서버 조회하던 것(VoiceBudgetPanel 파일은 보존) */}
           {/* [2026-10-22 폰] 햄버거 「메뉴」 버튼 삭제 — 폰은 하단 5칸 메뉴(AdminLiveBottomNav), 「더보기」가 옛 사이드바 서랍을 연다 */}
 
           {/* [2026-09-08 5단계 · 레이아웃 B] 왼쪽 = 큰 메뉴 화면(통째로 전환) / 오른쪽 = 접이식 방송·채팅 레일 */}
@@ -1976,7 +1974,7 @@ export default function AdminLiveDashboard() {
               {/* [2026-10-21 a4-1] 「방송」 화면 삭제 — 컨트롤타워(LiveHeader)는 아래 방송 관리 창으로, 숫자 띠·미션은 실시간 주문에 이미 있음, 라이브 현황(LiveStatsPanel)은 판매분석 위로 */}
 
               {/* ── 방송 › 채팅주문 대기열(판정 결과 확인 전용, 담기 없음) ── */}
-              {activeMenu === "chatorder" ? <ChatOrderQueuePopup embedded onClose={() => {}} /> : null}
+              {/* [2026-11-27 사장님] 채팅주문 대기열 뺌(8/19 이후 사용 0) — 옛 주소 ?panel=chatorder 는 실시간 주문으로 */}
 
               {/* ── 방송 › 이벤트 (항상 마운트 → 명단·상태 유지. 탭이 아닐 땐 숨김) ── */}
               <div hidden={activeMenu !== "event"} className="h-full">
@@ -2239,8 +2237,7 @@ export default function AdminLiveDashboard() {
             />
           )}
 
-          {/* 채팅읽기 상주 루프 — 컨트롤타워가 열려 있으면 자동으로 읽는다 (OFF면 서버가 건너뜀) */}
-          <ChatOrderReaderLoop />
+          {/* [2026-11-27 사장님] 채팅주문 읽기 루프(20초마다 서버 요청) 뺌 — 채팅주문 기능 안 씀(ChatOrderReaderLoop 파일 보존) */}
 
           {/* [2026-11-27] 유튜브 채팅 기록 창 — 주문상세·주문서 줄 「채팅」에서 창 이벤트로 열림 */}
           <YoutubeChatLogDrawer />

@@ -62,7 +62,7 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
   // [2026-10-21 a3-2] 2층(회원·이슈·단골 안의 탭) → 1층 6탭. 화면 키는 그대로(customers 안 탭은 custTab 으로 구분)
   customers: [
     { key: "customers", label: "회원", custTab: "members" },
-    { key: "customers", label: "AI 회원", custTab: "ai-members" },
+    // [2026-11-27 사장님] 「AI 회원」 탭 뺌(다른 도구로 들어온 탭, 파일 보존)
     { key: "customers", label: "고객이슈", custTab: "issues" },
     { key: "customers", label: "채팅 기록", custTab: "chatlog" },
     { key: "customers", label: "단골", custTab: "loyalty" },

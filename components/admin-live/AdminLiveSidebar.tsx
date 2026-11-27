@@ -290,14 +290,7 @@ export default function AdminLiveSidebar({
         </section>
 
         <div className="mt-auto space-y-2 pt-4">
-          {/* 라이트/다크 토글 */}
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface-2 py-2.5 text-[13px] font-bold text-ink-soft transition hover:bg-surface-3"
-          >
-            {theme === "dark" ? "라이트 모드" : "다크 모드"}
-          </button>
+          {/* [2026-11-27 사장님] 다크 모드 버튼 뺌 */}
           <AdminLiveLogoutButton />
         </div>
       </aside>

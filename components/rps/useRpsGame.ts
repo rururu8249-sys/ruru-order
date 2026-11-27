@@ -3,7 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {supabase} from '@/lib/supabase';
 import {chatIdentityHeaders} from '@/lib/useLiveChatPrivate';
 import type {RpsPlayer,RpsRewardRow,RpsState,RpsSetup} from '@/lib/rps';
-export function useRpsGame(publicOnly=false){
+export function useRpsGame(publicOnly=false,enabled=true){
  const [state,setState]=useState<RpsState|null>(null);const [player,setPlayer]=useState<RpsPlayer|null>(null);
  const [admin,setAdmin]=useState(false);const [verified,setVerified]=useState(false);const [winners,setWinners]=useState<RpsRewardRow[]>([]);
  const [setup,setSetup]=useState<RpsSetup|null>(null);
@@ -16,19 +16,21 @@ export function useRpsGame(publicOnly=false){
  latest.current=next;room.current=next.id;phase.current=`${next.id}:${next.revision}:${next.status}`;setState(next);
  },[]);
  const loadPublic=useCallback(async()=>{
- if(loading.current||document.hidden)return;loading.current=true;
+ if(!enabled||loading.current||document.hidden)return;loading.current=true;
  try{const start=Date.now();const response=await fetch('/api/rps/state');const data=await response.json();if(!data.ok)throw Error();
  if(mounted.current){offset.current=Date.parse(data.serverTime)+(Number(response.headers.get('age'))||0)*1000-(start+Date.now())/2;accept(data.state);lastSuccess.current=Date.now();}}
  catch{if(mounted.current&&lastSuccess.current&&Date.now()-lastSuccess.current>20000)setError('게임 연결이 잠시 끊겼어요. 다시 연결 중입니다.');}
  finally{loading.current=false;}
- },[accept]);
+ },[accept,enabled]);
  const loadMe=useCallback(async()=>{
- if(publicOnly)return;
+ if(publicOnly||!enabled)return;
  try{const requestId=++privateRequest.current;const requestedPhase=phase.current;const headers=chatIdentityHeaders();const requestedRoom=room.current;const response=await fetch(`/api/rps/me${requestedRoom?'?room='+encodeURIComponent(requestedRoom):''}`,{headers,cache:'no-store'});const data=await response.json();
  if(data.ok&&mounted.current&&room.current===requestedRoom&&requestId===privateRequest.current&&phase.current===requestedPhase&&JSON.stringify(headers)===JSON.stringify(chatIdentityHeaders())){setAdmin(data.admin);setVerified(data.verified);setPlayer(data.player);setWinners(data.winners);setSetup(data.setup??null);if(data.state)accept(data.state);}}
  catch{/* Preserve prior state during reconnection. */}
- },[publicOnly,accept]);
+ },[publicOnly,accept,enabled]);
  useEffect(()=>{
+ // [2026-11-27] enabled=false 면 게임 상태를 묻지도, 실시간 소식도 받지 않음(방송 화면에서 가위바위보 뺌)
+ if(!enabled)return;
  mounted.current=true;queueMicrotask(()=>{void loadPublic();void loadMe();});
  const channel=supabase.channel('ruru-rps').on('broadcast',{event:'changed'},({payload})=>{if(payload?.setup)void loadMe();else void loadPublic();}).subscribe(status=>{if(status==='SUBSCRIBED')void loadPublic();});
  // [2026-11-13] 게임이 없거나 끝난 동안엔 내 참가 정보(/api/rps/me)를 10초마다 묻지 않고 1분에 한 번만 — 방송 보는 손님 전원이 쉬지 않고 묻던 것.
@@ -38,7 +40,7 @@ export function useRpsGame(publicOnly=false){
  const resume=()=>{if(!document.hidden){void loadPublic();void loadMe();}};
  window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);
  return()=>{mounted.current=false;clearInterval(fallback);void supabase.removeChannel(channel);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume);};
- },[loadMe,loadPublic]);
+ },[loadMe,loadPublic,enabled]);
  // Verification happens in a popup; refresh immediately, not on the 10s fallback.
  // Clear private state before rechecking so another account cannot inherit controls.
  useEffect(()=>{
