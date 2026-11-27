@@ -623,6 +623,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-black text-ink">주문 방법 팝업</div>
+                    {/* [2026-11-27] 손님 화면(새 모양)은 그림 3장 — 아래 문구 칸은 예전 모양(?ui=v1)에서만 보임 */}
+                    <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">손님 화면엔 주문 방법 그림 3장(방송 채팅 «저요!» 접수 → 담기 → 주문서·결제)이 보여요.</div>
                     <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
                       {howtoAudience === "new" ? "처음 온 손님에게만 한 번 뜹니다. 닫으면 다시 안 뜹니다." : "모든 손님에게 뜹니다. 손님이 닫으면 24시간 안 뜹니다."}
                     </div>
