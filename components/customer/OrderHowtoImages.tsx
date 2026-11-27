@@ -1,14 +1,14 @@
 "use client";
 
 // [2026-11-27 사장님 「주문방법 너무 복잡해 — 50대 이상도 알게 그림 2~3장, 1번은 방송 채팅 «저요!» 접수 먼저」]
-//   손님 주문 방법 그림 3장(public/order-howto-1~3.png)을 옆으로 넘겨 보는 칸.
+//   손님 주문 방법 그림 3장(public/order-howto-v2-1~3.jpg — 11/27 사장님이 준 그림)을 옆으로 넘겨 보는 칸.
 //   쇼핑몰 「주문 방법」 창과 방송 보며 주문 「주문 방법」 창이 같이 씀. 표시만 — 돈·주문 무관.
 import { useRef, useState } from "react";
 
 export const ORDER_HOWTO_IMAGES = [
-  { src: "/order-howto-1.png", alt: "1. 먼저 방송 채팅에 상품번호·색상·사이즈와 «저요!»를 쓰고, 루루언니가 «접수했어요» 한 뒤에 사이트에서 담아 주세요. 재고가 실시간으로 바뀌어서 접수가 먼저예요." },
-  { src: "/order-howto-2.png", alt: "2. 사이트에서 「상품」 → 접수한 상품의 「상품 선택」 → 색상·사이즈·수량 고르기 → 「담기」." },
-  { src: "/order-howto-3.png", alt: "3. 「주문서」 → 배송지·금액 확인 → 「주문서 제출」. 무통장입금은 입금자명을 닉네임으로 금액 그대로, 카드결제는 카톡으로 오는 결제 링크에서." },
+  { src: "/order-howto-v2-1.jpg", alt: "카톡채널 대화방 아래 「주문 사이트」를 눌러 주세요. 카카오톡으로 바로 로그인, 방송 보면서 간편 주문 가능." },
+  { src: "/order-howto-v2-2.jpg", alt: "STEP 01 카톡채널 대화방에서 주문 사이트 누르기, STEP 02 화면 아래 상품 누르기, STEP 03 원하는 상품의 상품 선택 누르기." },
+  { src: "/order-howto-v2-3.jpg", alt: "STEP 04 목록에서 원하는 상품의 상품 선택 누르기, STEP 05 사이즈 선택·수량 확인 후 선택상품 담기." },
 ];
 
 export default function OrderHowtoImages({ onPageChange }: { onPageChange?: (page: number, last: boolean) => void }) {
@@ -42,7 +42,7 @@ export default function OrderHowtoImages({ onPageChange }: { onPageChange?: (pag
             loading={i === 0 ? "eager" : "lazy"}
             draggable={false}
             onClick={() => { if (i < n - 1) go(i + 1); }}
-            style={{ flex: "0 0 100%", width: "100%", height: "auto", aspectRatio: "1080 / 1350", scrollSnapAlign: "start", display: "block", objectFit: "contain", background: "#FFFFFF" }}
+            style={{ flex: "0 0 100%", width: "100%", height: "auto", scrollSnapAlign: "start", display: "block", objectFit: "contain", background: "#FFFFFF" }}
           />
         ))}
       </div>
