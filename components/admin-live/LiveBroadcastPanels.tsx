@@ -337,26 +337,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   const [pinnedProduct, setPinnedProduct] = useState<any | null>(null);
   const [rotationProducts, setRotationProducts] = useState<any[]>([]);
   const [lightbox, setLightbox] = useState<string | null>(null); // 상품 사진 클릭 확대
-  // 라이브 통계(동접·좋아요) — 25초 폴링. 읽기 전용.
-  const [liveStats, setLiveStats] = useState<{ concurrentViewers: number | null; likeCount: number | null } | null>(null);
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await fetch("/api/youtube/live-stats", { cache: "no-store" });
-        const j = await r.json();
-        if (!alive || !j?.ok) return;
-        const cv = j.concurrentViewers ?? null;
-        const lc = j.likeCount ?? null;
-        // 숫자가 실제로 바뀔 때만 갱신(같으면 prev 그대로 반환 → 리렌더 0, 깜박임 없음).
-        setLiveStats((prev) => (prev && prev.concurrentViewers === cv && prev.likeCount === lc ? prev : { concurrentViewers: cv, likeCount: lc }));
-      } catch { /* 무시 */ }
-    };
-    load();
-    // [2026-11-06] 유튜브 하루 한도 아끼기 — 25초 → 60초(시청자 수 확인 한 번에 1씩 씀)
-    const t = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(t); };
-  }, []);
+  // [2026-11-27 사장님] 관리자 화면 «시청 N·좋아요 N»(유튜브에 1분마다 물어 한도를 쓰던 것) 삭제.
   const [liveIdx, setLiveIdx] = useState(0);
   const [cycleOn, setCycleOn] = useState(false);
 
@@ -851,12 +832,6 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             >
               {videoEmbedUrl ? "영상 연결" : "URL 대기"}
             </span>
-            {liveStats?.concurrentViewers != null ? (
-              <span className="rounded-lg bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep" title="동시 시청자 수">시청 {liveStats.concurrentViewers.toLocaleString("ko-KR")}</span>
-            ) : null}
-            {liveStats?.likeCount != null ? (
-              <span className="rounded-lg bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft" title="좋아요 수">좋아요 {liveStats.likeCount.toLocaleString("ko-KR")}</span>
-            ) : null}
           </div>
           <div className="flex items-center gap-1.5">
             {videoEmbedUrl ? (
