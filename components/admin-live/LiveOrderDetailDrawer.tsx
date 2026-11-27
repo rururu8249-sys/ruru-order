@@ -1,6 +1,7 @@
 "use client";
 
 import ExtraDepositLinker from "./ExtraDepositLinker";
+import { openChatLog } from "./YoutubeChatLogDrawer";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { cardPaymentStatusPatch } from "@/lib/cardPaymentStatusUpdate";
@@ -2250,6 +2251,14 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 쪽지
               </button>
             ) : null}
+            <button
+              type="button"
+              title="이 손님 유튜브 채팅 기록 보기"
+              onClick={() => openChatLog(clean(orderForView.nickname), orderForView.broadcastId)}
+              className="h-11 shrink-0 rounded-[10px] border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2"
+            >
+              채팅 기록
+            </button>
         <button
           type="button"
           aria-label="더보기 — 입금확인 취소·주문서 취소·차단"

@@ -1737,7 +1737,15 @@ export default function LiveOrderTable({
                   return (
                     <Fragment key={order.id}>
                     <div
-                      className={`group grid min-h-[60px] min-w-[900px] grid-cols-[40px_88px_168px_minmax(0,1fr)_120px_132px_120px] gap-0 items-center text-[14px] transition ${selected ? "bg-surface-2" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "shadow-[inset_3px_0_0_var(--color-warn-tx)]" : ""}`}
+                      // [2026-11-27 사장님 「닉네임을 눌러야만 열림」] 줄 아무 데나 눌러도 주문상세(쇼피파이처럼).
+                      //   줄 안 버튼·체크·링크를 누른 것과 글자를 끌어 고른 것은 제외 — 그 버튼 동작 그대로.
+                      onClick={(e) => {
+                        const t = e.target as HTMLElement;
+                        if (t.closest("button,a,input,select,textarea,label,[role=button]")) return;
+                        if (typeof window !== "undefined" && String(window.getSelection?.() || "").length > 0) return;
+                        onSelectOrder(order);
+                      }}
+                      className={`group grid min-h-[60px] min-w-[900px] cursor-pointer grid-cols-[40px_88px_168px_minmax(0,1fr)_120px_132px_120px] gap-0 items-center text-[14px] transition ${selected ? "bg-surface-2" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "shadow-[inset_3px_0_0_var(--color-warn-tx)]" : ""}`}
                     >
                       <div className="flex items-center justify-center py-2" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" aria-label={`${order.nickname} 주문 선택`} checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} className="h-4 w-4 cursor-pointer accent-[var(--color-ink)]" />

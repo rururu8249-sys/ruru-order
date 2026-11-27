@@ -12,6 +12,7 @@ import { BULK_POINT_MAX_MESSAGE, BULK_POINT_MAX_PER_PERSON, useBulkPointGrant, t
 
 // 일괄지급 사유 프리셋(고객에게 보이는 문구). "직접입력" 선택 시 직접 작성.
 import AdminLiveLinkRequestsPanel, { LINK_REQUESTS_CHANGED_EVENT } from "@/components/admin-live/AdminLiveLinkRequestsPanel";
+import YoutubeChatLogPanel from "./YoutubeChatLogPanel";
 
 const BULK_POINT_REASON_PRESETS = ["방송 이벤트 당첨", "단골 감사", "리뷰 감사", "오지급 보정", "직접입력"];
 import { supabase } from "@/lib/supabase";
@@ -38,7 +39,7 @@ type Props = {
   orders: LiveOrder[];
   onClose?: () => void;
   // [2026-09-08] loyalty(단골 리포트)도 바깥에서 바로 열 수 있게(예전엔 타입에 빠져 있었음)
-  initialTab?: "members" | "ai-members" | "issues" | "loyalty" | "link";
+  initialTab?: "members" | "ai-members" | "issues" | "chatlog" | "loyalty" | "link";
   /** [2026-09-21] «탭을 열어달라»는 요청 시각(Date.now()).
    *   initialTab 만으로는 못 연다 — useState 는 «처음 한 번»만 초깃값을 읽기 때문에
    *   이미 떠 있는 화면에서 prop 이 바뀌어도 탭이 안 바뀌었다(사장님: 「전체 보기 눌러도 반응 없음」).
@@ -54,7 +55,7 @@ type Props = {
   /** [2026-09-08 5단계] 페이지 안에 그대로(고객 메뉴). 팝업 껍데기·✕ 없음 */
   embedded?: boolean;
   /** [2026-09-25] 현재 탭을 바깥에 알린다 — 「고객이슈」 탭에선 위쪽 미해결 알림 띠를 숨기려고. */
-  onTabChange?: (tab: "members" | "ai-members" | "issues" | "loyalty" | "link" | "refund") => void;
+  onTabChange?: (tab: "members" | "ai-members" | "issues" | "chatlog" | "loyalty" | "link" | "refund") => void;
   /** [2026-10-21 a3-2] 바깥(상단 탭 줄)이 탭을 그리면 패널 안 탭바는 숨긴다 */
   hideTabBar?: boolean;
   /** [2026-10-21 a3-2] 계정 잇기 대기 건수를 바깥 탭 배지에 알린다 */
@@ -1161,7 +1162,7 @@ function CustomerDetailDrawer({
 export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openCustomerRef = null, openCustomerAt = 0, openIssueCount = 0, embedded = false, onTabChange, hideTabBar = false, onLinkPendingCountChange }: Props) {
   // [2026-09-09] «계정 연결 요청» 탭 추가 — 손님이 카톡을 바꿔 회원이 갈라졌을 때 들어오는 요청함
   // [2026-09-26] 교환·환불은 «고객이슈 안»에서 처리(별도 탭 없음). refund 관련 탭/리스너 제거.
-  const [custTab, setCustTab] = useState<"members" | "ai-members" | "issues" | "loyalty" | "link">(initialTab);
+  const [custTab, setCustTab] = useState<"members" | "ai-members" | "issues" | "chatlog" | "loyalty" | "link">(initialTab);
   // [2026-09-21] 바깥(고객이슈 알림 띠 등)에서 탭 열기 요청이 오면 실제로 전환하고 그 자리로 스크롤한다.
   const tabBarRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -1995,6 +1996,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               ["members", "회원 목록", 0],
               ["ai-members", "AI 회원", 0],
               ["issues", "고객이슈", openIssueCount],
+              ["chatlog", "채팅 기록", 0],
               ["loyalty", "단골 리포트", 0],
               ["link", "계정 잇기", linkPendingCount],
             ] as const).map(([key, label, badge]) => {
@@ -2018,6 +2020,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       {custTab === "ai-members" ? <AdminLiveAiMembersPanel /> : null}
       {custTab === "link" ? <AdminLiveLinkRequestsPanel /> : null}
+      {custTab === "chatlog" ? <YoutubeChatLogPanel /> : null}
 
 
       {custTab === "loyalty" ? (

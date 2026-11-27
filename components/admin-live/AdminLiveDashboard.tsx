@@ -25,6 +25,7 @@ import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSideDrawer from "./AdminLiveSideDrawer";
 import AdminLiveAssistantDrawer from "./AdminLiveAssistantDrawer";
+import YoutubeChatLogDrawer from "./YoutubeChatLogDrawer";
 import { resolveAdminLiveDestination, transitionAdminLiveDrawer, resolveDrawerOrder, type AdminLiveDrawerState } from "./adminLiveDrawerState";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
 import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
@@ -583,11 +584,11 @@ export default function AdminLiveDashboard() {
       setDrawer(destination.drawer);
     })();
   };
-  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "ai-members" | "issues" | "loyalty" | "link">("members");
+  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "ai-members" | "issues" | "chatlog" | "loyalty" | "link">("members");
   // [2026-10-21 a3-2] 계정 잇기 대기 수 — 상단 탭 배지용(패널이 알려줌)
   const [customersLinkPendingCount, setCustomersLinkPendingCount] = useState(0);
   // [2026-09-25] 고객·이슈 패널의 «현재» 탭 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨긴다(중복 표시 방지).
-  const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "ai-members" | "issues" | "loyalty" | "link" | "refund">("members");
+  const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "ai-members" | "issues" | "chatlog" | "loyalty" | "link" | "refund">("members");
   // [2026-09-21] 「바로 처리 →」 를 누른 «시각». 탭 이름만 넘기면 두 번째 클릭부터 안 먹는다
   //   (같은 값이라 화면이 바뀐 걸 모른다). 시각은 누를 때마다 달라지므로 매번 확실히 열린다.
   const [customersOpenTabAt, setCustomersOpenTabAt] = useState(0);
@@ -1897,7 +1898,7 @@ export default function AdminLiveDashboard() {
                       value={depositDrawerOpen?'payments':activeMenu==='reports'?'sales':activeMenu==='customers'?`customers:${customersActiveTab}`:activeMenu}
                       onChange={event=>{
                         const v = event.target.value;
-                        if (v.startsWith("customers:")) { setCustomersInitialTab(v.slice(10) as "members" | "ai-members" | "issues" | "loyalty" | "link"); setCustomersOpenTabAt(Date.now()); setActiveMenu("customers"); return; }
+                        if (v.startsWith("customers:")) { setCustomersInitialTab(v.slice(10) as "members" | "ai-members" | "issues" | "chatlog" | "loyalty" | "link"); setCustomersOpenTabAt(Date.now()); setActiveMenu("customers"); return; }
                         setActiveMenu(v as typeof activeMenu);
                       }}
                       className="mb-2 min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-base font-bold md:hidden"
@@ -2215,6 +2216,9 @@ export default function AdminLiveDashboard() {
 
           {/* 채팅읽기 상주 루프 — 컨트롤타워가 열려 있으면 자동으로 읽는다 (OFF면 서버가 건너뜀) */}
           <ChatOrderReaderLoop />
+
+          {/* [2026-11-27] 유튜브 채팅 기록 창 — 주문상세·주문서 줄 「채팅」에서 창 이벤트로 열림 */}
+          <YoutubeChatLogDrawer />
 
           {assistantOpen ? (
             <AdminLiveAssistantDrawer
