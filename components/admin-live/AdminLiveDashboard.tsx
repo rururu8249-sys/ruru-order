@@ -314,6 +314,9 @@ function isMenuKeyForUrl(value: string | null): value is AdminLiveMenuKey {
   return isAdminLiveMenuKey(value);
 }
 
+const ADMIN_SCREEN_KEY = "ruru_admin_screen";
+const ADMIN_CUST_TAB_KEY = "ruru_admin_cust_tab";
+
 function readMenuFromUrl(): AdminLiveMenuKey {
   if (typeof window === "undefined") return "orders";
 
@@ -321,7 +324,14 @@ function readMenuFromUrl(): AdminLiveMenuKey {
   const panel = params.get("panel");
 
   // [2026-10-21 a4-1] 첫 화면 = 주문·입금(실시간 주문). 「방송」 메뉴 삭제 → ?panel=broadcast 는 주문·입금 + 방송 관리 창
-  if (!isMenuKeyForUrl(panel)) return "orders";
+  // [2026-11-27 사장님 요청] 같은 탭에서 새로고침하면 보던 화면 그대로(sessionStorage — 화면 기억일 뿐, 새 탭은 주문·입금)
+  if (!isMenuKeyForUrl(panel)) {
+    try {
+      const saved = window.sessionStorage.getItem(ADMIN_SCREEN_KEY);
+      if (saved && isAdminLiveMenuKey(saved)) return saved;
+    } catch {}
+    return "orders";
+  }
   // [2026-10-21] 시스템 점검 화면은 메뉴에서 뺐다 → 옛 주소 ?panel=audit 는 설정으로
   if (panel === "audit") return "settings";
   if (panel === "broadcast") return "orders";
@@ -584,7 +594,14 @@ export default function AdminLiveDashboard() {
       setDrawer(destination.drawer);
     })();
   };
-  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "ai-members" | "issues" | "chatlog" | "loyalty" | "link">("members");
+  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "ai-members" | "issues" | "chatlog" | "loyalty" | "link">(() => {
+    if (typeof window === "undefined") return "members";
+    try {
+      const t = window.sessionStorage.getItem(ADMIN_CUST_TAB_KEY);
+      if (t === "members" || t === "ai-members" || t === "issues" || t === "chatlog" || t === "loyalty" || t === "link") return t;
+    } catch {}
+    return "members";
+  });
   // [2026-10-21 a3-2] 계정 잇기 대기 수 — 상단 탭 배지용(패널이 알려줌)
   const [customersLinkPendingCount, setCustomersLinkPendingCount] = useState(0);
   // [2026-09-25] 고객·이슈 패널의 «현재» 탭 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨긴다(중복 표시 방지).
@@ -1203,7 +1220,15 @@ export default function AdminLiveDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // [2026-10-22 사장님 요청] 메뉴를 바꿔도 주소줄에 ?panel= 을 안 남긴다 → 새로고침·다시 열기는 항상 첫 화면(주문·입금).
+  // [2026-11-27 사장님 요청] 같은 탭 새로고침은 보던 화면·고객 탭 유지(sessionStorage), 새 탭은 주문·입금
+  useEffect(() => {
+    try { window.sessionStorage.setItem(ADMIN_SCREEN_KEY, activeMenu); } catch {}
+  }, [activeMenu]);
+  useEffect(() => {
+    try { window.sessionStorage.setItem(ADMIN_CUST_TAB_KEY, customersActiveTab); } catch {}
+  }, [customersActiveTab]);
+
+  // [2026-10-22 사장님 요청] 메뉴를 바꿔도 주소줄에 ?panel= 을 안 남긴다 (주소는 깨끗하게, 화면 기억은 위 sessionStorage).
   //   ?panel= 읽기(readMenuFromUrl·옛 주소 broadcast/notice/audit)는 그대로라 링크로 여는 건 됨. 한 번 열린 뒤엔 주소에서 지운다.
   useEffect(() => {
     if (typeof window === "undefined") return;
