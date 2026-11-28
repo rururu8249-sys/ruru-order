@@ -682,7 +682,7 @@ function ImagePicker({
             촬영하기
             <input type="file" accept="image/*" capture="environment" hidden onChange={handleFileChange} />
           </label>
-          {compact ? null : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>첫 장이 대표 사진 · 다른 사진의 ☆을 누르면 대표가 바뀝니다</span>}
+          {compact ? null : <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>첫 장이 대표 사진 · 다른 사진의 ☆을 누르면 대표가 바뀝니다</span>}
         </div>
       </div>
     );
@@ -745,7 +745,7 @@ function ImagePicker({
         촬영하기
         <input type="file" accept="image/*" capture="environment" hidden onChange={handleFileChange} />
       </label>
-      <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", textAlign: "right", marginTop: "4px" }}>{value.length} / {maxFiles}</div>
+      <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", textAlign: "right", marginTop: "4px" }}>{value.length} / {maxFiles}</div>
     </div>
   );
 }
@@ -1366,7 +1366,7 @@ export default function QuickProductFastForm({
   // [2026-09-03 사장님 요청] "비우면 직접입력 · 없음이면 안 씀"이 눈에 안 보여 헷갈린다 →
   //   스마트스토어처럼 방식(손님이 적어요/안 써요)을 누르는 칩으로 보여준다. 저장값은 기존 그대로("" / "없음").
   const optionModeChip = (on: boolean, label: string, onClick: () => void) => (
-    <button type="button" onClick={onClick} style={{ padding: "4px 8px", borderRadius: "999px", fontSize: "11px", fontWeight: 900, whiteSpace: "nowrap", cursor: "pointer", border: on ? "1.5px solid var(--color-rose-deep)" : "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "#fff", color: on ? "var(--color-rose-deep)" : "var(--color-ink-mute)", flexShrink: 0 }}>{label}</button>
+    <button type="button" onClick={onClick} style={{ padding: "4px 8px", borderRadius: "999px", fontSize: "12px", fontWeight: 900, whiteSpace: "nowrap", cursor: "pointer", border: on ? "1.5px solid var(--color-rose-deep)" : "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "#fff", color: on ? "var(--color-rose-deep)" : "var(--color-ink-mute)", flexShrink: 0 }}>{label}</button>
   );
 
   const presetBtn = (count: number): CSSProperties => ({
@@ -2257,7 +2257,7 @@ export default function QuickProductFastForm({
   const groupTitle = (no: string, text: string, hint: string) => (
     <div style={{ display: "flex", alignItems: "baseline", gap: "6px", margin: "20px 0 8px", paddingBottom: "6px", borderBottom: "2px solid var(--color-rose-line)" }}>
       <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{no} {text}</span>
-      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{hint}</span>
+      <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{hint}</span>
     </div>
   );
 
@@ -2289,12 +2289,12 @@ export default function QuickProductFastForm({
                   <div style={{ marginTop: "8px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                       <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>조합 {resolvedVariantRows.length}개</span>
-                      {stockManagementEnabled ? <span style={{ fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", alignItems: "center", gap: "4px" }}>
+                      {stockManagementEnabled ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)", display: "flex", alignItems: "center", gap: "4px" }}>
                         전체
-                        <input style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid var(--color-line)", borderRadius: "4px", textAlign: "right", width: "46px" }} type="text" inputMode="numeric" value={bulkStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setBulkStockText(e.target.value.replace(/[^0-9]/g, ""))} />
+                        <input style={{ fontSize: "12px", padding: "4px 6px", border: "1px solid var(--color-line)", borderRadius: "4px", textAlign: "right", width: "46px" }} type="text" inputMode="numeric" value={bulkStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setBulkStockText(e.target.value.replace(/[^0-9]/g, ""))} />
                         개
-                        <button type="button" onClick={applyBulkStock} style={{ border: "1.5px dashed var(--color-rose-deep)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>일괄적용</button>
-                      </span> : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>수량 칸: 비우면 무제한 · 숫자를 넣으면 그만큼만 판매</span>}
+                        <button type="button" onClick={applyBulkStock} style={{ border: "1.5px dashed var(--color-rose-deep)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>일괄적용</button>
+                      </span> : <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>수량 칸: 비우면 무제한 · 숫자를 넣으면 그만큼만 판매</span>}
                     </div>
 
                     <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", maxHeight: "260px", overflowY: "auto", border: "1px solid var(--color-line)" }}>
@@ -2330,7 +2330,7 @@ export default function QuickProductFastForm({
                                   const realPrice = moneyNumber(priceText) + Math.max(0, Number(detailPlus[group.detail]) || 0);
                                   if (realPrice <= 0) return null;
                                   return (
-                                    <span style={{ display: "block", marginTop: "1px", fontSize: "11px", fontWeight: 900, color: "var(--color-ok-tx)" }}>
+                                    <span style={{ display: "block", marginTop: "1px", fontSize: "12px", fontWeight: 900, color: "var(--color-ok-tx)" }}>
                                       판매가 {realPrice.toLocaleString("ko-KR")}원
                                     </span>
                                   );
@@ -2359,7 +2359,7 @@ export default function QuickProductFastForm({
                                       onChange={(e) => applySalePrice(group.detail, e.target.value)}
                                       onBlur={() => clearSalePriceDraft(group.detail)}
                                     />
-                                    <span style={{ fontSize: "11px", fontWeight: 800, color: tooLow ? "var(--color-danger-tx)" : "var(--color-ink-soft)", textAlign: "right", whiteSpace: "nowrap" }}>
+                                    <span style={{ fontSize: "12px", fontWeight: 800, color: tooLow ? "var(--color-danger-tx)" : "var(--color-ink-soft)", textAlign: "right", whiteSpace: "nowrap" }}>
                                       {tooLow ? "대표가보다 낮음" : `추가금 +${plusNow.toLocaleString("ko-KR")}`}
                                     </span>
                                   </span>
@@ -2389,21 +2389,21 @@ export default function QuickProductFastForm({
                                     style={{ width: "16px", height: "16px", accentColor: "var(--color-danger-tx)" }} />
                                   품절
                                 </label>
-                                {!row.manual_soldout && stockManagementEnabled && sellable <= 0 ? <span style={{ gridColumn: "1 / -1", fontSize: "11px", color: "var(--color-danger-tx)" }}>재고 소진 · 자동 품절</span> : null}
+                                {!row.manual_soldout && stockManagementEnabled && sellable <= 0 ? <span style={{ gridColumn: "1 / -1", fontSize: "12px", color: "var(--color-danger-tx)" }}>재고 소진 · 자동 품절</span> : null}
                                 {!stockManagementEnabled && typeof row.limit_qty === "number" && editingProductId ? (() => {
                                   const limitAt = limitLoadedRef.current[limitKeyOf(row.color, row.size)];
                                   const sinceAt = limitAt && limitAt.qty === row.limit_qty ? limitAt.at : null;
                                   const sold = soldOf(String(group.detail || ""), String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""), sinceAt);
                                   const left = Math.max(0, row.limit_qty - sold - heldQty);
                                   return (
-                                    <span style={{ gridColumn: "1 / -1", fontSize: "11px", fontWeight: 700, color: left <= 0 ? "var(--color-danger-tx)" : "var(--color-ink-soft)", paddingLeft: group.detail ? "12px" : "2px" }}>
+                                    <span style={{ gridColumn: "1 / -1", fontSize: "12px", fontWeight: 700, color: left <= 0 ? "var(--color-danger-tx)" : "var(--color-ink-soft)", paddingLeft: group.detail ? "12px" : "2px" }}>
                                       {left <= 0 ? `수량 ${row.limit_qty}개 다 팔림 · 자동 품절` : `${sinceAt ? "입력 후 " : ""}팔림 ${sold} / 수량 ${row.limit_qty}${heldQty > 0 ? ` · 담김 ${heldQty}` : ""} · 남은 ${left}`}
                                       {left <= 0 ? " (더 팔려면 수량을 올려 주세요)" : ""}
                                     </span>
                                   );
                                 })() : null}
                                 {stockManagementEnabled && heldQty > 0 ? (
-                                  <span style={{ gridColumn: "1 / -1", marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", paddingLeft: group.detail ? "12px" : "2px" }}>
+                                  <span style={{ gridColumn: "1 / -1", marginTop: "1px", fontSize: "12px", fontWeight: 700, color: "var(--color-warn-tx)", paddingLeft: group.detail ? "12px" : "2px" }}>
                                     담김 {heldQty}개 · 지금 판매가능 <b style={{ color: sellable > 0 ? "var(--color-ok-tx)" : "var(--color-danger-tx)" }}>{sellable}개</b>
                                   </span>
                                 ) : null}
@@ -2414,7 +2414,7 @@ export default function QuickProductFastForm({
                       ))}
                     </div>
 
-                    {stockManagementEnabled ? <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", justifyContent: "space-between" }}>
+                    {stockManagementEnabled ? <div style={{ marginTop: "6px", fontSize: "12px", color: "var(--color-ink-mute)", display: "flex", justifyContent: "space-between" }}>
                       <span>
                         실재고 <b style={{ color: "var(--color-ink)" }}>{totalStock.toLocaleString("ko-KR")}</b>개
                         {heldTotal > 0 ? <> · 담김 <b style={{ color: "var(--color-warn-tx)" }}>{heldTotal}</b>개 · 판매가능 <b style={{ color: "var(--color-ok-tx)" }}>{Math.max(0, totalStock - heldTotal).toLocaleString("ko-KR")}</b>개</> : null}
@@ -2426,9 +2426,9 @@ export default function QuickProductFastForm({
                   <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", border: "1px solid var(--color-line)" }}>
                     <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>총 재고 수량</span>
                     <input style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "80px" }} type="number" min={0} inputMode="numeric" value={totalStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setTotalStockText(e.target.value)} />
-                    <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+                    <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>개</span>
                     {heldTotal > 0 ? (
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", whiteSpace: "nowrap" }}>담김 {heldTotal} · 판매가능 {Math.max(0, (Number(totalStockText) || 0) - heldTotal)}</span>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-warn-tx)", whiteSpace: "nowrap" }}>담김 {heldTotal} · 판매가능 {Math.max(0, (Number(totalStockText) || 0) - heldTotal)}</span>
                     ) : null}
                   </div>
                 )
@@ -2445,7 +2445,7 @@ export default function QuickProductFastForm({
                     ? <>세부상품 <span style={{ color: "var(--color-rose-deep)", fontWeight: 800 }}>{details.length}개</span></>
                     : <>옵션 <span style={{ color: "var(--color-rose-deep)", fontWeight: 800 }}>{usedAxisCount > 0 ? `${usedAxisCount}단` : "없음"}</span></>}
                 </span>
-                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{brandGroupActive ? "색상·사이즈·가격은 세부상품마다 따로" : "값을 쓰면 손님이 골라요"}</span>
+                <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>{brandGroupActive ? "색상·사이즈·가격은 세부상품마다 따로" : "값을 쓰면 손님이 골라요"}</span>
               </div>
 
               {/* 슬롯 1 — 옛 조합형(세부상품 텍스트 축) — 그런 상품을 수정할 때만 보인다. 새 상품은 아래 [＋ 세부상품 추가]로 */}
@@ -2467,7 +2467,7 @@ export default function QuickProductFastForm({
                 ) : <>
                 {splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음") ? (
                   <button type="button" onClick={() => { setFormTouched(true); setColorText(""); }} title="누르면 색상을 넣을 수 있어요" style={{ ...optInput, textAlign: "left", cursor: "pointer", background: "var(--color-surface-2)", color: "var(--color-ink)", fontWeight: 800 }}>
-                    기본 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>— 색상 하나뿐 · 손님이 고를 게 없어요</span>
+                    기본 <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>— 색상 하나뿐 · 손님이 고를 게 없어요</span>
                   </button>
                 ) : (
                   <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
@@ -2520,13 +2520,13 @@ export default function QuickProductFastForm({
                       setColorPhotoUploading("");
                     }
                   }} />
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", lineHeight: "38px", flexShrink: 0 }}>색상별 사진 <span style={{ fontWeight: 700 }}>(선택)</span></span>
+                  <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink-soft)", lineHeight: "38px", flexShrink: 0 }}>색상별 사진 <span style={{ fontWeight: 700 }}>(선택)</span></span>
                   {colors.filter((c) => c !== "없음").map((c) => (
                     <div key={`cp-${c}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", width: "46px" }}>
                       <div style={{ position: "relative", width: "38px", height: "38px" }}>
                         <button type="button" title={colorPhotos[c] ? `${c} 사진 바꾸기` : `${c} 사진 넣기`} onClick={() => { colorPhotoTargetRef.current = c; colorPhotoInputRef.current?.click(); }} disabled={colorPhotoUploading !== ""} style={{ width: "38px", height: "38px", padding: 0, borderRadius: "8px", border: colorPhotos[c] ? "1px solid var(--color-line)" : "1.5px dashed var(--color-line)", background: "var(--color-surface)", cursor: "pointer", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           {colorPhotoUploading === c
-                            ? <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-warn-tx)" }}>…</span>
+                            ? <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-warn-tx)" }}>…</span>
                             : colorPhotos[c]
                               ? <img src={resolveProductImageUrl(colorPhotos[c])} alt={c} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                               : <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-line)" }}>＋</span>}
@@ -2535,10 +2535,10 @@ export default function QuickProductFastForm({
                           <button type="button" title="사진 빼기" onClick={() => { setFormTouched(true); setColorPhotos((prev) => { const next = { ...prev }; delete next[c]; return next; }); }} style={{ position: "absolute", top: "-6px", right: "-6px", width: "16px", height: "16px", padding: 0, borderRadius: "999px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "11px", fontWeight: 900, lineHeight: "16px", cursor: "pointer" }}>×</button>
                         ) : null}
                       </div>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", maxWidth: "46px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c}</span>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", maxWidth: "46px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c}</span>
                     </div>
                   ))}
-                  <span style={{ fontSize: "11px", color: "var(--color-ink-mute)", lineHeight: "38px" }}>누르면 사진이 올라가고, 손님 색상 버튼에 떠요</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-ink-mute)", lineHeight: "38px" }}>누르면 사진이 올라가고, 손님 색상 버튼에 떠요</span>
                 </div>
               ) : null}
 
@@ -2547,7 +2547,7 @@ export default function QuickProductFastForm({
                 <span style={optLabel}>사이즈</span>
                 {splitOptions(sizeText).length > 0 && splitOptions(sizeText).every((x) => x === "없음") ? (
                   <button type="button" onClick={() => { setFormTouched(true); setSizeText(""); }} title="누르면 사이즈를 넣을 수 있어요" style={{ ...optInput, textAlign: "left", cursor: "pointer", background: "var(--color-surface-2)", color: "var(--color-ink)", fontWeight: 800 }}>
-                    기본 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>— 사이즈 하나뿐 · 손님이 고를 게 없어요</span>
+                    기본 <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>— 사이즈 하나뿐 · 손님이 고를 게 없어요</span>
                   </button>
                 ) : (
                   <input style={optInput} type="text" placeholder="쉼표로 구분 — 예: XS/S, M/L, XL/XXL" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
@@ -2607,7 +2607,7 @@ export default function QuickProductFastForm({
                 <div style={{ marginTop: "8px", borderTop: "1px solid var(--color-line)", paddingTop: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
                     <span style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)" }}>이 브랜드의 상품</span>
-                    <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ok-tx)" }}>{details.length}개 · 사진 {brandGroupDetailPhotoCount}장</span>
+                    <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ok-tx)" }}>{details.length}개 · 사진 {brandGroupDetailPhotoCount}장</span>
                   </div>
 
                   {/* 사진 몽땅 놓기 — 장수만큼 줄이 생기고 파일 이름이 상품명이 된다 */}
@@ -2638,7 +2638,7 @@ export default function QuickProductFastForm({
                         onClick={(event) => { event.stopPropagation(); openBrandDetailEditorForNew(); }}
                         style={{ border: "none", borderRadius: "8px", background: "var(--color-rose-deep)", color: "#fff", padding: "12px 24px", fontSize: "14px", fontWeight: 900, cursor: "pointer" }}
                       >세부상품 추가</button>
-                      <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-ok-tx)" }}>
+                      <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "var(--color-ok-tx)" }}>
                         사진 없어도 됩니다 — 손님에게는 <b>상품명 자동 그림</b>이 나가요 (화장품→화장품 그림)
                       </div>
                     </div>
@@ -2660,7 +2660,7 @@ export default function QuickProductFastForm({
                                 숨김 줄에는 「숨김」 딱지를 붙인다. 위에 숨김 개수 + [전부 노출] 도 둔다. */}
                       {details.some((n) => detailHidden.includes(n)) ? (
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 8px", borderBottom: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
-                          <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>
                             숨김 {details.filter((n) => detailHidden.includes(n)).length}개 — 손님에게 안 보입니다
                           </span>
                           <button
@@ -2679,7 +2679,7 @@ export default function QuickProductFastForm({
                                 <th
                                   key={`h-${i}`}
                                   style={{
-                                    textAlign: i === 2 ? "right" : i === 3 ? "center" : "left", fontSize: "11px", fontWeight: 900,
+                                    textAlign: i === 2 ? "right" : i === 3 ? "center" : "left", fontSize: "12px", fontWeight: 900,
                                     color: "var(--color-ink-mute)", letterSpacing: "0.04em", padding: "8px 8px", whiteSpace: "nowrap",
                                     width: i === 0 ? "56px" : i === 2 ? "104px" : i === 3 ? "96px" : undefined,
                                   }}
@@ -2780,18 +2780,18 @@ export default function QuickProductFastForm({
                                       onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
                                     />
                                     <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "2px" }}>
-                                      <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>색상</span>
+                                      <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>색상</span>
                                       <input
-                                        style={{ ...cellStyle, height: "26px", fontSize: "11px", fontWeight: 700, flex: 1, minWidth: 0 }}
+                                        style={{ ...cellStyle, height: "26px", fontSize: "12px", fontWeight: 700, flex: 1, minWidth: 0 }}
                                         placeholder="없음"
                                         defaultValue={(cfg.colors || []).join(", ")}
                                         key={`c-${name}-${(cfg.colors || []).join(",")}`}
                                         onBlur={(event) => setDetailAxisValues(name, "colors", event.target.value)}
                                         onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
                                       />
-                                      <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>사이즈</span>
+                                      <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>사이즈</span>
                                       <input
-                                        style={{ ...cellStyle, height: "26px", fontSize: "11px", fontWeight: 700, flex: 1, minWidth: 0 }}
+                                        style={{ ...cellStyle, height: "26px", fontSize: "12px", fontWeight: 700, flex: 1, minWidth: 0 }}
                                         placeholder="없음"
                                         defaultValue={(cfg.sizes || []).join(", ")}
                                         key={`s-${name}-${(cfg.sizes || []).join(",")}`}
@@ -2813,7 +2813,7 @@ export default function QuickProductFastForm({
                                       onChange={(event) => applySalePrice(name, event.target.value)}
                                       onBlur={() => clearSalePriceDraft(name)}
                                     />
-                                    <div style={{ fontSize: "11px", fontWeight: 800, textAlign: "right", paddingRight: "8px", color: tooLow ? "var(--color-danger-tx)" : "var(--color-ink-mute)" }}>
+                                    <div style={{ fontSize: "12px", fontWeight: 800, textAlign: "right", paddingRight: "8px", color: tooLow ? "var(--color-danger-tx)" : "var(--color-ink-mute)" }}>
                                       {tooLow ? "대표가보다 낮음" : `추가금 +${plusNow.toLocaleString("ko-KR")}`}
                                     </div>
                                   </td>
@@ -2917,19 +2917,19 @@ export default function QuickProductFastForm({
                           onClick={() => { setBulkNamesText(""); setBulkNamesOpen(true); }}
                           style={{ border: "1px solid var(--color-rose-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)", padding: "8px 12px", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
                         >여러 개 붙여넣기</button>
-                        <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>칸을 누르면 바로 고쳐집니다</span>
+                        <span style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>칸을 누르면 바로 고쳐집니다</span>
                       </div>
                     </div>
                   )}
 
-                  <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+                  <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
                     사진칸: 끌어놓기·클릭·붙여넣기(Ctrl+V) 다 됩니다 · 우클릭=사진 빼기 · [수정]=창에서 자세히
                   </div>
                 </div>
               ) : null}
 
               {usedAxisCount === 0 && !brandGroupActive ? (
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", padding: "2px 2px 0", lineHeight: 1.6 }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-warn-tx)", padding: "2px 2px 0", lineHeight: 1.6 }}>
                   {(() => {
                     // 실제 손님 화면 그대로: 비움=손님이 적어요(필수), 없음=안 씀. 칸 제목은 없음이어도 뜬다.
                     const label = effectiveCustomInputLabel;
@@ -2949,7 +2949,7 @@ export default function QuickProductFastForm({
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-line)", marginTop: "8px", paddingTop: "8px" }}>
                 <div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)" }}>재고관리</div>
-                  <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{stockManagementEnabled ? "재고 수량 관리 중" : "(끄면 무제한 — 재고를 세지 않음)"}</div>
+                  <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{stockManagementEnabled ? "재고 수량 관리 중" : "(끄면 무제한 — 재고를 세지 않음)"}</div>
                 </div>
                 <div onClick={() => setStockManagementEnabled((v) => !v)} style={tgStyle(stockManagementEnabled)}><span style={tgKnob(stockManagementEnabled)} /></div>
               </div>
@@ -2992,7 +2992,7 @@ export default function QuickProductFastForm({
               <div style={toggleRow}>
                 <div>
                   <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>개인당 구매제한</div>
-                  <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
+                  <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
                 </div>
                 <div onClick={() => setPurchaseLimitEnabled((v) => !v)} style={tgStyle(purchaseLimitEnabled)}><span style={tgKnob(purchaseLimitEnabled)} /></div>
               </div>
@@ -3001,7 +3001,7 @@ export default function QuickProductFastForm({
                 <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
                   <input style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "80px" }} type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
-                  <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>개</span>
                 </div>
               ) : null}
             </div>
@@ -3527,7 +3527,7 @@ export default function QuickProductFastForm({
                 coverImages.length > 0 ? (
                   <div>
                     <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
-                    <div style={{ marginTop: "4px", textAlign: "center", fontSize: "11px", lineHeight: 1.3, fontWeight: 800, color: "var(--color-ok-tx)" }}>
+                    <div style={{ marginTop: "4px", textAlign: "center", fontSize: "12px", lineHeight: 1.3, fontWeight: 800, color: "var(--color-ok-tx)" }}>
                       올린 사진이 대표로 쓰입니다<br />
                       <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>지우면 글자 썸네일로 돌아감</span>
                     </div>
@@ -3542,7 +3542,7 @@ export default function QuickProductFastForm({
                     <div style={{ marginTop: "6px" }}>
                       <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
                     </div>
-                    <div style={{ marginTop: "4px", textAlign: "center", fontSize: "11px", lineHeight: 1.3, fontWeight: 800, color: "var(--color-rose-deep)" }}>
+                    <div style={{ marginTop: "4px", textAlign: "center", fontSize: "12px", lineHeight: 1.3, fontWeight: 800, color: "var(--color-rose-deep)" }}>
                       브랜드 글자 썸네일 자동 적용<br />
                       <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>사진을 올리면 그걸 씁니다</span>
                     </div>
@@ -3572,10 +3572,10 @@ export default function QuickProductFastForm({
                   value={productName}
                   onChange={(e) => { setFormTouched(true); setProductName(e.target.value); if (nameError) setNameError(false); }}
                 />
-                {nameError ? <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--color-danger-tx)" }}>상품명은 필수입니다</div> : null}
+                {nameError ? <div style={{ marginTop: "4px", fontSize: "12px", color: "var(--color-danger-tx)" }}>상품명은 필수입니다</div> : null}
               </div>
               <div>
-                <label style={fieldLabel}>{brandGroupActive ? <>대표가 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(세부상품 판매가의 기준 — 판매가 = 대표가 + 추가금)</span></> : <>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(비우면 손님 직접입력)</span></>}</label>
+                <label style={fieldLabel}>{brandGroupActive ? <>대표가 <span style={{ fontSize: "12px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(세부상품 판매가의 기준 — 판매가 = 대표가 + 추가금)</span></> : <>가격 <span style={{ fontSize: "12px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(비우면 손님 직접입력)</span></>}</label>
                 <div style={{ position: "relative" }}>
                   <input style={{ ...fieldInput, paddingRight: "32px", opacity: freeProductEnabled ? 0.45 : 1 }} type="text" inputMode="numeric" placeholder="59,000" value={freeProductEnabled ? "0" : priceText} disabled={freeProductEnabled} onChange={(e) => { setFormTouched(true); setPriceText(formatNumberWithComma(e.target.value)); }} />
                   <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
@@ -3583,13 +3583,13 @@ export default function QuickProductFastForm({
                 {/* [2026-08-29] 세부상품 판매가는 "대표가 + 추가금"이라 대표가를 바꾸면 같이 움직인다.
                     모르고 바꾸면 여러 상품 값이 한꺼번에 틀어지므로 미리 알려준다. */}
                 {details.length > 0 && !freeProductEnabled ? (
-                  <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)", lineHeight: 1.45 }}>
+                  <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 800, color: "var(--color-warn-tx)", lineHeight: 1.45 }}>
                     ⚠ 이 값을 바꾸면 세부상품 {details.length}개의 판매가가 <b>같이 움직입니다</b> (판매가 = 이 값 + 추가금)
                   </div>
                 ) : null}
                 {!brandGroupActive ? (
                   <div style={{ marginTop: "8px" }}>
-                    <label style={fieldLabel}>입금가 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(선택 · 창고에 내는 1개 값 · 손님에겐 안 보임)</span></label>
+                    <label style={fieldLabel}>입금가 <span style={{ fontSize: "12px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(선택 · 창고에 내는 1개 값 · 손님에겐 안 보임)</span></label>
                     <div style={{ position: "relative" }}>
                       <input style={{ ...fieldInput, paddingRight: "32px" }} type="text" inputMode="numeric" placeholder="미입력" value={costText} onChange={(e) => { setFormTouched(true); setCostText(formatNumberWithComma(e.target.value)); }} />
                       <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
@@ -3645,7 +3645,7 @@ export default function QuickProductFastForm({
               style={{ width: "100%", marginBottom: "12px", padding: "12px 12px", border: "1px dashed var(--color-rose-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, cursor: "pointer", textAlign: "left" }}
             >
               ▾ 자세히 열기 — 옵션(색상·사이즈) · 재고 · 노출 · 카테고리 · 뱃지 · 설명
-              <span style={{ display: "block", marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
+              <span style={{ display: "block", marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
                 지금 설정 · {(() => { const parts = [effectiveCustomInputLabel && realColors.length === 0 ? "색상 안 씀" : colors.length === 0 ? "색상 손님이 적음" : colors.every((c) => c === "없음") ? "색상 안 씀" : `색상 ${realColors.length}개`, sizes.length === 0 ? "사이즈 손님이 적음" : sizes.every((c) => c === "없음") ? "사이즈 안 씀" : `사이즈 ${realSizes.length}개`, effectiveCustomInputLabel && realColors.length === 0 ? `고객 직접입력: ${effectiveCustomInputLabel}` : "", stockManagementEnabled ? "재고 관리함" : "재고 안 셈", isVisible ? "손님에게 보임" : "숨김"]; return parts.filter(Boolean).join(" · "); })()}
               </span>
             </button>
@@ -3663,7 +3663,7 @@ export default function QuickProductFastForm({
               style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "8px 12px", border: "none", background: "transparent", cursor: "pointer" }}
             >
               <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>손님 화면 미리보기</span>
-              <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>{previewOpen ? "접기 ▲" : "펴기 ▼"}</span>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink-mute)" }}>{previewOpen ? "접기 ▲" : "펴기 ▼"}</span>
             </button>
 
             {previewOpen ? (() => {
@@ -3717,7 +3717,7 @@ export default function QuickProductFastForm({
                         {productName.trim() || "상품명을 입력하세요"}
                       </div>
                       {details.length > 1 ? (
-                        <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "2px" }}>
+                        <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginTop: "2px" }}>
                           {brandGroupActive
                             ? `세부상품 ${details.length - detailHidden.length}가지 · 상품별 금액이 달라요`
                             : `종류 ${details.length}가지 · 눌러서 선택`}
@@ -3732,10 +3732,10 @@ export default function QuickProductFastForm({
 
                   {/* 손님이 못 보는 상태를 미리 알려준다 */}
                   <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {!productName.trim() ? <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)" }}>· 상품명이 없으면 저장되지 않습니다</span> : null}
-                    {!brandGroupActive && !uploadedCover && !detailImages[0] ? <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ok-tx)" }}>· 사진이 없으면 상품명에 맞는 자동 그림이 나갑니다 (위 미리보기 그대로 · 사진 올리면 교체)</span> : null}
-                    {!isVisible ? <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)" }}>· 고객 노출이 꺼져 있어 손님 화면에 아예 안 보입니다</span> : null}
-                    {details.length > 0 && detailHidden.length === details.length ? <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)" }}>· 세부상품이 전부 숨김이라 손님이 고를 수 있는 게 없습니다</span> : null}
+                    {!productName.trim() ? <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-danger-tx)" }}>· 상품명이 없으면 저장되지 않습니다</span> : null}
+                    {!brandGroupActive && !uploadedCover && !detailImages[0] ? <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ok-tx)" }}>· 사진이 없으면 상품명에 맞는 자동 그림이 나갑니다 (위 미리보기 그대로 · 사진 올리면 교체)</span> : null}
+                    {!isVisible ? <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-warn-tx)" }}>· 고객 노출이 꺼져 있어 손님 화면에 아예 안 보입니다</span> : null}
+                    {details.length > 0 && detailHidden.length === details.length ? <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-danger-tx)" }}>· 세부상품이 전부 숨김이라 손님이 고를 수 있는 게 없습니다</span> : null}
                   </div>
                 </div>
               );
@@ -3750,7 +3750,7 @@ export default function QuickProductFastForm({
             <div style={toggleRow}>
               <div>
                 <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>고객 노출</div>
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>손님 주문 페이지에 표시</div>
+                <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginTop: "1px" }}>손님 주문 페이지에 표시</div>
               </div>
               <div onClick={() => setIsVisible((v) => !v)} style={tgStyle(isVisible)}><span style={tgKnob(isVisible)} /></div>
             </div>
@@ -3813,7 +3813,7 @@ export default function QuickProductFastForm({
             >
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>고객 카테고리 버튼에 표시</span>
-                <span style={{ display: "block", marginTop: "2px", fontSize: "11px", lineHeight: 1.45, color: "var(--color-ink-mute)" }}>
+                <span style={{ display: "block", marginTop: "2px", fontSize: "12px", lineHeight: 1.45, color: "var(--color-ink-mute)" }}>
                   꺼도 상품은 ‘전체’ 목록에서 정상적으로 보여요.
                 </span>
               </span>
@@ -3830,7 +3830,7 @@ export default function QuickProductFastForm({
           {/* 상품 뱃지 */}
           <div style={{ marginBottom: "12px" }}>
             <div style={sectionLabel}>상품 뱃지</div>
-            <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
               손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "var(--color-ok-tx)" }}>배지를 하나도 안 골라도 자동으로 붙습니다</b> — 신상(등록 7일) · 급상승(담김 많거나 판매 상위 10%) · 루루픽(판매 상위 3%) · 「N개 남음」(재고) · 「방송 중 N개 주문」(실시간) · 「판매 N개」 · 「재구매 N명」. 배지는 «더» 강조하고 싶을 때만 누르세요.
               <br />해외배송 뱃지는 직접 골라야 붙습니다
             </div>
@@ -3861,7 +3861,7 @@ export default function QuickProductFastForm({
             <div style={{ ...toggleRow, opacity: customerDetailInputUnavailable ? 0.55 : 1 }}>
               <div style={{ minWidth: 0, paddingRight: "8px" }}>
                 <div style={{ fontSize: "13px", color: "var(--color-ink)", fontWeight: 800 }}>세부상품명 고객 직접입력</div>
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px", lineHeight: 1.45 }}>
+                <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginTop: "1px", lineHeight: 1.45 }}>
                   {customerDetailInputUnavailable
                     ? "등록된 세부상품 선택형에는 사용할 수 없음"
                     : customerDetailInputEnabled
@@ -3911,7 +3911,7 @@ export default function QuickProductFastForm({
                   {chips.map((c) => (
                     <span key={c} style={{ maxWidth: "100%", boxSizing: "border-box", overflowWrap: "anywhere", fontSize: "12px", fontWeight: 800, background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", borderRadius: "20px", padding: "4px 8px" }}>{c}</span>
                   ))}
-                  <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>
+                  <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>
                     {chips.length === 0 ? "쉼표로 구분해 주세요 · 손님 옵션 창 위쪽에 보여요" : `${chips.length}개 · 손님 옵션 창에 이렇게 보여요`}
                   </span>
                 </div>
@@ -3937,10 +3937,10 @@ export default function QuickProductFastForm({
                     <button type="button" aria-pressed={instant} style={btn(instant)} onClick={() => { setFormTouched(true); setOrderNoticeMode("instant"); setBadgeTypes((prev) => prev.includes("direct") ? prev : [...prev, "direct"]); }}>바로구매 가능</button>
                     <button type="button" aria-pressed={!instant} style={btn(!instant)} onClick={() => { setFormTouched(true); setOrderNoticeMode("live_only"); setBadgeTypes((prev) => prev.filter((x) => x !== "direct")); }}>방송 접수 후 구매</button>
                   </div>
-                  <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>
+                  <div style={{ marginTop: "6px", fontSize: "12px", color: "var(--color-ink-mute)" }}>
                     {instant ? "손님 옵션창에 「방송 접수 없이 바로 구매 가능!」" : "손님 옵션창에 「방송 접수 완료 후 구매 가능!」"}
                   </div>
-                  <div style={{ marginTop: "2px", fontSize: "11px", color: "var(--color-ink-mute)" }}>쇼핑몰에 진열한 상품은 이 설정과 상관없이 항상 「바로 주문」이에요</div>
+                  <div style={{ marginTop: "2px", fontSize: "12px", color: "var(--color-ink-mute)" }}>쇼핑몰에 진열한 상품은 이 설정과 상관없이 항상 「바로 주문」이에요</div>
                 </>
               );
             })()}
@@ -3981,7 +3981,7 @@ export default function QuickProductFastForm({
           <div style={{ width: "min(440px, 94vw)", borderRadius: "12px", overflow: "hidden", background: "var(--color-surface)", boxShadow: "0 20px 60px rgba(0,0,0,0.28)" }}>
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-line)", fontSize: "14px", fontWeight: 900, color: "var(--color-ink)" }}>이름 여러 개 붙여넣기</div>
             <div style={{ padding: "16px" }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", marginBottom: "8px", lineHeight: 1.6 }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", marginBottom: "8px", lineHeight: 1.6 }}>
                 한 줄에 하나씩 넣으세요. <b>이름, 판매가</b> 로 써도 됩니다.
               </div>
               <textarea
@@ -3990,7 +3990,7 @@ export default function QuickProductFastForm({
                 placeholder={"BB-39 코트, 179000\nBB-40 코트, 179000\nBB-41 코트"}
                 style={{ width: "100%", height: "140px", padding: "12px 12px", borderRadius: "8px", border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "13px", fontWeight: 600, outline: "none", resize: "vertical", lineHeight: 1.6 }}
               />
-              <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+              <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
                 색상·사이즈는 <b>맨 아랫줄 상품과 똑같이</b> 채워집니다. 나중에 표에서 고치면 됩니다.
               </div>
             </div>

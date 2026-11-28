@@ -1730,7 +1730,7 @@ export default function AdminLiveEventRoulettePanel({
                               // [2026-09-13] 같은 닉네임으로 «서로 다른 손님»이 주문하면 한 칸으로 합쳐진다. 표시만 해서 알려준다.
                               const mixed = Number(p.person_count || 0) >= 2;
                               return (
-                                <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={mixed ? `⚠ 이 이름으로 주문한 손님이 ${p.person_count}명입니다(번호가 다름). 당첨되면 자동지급이 멈추고 수동지급 안내가 뜹니다.` : (ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined)}>{on ? "고정 · " : ""}{p.nickname}{mixed ? <span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 700 }}> ⚠{p.person_count}명</span> : null}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "11px" }}>{ticketTail}</span> : null}</span>
+                                <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={mixed ? `⚠ 이 이름으로 주문한 손님이 ${p.person_count}명입니다(번호가 다름). 당첨되면 자동지급이 멈추고 수동지급 안내가 뜹니다.` : (ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined)}>{on ? "고정 · " : ""}{p.nickname}{mixed ? <span style={{ color: "#f59e0b", fontSize: "12px", fontWeight: 700 }}> ⚠{p.person_count}명</span> : null}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "12px" }}>{ticketTail}</span> : null}</span>
                               );
                             })
                           )}

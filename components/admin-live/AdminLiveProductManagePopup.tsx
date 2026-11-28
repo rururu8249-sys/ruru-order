@@ -2024,9 +2024,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0, fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", cursor: isNarrow ? "pointer" : "default" }}
                 >
                   방송 목록
-                  {isNarrow ? <span style={{ fontSize: "11px" }}>{bcListOpen ? "▲" : "▼"}</span> : null}
+                  {isNarrow ? <span style={{ fontSize: "12px" }}>{bcListOpen ? "▲" : "▼"}</span> : null}
                   {isNarrow && !bcListOpen ? (
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>· {bcList.find((b) => b.id === bcSelId)?.title ?? "방송 선택"}</span>
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)" }}>· {bcList.find((b) => b.id === bcSelId)?.title ?? "방송 선택"}</span>
                   ) : null}
                 </span>
                 <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcCopyIds(null); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "4px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
@@ -2066,7 +2066,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   {bcDateFilter === "custom" ? (
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                       <input type="date" value={bcCustomFrom} onChange={(e) => { if (e.target.value !== bcCustomFrom) { retainBcFilterSelection(); setBcCustomFrom(e.target.value); } }} style={{ flex: 1, minWidth: 0, height: "28px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 700, padding: "0 4px" }} />
-                      <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>~</span>
+                      <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>~</span>
                       <input type="date" value={bcCustomTo} onChange={(e) => { if (e.target.value !== bcCustomTo) { retainBcFilterSelection(); setBcCustomTo(e.target.value); } }} style={{ flex: 1, minWidth: 0, height: "28px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 700, padding: "0 4px" }} />
                     </div>
                   ) : null}
@@ -2079,7 +2079,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 ) : bcList.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>방송 없음 — 방송 시작 후 생김</div></div>
                 ) : bcListView.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "24px 12px", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700, lineHeight: 1.6 }}>조건에 맞는 방송이 없습니다.<br /><span style={{ fontSize: "11px" }}>기간을 「전체」로 바꾸거나 검색어를 지워보세요.</span></div>
+                  <div style={{ textAlign: "center", padding: "24px 12px", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700, lineHeight: 1.6 }}>조건에 맞는 방송이 없습니다.<br /><span style={{ fontSize: "12px" }}>기간을 「전체」로 바꾸거나 검색어를 지워보세요.</span></div>
                 ) : (
                   bcListView.map((b) => {
                     const on = b.id === bcSelId;
@@ -2104,7 +2104,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             </span>
                           ) : null}
                         </div>
-                        <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>{dateLabel}</div>
+                        <div style={{ fontSize: "12px", color: "var(--color-ink-soft)", marginTop: "2px" }}>{dateLabel}</div>
                       </button>
                     );
                   })
@@ -2121,7 +2121,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface)" }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
-                            <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "2px" }}>{dateLabel}</div>
+                            <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginTop: "2px" }}>{dateLabel}</div>
                           </div>
                           <button type="button" disabled={bcBusy} onClick={() => void handleRestoreBroadcast(b)} style={{ flexShrink: 0, height: "28px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", cursor: bcBusy ? "default" : "pointer" }}>되살리기</button>
                         </div>
@@ -2175,7 +2175,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         <button type="button" onClick={() => setBcRenameOpen(false)} style={{ ...rowBtn, height: "36px" }}>취소</button>
                       </div>
                     ) : <button type="button" disabled={bcBusy} onClick={() => { setBcRenameTitle(selectedBroadcastForEdit.title); setBcRenameOpen(true); }} style={{ ...rowBtn, height: "36px" }}>방송명 수정</button>
-                  ) : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>진행 중 방송 제목은 「현재 방송 설정」에서 수정</span>}
+                  ) : <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>진행 중 방송 제목은 「현재 방송 설정」에서 수정</span>}
                 </div>
               ) : null}
               <div style={{ padding: "8px 12px 0" }}>
@@ -2369,14 +2369,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px", minHeight: "56px", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
                             {bcCopyMode ? <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "20px", height: "20px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : <span aria-hidden="true" style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }}>⠿</span>}
                             {!bcCopyMode ? <input type="checkbox" aria-label={`${productName(p)} 체크`} checked={rotChecked.has(pid)} onChange={() => toggleRotRowCheck(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "20px", height: "20px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : null}
-                            <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                             <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default", opacity: rowHidden ? 0.45 : 1 }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</span>
                             <div style={{ flex: 1, minWidth: 0, opacity: rowHidden ? 0.55 : 1 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
                                 {isBrandFolder && !bcCopyMode ? (
                                   <button type="button" aria-expanded={expanded} aria-label={`${productName(p)} 세부상품 ${expanded ? "접기" : "펼치기"}`} onClick={(e) => { e.stopPropagation(); toggleExpand(); }} style={{ display: "inline-flex", alignItems: "center", gap: "6px", minWidth: 0, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left" }}>
                                     <span style={{ fontSize: isNarrow ? "14px" : "13px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
-                                    <span aria-hidden="true" style={{ fontSize: "11px", color: "var(--color-ink-mute)", flexShrink: 0 }}>{expanded ? "▴" : "▾"}</span>
+                                    <span aria-hidden="true" style={{ fontSize: "12px", color: "var(--color-ink-mute)", flexShrink: 0 }}>{expanded ? "▴" : "▾"}</span>
                                   </button>
                                 ) : (
                                   <span style={{ fontSize: isNarrow ? "14px" : "13px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
@@ -2488,7 +2488,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       >
                         {/* 드래그 핸들 */}
                         <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
-                        <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                         <span
                           onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }}
                           title={img ? "클릭하면 크게 보기" : undefined}
@@ -2611,7 +2611,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             if (!m.managed || m.stock === null) return null;
                             if (m.hasVariants) {
                               return (
-                                <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
+                                <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
                                   재고 {m.stock.toLocaleString("ko-KR")}개
                                   <button type="button" onClick={() => editProduct(p)} title="옵션별 재고는 수정 폼에서 변경" style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "2px 8px", cursor: "pointer" }}>옵션별 수정</button>
                                 </div>
@@ -2619,7 +2619,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             }
                             if (inlineStockId !== id) {
                               return (
-                                <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
+                                <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
                                   재고 {m.stock.toLocaleString("ko-KR")}개
                                   <button type="button" onClick={() => { setInlineStockId(id); setInlineStockText(String(m.stock)); }} style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "4px", padding: "2px 8px", cursor: "pointer" }}>수정</button>
                                 </div>
@@ -2636,7 +2636,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                   onKeyDown={(e) => { if (e.key === "Enter") void saveInlineStock(p); if (e.key === "Escape") setInlineStockId(""); }}
                                   style={{ width: "64px", height: "26px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", padding: "0 8px", fontSize: "12px", fontWeight: 800, textAlign: "right", color: "var(--color-ink)", background: "var(--color-surface)" }}
                                 />
-                                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+                                <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>개</span>
                                 <button type="button" disabled={inlineStockSaving} onClick={() => void saveInlineStock(p)} style={{ fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "4px", padding: "4px 8px", cursor: inlineStockSaving ? "wait" : "pointer", opacity: inlineStockSaving ? 0.6 : 1 }}>{inlineStockSaving ? "저장중…" : "저장"}</button>
                                 <button type="button" onClick={() => setInlineStockId("")} style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "4px", padding: "4px 8px", cursor: "pointer" }}>취소</button>
                               </div>
@@ -2680,7 +2680,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       </div>
                       {matchedDetails.length > 0 ? (
                         <div style={{ marginLeft: "96px", border: "1px solid var(--color-rose-line)", borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)" }}>
-                          <div style={{ padding: "6px 8px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900 }}>{normalizedQuery && !parentNameMatched ? '세부상품 검색결과' : '연결된 세부상품'} {matchedDetails.length}개</div>
+                          <div style={{ padding: "6px 8px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 900 }}>{normalizedQuery && !parentNameMatched ? '세부상품 검색결과' : '연결된 세부상품'} {matchedDetails.length}개</div>
                           {matchedDetails.map((detail) => (
                             <div key={detail.detailName} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px", borderTop: "1px solid var(--color-line)" }}>
                               <button type="button" onClick={() => detail.image && setLightbox(detail.image)} style={{ width: "54px", height: "54px", flexShrink: 0, border: "none", borderRadius: "8px", overflow: "hidden", padding: 0, background: "var(--color-surface-2)", cursor: detail.image ? "zoom-in" : "default" }}>
@@ -2692,7 +2692,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                   {detail.hidden ? <span style={{ padding: "1px 4px", borderRadius: "4px", background: "var(--color-surface-2)", color: "var(--color-ink-mute)", fontSize: "11px", fontWeight: 700 }}>숨김</span> : null}
                                 </div>
                                 <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{money(detail.price)}</div>
-                                {(detail.colors.length > 0 || detail.sizes.length > 0) ? <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{detail.colors.length > 0 ? `색상: ${detail.colors.join(", ")}` : ""}{detail.colors.length > 0 && detail.sizes.length > 0 ? " · " : ""}{detail.sizes.length > 0 ? `사이즈: ${detail.sizes.join(", ")}` : ""}</div> : null}
+                                {(detail.colors.length > 0 || detail.sizes.length > 0) ? <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{detail.colors.length > 0 ? `색상: ${detail.colors.join(", ")}` : ""}{detail.colors.length > 0 && detail.sizes.length > 0 ? " · " : ""}{detail.sizes.length > 0 ? `사이즈: ${detail.sizes.join(", ")}` : ""}</div> : null}
                               </div>
                               <button type="button" onClick={() => {
                                 const source = 'sourceProductId' in detail ? products.find(row => productId(row) === detail.sourceProductId) : p;
@@ -2728,7 +2728,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
 
-            <div style={{ padding: "0 16px 8px", fontSize: "11px", color: "var(--color-ink-mute)", fontWeight: 700 }}>
+            <div style={{ padding: "0 16px 8px", fontSize: "12px", color: "var(--color-ink-mute)", fontWeight: 700 }}>
               선택 상품을 방송 순환목록에 담습니다. 정확한 위젯 고정은 방송상품의 세부상품 행에서 합니다.
             </div>
 
@@ -2738,7 +2738,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <input type="checkbox" checked={wsAllChecked} onChange={wsToggleAll} />
                 전체선택
               </label>
-              <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)" }}>✓ {wsSelected.size}개 선택</span>
+              <span style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>✓ {wsSelected.size}개 선택</span>
             </div>
 
             {/* 상품 목록(개별선택) */}
@@ -2759,7 +2759,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
-                          <span style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{productPriceLabel(p)}</span>
+                          <span style={{ fontSize: "12px", color: "var(--color-ink-soft)" }}>{productPriceLabel(p)}</span>
                         </span>
                       </label>
                     );
@@ -3032,7 +3032,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <button type="button" onClick={() => setNewBcOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
             <div style={{ padding: "16px 16px" }}>
-              <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", marginBottom: "6px" }}>방송 제목</label>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "var(--color-ink-soft)", marginBottom: "6px" }}>방송 제목</label>
               <input
                 autoFocus
                 value={newBcTitle}

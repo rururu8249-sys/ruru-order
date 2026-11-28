@@ -1172,7 +1172,7 @@ export default function LiveOrderTable({
                 onClick={() => { setExportConfirm(""); void runExport("rozen", newInvoiceExportOrders, invoiceScopeMeta.label+" · 새로 출력", "new"); }}
                 style={{ padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: newInvoiceExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: newInvoiceExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
                 새로 출력 (아직 안 뽑은 결제완료 {newInvoiceExportOrders.length.toLocaleString("ko-KR")}건)
-                <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력했거나 출고완료된 건은 빼요</div>
+                <div style={{ fontSize: "12px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력했거나 출고완료된 건은 빼요</div>
               </button>
             ) : null}
 
@@ -1185,9 +1185,9 @@ export default function LiveOrderTable({
                 : { padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
               {exportConfirm === "rozen"
                 ? <>이미 출력한 {alreadyPrintedPaidCount.toLocaleString("ko-KR")}건까지 모두 다시 출력 (결제완료 {paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
-                    <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력한 {alreadyPrintedPaidCount.toLocaleString("ko-KR")}건도 다시 나와요</div></>
+                    <div style={{ fontSize: "12px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력한 {alreadyPrintedPaidCount.toLocaleString("ko-KR")}건도 다시 나와요</div></>
                 : <>돈 받은 것만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
-                    <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>입금확인·카드결제 완료분만</div></>}
+                    <div style={{ fontSize: "12px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>입금확인·카드결제 완료분만</div></>}
             </button>
 
             {selectedExportOrders.length > 0 ? (
@@ -1203,7 +1203,7 @@ export default function LiveOrderTable({
               onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, invoiceCandidates, invoiceScopeMeta.label+" · 미결제 포함", "all"); }}
               style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-warn-tx)", background: "var(--color-warn-bg)", color: "var(--color-warn-tx)", fontWeight: 700, cursor: "pointer", fontSize: "12px", textAlign: "left" }}>
               ⚠️ 미결제 포함 전체 ({invoiceCandidates.length.toLocaleString("ko-KR")}건)
-              <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.9, marginTop: "2px" }}>돈 안 들어온 주문도 포함됩니다</div>
+              <div style={{ fontSize: "12px", fontWeight: 600, opacity: 0.9, marginTop: "2px" }}>돈 안 들어온 주문도 포함됩니다</div>
             </button>
 
             {exportConfirm==='rozen'?<div className="rounded-lg border border-line p-2 text-sm text-ink">

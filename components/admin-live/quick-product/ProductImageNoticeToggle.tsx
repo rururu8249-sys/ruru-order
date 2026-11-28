@@ -63,7 +63,7 @@ export default function ProductImageNoticeToggle() {
         <span>{on ? "☑" : "☐"}</span>
         <span>사진에 안내문구 넣기</span>
       </button>
-      <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>
+      <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>
         {on
           ? `지금 올리는 사진 오른쪽 아래에 「${text.slice(0, 22)}${text.length > 22 ? "…" : ""}」 가 들어갑니다`
           : "문구 없이 사진 그대로 올라갑니다 · 문구 내용은 설정 › 상품사진 문구"}
