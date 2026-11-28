@@ -2039,15 +2039,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     value={bcSearch}
                     onChange={(e) => { if (e.target.value !== bcSearch) { retainBcFilterSelection(); setBcSearch(e.target.value); } }}
                     placeholder="방송 이름 검색"
-                    style={{ width: "100%", height: "28px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 700, padding: "0 8px" }}
+                    style={{ width: "100%", height: "32px", boxSizing: "border-box", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "13px", fontWeight: 400, padding: "0 8px" }}
                   />
                   {/* 기간 프리셋 칩 */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                  <div style={{ display: "flex", flexWrap: "nowrap", gap: "4px" }}>
                     {([
-                      { key: "recent30", label: "최근 30일" },
-                      { key: "recent90", label: "최근 3개월" },
+                      { key: "recent30", label: "30일" },
+                      { key: "recent90", label: "3개월" },
                       { key: "all", label: "전체" },
-                      { key: "custom", label: "기간 선택" },
+                      { key: "custom", label: "기간" },
                     ] as const).map((o) => {
                       const active = bcDateFilter === o.key;
                       return (
@@ -2055,7 +2055,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           key={o.key}
                           type="button"
                           onClick={() => { if (o.key !== bcDateFilter) { retainBcFilterSelection(); setBcDateFilter(o.key); } }}
-                          style={{ fontSize: "11px", fontWeight: 800, borderRadius: "999px", padding: "4px 8px", cursor: "pointer", border: active ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", background: active ? "var(--color-rose-deep)" : "var(--color-surface)", color: active ? "#fff" : "var(--color-ink-soft)" }}
+                          style={{ fontSize: "12px", fontWeight: 700, borderRadius: "999px", padding: "4px 8px", cursor: "pointer", border: active ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", background: active ? "var(--color-rose-deep)" : "var(--color-surface)", color: active ? "#fff" : "var(--color-ink-soft)" }}
                         >
                           {o.label}
                         </button>
@@ -2573,7 +2573,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const createdAtLabel = productCreatedAtLabel(p);
                     const widgetStyle: React.CSSProperties = state === "rotating"
                       ? { background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", border: "1px solid var(--color-rose-line)" }
-                      : { background: "var(--color-rose-deep)", color: "#fff", border: "none" };
+                      : { background: "var(--color-surface)", color: "var(--color-ink)", border: "1px solid var(--color-line)" };
                     const widgetText = state === "rotating" ? "방송에서 빼기" : "+ 방송에 담기";
                     const normalizedQuery = normalizeProductSearchText(search);
                     const parentNameMatched = normalizedQuery ? productSearchMatches(productName(p), normalizedQuery) : false;
@@ -2586,21 +2586,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         <button
                           type="button"
                           onClick={() => img && setLightbox(img)}
-                          style={{ width: "88px", height: "88px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", border: "none", padding: 0, cursor: img ? "zoom-in" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          style={{ width: "56px", height: "56px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", border: "none", padding: 0, cursor: img ? "zoom-in" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}
                         >
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                         </button>
 
                         {/* 정보 */}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                          <div style={{ marginTop: "4px", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{productPriceLabel(p)}{(() => { const c = Number(parseProductNote(p).cost_price); return Number.isFinite(c) && c > 0 ? <span style={{ marginLeft: "8px", fontSize: "12px", fontWeight: 600, color: "var(--color-ink-mute)" }}>입금가 {Math.round(c).toLocaleString("ko-KR")}원</span> : null; })()}</div>
-                          {createdAtLabel ? (
-                            <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
-                              등록일시 {createdAtLabel}
-                            </div>
-                          ) : null}
-                          <div style={{ marginTop: "4px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                          <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
+                          <div style={{ marginTop: "2px", fontSize: "14px", fontWeight: 700, color: "var(--color-ink)" }}>{productPriceLabel(p)}{(() => { const c = Number(parseProductNote(p).cost_price); return Number.isFinite(c) && c > 0 ? <span style={{ marginLeft: "8px", fontSize: "12px", fontWeight: 600, color: "var(--color-ink-mute)" }}>입금가 {Math.round(c).toLocaleString("ko-KR")}원</span> : null; })()}</div>
+                          <div style={{ marginTop: "4px", display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
+                            {createdAtLabel ? <span style={{ fontSize: "12px", color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums", marginRight: "4px" }}>등록 {createdAtLabel}</span> : null}
                             <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-2)", color: "var(--color-ink-soft)" }}>{shippingLabel(p)}</span>
                             {productCategory(p) ? <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
                             {(() => {
@@ -2646,19 +2642,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               </div>
                             );
                           })()}
-                          {/* 원버튼 위젯 */}
+                        </div>
+
+                        {/* 수정 / 삭제 — 오른쪽 끝 나란히 */}
+                        <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexShrink: 0, alignItems: "center" }}>
+                          {/* 원버튼 위젯 — 줄마다 검정 주버튼이 늘어서지 않게 보조 버튼 모양으로(동작 그대로) */}
                           <button
                             type="button"
                             disabled={busy}
                             onClick={() => onWidgetClick(p)}
-                            style={{ marginTop: "8px", height: "28px", borderRadius: "8px", padding: "0 12px", fontSize: "11px", fontWeight: 800, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.5 : 1, ...widgetStyle }}
+                            style={{ height: "36px", borderRadius: "8px", padding: "0 12px", fontSize: "12px", fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.5 : 1, whiteSpace: "nowrap", ...widgetStyle }}
                           >
                             {busy ? "처리중…" : widgetText}
                           </button>
-                        </div>
-
-                        {/* 수정 / 삭제 — 오른쪽 끝 나란히 */}
-                        <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexShrink: 0, alignSelf: "flex-start" }}>
                           <button type="button" onClick={() => editProduct(p)} style={{ height: "36px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: "pointer" }}>수정</button>
                           <details className="relative">
                             <summary className="min-h-9 cursor-pointer list-none rounded-xl border border-line px-2.5 py-1.5 text-xs font-bold text-ink" aria-label={`${productName(p)} 더보기`}>더보기</summary>

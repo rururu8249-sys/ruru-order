@@ -20,7 +20,7 @@ import {activeSettingsGroupId} from '../components/admin-live/adminLiveSettingsN
 // [2026-11-26] 왼쪽은 묶음 6개, 어느 화면이든 정확히 한 묶음에 속함
 assert.equal(activeSettingsGroupId('shop','bank'),'money');
 assert.equal(activeSettingsGroupId('shop','payster'),'money');
-assert.equal(activeSettingsGroupId('shop',undefined),'shop');
+assert.equal(activeSettingsGroupId('shop','inquiry'),'shop');
 assert.equal(activeSettingsGroupId('payment','subscribe'),'benefit');
 assert.equal(activeSettingsGroupId('payment',undefined),'ship');
 assert.equal(activeSettingsGroupId('notes',undefined),'customer');

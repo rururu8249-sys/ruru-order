@@ -83,7 +83,7 @@ export default function LivePresenceList({ data, refreshing, onRefresh }: Props)
     <div className="max-w-[760px]">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <div className="text-[20px] font-bold tabular-nums text-ink">지금 접속 {(data?.total ?? 0).toLocaleString("ko-KR")}명</div>
-        <div className="text-[12px] text-ink-mute">최근 2분 안에 신호 · 20초마다 새로 셈 · 관리자·제외 계정은 안 셈 · 주문은 {data?.since ? "이번 방송(또는 오늘)" : "오늘"} 기준</div>
+        <div className="text-[12px] text-ink-mute">지금 사이트를 보고 있는 손님 · 주문은 {data?.since ? "이번 방송(또는 오늘)" : "오늘"} 기준</div>
         <button type="button" onClick={onRefresh} disabled={refreshing} className="ml-auto inline-flex h-9 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[14px] text-ink hover:bg-surface-2 disabled:opacity-50">{refreshing ? "새로 세는 중…" : "새로고침"}</button>
       </div>
 
@@ -181,7 +181,7 @@ export default function LivePresenceList({ data, refreshing, onRefresh }: Props)
       {(data?.total ?? 0) > (data?.listed ?? 0) ? (
         <div className="mt-2 text-[12px] text-ink-mute">목록은 최근 {data?.listed}명까지 · 외 {((data?.total ?? 0) - (data?.listed ?? 0)).toLocaleString("ko-KR")}명 더 접속 중</div>
       ) : null}
-      <div className="mt-2 text-[12px] text-ink-mute">줄을 누르면 그 손님의 최근 동작(옵션 열기·색상/사이즈·수량·담기·빼기·검색·주문서·주문 완료)이 시각순으로 보여요 · 동작은 손님 폰에서 모아 기존 신호에 같이 와서 서버 부담은 그대로예요</div>
+      <div className="mt-2 text-[12px] text-ink-mute">줄을 누르면 그 손님이 최근에 한 일(상품 고르기·담기·주문서 등)이 시간순으로 보여요.</div>
     </div>
   );
 }

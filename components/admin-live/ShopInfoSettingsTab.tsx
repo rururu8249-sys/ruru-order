@@ -71,7 +71,7 @@ function sectionTitle(title: string, desc: string) {
   );
 }
 
-export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:SettingsDraftProps & {focusSection?:"bank"|"payster"} = {}) {
+export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:SettingsDraftProps & {focusSection?:"bank"|"payster"|"inquiry"} = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [storedKeys, setStoredKeys] = useState(0);
@@ -201,7 +201,7 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
   const markSaved=useSettingsDraft({value:{contactType,contactValue,adminChatUrl,paysterUrl,bankAccounts,bankRouting},loading,saving,save,onDraftStateChange});
   // [2026-10-22] 설정을 처음 열 때(입금계좌가 맨 위)는 스크롤 안 함 — 왼쪽 메뉴를 눌러 바뀔 때만 그 카드로. 창 밖(페이지)까지 밀리던 것 방지
   const focusSeen=useRef(false);
-  useEffect(()=>{if (loading) return; if (!focusSeen.current) {focusSeen.current=true; return;} if (!focusSection) return; const target=document.getElementById(`shop-setting-${focusSection}`); target?.scrollIntoView({block:"start"}); target?.focus({preventScroll:true});},[loading,focusSection]);
+  useEffect(()=>{if (loading) return; if (!focusSeen.current) {focusSeen.current=true; if (focusSection!=="inquiry") return;} if (!focusSection) return; const target=document.getElementById(`shop-setting-${focusSection}`); target?.scrollIntoView({block:"start"}); target?.focus({preventScroll:true});},[loading,focusSection]);
   const hint = CONTACT_HINT[contactType];
 
   return (
@@ -241,7 +241,7 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
         </div>
 
         {/* ── 손님 문의 방식 ── */}
-        <div className={cardClass}>
+        <div id="shop-setting-inquiry" tabIndex={-1} className={cardClass}>
           {sectionTitle("손님 문의 받는 방법", "손님 「문의하기」 버튼 방식")}
           <div className="grid gap-3">
             <div className="grid grid-cols-2 gap-2">

@@ -1800,7 +1800,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               <div className="hidden xl:block">유형</div>
               <div className="hidden xl:block">손님</div>
               <div className="hidden xl:block">무엇을</div>
-              <div className="hidden text-right xl:block">돌려줄 돈</div>
+              <div className="hidden text-right xl:block">금액</div>
               <div className="hidden xl:block" />
             </div>
             {pageTasks.map((task, index) => (

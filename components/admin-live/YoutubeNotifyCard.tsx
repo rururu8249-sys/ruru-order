@@ -140,10 +140,10 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
       <div className="mt-3 rounded-2xl border border-line bg-surface-2 p-4">
         <div className="text-sm font-black text-ink">현재 라이브 주소 (자동)</div>
         <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-          메인 화면(방송 컨트롤타워)에서 입력·저장한 유튜브 라이브 주소를 그대로 사용합니다. 여기서 따로 넣을 필요 없어요.
+          왼쪽 「방송 설정」에 넣은 유튜브 라이브 주소를 그대로 써요.
         </div>
         <div className="mt-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-bold text-ink">
-          {liveUrl ? liveUrl : "아직 메인 화면에 라이브 주소가 저장되지 않았습니다."}
+          {liveUrl ? liveUrl : "아직 방송 설정에 라이브 주소가 없어요."}
         </div>
       </div>
 

@@ -2187,7 +2187,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                             {memberStatsReady && d.orderTwo.line2 ? <div className="truncate text-ink-mute">{d.orderTwo.line2}</div> : null}
                           </div>
                           {/* 포인트 (오른쪽) */}
-                          <span className="text-right font-semibold tabular-nums text-rose-deep">{d.pts != null ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
+                          <span className="text-right font-semibold tabular-nums text-rose-deep">{d.pts ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
                           {/* 처리 (오른쪽) */}
                           <div className="flex items-center justify-end gap-1.5">
                             <button type="button" onClick={() => handleCustomerBlockButton(customer)} disabled={blockSaving || blockLoadStatus !== "ready"} className={`min-h-9 shrink-0 rounded-lg px-2 text-xs font-semibold transition-colors disabled:opacity-40 ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
@@ -2238,7 +2238,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               <span className="text-ink-mute">·</span>
                               <span><span className="text-ink-mute">누적 결제 </span><strong className="font-bold text-ink tabular-nums">{memberStatsReady ? money(customer.paidAmount) : "…"}</strong></span>
                               <span><span className="text-ink-mute">주문 수 </span>{memberStatsReady ? `${customer.orderCount}건` : "…"}</span>
-                              {d.pts != null ? <span className="font-bold text-ink">{d.pts.toLocaleString("ko-KR")}P</span> : null}
+                              {d.pts ? <span className="font-bold text-ink">{d.pts.toLocaleString("ko-KR")}P</span> : null}
                             </div>
                             {customer.blocked && d.blockLine2 ? <div className="mt-0.5 truncate text-[12px] text-ink-soft">{d.blockLine2}</div> : null}
                           </div>
