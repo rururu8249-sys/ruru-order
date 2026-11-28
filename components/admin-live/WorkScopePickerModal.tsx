@@ -45,8 +45,17 @@ export default function WorkScopePickerModal({
   work, currentLabel, allOrders, currentOrders, selectedOrders,
   broadcasts, shopDates, onConfirm, onClose,
 }: Props) {
-  const [kind, setKind] = useState<WorkScopeKind>('current');
-  const [bcIds, setBcIds] = useState<Set<string>>(new Set());
+  // 처음 고를 범위: 체크한 주문 → 지금 필터 → (지금 필터가 0개면) 가장 최근 방송.
+  // 「전체보기」에선 현재 필터가 0개라 빈 범위로 열리던 것을 막는다(고르는 기본값만, 계산 무변경).
+  const [initialScope] = useState<{ kind: WorkScopeKind; bc: string[] }>(() => {
+    if (selectedOrders.length && availableQty(selectedOrders, work) > 0) return { kind: 'selected', bc: [] };
+    if (availableQty(currentOrders, work) > 0) return { kind: 'current', bc: [] };
+    const latest = [...broadcasts].filter((b) => b.id).sort((a, b) => b.dateKey.localeCompare(a.dateKey)).find((b) =>
+      availableQty(selectWorkScope({kind:'broadcast', allOrders, currentOrders:[], selectedOrders:[], broadcasts:[b], chosenBroadcastIds:[b.id]}), work) > 0);
+    return latest ? { kind: 'broadcast', bc: [latest.id] } : { kind: 'current', bc: [] };
+  });
+  const [kind, setKind] = useState<WorkScopeKind>(initialScope.kind);
+  const [bcIds, setBcIds] = useState<Set<string>>(() => new Set(initialScope.bc));
   const [shopDays, setShopDays] = useState<Set<string>>(new Set());
   const [paymentView, setPaymentView] = useState<PickingPaymentView>('all');
   const [error, setError] = useState('');
