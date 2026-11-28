@@ -99,15 +99,30 @@ function Santa({ x }: { x: number }) {
 export function ChristmasBanner() {
   return (
     <div data-xmas-banner="true" aria-hidden="true" style={{ position: "relative", height: 112, borderRadius: 14, overflow: "hidden", marginBottom: 10, background: "linear-gradient(180deg,#0f2f22 0%,#173f2c 70%,#1d4a34 100%)" }}>
-      <svg viewBox="0 -18 360 114" width="100%" height="112" preserveAspectRatio="xMidYMax slice" style={{ display: "block" }}>
+      {/* [2026-11-28] 넓은 화면(PC)에서 위가 잘려 산타·선물이 안 보이던 것 → 그림을 양옆으로 넓게(가운데 0~360은 폰 그대로) */}
+      <svg viewBox="-360 -18 1080 114" width="100%" height="112" preserveAspectRatio="xMidYMax slice" style={{ display: "block" }}>
         {/* 별·달 */}
         <circle cx="268" cy="20" r="9" fill="#fff6cf" />
         <circle cx="272" cy="17" r="8" fill="#173f2c" />
-        {[[40, 14], [96, 8], [150, 20], [210, 10], [236, 26], [344, 12]].map(([cx, cy], i) => (
+        {[[40, 14], [96, 8], [150, 20], [210, 10], [236, 26], [344, 12], [-300, 12], [-210, 22], [-120, 8], [-40, 18], [400, 16], [470, 8], [560, 22], [650, 10]].map(([cx, cy], i) => (
           <circle key={i} cx={cx} cy={cy} r="1.3" fill="#ffffff" className="ruru-xmas-twinkle" style={{ animationDelay: `${i * 0.35}s` }} />
         ))}
         {/* 눈 언덕 */}
-        <path d="M0 80 Q60 66 120 78 T240 76 T360 74 L360 96 L0 96 Z" fill="#ffffff" />
+        <path d="M-360 76 Q-300 66 -240 78 T-120 76 T0 80 Q60 66 120 78 T240 76 T360 74 T480 78 T600 74 T720 78 L720 96 L-360 96 Z" fill="#ffffff" />
+        <Tree x={-340} s={0.8} />
+        <Tree x={-280} s={1} />
+        <Gift x={-220} color="#2f7d4f" ribbon="#ffd34d" />
+        <Gift x={-202} color="#c0262d" ribbon="#ffffff" />
+        <Tree x={-150} s={0.75} />
+        <Tree x={-90} s={0.95} />
+        <Gift x={-40} color="#ffd34d" ribbon="#c0262d" />
+        <Tree x={380} s={0.9} />
+        <Gift x={440} color="#c0262d" ribbon="#ffd34d" />
+        <Gift x={458} color="#2f7d4f" ribbon="#ffffff" />
+        <Tree x={500} s={0.7} />
+        <Tree x={560} s={1} />
+        <Gift x={620} color="#ffd34d" ribbon="#2f7d4f" />
+        <Tree x={660} s={0.8} />
         <Tree x={10} s={0.95} />
         <Tree x={52} s={0.7} />
         <Gift x={96} color="#c0262d" ribbon="#ffd34d" />
