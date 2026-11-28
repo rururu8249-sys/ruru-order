@@ -241,7 +241,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 <button
                   type="button"
                   onClick={() => setShowHistory((prev) => !prev)}
-                  className="rounded-full border border-warn-tx bg-surface px-2 py-1 text-[11px] font-bold text-warn-tx hover:bg-warn-bg"
+                  className="rounded-full border border-warn-tx bg-surface px-2 py-1 text-[12px] font-bold text-warn-tx hover:bg-warn-bg"
                 >
                   {showHistory ? "이력닫기" : "수정이력 보기"}
                 </button>
@@ -333,7 +333,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               />
             </label>
             ) : (
-            <button type="button" onClick={() => setShowColorField(true)} className="w-fit rounded-lg border border-dashed border-line bg-surface px-2 py-1 text-left text-[11px] font-bold text-ink-mute hover:bg-surface-2">
+            <button type="button" onClick={() => setShowColorField(true)} className="w-fit rounded-lg border border-dashed border-line bg-surface px-2 py-1 text-left text-[12px] font-bold text-ink-mute hover:bg-surface-2">
               ＋ {colorFieldLabel} 추가 — 이 주문엔 {colorFieldLabel} 없음
             </button>
             )}
@@ -349,7 +349,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               />
             </label>
             ) : (
-            <button type="button" onClick={() => setShowSizeField(true)} className="w-fit rounded-lg border border-dashed border-line bg-surface px-2 py-1 text-left text-[11px] font-bold text-ink-mute hover:bg-surface-2">
+            <button type="button" onClick={() => setShowSizeField(true)} className="w-fit rounded-lg border border-dashed border-line bg-surface px-2 py-1 text-left text-[12px] font-bold text-ink-mute hover:bg-surface-2">
               ＋ 사이즈 추가 — 이 주문엔 사이즈 없음
             </button>
             )}
@@ -472,7 +472,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               <button
                 type="button"
                 onClick={() => setShowHistory((prev) => !prev)}
-                className="rounded-full border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft hover:bg-surface-2"
+                className="rounded-full border border-line bg-surface px-2 py-1 text-[12px] font-bold text-ink-soft hover:bg-surface-2"
               >
                 {showHistory ? "이력닫기" : "수정이력 보기"}
               </button>

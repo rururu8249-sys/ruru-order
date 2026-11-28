@@ -2096,7 +2096,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           {selectedPhones.size > 0 ? (
             <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-rose-line bg-rose-soft px-3 py-2">
               <span className="text-[12px] font-black text-rose-deep">{selectedPhones.size}명 선택</span>
-              <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[11px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
+              <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[12px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
               <button
                 type="button"
                 onClick={openBulk}

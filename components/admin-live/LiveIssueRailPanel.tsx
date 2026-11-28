@@ -106,7 +106,7 @@ export default function LiveIssueRailPanel({ onOpenAll, onCountChange, variant =
           type="button"
           onClick={() => void load()}
           title="새로고침"
-          className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+          className="rounded-lg border border-line bg-surface px-2 py-1 text-[12px] font-black text-ink-soft transition hover:bg-surface-2"
         >
           ↻
         </button>
@@ -138,7 +138,7 @@ export default function LiveIssueRailPanel({ onOpenAll, onCountChange, variant =
             type="button"
             onClick={() => void load()}
             title="새로고침"
-            className="rounded-lg border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
+            className="rounded-lg border border-line bg-surface-2 px-2 py-0.5 text-[12px] font-black text-ink-soft transition hover:bg-surface-3"
           >
             ↻
           </button>

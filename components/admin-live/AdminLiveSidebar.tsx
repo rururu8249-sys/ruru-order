@@ -193,7 +193,7 @@ export default function AdminLiveSidebar({
                         type="button"
                         title={`입금자명·금액이 주문과 자동으로 안 맞아 수동 확인이 필요한 주문 ${exceptionBadges.needMatch}건 — 클릭하면 해당 주문만 보여요`}
                         onClick={() => { onExceptionBadgeClick?.("match"); onCloseNav?.(); }}
-                        className="cursor-pointer whitespace-nowrap rounded-full bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn-tx hover:ring-2 hover:ring-warn-tx/30"
+                        className="cursor-pointer whitespace-nowrap rounded-full bg-warn-bg px-2 py-0.5 text-[12px] font-bold text-warn-tx hover:ring-2 hover:ring-warn-tx/30"
                       >매칭필요 {exceptionBadges.needMatch} ›</button>
                     ) : null}
                     {exceptionBadges.cardUnpaid > 0 ? (
@@ -201,7 +201,7 @@ export default function AdminLiveSidebar({
                         type="button"
                         title={`카드결제 선택 후 아직 결제완료 처리 전인 주문 ${exceptionBadges.cardUnpaid}건 — 클릭하면 해당 주문만 보여요`}
                         onClick={() => { onExceptionBadgeClick?.("card"); onCloseNav?.(); }}
-                        className="cursor-pointer whitespace-nowrap rounded-full bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn-tx hover:ring-2 hover:ring-warn-tx/30"
+                        className="cursor-pointer whitespace-nowrap rounded-full bg-warn-bg px-2 py-0.5 text-[12px] font-bold text-warn-tx hover:ring-2 hover:ring-warn-tx/30"
                       >카드미결제 {exceptionBadges.cardUnpaid} ›</button>
                     ) : null}
                   </span>

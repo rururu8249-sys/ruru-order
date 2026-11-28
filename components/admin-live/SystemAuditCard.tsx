@@ -61,7 +61,7 @@ export default function SystemAuditCard({ onOpenDetail }: { onOpenDetail?: () =>
             onClick={() => void load()}
             disabled={loading}
             title="다시 점검"
-            className="rounded-full border border-line bg-surface px-1.5 py-0.5 text-[11px] font-black text-ink-soft disabled:opacity-50"
+            className="rounded-full border border-line bg-surface px-1.5 py-0.5 text-[12px] font-black text-ink-soft disabled:opacity-50"
           >
             ↻
           </button>

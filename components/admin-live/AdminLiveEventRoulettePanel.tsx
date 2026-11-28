@@ -1766,11 +1766,11 @@ export default function AdminLiveEventRoulettePanel({
                     <span key={chip.key} className="badge" style={{ cursor: "pointer", padding: "4px 8px", border: "1px solid var(--bd)", background: listPeriod === chip.key ? "var(--rose)" : "var(--color-surface)", color: listPeriod === chip.key ? "#fff" : "var(--mut)" }} onClick={() => setListPeriod(chip.key)}>{chip.label}</span>
                   ))}
                   {listPeriod === "date" ? (
-                    <input type="date" className="ipt" style={{ height: "26px" }} value={listDate} onChange={(e) => setListDate(e.target.value)} />
+                    <input type="date" className="ipt" style={{ height: "32px" }} value={listDate} onChange={(e) => setListDate(e.target.value)} />
                   ) : null}
                   <span style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
-                    <button className="btn" style={{ height: "26px", padding: "0 8px" }} onClick={() => void loadEventsAndWinners()}>새로고침</button>
-                    <button className="btn" style={{ height: "26px", padding: "0 8px" }} onClick={() => void deleteAllTestRecords()}>테스트정리</button>
+                    <button className="btn" style={{ height: "32px", padding: "0 12px" }} onClick={() => void loadEventsAndWinners()}>새로고침</button>
+                    <button className="btn" style={{ height: "32px", padding: "0 12px" }} onClick={() => void deleteAllTestRecords()}>테스트정리</button>
                   </span>
                 </div>
                 {filteredWinners.length === 0 ? (

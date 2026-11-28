@@ -343,7 +343,7 @@ export default function SettlementManualEntryPanel({
                 <button
                   type="button"
                   onClick={() => setEntryDate(presetDate)}
-                  className="justify-self-start rounded-lg border border-warn-tx/35 bg-warn-bg px-2 py-0.5 text-[11px] font-black text-warn-tx"
+                  className="justify-self-start rounded-lg border border-warn-tx/35 bg-warn-bg px-2 py-0.5 text-[12px] font-black text-warn-tx"
                 >
                   ↺ 고른 방송 날짜({presetDate})로
                 </button>
@@ -382,8 +382,8 @@ export default function SettlementManualEntryPanel({
                     onClick={() => setTitle(quickTitle)}
                     className={
                       title === quickTitle
-                        ? "rounded-full bg-rose-deep px-2.5 py-1 text-[11px] font-black text-white"
-                        : "rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+                        ? "rounded-full bg-rose-deep px-2.5 py-1 text-[12px] font-black text-white"
+                        : "rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] font-black text-ink-soft transition hover:bg-surface-2"
                     }
                   >
                     {quickTitle}

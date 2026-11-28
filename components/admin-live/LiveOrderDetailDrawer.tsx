@@ -2052,7 +2052,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               />
               <span className="text-[12px] text-ink-soft">원 (0원 가능)</span>
               <button type="button" disabled={savingShipping} onClick={() => void handleSaveShippingFee()} className="ml-auto h-7 rounded-lg bg-ink px-2.5 text-[12px] font-bold text-white disabled:opacity-50">{savingShipping ? "저장중…" : "저장"}</button>
-              <button type="button" disabled={savingShipping} onClick={() => setShipEditOpen(false)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft">취소</button>
+              <button type="button" disabled={savingShipping} onClick={() => setShipEditOpen(false)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[12px] font-bold text-ink-soft">취소</button>
             </div>
           ) : null}
           {!isCanceled && !orderForView.isTestOrder ? (

@@ -843,7 +843,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                   aria-label={videoMuted ? "방송 소리 켜기" : "방송 음소거"}
                   aria-pressed={videoMuted}
                   title={videoMuted ? "소리 켜기" : "음소거"}
-                  className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold leading-none hover:bg-surface-3"
+                  className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[12px] font-bold leading-none hover:bg-surface-3"
                 >
                   {videoMuted ? "음소거" : "소리"}
                 </button>
@@ -935,14 +935,14 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                 type="button"
                 onClick={toggleCycle}
                 title="자동순환(여러 상품을 번갈아 표시)"
-                className={["rounded-lg px-2 py-1 text-[11px] font-black transition", cycleOn ? "bg-rose-deep text-white" : "border border-line bg-surface-2 text-ink-soft hover:bg-surface-3"].join(" ")}
+                className={["rounded-lg px-2 py-1 text-[12px] font-black transition", cycleOn ? "bg-rose-deep text-white" : "border border-line bg-surface-2 text-ink-soft hover:bg-surface-3"].join(" ")}
               >
                 {cycleOn ? "순환 ON" : "순환"}
               </button>
               <button
                 type="button"
                 onClick={() => window.dispatchEvent(new Event("ruru-reopen-product-manage"))}
-                className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
+                className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-[12px] font-black text-ink-soft transition hover:bg-surface-3"
               >
                 관리·변경
               </button>
@@ -1007,7 +1007,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             type="button"
             onClick={toggleCycle}
             className={[
-              "ml-auto rounded-lg px-2.5 py-1 text-[11px] font-black transition",
+              "ml-auto rounded-lg px-2.5 py-1 text-[12px] font-black transition",
               cycleOn ? "text-white" : "bg-surface-2 text-ink-soft hover:bg-surface-3",
             ].join(" ")}
             style={cycleOn ? { background: "var(--color-rose-deep)" } : undefined}
@@ -1092,7 +1092,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event("ruru-open-quick-product-panel"))}
-            className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-black text-white"
+            className="flex-1 rounded-lg px-2 py-1.5 text-[12px] font-black text-white"
             style={{ background: "var(--color-rose-deep)" }}
           >
             + 즉석
@@ -1100,7 +1100,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event("ruru-reopen-product-manage"))}
-            className="flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2"
+            className="flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-[12px] font-black text-ink-soft hover:bg-surface-2"
           >
             관리
           </button>
@@ -1108,7 +1108,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             type="button"
             onClick={copyObsWidgetUrl}
             title="OBS 위젯 주소 복사"
-            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2"
+            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-black text-ink-soft hover:bg-surface-2"
           >
             위젯 주소
           </button>

@@ -279,7 +279,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
             💬 채팅 주문 대기열 <span className="text-ink-mute">(검증 단계 — 담기지 않습니다)</span>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => void loadQueue()} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft hover:bg-surface-2">
+            <button type="button" onClick={() => void loadQueue()} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[12px] font-black text-ink-soft hover:bg-surface-2">
               새로고침
             </button>
             {embedded ? null : <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[14px] font-black text-ink-mute hover:text-ink">✕</button>}
@@ -307,7 +307,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
               접수후보 <b className="text-ok-tx">{counts.parsed || 0}</b> · 확인필요 {(counts.need_product || 0) + (counts.ambiguous || 0)}
             </span>
             <button type="button" onClick={() => setAdvanced((v) => !v)}
-              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2">
+              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-black text-ink-soft hover:bg-surface-2">
               ⚙ 고급{advanced ? " 닫기" : ""}
             </button>
           </div>
@@ -367,7 +367,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                   className="min-w-[280px] flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-bold text-ink"
                 />
                 <button type="button" onClick={() => void saveTestUrl()} disabled={busy === "url"}
-                  className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">
+                  className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">
                   저장
                 </button>
               </div>
@@ -400,7 +400,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
               return (
                 <button
                   key={p.id} type="button" onClick={() => void pickCurrent(p)} disabled={busy === "current"}
-                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-black disabled:opacity-50 ${on ? "border-danger-tx bg-danger-bg text-danger-tx" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
+                  className={`rounded-lg border px-2.5 py-1 text-[12px] font-black disabled:opacity-50 ${on ? "border-danger-tx bg-danger-bg text-danger-tx" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
                   title={p.variants && p.variants.length > 0 ? `세부상품 ${p.variants.length}종` : undefined}
                 >
                   {p.name}{p.variants && p.variants.length > 0 ? ` (${p.variants.length}종)` : ""}

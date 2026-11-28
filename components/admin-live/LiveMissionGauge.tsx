@@ -69,7 +69,7 @@ export default function LiveMissionGauge({ broadcastOn, onOpenMission }: Props) 
             {prog.reward > 0 ? ` · 달성 시 구매자 전원 ${won(prog.reward)}P` : " · 달성 시 선물(명단은 미션 탭)"}
           </span>
           {onOpenMission ? (
-            <button type="button" onClick={onOpenMission} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft hover:bg-surface-2">
+            <button type="button" onClick={onOpenMission} className="rounded-lg border border-line bg-surface px-2 py-1 text-[12px] font-black text-ink-soft hover:bg-surface-2">
               수정
             </button>
           ) : null}

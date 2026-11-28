@@ -617,7 +617,7 @@ function ImagePicker({
             onClick={() => inputRef.current?.click()}
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            style={{ width: "120px", height: "120px", border: coverImage ? "1px solid var(--color-line)" : "1.5px dashed var(--color-line)", borderRadius: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", cursor: "pointer", overflow: "hidden", color: "var(--color-ink-mute)", fontSize: "11px", textAlign: "center", padding: 0 }}
+            style={{ width: "120px", height: "120px", border: coverImage ? "1px solid var(--color-line)" : "1.5px dashed var(--color-line)", borderRadius: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", cursor: "pointer", overflow: "hidden", color: "var(--color-ink-mute)", fontSize: "12px", textAlign: "center", padding: 0 }}
           >
             {coverImage ? (
               <img src={resolveProductImageUrl(coverImage)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -632,7 +632,7 @@ function ImagePicker({
             <button
               type="button"
               onClick={() => onChange([])}
-              style={{ position: "absolute", right: "6px", top: "6px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: "11px", fontWeight: 700, padding: "2px 8px", border: "none", cursor: "pointer" }}
+              style={{ position: "absolute", right: "6px", top: "6px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: "12px", fontWeight: 700, padding: "2px 8px", border: "none", cursor: "pointer" }}
             >
               삭제
             </button>
@@ -665,13 +665,13 @@ function ImagePicker({
               {index === 0 ? (
                 <span style={{ position: "absolute", top: "4px", left: "4px", background: "var(--color-rose-deep)", color: "#fff", fontSize: "11px", fontWeight: 900, borderRadius: "9999px", padding: "2px 6px", pointerEvents: "none" }}>★ 대표</span>
               ) : (
-                <button type="button" title="이 사진을 대표로" onClick={() => onChange([value[index], ...value.filter((_, i) => i !== index)])} style={{ position: "absolute", top: "3px", left: "3px", background: "rgba(255,255,255,0.92)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900, borderRadius: "9999px", padding: "1px 6px", border: "1px solid var(--color-rose-line)", cursor: "pointer" }}>☆</button>
+                <button type="button" title="이 사진을 대표로" onClick={() => onChange([value[index], ...value.filter((_, i) => i !== index)])} style={{ position: "absolute", top: "3px", left: "3px", background: "rgba(255,255,255,0.92)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 900, borderRadius: "9999px", padding: "1px 6px", border: "1px solid var(--color-rose-line)", cursor: "pointer" }}>☆</button>
               )}
-              <button type="button" onClick={() => removeImage(index)} style={{ position: "absolute", top: "3px", right: "3px", width: "16px", height: "16px", background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: "50%", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", padding: 0 }}>×</button>
+              <button type="button" onClick={() => removeImage(index)} style={{ position: "absolute", top: "3px", right: "3px", width: "16px", height: "16px", background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: "50%", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", padding: 0 }}>×</button>
             </div>
           ))}
           {value.length < maxFiles ? (
-            <button type="button" onClick={() => inputRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={handleDrop} style={{ width: "74px", height: "74px", borderRadius: "8px", border: "2px dashed var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", fontSize: "11px", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>
+            <button type="button" onClick={() => inputRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={handleDrop} style={{ width: "74px", height: "74px", borderRadius: "8px", border: "2px dashed var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", fontSize: "12px", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>
               <span style={{ fontSize: "20px", lineHeight: 1 }}>＋</span>
               <span>{uploading ? "업로드 중" : "추가"}</span>
             </button>
@@ -715,7 +715,7 @@ function ImagePicker({
                 onClick={() => inputRef.current?.click()}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={handleDrop}
-                style={{ width: "100%", height: "100%", borderRadius: "8px", border: image ? "1px solid var(--color-line)" : "1px dashed var(--color-line)", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", fontSize: "11px", color: "var(--color-ink-mute)", cursor: "pointer", overflow: "hidden", padding: 0 }}
+                style={{ width: "100%", height: "100%", borderRadius: "8px", border: image ? "1px solid var(--color-line)" : "1px dashed var(--color-line)", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", fontSize: "12px", color: "var(--color-ink-mute)", cursor: "pointer", overflow: "hidden", padding: 0 }}
               >
                 {image ? (
                   <img src={resolveProductImageUrl(image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px" }} />
@@ -2365,7 +2365,7 @@ export default function QuickProductFastForm({
                                   </span>
                                 );
                               })()}
-                              <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "1px solid var(--color-line)", background: "var(--color-surface)", cursor: "pointer", fontSize: "11px", fontWeight: 700, padding: "2px 6px", borderRadius: "8px", color: "var(--color-ink)" }}>
+                              <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "1px solid var(--color-line)", background: "var(--color-surface)", cursor: "pointer", fontSize: "12px", fontWeight: 700, padding: "2px 6px", borderRadius: "8px", color: "var(--color-ink)" }}>
                                 {detailHidden.includes(group.detail) ? "숨김" : "보임"}
                               </button>
                             </div>
@@ -2532,7 +2532,7 @@ export default function QuickProductFastForm({
                               : <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-line)" }}>＋</span>}
                         </button>
                         {colorPhotos[c] && colorPhotoUploading !== c ? (
-                          <button type="button" title="사진 빼기" onClick={() => { setFormTouched(true); setColorPhotos((prev) => { const next = { ...prev }; delete next[c]; return next; }); }} style={{ position: "absolute", top: "-6px", right: "-6px", width: "16px", height: "16px", padding: 0, borderRadius: "999px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "11px", fontWeight: 900, lineHeight: "16px", cursor: "pointer" }}>×</button>
+                          <button type="button" title="사진 빼기" onClick={() => { setFormTouched(true); setColorPhotos((prev) => { const next = { ...prev }; delete next[c]; return next; }); }} style={{ position: "absolute", top: "-6px", right: "-6px", width: "16px", height: "16px", padding: 0, borderRadius: "999px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "12px", fontWeight: 900, lineHeight: "16px", cursor: "pointer" }}>×</button>
                         ) : null}
                       </div>
                       <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", maxWidth: "46px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c}</span>
@@ -2666,7 +2666,7 @@ export default function QuickProductFastForm({
                           <button
                             type="button"
                             onClick={() => { setFormTouched(true); setDetailHidden([]); }}
-                            style={{ marginLeft: "auto", border: "1px solid var(--color-ok-bg)", borderRadius: "8px", background: "var(--color-ok-bg)", color: "var(--color-ok-tx)", padding: "4px 12px", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}
+                            style={{ marginLeft: "auto", border: "1px solid var(--color-ok-bg)", borderRadius: "8px", background: "var(--color-ok-bg)", color: "var(--color-ok-tx)", padding: "4px 12px", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}
                           >숨김 해제</button>
                         </div>
                       ) : null}
@@ -2823,13 +2823,13 @@ export default function QuickProductFastForm({
                                       type="button"
                                       title={off ? "숨김 — 누르면 손님에게 보임" : "보이는 중 — 누르면 숨김"}
                                       onClick={() => { setFormTouched(true); toggleDetailHidden(name); }}
-                                      style={{ height: "28px", padding: "0 8px", borderRadius: "8px", cursor: "pointer", fontSize: "11px", fontWeight: 700, border: "1px solid var(--color-line)", background: off ? "var(--color-surface-2)" : "var(--color-surface)", color: off ? "var(--color-ink-mute)" : "var(--color-ink)" }}
+                                      style={{ height: "28px", padding: "0 8px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 700, border: "1px solid var(--color-line)", background: off ? "var(--color-surface-2)" : "var(--color-surface)", color: off ? "var(--color-ink-mute)" : "var(--color-ink)" }}
                                     >{off ? "숨김" : "보임"}</button>
                                     <button
                                       type="button"
                                       title="사진·이름·가격·색상·사이즈를 창에서 자세히 수정"
                                       onClick={() => openBrandDetailEditor(name)}
-                                      style={{ marginLeft: "4px", height: "28px", padding: "0 8px", borderRadius: "8px", cursor: "pointer", fontSize: "11px", fontWeight: 800, border: "1px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink-mute)" }}
+                                      style={{ marginLeft: "4px", height: "28px", padding: "0 8px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 800, border: "1px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink-mute)" }}
                                     >수정</button>
                                   </td>
                                 </tr>
@@ -2959,7 +2959,7 @@ export default function QuickProductFastForm({
                 <div style={{ background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-bg)", color: "var(--color-danger-tx)", fontSize: "12px", fontWeight: 700, borderRadius: "8px", padding: "8px 12px", marginTop: "8px", lineHeight: 1.6 }}>
                   재고를 입력했는데 <b>재고관리가 꺼져 있어요.</b>
                   <div style={{ fontWeight: 400, marginTop: "2px" }}>이대로 등록하면 <b>무제한으로 팔립니다.</b></div>
-                  <button type="button" onClick={() => setStockManagementEnabled(true)} style={{ marginTop: "6px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 12px", cursor: "pointer" }}>재고관리 켜기</button>
+                  <button type="button" onClick={() => setStockManagementEnabled(true)} style={{ marginTop: "6px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "12px", fontWeight: 800, borderRadius: "8px", padding: "4px 12px", cursor: "pointer" }}>재고관리 켜기</button>
                 </div>
               ) : null}
 
@@ -3058,7 +3058,7 @@ export default function QuickProductFastForm({
                 {index === 0 ? (
                   <span style={{ position: "absolute", top: "4px", left: "4px", background: "var(--color-ink)", color: "#fff", fontSize: "11px", fontWeight: 600, borderRadius: "8px", padding: "2px 6px", pointerEvents: "none" }}>대표</span>
                 ) : (
-                  <button type="button" title="이 사진을 대표로" onClick={() => setBrandDetailEditDraft((prev) => { if (!prev) return prev; const a = [prev.photos[index], ...prev.photos.filter((_, i) => i !== index)]; return { ...prev, photos: a }; })} style={{ position: "absolute", top: "3px", left: "3px", background: "rgba(255,255,255,0.92)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 600, borderRadius: "8px", padding: "1px 6px", border: "1px solid var(--color-line)", cursor: "pointer" }}>대표로</button>
+                  <button type="button" title="이 사진을 대표로" onClick={() => setBrandDetailEditDraft((prev) => { if (!prev) return prev; const a = [prev.photos[index], ...prev.photos.filter((_, i) => i !== index)]; return { ...prev, photos: a }; })} style={{ position: "absolute", top: "3px", left: "3px", background: "rgba(255,255,255,0.92)", color: "var(--color-ink)", fontSize: "12px", fontWeight: 600, borderRadius: "8px", padding: "1px 6px", border: "1px solid var(--color-line)", cursor: "pointer" }}>대표로</button>
                 )}
                 <button type="button" aria-label="사진 삭제" onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, photos: prev.photos.filter((_, i) => i !== index) } : prev)} style={{ position: "absolute", top: "3px", right: "3px", width: "20px", height: "20px", background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: "50%", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", padding: 0 }}>×</button>
               </div>

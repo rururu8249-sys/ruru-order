@@ -169,7 +169,7 @@ function CalcRow({
           <button
             type="button"
             onClick={action.onClick}
-            className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+            className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[12px] font-black text-ink-soft transition hover:bg-surface-2"
           >
             {action.label} ›
           </button>
@@ -502,7 +502,7 @@ export default function SettlementMoneyFlowDashboard({
               <button
                 type="button"
                 onClick={onGoToUnpaidOrders}
-                className="rounded-lg border border-warn-tx/35 bg-warn-bg px-2 py-0.5 text-[11px] font-black text-warn-tx transition hover:opacity-90"
+                className="rounded-lg border border-warn-tx/35 bg-warn-bg px-2 py-0.5 text-[12px] font-black text-warn-tx transition hover:opacity-90"
               >
                 안 들어온 돈 {won(stats.unpaidAmount)} 주문 보기 ›
               </button>

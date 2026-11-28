@@ -57,7 +57,7 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
             <button
               type="button"
               onClick={onOpenReport}
-              className="rounded-full border border-rose-line bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep"
+              className="rounded-full border border-rose-line bg-rose-soft px-2 py-0.5 text-[12px] font-black text-rose-deep"
             >
               더보기 →
             </button>

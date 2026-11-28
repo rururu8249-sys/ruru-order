@@ -1746,10 +1746,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           {canSelectWholeTab ? (
             <button type="button" onClick={selectWholeTab} className="h-8 rounded-lg px-2 text-[12px] font-semibold text-ink underline underline-offset-2 hover:bg-surface">이 탭 {visibleTasks.length.toLocaleString("ko-KR")}건 전체 선택</button>
           ) : null}
-          <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[11px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
+          <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[12px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
           {/* [2026-09-26] 교환·환불 건 대상 — 이체 목록 복사(계좌이체·금액 있는 건, 이때만 전체 계좌)·엑셀(계좌 뒷4만) */}
           <button type="button" onClick={copyTransferListBulk} className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2">이체 목록 복사</button>
-          <button type="button" onClick={downloadRefundExcel} className="h-8 rounded-lg border border-line bg-surface px-2 text-[11px] font-black text-ink-soft hover:bg-surface-2">엑셀</button>
+          <button type="button" onClick={downloadRefundExcel} className="h-8 rounded-lg border border-line bg-surface px-2 text-[12px] font-black text-ink-soft hover:bg-surface-2">엑셀</button>
           <div className="ml-auto flex items-center gap-1.5">
             {activeTab === "deleted" ? (
               <>

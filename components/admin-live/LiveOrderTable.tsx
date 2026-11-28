@@ -1764,7 +1764,7 @@ export default function LiveOrderTable({
                             type="button"
                             onClick={(e) => { e.stopPropagation(); void copyOrderItemsOnly([order]); }}
                             title="상품·옵션·수량만 복사"
-                            className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[11px] font-bold text-ink hover:bg-surface-2"
+                            className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[12px] font-bold text-ink hover:bg-surface-2"
                           >
                             주문내용
                           </button>
@@ -1772,7 +1772,7 @@ export default function LiveOrderTable({
                             type="button"
                             onClick={(e) => { e.stopPropagation(); void copyOrderForCustomer(order); }}
                             title="이 주문서 한 건을 상세 안 열고 고객용 형식(주소·입금상태·계좌 안내 포함)으로 복사"
-                            className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[11px] font-bold text-ink hover:bg-surface-2"
+                            className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[12px] font-bold text-ink hover:bg-surface-2"
                           >
                             상세 복사
                           </button>
