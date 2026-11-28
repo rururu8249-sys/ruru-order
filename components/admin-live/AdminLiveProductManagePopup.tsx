@@ -2165,7 +2165,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               {selectedBroadcastForEdit && selectedBroadcastForEdit.status === "OFF" && !selectedBroadcastForEdit.started_at ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
                   <div style={{ flex: 1, minWidth: "160px" }}>
-                    <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", fontWeight: 600 }}>아직 안 켠 방송이에요 · 이름을 바꿀 수 있어요</div>
+                    <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", fontWeight: 600, wordBreak: "keep-all" }}>아직 안 켠 방송이에요 · 이름을 바꿀 수 있어요</div>
                   </div>
                   {selectedBroadcastForEdit.status === "OFF" && !selectedBroadcastForEdit.started_at ? (
                     bcRenameOpen ? (
@@ -2311,7 +2311,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 ) : !bcProductsReady ? (
                   <div role="status" style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>방송 상품을 불러오는 중…</div>
                 ) : bcProducts.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>아직 담은 상품이 없어요 — 오른쪽 위 「+ 담기」로 골라 주세요</div></div>
+                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)", wordBreak: "keep-all" }}>아직 담은 상품이 없어요 — 오른쪽 위 「+ 담기」로 골라 주세요</div></div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     {bcProductsView.filter(p=>{

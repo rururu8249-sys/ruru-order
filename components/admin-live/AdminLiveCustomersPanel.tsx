@@ -2233,10 +2233,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               {!customer.kakaoId ? <span className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-mute">카카오 미연동</span> : null}
                             </div>
                             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[12px] text-ink-soft tabular-nums">
-                              <span><span className="text-ink-mute">연락처 </span>{customer.phone ? <a href={`tel:${d.phoneDigits}`} onClick={event => event.stopPropagation()} className="inline-flex min-h-11 items-center">{formatPhone(customer.phone)}</a> : "-"}</span>
-                              <span className="text-ink-mute">·</span>
-                              <span><span className="text-ink-mute">마지막 주문 </span>{memberStatsReady ? d.orderTwo.line1 : "…"}</span>
-                              <span className="text-ink-mute">·</span>
+                              <span className="basis-full"><span className="text-ink-mute">연락처 </span>{customer.phone ? <a href={`tel:${d.phoneDigits}`} onClick={event => event.stopPropagation()} className="inline-flex min-h-11 items-center">{formatPhone(customer.phone)}</a> : "-"}</span>
+                              <span className="basis-full"><span className="text-ink-mute">마지막 주문 </span>{memberStatsReady ? d.orderTwo.line1 : "…"}</span>
                               <span><span className="text-ink-mute">누적 결제 </span><strong className="font-bold text-ink tabular-nums">{memberStatsReady ? money(customer.paidAmount) : "…"}</strong></span>
                               <span><span className="text-ink-mute">주문 수 </span>{memberStatsReady ? `${customer.orderCount}건` : "…"}</span>
                               {d.pts ? <span className="font-bold text-ink">{d.pts.toLocaleString("ko-KR")}P</span> : null}
