@@ -1298,28 +1298,68 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       const collected: CustomerProfile[] = [];
       let complete = false;
 
-      for (let from = 0; from < 50000; from += PAGE_SIZE) {
-        const { data, error } = await supabase
-          .from("customers")
-          .select(
-            "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, shipping_addresses, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history, live_alert_optin, live_alert_optin_at"
-          )
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .range(from, from + PAGE_SIZE - 1);
+      // [2026-11-28] 첫 장에서 전체 줄 수를 받고 나머지 장은 4장씩 동시에(순서·결과 같음). 줄 수를 못 받으면 예전처럼 한 장씩.
+      const COLS = "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, shipping_addresses, is_blocked, block_reason, customer_memo, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, first_login_at, last_login_at, customer_history, live_alert_optin, live_alert_optin_at";
+      const fetchPage = (from: number, withCount: boolean) => supabase
+        .from("customers")
+        .select(COLS, withCount ? { count: "exact" } : undefined)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+      const failLoad = (message: string) => {
+        console.warn("[admin-live] customers 테이블 불러오기 실패", message);
+        setCustomerProfiles([]);
+        setProfileLoadStatus("error");
+      };
 
-        if (!alive) return;
-
-        if (error) {
-          console.warn("[admin-live] customers 테이블 불러오기 실패", error.message);
-          setCustomerProfiles([]);
-          setProfileLoadStatus("error");
-          return; // 일부만 읽었을 때 전 회원 조회 완료로 표시하지 않음
+      const first = await fetchPage(0, true);
+      if (!alive) return;
+      if (first.error) { failLoad(first.error.message); return; }
+      const firstChunk = (first.data || []) as CustomerProfile[];
+      collected.push(...firstChunk);
+      const total = typeof first.count === "number" ? first.count : null;
+      if (firstChunk.length < PAGE_SIZE) {
+        complete = true;
+      } else if (total !== null) {
+        const starts: number[] = [];
+        for (let from = PAGE_SIZE; from < Math.min(total, 50000); from += PAGE_SIZE) starts.push(from);
+        let failed = false;
+        for (let i = 0; i < starts.length && !failed; i += 4) {
+          const results = await Promise.all(starts.slice(i, i + 4).map((from) => fetchPage(from, false)));
+          if (!alive) return;
+          for (const r of results) {
+            if (r.error) { failLoad(r.error.message); failed = true; break; }
+            collected.push(...((r.data || []) as CustomerProfile[]));
+          }
         }
-
-        const chunk = (data || []) as CustomerProfile[];
-        collected.push(...chunk);
-        if (chunk.length < PAGE_SIZE) { complete = true; break; }
+        if (failed) return;
+        // 세는 사이 회원이 늘었으면 남은 장을 예전처럼 이어서
+        let from = starts.length ? starts[starts.length - 1] + PAGE_SIZE : PAGE_SIZE;
+        complete = collected.length < from;
+        while (!complete && from < 50000) {
+          const r = await fetchPage(from, false);
+          if (!alive) return;
+          if (r.error) { failLoad(r.error.message); return; }
+          const chunk = (r.data || []) as CustomerProfile[];
+          collected.push(...chunk);
+          if (chunk.length < PAGE_SIZE) complete = true;
+          from += PAGE_SIZE;
+        }
+      } else {
+        for (let from = PAGE_SIZE; from < 50000; from += PAGE_SIZE) {
+          const r = await fetchPage(from, false);
+          if (!alive) return;
+          if (r.error) { failLoad(r.error.message); return; }
+          const chunk = (r.data || []) as CustomerProfile[];
+          collected.push(...chunk);
+          if (chunk.length < PAGE_SIZE) { complete = true; break; }
+        }
+      }
+      // 같은 회원이 두 장에 걸쳐 들어오면(세는 사이 새 회원) 한 번만
+      const seenIds = new Set<string>();
+      for (let i = collected.length - 1; i >= 0; i -= 1) {
+        const key = String(collected[i].id);
+        if (seenIds.has(key)) collected.splice(i, 1); else seenIds.add(key);
       }
 
       if (!alive) return;

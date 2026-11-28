@@ -1575,7 +1575,13 @@ export default function AdminLiveDashboard() {
     [filteredOrders, orders],
   );
   // [2026-10-25] 이 화면에 «옮겨 온» 주문(원래 주문 id) — 숫자 띠 괄호 표시용
-  const movedInIds = useMemo(() => new Set(filteredOrders.filter((o) => o.pickPull?.whole).map((o) => originalOrderIdOf(o))), [filteredOrders]);
+  // [2026-11-28] 방송 «전체보기»에선 옮긴 곳·원래 곳이 한 화면이라 「옮겨 온 주문 포함」 안내를 안 붙임(숫자는 그대로)
+  // [2026-11-28] 방송 «전체보기»에선 일부 줄만 넘긴 주문이 원래 주문서 + 넘겨받은 묶음으로 두 번 세져 상태 칩 숫자가 많던 것(결제완료 4,223 vs 실제 4,217) — 칩 숫자에서만 그 묶음을 뺌(목록·물건챙기기 그대로)
+  const statusChipCountOrders = useMemo(
+    () => (filters.broadcast === "all" ? filteredOrdersForCounts.filter((order) => !order.pickPull || order.pickPull.whole) : filteredOrdersForCounts),
+    [filteredOrdersForCounts, filters.broadcast],
+  );
+  const movedInIds = useMemo(() => (filters.broadcast === "all" ? new Set<string>() : new Set(filteredOrders.filter((o) => o.pickPull?.whole).map((o) => originalOrderIdOf(o)))), [filteredOrders, filters.broadcast]);
   const toRealOrder = (order: LiveOrder): LiveOrder => (order.pickPull ? orders.find((o) => o.id === originalOrderIdOf(order)) || order : order);
 
   useEffect(() => {
@@ -2023,7 +2029,7 @@ export default function AdminLiveDashboard() {
                   <div className="flex min-w-0 flex-col">
                     <LiveOrderTable
                       orders={filteredOrders}
-                      countBaseOrders={filteredOrdersForCounts}
+                      countBaseOrders={statusChipCountOrders}
                       pickingBaseOrders={pickingBaseOrders}
                       allWorkOrders={[...orders.filter(o=>!wholeMovedIds.has(String(o.id))),...pulledVirtualOrders]}
                       selectedPickingBroadcastId={filters.scope === "shop" ? null : filters.broadcast === "current" ? activeBroadcast?.id || null : broadcasts.find(b => b.id === filters.broadcast)?.id || null}

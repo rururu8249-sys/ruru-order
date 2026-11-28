@@ -7,8 +7,7 @@ export default function AdminAuthSettingsPanel() {
   return (
     <section className="rounded-2xl border border-line bg-surface p-5">
       <h3 className="text-base font-bold text-ink">관리자 로그인</h3>
-      <p className="mt-2 text-sm font-bold leading-6 text-ink-soft">아이디·비밀번호는 개발자에게 요청해 서버에서 바꿉니다.</p>
-      <div className="mt-2 text-xs font-bold text-ink-mute">개발자용: docs/인수인계_관리자설정.md</div>
+      <p className="mt-2 text-sm leading-6 text-ink-soft">아이디·비밀번호를 바꾸려면 클로드에게 말해 주세요.</p>
     </section>
   );
 }

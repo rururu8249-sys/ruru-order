@@ -7480,7 +7480,7 @@ export default function OrderPage() {
                       {imageUrl ? <img src={imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "15px", fontWeight: 600, color: "#111111", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all" }}>{item.product_name}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 600, color: "#111111", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all" }}>{item.product_name}</div>
                       {optionText ? <div style={{ marginTop: "2px", fontSize: "13px", color: "#707072" }}>{optionText}</div> : null}
                       <div style={{ marginTop: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                         <span style={{ fontSize: "13px", color: "#707072" }}>{qty}개 · <b style={{ fontSize: "15px", fontWeight: 700, color: "#111111" }}>{(toNumber(item.product_price) * qty).toLocaleString()}원</b></span>
@@ -8451,7 +8451,7 @@ export default function OrderPage() {
                               );
                             })()}
                             {/* [2026-09-11 manysell 실측 흡수] 상품명 13→15px(목록)·14px(격자) — 주 고객 중장년, 마켓오리진 16px 대비 우리가 작았다(표시 전용) */}
-                            <div style={uiV2 ? { fontSize: listView === "grid" ? "16px" : "17px", fontWeight: 600, color: "#111111", lineHeight: 1.45, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const } : listView === "grid"
+                            <div style={uiV2 ? { fontSize: listView === "grid" ? "16px" : "17px", fontWeight: 600, color: "#111111", lineHeight: 1.45, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const } : listView === "grid"
                               ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const }
                               : { fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             {!brandGroup && !readComboInfoOrderProduct(product) ? (uiV2 ? (() => {
