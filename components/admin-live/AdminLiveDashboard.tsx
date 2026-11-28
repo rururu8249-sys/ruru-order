@@ -1574,6 +1574,13 @@ export default function AdminLiveDashboard() {
       .filter((order) => !order.pickPull),
     [filteredOrders, orders],
   );
+  // [2026-11-28] 숫자 띠(받은 돈·미결제)는 상태 칩과 무관 — 「미입금」 칩을 눌러도 받은 돈이 0원으로 바뀌지 않게(같은 방송·기간·검색 기준)
+  const statsOrders = useMemo(
+    () => filteredOrdersForCounts
+      .map((order) => (order.pickPull?.whole ? orders.find((o) => o.id === originalOrderIdOf(order)) || order : order))
+      .filter((order) => !order.pickPull),
+    [filteredOrdersForCounts, orders],
+  );
   // [2026-10-25] 이 화면에 «옮겨 온» 주문(원래 주문 id) — 숫자 띠 괄호 표시용
   // [2026-11-28] 방송 «전체보기»에선 옮긴 곳·원래 곳이 한 화면이라 「옮겨 온 주문 포함」 안내를 안 붙임(숫자는 그대로)
   // [2026-11-28] 방송 «전체보기»에선 일부 줄만 넘긴 주문이 원래 주문서 + 넘겨받은 묶음으로 두 번 세져 상태 칩 숫자가 많던 것(결제완료 4,223 vs 실제 4,217) — 칩 숫자에서만 그 묶음을 뺌(목록·물건챙기기 그대로)
@@ -1581,7 +1588,7 @@ export default function AdminLiveDashboard() {
     () => (filters.broadcast === "all" ? filteredOrdersForCounts.filter((order) => !order.pickPull || order.pickPull.whole) : filteredOrdersForCounts),
     [filteredOrdersForCounts, filters.broadcast],
   );
-  const movedInIds = useMemo(() => (filters.broadcast === "all" ? new Set<string>() : new Set(filteredOrders.filter((o) => o.pickPull?.whole).map((o) => originalOrderIdOf(o)))), [filteredOrders, filters.broadcast]);
+  const movedInIds = useMemo(() => (filters.broadcast === "all" ? new Set<string>() : new Set(filteredOrdersForCounts.filter((o) => o.pickPull?.whole).map((o) => originalOrderIdOf(o)))), [filteredOrdersForCounts, filters.broadcast]);
   const toRealOrder = (order: LiveOrder): LiveOrder => (order.pickPull ? orders.find((o) => o.id === originalOrderIdOf(order)) || order : order);
 
   useEffect(() => {
@@ -1848,7 +1855,7 @@ export default function AdminLiveDashboard() {
     }
   };
 
-  const criteriaLabel = buildCriteriaLabel(filters);
+  const criteriaLabel = buildCriteriaLabel({ ...filters, status: "all" }).replace(" · 상태 전체보기", "");  // [2026-11-28] 숫자 띠는 상태 칩 무관
 
   // 사이드바 예외 배지 (읽기 전용 카운트): 정산제외(테스트) 제외, 매칭필요/카드미결제 — 필터와 무관하게 로드된 전체 주문 기준
   // (취소 주문은 paymentStatus가 "canceled"라 아래 조건에 자연 제외됨)
@@ -2021,7 +2028,7 @@ export default function AdminLiveDashboard() {
               {activeMenu === "orders" ? (
                 <div className="flex flex-col gap-3 p-4 max-md:px-0 max-md:pt-1">{/* [2026-10-25 폰] 판 1겹 — 바깥 main 여백 16 만 */}
                   <div className="shrink-0">
-                    <LiveStatsCards orders={filteredOrdersNoPull} criteriaLabel={criteriaLabel} movedInIds={movedInIds} />
+                    <LiveStatsCards orders={statsOrders} criteriaLabel={criteriaLabel} movedInIds={movedInIds} />
                   </div>
                   <div className="shrink-0">
                     <LiveMissionGauge

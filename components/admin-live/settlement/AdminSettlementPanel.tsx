@@ -197,8 +197,9 @@ export default function AdminSettlementPanel({
       endDate: effectiveEndDate,
       selectedBroadcastKeys,
       paymentFilter,
+      broadcasts,
     });
-  }, [allRows, effectiveStartDate, effectiveEndDate, selectedBroadcastKeys, paymentFilter]);
+  }, [allRows, effectiveStartDate, effectiveEndDate, selectedBroadcastKeys, paymentFilter, broadcasts]);
 
   const manualEntriesInScope = useMemo(() => {
     return filterManualEntries({
@@ -236,8 +237,8 @@ export default function AdminSettlementPanel({
   const stats = useMemo(() => calculateStats(filteredRows, actualRateNumber, manualEntriesInScope), [filteredRows, actualRateNumber, manualEntriesInScope]);
   const trend = useMemo(() => buildDailyTrend(filteredRows, actualRateNumber, manualEntriesInScope), [filteredRows, actualRateNumber, manualEntriesInScope]);
   const broadcastRows = useMemo(() => {
-    return buildBroadcastRows(filteredRows, broadcastOptions, actualRateNumber, manualEntriesInScope);
-  }, [filteredRows, broadcastOptions, actualRateNumber, manualEntriesInScope]);
+    return buildBroadcastRows(filteredRows, broadcastOptions, actualRateNumber, manualEntriesInScope, broadcasts);
+  }, [filteredRows, broadcastOptions, actualRateNumber, manualEntriesInScope, broadcasts]);
 
   const resetFilters = () => {
     setStartDate("");

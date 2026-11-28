@@ -276,8 +276,48 @@ export function orderDateKey(row: AnyRow) {
   return toDateKey(row.created_at || row.order_date || row.date);
 }
 
-export function orderBroadcastKey(row: AnyRow) {
-  return `date:${orderDateKey(row) || "unknown"}`;
+export function orderBroadcastKey(row: AnyRow, broadcasts?: AnyRow[]) {
+  // [2026-11-28] 방송별 묶음 = 방송 기준(자정 넘긴 방송이 둘로 쪼개지던 것). 물건챙기기 엑셀 pickBroadcastGroup 과 같은 순서:
+  //   ①주문에 적힌 방송 ②방송 시간 안에 들어온 주문 → 그 방송 «시작 날짜» 키 / ③그 밖은 주문 날짜 키(쇼핑몰 주문).
+  //   키 모양은 예전과 같은 date:YYYY-MM-DD(정산추가·방송 종료 기록이 이 키를 씀). 합계는 안 바뀜 — 묶음만 바뀜.
+  const own = broadcastStartKeyFor(row, broadcasts);
+  return `date:${own || orderDateKey(row) || "unknown"}`;
+}
+
+type BroadcastSpan = { id: string; dateKey: string; start: number; end: number; deleted: boolean };
+const spanCache = new WeakMap<AnyRow[], BroadcastSpan[]>();
+function broadcastSpans(broadcasts?: AnyRow[]): BroadcastSpan[] {
+  if (!Array.isArray(broadcasts) || broadcasts.length === 0) return [];
+  const hit = spanCache.get(broadcasts);
+  if (hit) return hit;
+  const list: BroadcastSpan[] = [];
+  broadcasts.forEach((b) => {
+    const id = cleanText(b?.id);
+    const startIso = b?.started_at;
+    const start = new Date(String(startIso || "")).getTime();
+    const dateKey = toDateKey(startIso);
+    if (!id || !dateKey || !Number.isFinite(start)) return;
+    const endRaw = b?.ended_at ? new Date(String(b.ended_at)).getTime() : NaN;
+    const live = String(b?.status || "").toUpperCase() === "ON";
+    const end = Number.isFinite(endRaw) ? endRaw : live ? Date.now() : start + 18 * 3600_000;
+    list.push({ id, dateKey, start, end, deleted: b?.is_deleted === true });
+  });
+  spanCache.set(broadcasts, list);
+  return list;
+}
+function broadcastStartKeyFor(row: AnyRow, broadcasts?: AnyRow[]): string {
+  const spans = broadcastSpans(broadcasts);
+  if (spans.length === 0) return "";
+  const bid = cleanText(row?.broadcast_id);
+  if (bid) {
+    const own = spans.find((s) => s.id === bid);
+    if (own) return own.dateKey;
+  }
+  const t = new Date(String(row?.created_at || "")).getTime();
+  if (!Number.isFinite(t)) return "";
+  const inside = spans.filter((s) => t >= s.start && t <= s.end);
+  const pick = inside.find((s) => !s.deleted) || inside[0];
+  return pick ? pick.dateKey : "";
 }
 
 export function buildBroadcastOptions(rows: AnyRow[], broadcasts?: AnyRow[]): SettlementBroadcastOption[] {
@@ -306,10 +346,10 @@ export function buildBroadcastOptions(rows: AnyRow[], broadcasts?: AnyRow[]): Se
   }
 
   rows.forEach((row) => {
-    const dateKey = orderDateKey(row);
-    if (!dateKey) return;
+    const key = orderBroadcastKey(row, broadcasts);
+    const dateKey = key.slice(5);
+    if (!dateKey || dateKey === "unknown") return;
 
-    const key = `date:${dateKey}`;
     const current =
       map.get(key) ||
       {
@@ -333,12 +373,14 @@ export function filterRows({
   endDate,
   selectedBroadcastKeys,
   paymentFilter,
+  broadcasts,
 }: {
   rows: AnyRow[];
   startDate: string;
   endDate: string;
   selectedBroadcastKeys: string[];
   paymentFilter: PaymentFilter;
+  broadcasts?: AnyRow[];
 }) {
   const selected = new Set(selectedBroadcastKeys);
 
@@ -347,7 +389,7 @@ export function filterRows({
 
     if (startDate && dateKey < startDate) return false;
     if (endDate && dateKey > endDate) return false;
-    if (selected.size > 0 && !selected.has(orderBroadcastKey(row))) return false;
+    if (selected.size > 0 && !selected.has(orderBroadcastKey(row, broadcasts))) return false;
     if (paymentFilter !== "전체" && paymentMethod(row) !== paymentFilter) return false;
 
     return true;
@@ -493,13 +535,14 @@ export function buildBroadcastRows(
   options: SettlementBroadcastOption[],
   actualCardRate: number,
   manualEntries: SettlementManualEntry[] = [],
+  broadcasts?: AnyRow[],
 ): SettlementBroadcastRow[] {
   const optionMap = new Map(options.map((option) => [option.key, option]));
   const orderGrouped = new Map<string, AnyRow[]>();
   const manualGrouped = new Map<string, SettlementManualEntry[]>();
 
   rows.forEach((row) => {
-    const key = orderBroadcastKey(row);
+    const key = orderBroadcastKey(row, broadcasts);
     const current = orderGrouped.get(key) || [];
     current.push(row);
     orderGrouped.set(key, current);
