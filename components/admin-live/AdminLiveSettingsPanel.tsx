@@ -546,7 +546,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                   onClick={() => setPointAutoEarn((v) => !v)}
                   className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${pointAutoEarn ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
                 >
-                  {pointAutoEarn ? "자동적립 ON" : "자동적립 OFF"}
+                  {pointAutoEarn ? "켜짐" : "꺼짐"}
                 </button>
               </div>
 
@@ -775,20 +775,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                 ) : null}
               </div>
 
-              {/* [2026-08-30] 공지 문구·접속 팝업 공지는 사이드바 「공지·쪽지」 메뉴로 옮겼다. */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
-                {onOpenNotice ? (
-                  <button
-                    type="button"
-                    onClick={() => void selectDestination({ tab: "notices" })}
-                    className="shrink-0 rounded-lg border border-line bg-surface px-3 py-2 text-[13px] font-semibold text-ink transition hover:bg-surface-2"
-                  >
-                    공지사항 열기
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
+              <div className="flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
                 <div>
                   <div className="text-sm font-black text-ink">주문 전 최종 확인 체크</div>
                   <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
@@ -800,7 +787,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                   onClick={() => setFinalSubmitConfirmationEnabled((value) => !value)}
                   className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${finalSubmitConfirmationEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
                 >
-                  {finalSubmitConfirmationEnabled ? "최종 확인 ON" : "최종 확인 OFF"}
+                  {finalSubmitConfirmationEnabled ? "켜짐" : "꺼짐"}
                 </button>
               </div>
 
@@ -814,7 +801,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                   onClick={() => setDirectInputEnabled((v) => !v)}
                   className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${directInputEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
                 >
-                  {directInputEnabled ? "직접입력 ON" : "직접입력 OFF"}
+                  {directInputEnabled ? "켜짐" : "꺼짐"}
                 </button>
               </div>
 

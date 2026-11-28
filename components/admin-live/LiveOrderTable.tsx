@@ -1820,8 +1820,8 @@ export default function LiveOrderTable({
                         })}</div>
                         {order.paidAt && <div className="mt-0.5 text-[11px] text-ink-mute">{order.paidAt}</div>}
                         {!(order.pickPull && !order.pickPull.whole) && ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
-                          <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-0.5 rounded-full px-1 text-[14px] leading-none opacity-70 transition hover:opacity-100 hover:drop-shadow disabled:opacity-35">
-                            
+                          <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-1 inline-flex h-7 items-center rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink-soft transition hover:bg-surface-2 disabled:opacity-40">
+                            쪽지
                           </button>
                         ) : null}
                       </div>
@@ -1829,7 +1829,7 @@ export default function LiveOrderTable({
                       <div className="flex flex-col items-start gap-1 px-3 py-2">
                         {(order as any).shippingStatus ? (
                           <span className={`inline-flex items-center whitespace-nowrap rounded-lg px-2 py-1 text-[12px] font-semibold leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
-                        ) : <span className="text-ink-mute">-</span>}
+                        ) : null}
                         <span className="flex flex-wrap gap-1"><PickChip order={order} /><InvoiceChip order={order} /><PickingListChip order={order} /></span>
                       </div>
                     </div>

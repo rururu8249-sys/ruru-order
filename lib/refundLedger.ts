@@ -391,7 +391,7 @@ export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, ban
     const acctSeg = last4 ? `${bn ? `${bn} ` : ""}****${last4}` : bn;
     return `${wonTxt} 보냄${dd ? ` · ${dd}` : ""}${acctSeg ? ` · ${acctSeg}` : ""}`;
   }
-  if (isExchange) return `교환 · 바꿀 옵션 ${s(li.exchange_option) || "-"}`;
+  if (isExchange) return `교환 · 바꿀 옵션 ${s(li.exchange_option) || "안 정함"}`;
   if (method === "카드취소" && cardTotal > 0) return `카드 전체 취소 ${cardTotal.toLocaleString("ko-KR")}원${refundBack > 0 ? ` · 반품비 ${refundBack.toLocaleString("ko-KR")}원` : ""}`;
   if (method === "포인트" && amt > 0) return `포인트로 돌려줄 금액 ${wonTxt}`;
   if (method === "계좌이체" && amt > 0) {

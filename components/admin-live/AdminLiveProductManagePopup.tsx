@@ -2311,7 +2311,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 ) : !bcProductsReady ? (
                   <div role="status" style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>방송 상품을 불러오는 중…</div>
                 ) : bcProducts.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품 없음 — 아래에서 골라 「진열」</div></div>
+                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>아직 담은 상품이 없어요 — 오른쪽 위 「+ 담기」로 골라 주세요</div></div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     {bcProductsView.filter(p=>{

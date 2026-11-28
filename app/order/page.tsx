@@ -20,6 +20,7 @@
 // - 상품금액 1원 미만 제출 금지
 
 "use client";
+import EmptyCartNudge from "@/components/customer/EmptyCartNudge";
 import ProductDiscountLabel from '@/components/order/ProductDiscountLabel';
 import CustomerPressButton from '@/components/customer/CustomerPressButton';
 import ProductColorSwatches, {ColorSwatch} from '@/components/customer/ProductColorSwatches';
@@ -10321,14 +10322,12 @@ export default function OrderPage() {
                   uiV2 ? (
                     /* [2026-11-05 사장님 — 구아바 참고] 빈 장바구니 = 가운데 떠 있는 안내 알약. 누르면 상품 목록 맨 위로.
                        방송 중엔 화살표가 위아래로 살짝 움직임(동작 줄이기 설정이면 멈춤). 담기·장바구니 로직 무접촉 */
-                    <button type="button"
+                    <EmptyCartNudge
+                      animate={isBroadcastOn}
                       onClick={() => document.getElementById("ruru-shop-top")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                      style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(80px + env(safe-area-inset-bottom))", zIndex: 39, display: "inline-flex", alignItems: "center", gap: "8px", height: "48px", padding: "0 20px", borderRadius: "9999px", background: "#FFFFFF", border: "1px solid #E5E5E5", boxShadow: "0 4px 16px rgba(0,0,0,0.12)", color: "#111111", fontSize: "15px", fontWeight: 600, whiteSpace: "nowrap", fontFamily: "inherit", cursor: "pointer" }}>
-                      <svg className="ruru-nudge-arrow" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", animation: isBroadcastOn ? "ruruNudge 1.2s ease-in-out infinite" : "none" }}><path d="M12 19V5" /><path d="M6 11l6-6 6 6" /></svg>
-                      {/* [2026-11-05 20:14 사장님] 방송 중엔 «방송에서 주문 접수한 상품만» 담아야 함 → 문구 다르게 */}
-                      {/* [2026-11-26 사장님] 기본은 «방송 접수 후 담기» — 바로 구매 상품만 있을 때만 「마음에 드는 상품」 */}
-                      {isBroadcastOn || instantReadyCount < quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p)).length ? "방송에서 접수한 상품을 담아주세요" : "마음에 드는 상품을 담아주세요"}
-                    </button>
+                      /* [2026-11-26 사장님] 기본은 «방송 접수 후 담기» — 바로 구매 상품만 있을 때만 「마음에 드는 상품」 */
+                      label={isBroadcastOn || instantReadyCount < quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p)).length ? "방송에서 접수한 상품을 담아주세요" : "마음에 드는 상품을 담아주세요"}
+                    />
                   ) : (
                     <div style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
                       🛒 담은 상품이 없어요

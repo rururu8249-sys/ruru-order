@@ -35,7 +35,7 @@ const bn = (li) => bankDisplayName(String(li.bank ?? ""));
 { const li = { kind: "교환", method: "교환재발송", amount_final: 0, exchange_option: "XL → 2XL" };
   eq(ledgerSummaryLine(li, ""), "교환 · 바꿀 옵션 XL → 2XL", "미완료 교환(옵션 있음)"); }
 { const li = { kind: "교환", method: "교환재발송", amount_final: 0, exchange_option: "" };
-  eq(ledgerSummaryLine(li, ""), "교환 · 바꿀 옵션 -", "미완료 교환(옵션 없음→-)"); }
+  eq(ledgerSummaryLine(li, ""), "교환 · 바꿀 옵션 안 정함", "미완료 교환(옵션 없음→안 정함)"); }
 
 // ── 💳 요약: 완료 (6차: 은행 ****뒤4) ──
 { const li = { kind: "반품", method: "계좌이체", amount_final: 69000, done_at: "2026-09-26T10:00:00", bank: "국민", account_number: "", account_last4: "2708" };

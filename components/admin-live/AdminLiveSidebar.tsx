@@ -118,7 +118,7 @@ export default function AdminLiveSidebar({
       <aside
         className={[
           "fixed inset-y-0 left-0 z-40 flex w-[280px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-3 py-3 transition-transform duration-200 md:w-[220px] lg:w-[256px] xl:w-[280px]",
-          "md:static md:z-auto md:translate-x-0",
+          "md:sticky md:top-0 md:h-dvh md:self-start md:z-auto md:translate-x-0",
           navOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >
