@@ -28,7 +28,7 @@ type PaginationItem = number | "ellipsis";
 
 function sortMark(active: boolean, direction: SortDirection) {
   if (!active) return <span className="text-[11px] text-ink-mute">↕</span>;
-  return <span className="text-[11px] text-info-tx">{direction === "asc" ? "↑" : "↓"}</span>;
+  return <span className="text-[11px] text-ink">{direction === "asc" ? "↑" : "↓"}</span>;
 }
 
 function SortButton({
@@ -51,7 +51,7 @@ function SortButton({
       type="button"
       onClick={() => onSortChange(sortName)}
       className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-black transition ${
-        active ? "bg-info-bg text-info-tx" : "text-ink-soft hover:bg-surface-3 hover:text-ink"
+        active ? "bg-surface-3 text-ink" : "text-ink-soft hover:bg-surface-3 hover:text-ink"
       }`}
       title={`${label} 오름차순/내림차순 정렬`}
     >
@@ -215,7 +215,7 @@ export default function DepositLedgerTable({
                 const rowKey = `${getDepositTime(row)}-${getDepositName(row)}-${getDepositAmount(row)}-${normalizedPage}-${index}`;
 
                 return (
-                  <tr key={rowKey} className="group border-b border-line-soft transition hover:bg-info-bg">
+                  <tr key={rowKey} onClick={() => onOpenDetail(row)} className="group cursor-pointer border-b border-line-soft transition hover:bg-surface-2">
                     <td className="border-b border-line-soft px-3 py-4 text-sm font-black text-ink">
                       {formatDepositDateTime(row)}
                     </td>
@@ -231,8 +231,8 @@ export default function DepositLedgerTable({
                     <td className="border-b border-line-soft px-3 py-4 text-center">
                       <button
                         type="button"
-                        onClick={() => onOpenDetail(row)}
-                        className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-black text-ink shadow-sm transition hover:border-line hover:bg-info-bg hover:text-info-tx"
+                        onClick={(e) => { e.stopPropagation(); onOpenDetail(row); }}
+                        className="rounded-lg border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink transition hover:bg-surface-2"
                       >
                         보기
                       </button>

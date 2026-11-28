@@ -224,7 +224,7 @@ export default function LiveFloatingMatchPanel({
       map.get(label)!.push(dep);
     }
     // [2026-11-26 VER3 시안 AdminDeposit] 주문을 고르지 않았을 땐 날짜 머리 없이 두 묶음(짝을 찾았어요 / 주문 없는 입금)
-    const rest: [string, any[]][] = matchMode ? Array.from(map.entries()) : (() => { const all = Array.from(map.values()).flat(); return all.length ? [[`주문 없는 입금 · ${all.length}건`, all] as [string, any[]]] : []; })();
+    const rest: [string, any[]][] = matchMode ? Array.from(map.entries()) : (() => { const all = Array.from(map.values()).flat(); return all.length ? [[`주문 없는 입금`, all] as [string, any[]]] : []; })();
     return pairs.length > 0 ? [[`짝을 찾았어요 — 눌러서 연결 · ${pairs.length}건`, pairs] as [string, any[]], ...rest] : rest;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, matchMode, orders, allOrders, shortages]);
@@ -527,7 +527,7 @@ export default function LiveFloatingMatchPanel({
           <div className="flex items-center gap-2">
             <span className="min-w-0 flex-1 text-[12px] text-ink-mute">
               {bulkTargets.length > 0
-                ? `주문 없는 입금 ${bulkTargets.length}건${bulkKept > 0 ? ` · 주문 있을 수 있는 ${bulkKept}건 제외` : ""}`
+                ? (bulkKept > 0 ? `주문 있을 수 있는 ${bulkKept}건은 정리에서 빠져요` : "")
                 : "모두 같은 이름 미입금 주문이 있어요 — 한 건씩 확인하세요"}
             </span>
             <button type="button" onClick={() => setBulkSettleOpen(v => !v)} disabled={matchSaving || bulkTargets.length === 0}

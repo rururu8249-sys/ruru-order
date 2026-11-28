@@ -2007,9 +2007,12 @@ export default function AdminLiveDashboard() {
               {activeMenu === "reports" || activeMenu === "sales" ? (
                 <div className="flex flex-col gap-3">
                   {/* [2026-10-21 a4-1] 라이브 현황(이번 방송 KPI·TOP) — 방송 메뉴에서 이리로. a4-2 에서 「판매·정산」 탭으로 정리 예정 */}
+                  {/* [2026-11-28] 방송 없을 땐 빈 상자 안 보임 */}
+                  {activeBroadcast?.id ? (
                   <div className="px-4 pt-4">
-                    <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => { setActiveMenu("reports"); }} />
+                    <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast.id} onOpenReport={() => { setActiveMenu("reports"); }} />
                   </div>
+                  ) : null}
                   <SalesAnalysisPanel initialBroadcastId={activeBroadcast?.id || null} />
                 </div>
               ) : null}

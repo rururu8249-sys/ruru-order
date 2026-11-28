@@ -2175,7 +2175,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                                 {d.openIssues > 0 ? <span className="rounded bg-danger-bg px-1 py-0.5 text-[11px] font-black text-danger-tx" title="미해결 고객이슈">이슈 {d.openIssues}</span> : null}
                                 {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-xs font-semibold text-ink-mute" title="방송 알림 미신청">알림OFF</span> : null}
                               </>
-                            ) : blockLoadStatus === "ready" ? <span className="text-[11px] text-ink-mute">-</span> : null}
+                            ) : null}
                           </div>
                           {/* 누적 주문 (오른쪽) */}
                           <span className="text-right font-semibold tabular-nums text-ink">{memberStatsReady ? `${customer.orderCount}건` : "…"}</span>
@@ -2190,7 +2190,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                           <span className="text-right font-semibold tabular-nums text-rose-deep">{d.pts ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
                           {/* 처리 (오른쪽) */}
                           <div className="flex items-center justify-end gap-1.5">
-                            <button type="button" onClick={() => handleCustomerBlockButton(customer)} disabled={blockSaving || blockLoadStatus !== "ready"} className={`min-h-9 shrink-0 rounded-lg px-2 text-xs font-semibold transition-colors disabled:opacity-40 ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
+                            {/* [2026-11-28] 위험 동작(차단)은 줄마다 안 둠 — 회원 상세 › 기본 정보 «차단 관리»에서. 차단된 회원만 줄에서 바로 해제 */}
+                            {customer.blocked ? <button type="button" onClick={() => handleCustomerBlockButton(customer)} disabled={blockSaving || blockLoadStatus !== "ready"} className="min-h-9 shrink-0 rounded-lg border border-line px-2 text-xs font-semibold text-ink-soft transition-colors hover:bg-surface-2 disabled:opacity-40">{CUSTOMER_TERMS.unblock}</button> : null}
                             <button type="button" onClick={() => openDetail(customer)} className="min-h-9 shrink-0 rounded-lg px-2 text-[13px] font-semibold text-ink hover:bg-surface-2">열기</button>
                           </div>
                         </div>

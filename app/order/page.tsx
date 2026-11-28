@@ -1716,6 +1716,7 @@ export default function OrderPage() {
   const PRIVACY_CONSENT_STORAGE_KEY = "ruru_privacy_consent_version";
   const [hasPrivacyConsent, setHasPrivacyConsent] = useState(false);
   const [privacyConsentChecked, setPrivacyConsentChecked] = useState(false);
+  const [payMissingHint, setPayMissingHint] = useState(false);
   const hasSavedOrderCustomerInfo = Boolean(
     youtubeNickname.trim() && customerName.trim() && customerPhone.trim()
   );
@@ -5724,6 +5725,9 @@ export default function OrderPage() {
 
     if (!paymentMethod) {
       showCustomerNotice("결제 방법을 선택해 주세요. (무통장입금 또는 카드결제)");
+      // [2026-11-28 Baymard: 틀린 곳이 하나면 그 자리로 바로] 결제 버튼으로 이동 + 빨간 한 줄
+      setPayMissingHint(true);
+      window.setTimeout(() => document.getElementById("order-pay-section")?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
       return false;
     }
 
@@ -5734,6 +5738,7 @@ export default function OrderPage() {
 
     if (!hasPrivacyConsent && !hasSavedOrderCustomerInfo && !privacyConsentChecked) {
       showCustomerNotice("개인정보 수집·이용 및 배송정보 제공 안내 확인이 필요합니다.");
+      window.setTimeout(() => document.getElementById("order-privacy-consent")?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
       return false;
     }
 
@@ -9056,7 +9061,7 @@ export default function OrderPage() {
             {/* [2026-09-20 사장님 「심플하게」] 결제 = 버튼 2개(라벨만) + 고른 쪽 밑에 한 줄.
                 무통장: 「{닉네임} 이름으로 입금」 / 카드: 「제출하면 카톡으로 결제링크」 + 최소금액. 요청사항은 접어 둠. 계산·제출 로직 무변경. */}
             {uiS3 && selectedItemEntries.length === 0 ? null : (
-            <section style={uiS3 ? { padding: "16px", borderTop: "1px solid #E5E5E5" } : { padding: "14px 18px", borderTop: "0.5px solid #E5E1DC" }}>
+            <section id="order-pay-section" style={uiS3 ? { padding: "16px", borderTop: "1px solid #E5E5E5" } : { padding: "14px 18px", borderTop: "0.5px solid #E5E1DC" }}>
               <div style={uiS3 ? { fontSize: "15px", fontWeight: 700, color: "#111111", marginBottom: "10px" } : { fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: "8px" }}>결제</div>
               <div style={s3s({ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" })}>
                 {(["무통장입금", "카드결제"] as const).map((method) => (
@@ -9065,6 +9070,7 @@ export default function OrderPage() {
                     type="button"
                     onClick={() => {
                       setPaymentMethod(method);
+                      setPayMissingHint(false);
                       if (method === "무통장입금") void syncCartReservationsRef.current();
                     }}
                     data-at={`pay-${method}`}
@@ -9075,6 +9081,9 @@ export default function OrderPage() {
                   </button>
                 ))}
               </div>
+              {payMissingHint && !paymentMethod ? (
+                <div role="alert" style={{ marginTop: "8px", fontSize: "14px", fontWeight: 700, color: "#D30005" }}>결제 방법을 골라 주세요</div>
+              ) : null}
               {uiS3 && !paymentMethod ? null : (
               <div style={uiS3 ? { marginTop: "10px", borderRadius: "8px", background: "#F5F5F5", border: "none", padding: "12px 14px", fontSize: "15px", fontWeight: 400, lineHeight: 1.6, color: "#39393B", wordBreak: "keep-all" } : { marginTop: "8px", borderRadius: "10px", background: "#FAF8F6", border: "1px solid #E5E1DC", padding: "9px 12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#4B3540", wordBreak: "keep-all" }}>
                 {paymentMethod === "카드결제" ? (
@@ -9173,7 +9182,7 @@ export default function OrderPage() {
               </div>
 
               {!hasPrivacyConsent && !hasSavedOrderCustomerInfo && (
-                <label className={uiS3 ? "mt-4 flex cursor-pointer items-start gap-3" : "mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-rose-soft p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-rose-deep ring-1 ring-rose-line active:scale-[0.99]"} style={uiS3 ? { borderRadius: "8px", background: "#F5F5F5", padding: "16px", fontSize: "15px", fontWeight: 600, lineHeight: 1.5, color: "#111111" } : undefined}>
+                <label id="order-privacy-consent" className={uiS3 ? "mt-4 flex cursor-pointer items-start gap-3" : "mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-rose-soft p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-rose-deep ring-1 ring-rose-line active:scale-[0.99]"} style={uiS3 ? { borderRadius: "8px", background: "#F5F5F5", padding: "16px", fontSize: "15px", fontWeight: 600, lineHeight: 1.5, color: "#111111" } : undefined}>
                   <input
                     type="checkbox"
                     checked={privacyConsentChecked}
