@@ -75,7 +75,7 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('brand-move:'||p_request_id));
   select * into v_audit from public.product_brand_move_audit where request_id=p_request_id;
   if found then
-    if v_audit.request_payload <> v_payload then raise exception 'Conflict: request reused' using errcode='40001'; end if;
+    if v_audit.request_payload <> v_payload then raise exception 'Conflict: request reused' using errcode='PT409'; end if;
     return v_audit.result || jsonb_build_object('replayed',true);
   end if;
   -- Lock rows in a consistent order, including the parent that serializes siblings.
@@ -86,7 +86,7 @@ begin
   if not found then raise exception 'Missing parent' using errcode='22023'; end if;
   if public.product_brand_version(p_source_id) is distinct from p_source_version
      or public.product_brand_version(p_parent_id) is distinct from p_parent_version then
-    raise exception 'Conflict: product changed' using errcode='40001';
+    raise exception 'Conflict: product changed' using errcode='PT409';
   end if;
   v_note := coalesce(nullif(v_parent.product_note,'')::jsonb,'{}'::jsonb);
   if v_note #>> '{brand_group,enabled}' is distinct from 'true'
@@ -112,7 +112,7 @@ begin
     v_result := jsonb_build_object('link',jsonb_build_object('sourceId',v_link.source_id::text,'parentId',v_link.parent_id::text,'detailName',v_link.detail_name,'originalName',v_link.original_name,'movedAt',v_link.moved_at),'replayed',false);
   else
     delete from public.product_brand_links where source_id=p_source_id and parent_id=p_parent_id returning * into v_link;
-    if not found then raise exception 'Conflict: link missing' using errcode='40001'; end if;
+    if not found then raise exception 'Conflict: link missing' using errcode='PT409'; end if;
     v_name := v_link.detail_name;
     v_result := jsonb_build_object('link',null,'replayed',false);
   end if;
@@ -181,7 +181,7 @@ begin
   perform id from public.products where id=p_id for update;
   if not found then raise exception 'Missing product' using errcode='22023'; end if;
   if public.product_brand_version(p_id) is distinct from p_version then
-    raise exception 'Conflict: product changed' using errcode='40001';
+    raise exception 'Conflict: product changed' using errcode='PT409';
   end if;
   for v_key in select jsonb_object_keys(p_values) loop
     if v_key in ('id','created_at') then raise exception 'Protected product column' using errcode='22023'; end if;

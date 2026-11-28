@@ -26,6 +26,7 @@ assert.equal(calls.length,0,'validation must run before database');
 assert.equal((await call(body)).status,200);
 assert.deepEqual(calls[0],{name:'product_brand_move',args:{p_action:'move',p_source_id:'2',p_parent_id:'1',p_detail_name:'NEW',p_request_id:'request-1',p_source_version:'a'.repeat(32),p_parent_version:'b'.repeat(32)}});
 error={code:'40001',message:'Conflict: product changed'};assert.equal((await call(body)).status,409);
+error={code:'PT409',message:'Conflict: product changed'};assert.equal((await call(body)).status,409);
 error={code:'23505',message:'Duplicate'};assert.equal((await call(body)).status,409);
 error={code:'22023',message:'Invalid brand'};assert.equal((await call(body)).status,400);
 const {POST:catalogPost}=createUiLoader({

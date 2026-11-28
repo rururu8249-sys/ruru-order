@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({data:null,error:{message:'상품 저장 요청을 확인해주세요.'}},{status:400});
       }
       const {data,error}=await supabase.rpc('product_catalog_update',{p_id:id,p_version:body.expectedVersion,p_values:body.values});
-      if(error) return NextResponse.json({data:null,error:{message:error.code==='42703'?error.message:'상품이 변경되어 저장하지 않았습니다. 최신 상품을 다시 열어 확인해주세요.'}},{status:['40001','23505'].includes(error.code)?409:400});
+      if(error) return NextResponse.json({data:null,error:{message:error.code==='42703'?error.message:'상품이 변경되어 저장하지 않았습니다. 최신 상품을 다시 열어 확인해주세요.'}},{status:['40001','PT409','23505'].includes(error.code)?409:400});
       await afterWrite(data);
       return NextResponse.json({data:body.single?{id:data.id}:data,error:null});
     }
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await query;
     if (error) {
       // Protected brand links reject destructive/shadow writes in the same DB transaction.
-      if (table === 'products' && ['23503', '23505', '40001'].includes(error.code)) {
+      if (table === 'products' && ['23503', '23505', '40001', 'PT409'].includes(error.code)) {
         return NextResponse.json({data:null,error:{message:'연결된 상품 또는 변경된 상태가 있습니다. 최신 상품을 확인해주세요.'}},{status:409});
       }
       return NextResponse.json({ data: null, error: { message: error.message } }, { status: 200 });

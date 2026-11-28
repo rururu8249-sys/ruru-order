@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       p_source_version:body.expectedSourceVersion,p_parent_version:body.expectedParentVersion,
     });
     if (error) {
-      const status = ['40001','23505'].includes(error.code)?409:error.code==='22023'?400:500;
+      const status = ['40001','PT409','23505'].includes(error.code)?409:error.code==='22023'?400:500;
       return NextResponse.json({error:status===409?'상품 상태가 변경되었거나 같은 상품이 있습니다. 새 상태를 확인해주세요.':status===400?'이동할 상품과 브랜드를 확인해주세요.':'저장하지 못했습니다. 다시 확인해주세요.'},{status});
     }
     return NextResponse.json(data);
