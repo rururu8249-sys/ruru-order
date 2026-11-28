@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
-import { findSuspects, YOUTUBE_CHAT_LOG_TABLE } from "@/lib/youtubeChatLog";
+import { findSuspects, similarAuthors, YOUTUBE_CHAT_LOG_TABLE } from "@/lib/youtubeChatLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -105,16 +105,26 @@ export async function GET(request: NextRequest) {
         if (q) x = x.ilike("author_name", `%${likeSafe(q)}%`);
         return x.order("published_at", { ascending: true });
       }, q ? 3000 : 6000);
+      // 주문서는 oq(처음 연 주문 닉네임)가 있으면 그걸로 — 비슷한 닉네임 칩을 눌러도 원래 주문서가 남게
+      const oq = String(sp.get("oq") || "").trim().replace(/^@+/, "").slice(0, 40) || q;
       let orders: any[] = [];
-      if (q) {
+      if (oq) {
         if (bc) {
           const w = await broadcastWindow(sb, bc);
-          orders = w ? groupOrders(await ordersOfBroadcast(sb, w, q)) : [];
+          orders = w ? groupOrders(await ordersOfBroadcast(sb, w, oq)) : [];
         } else {
           const { data } = await sb.from("orders").select(ORDER_COLS).neq("is_deleted", true)
-            .ilike("youtube_nickname", `%${likeSafe(q)}%`).order("created_at", { ascending: false }).limit(300);
+            .ilike("youtube_nickname", `%${likeSafe(oq)}%`).order("created_at", { ascending: false }).limit(300);
           orders = groupOrders(data || []).reverse();
         }
+      }
+      // [2026-11-28] 비슷한 닉네임(그 방송) — 주문서 닉네임과 유튜브 닉네임이 조금 달라도 찾게
+      let similar: ReturnType<typeof similarAuthors> = [];
+      if (bc && q) {
+        const all = await fetchAll(() => sb.from(YOUTUBE_CHAT_LOG_TABLE).select("author_name,is_owner,is_bot").eq("broadcast_id", bc).order("published_at", { ascending: true }), 6000);
+        const cnt = new Map<string, number>();
+        for (const r of all) if (!r.is_owner && !r.is_bot && r.author_name) cnt.set(String(r.author_name), (cnt.get(String(r.author_name)) || 0) + 1);
+        similar = similarAuthors(q, [...cnt].map(([author, count]) => ({ author, count })));
       }
       // 방송 이름표(목록 30개 밖 옛 방송도 이름이 나오게)
       const bcIds = [...new Set(rows.map((m: any) => String(m.broadcast_id || "")).filter(Boolean))].slice(0, 200);
@@ -123,7 +133,7 @@ export async function GET(request: NextRequest) {
         const { data: bs } = await sb.from("broadcasts").select("id,public_title,started_at").in("id", bcIds);
         for (const b of bs || []) broadcasts[String(b.id)] = { title: String(b.public_title || ""), startedAt: b.started_at || null };
       }
-      return NextResponse.json({ ok: true, messages: rows, orders, broadcasts, truncated: rows.length >= (q ? 3000 : 6000) });
+      return NextResponse.json({ ok: true, messages: rows, orders, broadcasts, similar, truncated: rows.length >= (q ? 3000 : 6000) });
     }
 
     if (mode === "around") {

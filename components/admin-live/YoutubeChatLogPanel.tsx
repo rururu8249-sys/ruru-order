@@ -60,6 +60,10 @@ export default function YoutubeChatLogPanel({ initialNick = "", initialBroadcast
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [around, setAround] = useState<{ id: string; list: Msg[] } | null>(null);
+  const [similar, setSimilar] = useState<{ author: string; count: number; same: boolean }[]>([]);
+  // 주문서는 «사장님이 적은 닉네임» 기준 — 비슷한 닉네임 칩을 눌러도 원래 주문서가 남게
+  const [orderQ, setOrderQ] = useState(initialNick.replace(/^@+/, ""));
+  const chipPickRef = useRef(false);
   const reqRef = useRef(0);
 
   // 방송 목록(처음 한 번) — 기본: 받은 방송, 없으면 채팅이 저장된 가장 최근 방송
@@ -75,7 +79,16 @@ export default function YoutubeChatLogPanel({ initialNick = "", initialBroadcast
   }, [initialBroadcastId, initialNick]);
 
   // 닉네임 칸은 멈춘 뒤 0.4초에 찾기
-  useEffect(() => { const t = setTimeout(() => setQ(qLive.trim().replace(/^@+/, "")), 400); return () => clearTimeout(t); }, [qLive]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const v = qLive.trim().replace(/^@+/, "");
+      setQ(v);
+      if (!chipPickRef.current) setOrderQ(v);
+      chipPickRef.current = false;
+    }, 400);
+    return () => clearTimeout(t);
+  }, [qLive]);
+  const pickSimilar = (author: string) => { chipPickRef.current = true; setQLive(author.replace(/^@+/, "")); setView("all"); };
 
   const load = useCallback(async () => {
     if (!bc && !q) { setMsgs([]); setOrders(null); return; }
@@ -85,18 +98,20 @@ export default function YoutubeChatLogPanel({ initialNick = "", initialBroadcast
       const p = new URLSearchParams({ mode: "chat" });
       if (bc) p.set("bc", bc);
       if (q) p.set("q", q);
+      if (q && orderQ && orderQ !== q) p.set("oq", orderQ);
       const j = await fetch(`/api/admin-live/youtube-chat-log?${p}`, { cache: "no-store" }).then((r) => r.json());
       if (id !== reqRef.current) return;
       if (!j?.ok) throw new Error(j?.message || "불러오지 못했어요");
       setMsgs(j.messages || []);
       setOrders(q ? j.orders || [] : null);
+      setSimilar(Array.isArray(j.similar) ? j.similar : []);
       setBcNames(j.broadcasts || {});
     } catch (e) {
       if (id === reqRef.current) setErr(String((e as Error).message || e));
     } finally {
       if (id === reqRef.current) setLoading(false);
     }
-  }, [bc, q]);
+  }, [bc, q, orderQ]);
   useEffect(() => { void load(); }, [load]);
 
   // 의심 목록(방송 바뀔 때)
@@ -159,10 +174,33 @@ export default function YoutubeChatLogPanel({ initialNick = "", initialBroadcast
           주문서 없는 사람 {suspects ? suspects.length : "…"}</button> : null}
       </div>
 
+      {/* [2026-11-28] 비슷한 닉네임 — 주문서 닉네임과 유튜브 닉네임이 조금 달라도 바로 찾게 */}
+      {bc && q && similar.length > 0 && view !== "suspect" ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="text-xs font-semibold text-ink-mute">이 방송 채팅의 비슷한 닉네임 · 누르면 그 사람 말만</div>
+          <div className="flex flex-wrap gap-2">
+            {similar.map((s) => {
+              const on = s.author.replace(/^@+/, "") === q;
+              return (
+                <button key={s.author} type="button" aria-pressed={on} onClick={() => pickSimilar(s.author)}
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm ${on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`}>
+                  {s.author.replace(/^@+/, "")}
+                  <span className={`tabular-nums text-xs ${on ? "text-white/80" : "text-ink-mute"}`}>{s.count}</span>
+                  {!s.same ? <span className={`text-xs ${on ? "text-white/80" : "text-warn-tx"}`}>비슷</span> : null}
+                </button>
+              );
+            })}
+            {orderQ && q !== orderQ ? (
+              <button type="button" onClick={() => setQLive(orderQ)} className="h-9 rounded-full px-3 text-sm text-ink-mute hover:bg-surface-2">처음 닉네임으로</button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {/* 닉네임으로 찾으면: 그 닉네임 주문서 */}
       {q && orders && view !== "suspect" ? (
         <div className="rounded-xl border border-line bg-surface">
-          <div className="border-b border-line-soft px-4 py-2 text-sm font-bold text-ink">「{q}」 주문서 {orders.length}건{bc ? " · 이 방송" : ""}</div>
+          <div className="border-b border-line-soft px-4 py-2 text-sm font-bold text-ink">「{orderQ || q}」 주문서 {orders.length}건{bc ? " · 이 방송" : ""}</div>
           {orders.length === 0 ? <p className="px-4 py-3 text-[13px] text-warn-tx">이 닉네임으로 낸 주문서가 없어요 — 닉네임을 바꿨을 수 있으니 이름으로도 찾아보세요.</p> : (
             <ul className="divide-y divide-line-soft">
               {orders.map((o) => (

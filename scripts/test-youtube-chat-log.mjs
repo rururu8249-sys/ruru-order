@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createUiLoader } from "./admin-ui-test-loader.mjs";
 const load = createUiLoader();
-const { chatNickKey, orderLikeReasons, chatLogRowFromApi, nickMatches, findSuspects } = load("lib/youtubeChatLog.ts");
+const { chatNickKey, orderLikeReasons, chatLogRowFromApi, nickMatches, findSuspects, similarAuthors } = load("lib/youtubeChatLog.ts");
 
 // 닉네임 맞추기 키
 assert.equal(chatNickKey("@루루맘-f2h"), "루루맘");
@@ -49,4 +49,13 @@ assert.equal(sus[0].firstAt, "2026-11-27T12:01:00Z");
 assert.deepEqual(sus[0].similar, ["꽃님이네"], "비슷한 주문 닉네임은 힌트로");
 assert.deepEqual(sus[1].similar, ["꽃님이네"]);
 
+const au = [
+  { author: "@루루맘-f2h", count: 5 }, { author: "@루루 맘♡", count: 3 }, { author: "@루루맘마", count: 2 },
+  { author: "@루리맘", count: 1 }, { author: "@꽃님이", count: 9 }, { author: "@루", count: 4 },
+];
+const sim = similarAuthors("루루맘", au);
+assert.deepEqual(sim.map((x) => x.author), ["@루루맘-f2h", "@루루 맘♡", "@루루맘마", "@루리맘"], "꼬리표·공백·하트·한 글자 차이");
+assert.equal(sim[0].same, true); assert.equal(sim[1].same, true); assert.equal(sim[2].same, false);
+assert.deepEqual(similarAuthors("루", au), [], "한 글자는 안 찾음");
+assert.deepEqual(similarAuthors("꽃님", au).map((x) => x.author), ["@꽃님이"]);
 console.log("test-youtube-chat-log OK");

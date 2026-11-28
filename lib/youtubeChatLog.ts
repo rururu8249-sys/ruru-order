@@ -142,3 +142,36 @@ export function findSuspects(input: SuspectInput): Suspect[] {
   }
   return out.sort((a, b) => (a.firstAt < b.firstAt ? -1 : 1));
 }
+
+/** 글자 하나 다름(빼기·더하기·바꾸기) 이하인지 — 짧은 닉네임 오타·꾸밈 글자용 */
+function withinOneEdit(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, diff = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++diff > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+  }
+  return diff + (a.length - i) + (b.length - j) <= 1;
+}
+
+export type SimilarAuthor = { author: string; count: number; same: boolean };
+
+/** [2026-11-28 사장님 「주문서 눌렀을 때 비슷한 닉네임 찾기 쉽게」]
+ *  그 방송 채팅 닉네임 중 찾는 닉네임과 같은 사람일 수 있는 것(공백·@·꼬리표·특수문자 무시,
+ *  한쪽이 다른 쪽을 품거나 3글자 이상이면 한 글자 차이까지). same = 꾸밈 글자만 다른 완전 같은 닉네임. */
+export function similarAuthors(query: string, authors: Array<{ author: string; count: number }>, limit = 8): SimilarAuthor[] {
+  const strip = (s: string) => chatNickKey(s).replace(/[^\p{L}\p{N}]/gu, "");
+  const qk = strip(query);
+  if (qk.length < 2) return [];
+  const out: SimilarAuthor[] = [];
+  for (const a of authors) {
+    const k = strip(a.author);
+    if (!k) continue;
+    const same = k === qk;
+    const ok = same || nickMatches(k, qk) || (qk.length >= 3 && k.length >= 3 && withinOneEdit(k, qk));
+    if (ok) out.push({ author: a.author, count: a.count, same });
+  }
+  return out.sort((x, y) => Number(y.same) - Number(x.same) || y.count - x.count).slice(0, limit);
+}

@@ -60,6 +60,10 @@ assert.equal(r.body.orders.length, 1); assert.equal(r.body.orders[0].code, "RURU
 assert.equal(r.body.orders[0].items[0], "MX-509 블랙/M ×1");
 assert.equal(JSON.stringify(r.body).includes("0101111"), false, "전화번호 안 내보냄");
 
+assert.deepEqual(r.body.similar.map((x) => x.author), ["@루루맘"], "비슷한 닉네임");
+r = await call(`?mode=chat&bc=${BC}&q=꽃님&oq=루루맘`);
+assert.deepEqual(r.body.messages.map((m) => m.message_id), ["b"], "칩으로 바꾼 사람 말");
+assert.equal(r.body.orders[0].code, "RURU-1", "주문서는 처음 닉네임 기준 그대로");
 r = await call(`?mode=chat&q=꽃님`);
 assert.deepEqual(r.body.messages.map((m) => m.message_id), ["b"]);
 assert.equal(r.body.orders.length, 0, "꽃님 주문서 없음");
