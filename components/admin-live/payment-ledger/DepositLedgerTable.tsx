@@ -151,12 +151,12 @@ export default function DepositLedgerTable({
         <div className="flex flex-wrap gap-1 border-b border-line p-2">
           {([['time','입금일시'],['name','입금자명'],['amount','금액']] as const).map(([key,label]) => <SortButton key={key} label={label} sortName={key} sortKey={sortKey} sortDirection={sortDirection} onSortChange={onSortChange} />)}
         </div>
-        {visibleRows.length === 0 ? <p className="p-4 text-sm text-ink-soft">조회된 입금내역이 없습니다.</p> : visibleRows.map((row,index) => <div key={String(row.id ?? index)} className="flex items-center gap-2 border-b border-line-soft px-3 py-2">
+        {visibleRows.length === 0 ? <p className="p-4 text-sm text-ink-soft">조회된 입금내역이 없습니다.</p> : visibleRows.map((row,index) => <div key={String(row.id ?? index)} onClick={()=>onOpenDetail(row)} className="flex cursor-pointer items-center gap-2 border-b border-line-soft px-3 py-2 hover:bg-surface-2">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-black text-ink"><span className="break-all">{getDepositName(row) || "-"}</span><span className="tabular-nums">{formatDepositMoney(getDepositAmount(row))}</span></div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-mute"><span>{formatDepositDateTime(row)}</span><StatusBadge status={getDepositStatus(row)} /></div>
           </div>
-          <button type="button" onClick={()=>onOpenDetail(row)} className="min-h-11 shrink-0 rounded-xl border border-line px-3 text-xs font-bold text-ink md:min-h-9">보기</button>
+          <button type="button" onClick={(e)=>{ e.stopPropagation(); onOpenDetail(row); }} className="min-h-11 shrink-0 rounded-lg border border-line px-3 text-xs font-semibold text-ink md:min-h-9">보기</button>
         </div>)}
       </div> : <div className="overflow-auto px-4 pb-3">
         <table className="w-full min-w-[760px] border-separate border-spacing-0">

@@ -286,7 +286,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
           {compact ? <span className="text-[13px] font-semibold text-ink-mute">은행 입금 기록 · 조회 전용</span> : <h1 className="text-2xl font-black tracking-tight text-ink">입금내역</h1>}
 
           <p hidden={compact} className="mt-2 text-sm font-bold text-ink-soft">
-            새마을금고 계좌에 들어온 입금을 뱅크다가 자동으로 모아 온 기록입니다. 주문과 연결된 내용은 「보기」에서 확인합니다.
+            은행 계좌에 들어온 입금을 뱅크다가 자동으로 모아 온 기록입니다. 줄을 누르면 연결된 주문을 볼 수 있어요.
           </p>
         </div>
 
