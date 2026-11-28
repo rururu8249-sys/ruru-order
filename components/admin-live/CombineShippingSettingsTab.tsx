@@ -155,7 +155,7 @@ export default function CombineShippingSettingsTab({onDraftStateChange}:Settings
     <div className="space-y-4">
       <div className="rounded-2xl border border-line bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-warn-tx">
         아래 시간범위 안에 같은 고객이 주문하면 배송비 0원(합배송)이에요.
-        <span className="mt-1 block text-[11px] font-bold text-ink-mute">
+        <span className="mt-1 block text-[12px] font-bold text-ink-mute">
           방송을 껐다 켜도(쇼핑몰모드 포함) 이 범위 안이면 합배송돼요.
         </span>
       </div>
@@ -164,7 +164,7 @@ export default function CombineShippingSettingsTab({onDraftStateChange}:Settings
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-black text-ink">합배송 시간 사용</div>
-            <div className="mt-0.5 text-[11px] font-bold text-ink-mute">
+            <div className="mt-0.5 text-[12px] font-bold text-ink-mute">
               끄면 관리자 시간범위 대신 &apos;오늘 하루&apos; 기준으로 합배송합니다.
             </div>
           </div>

@@ -1697,7 +1697,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <div className="mt-2 space-y-2 rounded-lg bg-warn-bg px-3 py-2.5 leading-5">
                 <div className="text-[13px] font-bold text-warn-tx">손님이 {money(diff)} 더 냈어요.</div>
                 {balanceInfo.depositCount > 1 ? <ExtraDepositLinker groupId={balanceGroupId} nickname={String(orderForView.nickname || "")} mode="extras" onChanged={loadBalanceInfo} /> : null}
-                <div className="text-[11px] font-bold text-warn-tx">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
+                <div className="text-[12px] font-bold text-warn-tx">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
                 {refundDone && balanceInfo.lastRefund ? (
                   <div className="rounded-lg bg-ok-bg px-2.5 py-1.5 text-[12px] font-bold text-ok-tx">이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요.</div>
                 ) : (
@@ -1706,9 +1706,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       {balanceWorking ? "처리 중…" : `${money(diff)} 포인트로 돌려주기`}
                     </button>
                     {balanceInfo.lastRefund ? (
-                      <div className="text-[11px] font-bold text-warn-tx">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
+                      <div className="text-[12px] font-bold text-warn-tx">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
                     ) : null}
-                    <div className="text-[11px] font-bold text-warn-tx">계좌로 돌려주실 땐 이 버튼 대신 아래 「고객이슈」 › 「+ 등록」에서 환불로 등록하세요.</div>
+                    <div className="text-[12px] font-bold text-warn-tx">계좌로 돌려주실 땐 이 버튼 대신 아래 「고객이슈」 › 「+ 등록」에서 환불로 등록하세요.</div>
                   </>
                 )}
               </div>
@@ -1717,7 +1717,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           return (
             <div className="mt-2 space-y-2 rounded-lg bg-danger-bg px-3 py-2.5 leading-5">
               <div className="text-[13px] font-bold text-danger-tx">받은 돈이 {money(-diff)} 부족해요.</div>
-              <div className="text-[11px] font-bold text-danger-tx">주문 금액 {money(balanceOrderTotal)} − 받은 돈 {money(balanceInfo.depositSum)} = {money(-diff)}</div>
+              <div className="text-[12px] font-bold text-danger-tx">주문 금액 {money(balanceOrderTotal)} − 받은 돈 {money(balanceInfo.depositSum)} = {money(-diff)}</div>
               <button type="button" disabled={balanceWorking} onClick={() => void handleRequestShortageDeposit(-diff)} className="h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3 disabled:text-ink-mute">
                 {balanceWorking ? "처리 중…" : `${money(-diff)} 더 입금해달라고 쪽지 보내기`}
               </button>
@@ -1747,7 +1747,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               {/* [2026-09-20 사장님 요청] 닉네임 수정 — 자동 입금확인 키라서 제일 위 + 경고줄을 붙인다. */}
               <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">닉네임 (유튜브)
                 <input value={editNickname} onChange={(e) => setEditNickname(e.target.value)} placeholder="은행 입금자명과 똑같이" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
-                <span className="text-[11px] font-bold leading-4 text-warn-tx">입금자명과 글자가 같아야 자동 입금확인됩니다</span>
+                <span className="text-[12px] font-bold leading-4 text-warn-tx">입금자명과 글자가 같아야 자동 입금확인됩니다</span>
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">이름
@@ -1765,7 +1765,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   <input value={editRecipientPhone} onChange={(e) => setEditRecipientPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
                 </label>
               </div>
-              <button type="button" onClick={() => { setEditRecipientName(editName.trim()); setEditRecipientPhone(editPhone.replace(/[^0-9]/g, "")); }} className="h-8 w-full rounded-lg border border-dashed border-line bg-surface text-[11px] font-bold text-ink-soft hover:bg-surface-2">
+              <button type="button" onClick={() => { setEditRecipientName(editName.trim()); setEditRecipientPhone(editPhone.replace(/[^0-9]/g, "")); }} className="h-8 w-full rounded-lg border border-dashed border-line bg-surface text-[12px] font-bold text-ink-soft hover:bg-surface-2">
                 받는분을 주문자와 동일하게
               </button>
               <div className="grid gap-1 text-[12px] font-semibold text-ink-mute">우편번호 · 주소
@@ -2042,7 +2042,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
           {shipEditOpen && !isCanceled ? (
             <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-surface-2 px-2 py-1.5">
-              <span className="text-[11px] font-bold text-ink-soft">새 배송비</span>
+              <span className="text-[12px] font-bold text-ink-soft">새 배송비</span>
               <input
                 value={shipEditText === "" ? "" : Number(String(shipEditText).replace(/[^0-9]/g, "") || 0).toLocaleString("ko-KR")}
                 inputMode="numeric"
@@ -2050,7 +2050,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 className="w-24 rounded-lg border border-line px-2 py-1 text-right text-[12px] font-bold outline-none focus:border-ink"
                 placeholder="0"
               />
-              <span className="text-[11px] text-ink-soft">원 (0원 가능)</span>
+              <span className="text-[12px] text-ink-soft">원 (0원 가능)</span>
               <button type="button" disabled={savingShipping} onClick={() => void handleSaveShippingFee()} className="ml-auto h-7 rounded-lg bg-ink px-2.5 text-[12px] font-bold text-white disabled:opacity-50">{savingShipping ? "저장중…" : "저장"}</button>
               <button type="button" disabled={savingShipping} onClick={() => setShipEditOpen(false)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft">취소</button>
             </div>
@@ -2175,7 +2175,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                     <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2">
                       <div className="text-[12px] font-bold text-danger-tx">이미 차단된 손님입니다</div>
                       {blockedReason ? (
-                        <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] font-bold leading-4 text-danger-tx">{blockedReason}</pre>
+                        <pre className="mt-1 whitespace-pre-wrap break-words text-[12px] font-bold leading-4 text-danger-tx">{blockedReason}</pre>
                       ) : null}
                     </div>
                     <button

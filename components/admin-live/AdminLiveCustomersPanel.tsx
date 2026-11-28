@@ -168,16 +168,16 @@ function BlockedCardHead({
             <span className="shrink-0 rounded-lg bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">{parts.label}</span>
           ) : null}
           {parts.items.length > 0 ? (
-            <span className="shrink-0 text-[11px] font-black text-danger-tx">품목 {parts.items.length}개</span>
+            <span className="shrink-0 text-[12px] font-black text-danger-tx">품목 {parts.items.length}개</span>
           ) : null}
         </span>
         <span className="mt-0.5 block truncate text-[12px] font-bold text-ink-soft">{sub}</span>
         {!open && summary ? (
-          <span className="mt-0.5 block truncate text-[11px] font-bold text-ink-mute">{summary}</span>
+          <span className="mt-0.5 block truncate text-[12px] font-bold text-ink-mute">{summary}</span>
         ) : null}
       </span>
       <span className="shrink-0 whitespace-nowrap text-right">
-        <span className="block text-[11px] font-black text-ink-mute">
+        <span className="block text-[12px] font-black text-ink-mute">
           {blockedAt ? formatOrderDateTime(blockedAt) : "날짜 기록 없음"}
         </span>
         <span className="mt-0.5 block text-[12px] font-black text-ink-soft">{open ? "▴ 접기" : "▾ 펼치기"}</span>
@@ -200,7 +200,7 @@ function BlockedCardBody({
         <>
           {parts.items.length > 0 ? (
             <div>
-              <div className="text-[11px] font-black text-ink-soft">거파 품목</div>
+              <div className="text-[12px] font-black text-ink-soft">거파 품목</div>
               <ul className="mt-1 space-y-1">
                 {parts.items.map((item, index) => (
                   <li key={`${item}-${index}`} className="rounded-lg bg-surface-2 px-3 py-2 text-[12px] font-bold leading-5 text-ink">
@@ -212,7 +212,7 @@ function BlockedCardBody({
           ) : null}
           {parts.memo ? (
             <div className={parts.items.length > 0 ? "mt-3" : ""}>
-              <div className="text-[11px] font-black text-ink-soft">메모</div>
+              <div className="text-[12px] font-black text-ink-soft">메모</div>
               <div className="mt-1 break-keep text-[12px] font-bold leading-5 text-danger-tx">{parts.memo}</div>
             </div>
           ) : null}
@@ -220,7 +220,7 @@ function BlockedCardBody({
       )}
 
       {address ? (
-        <div className="mt-3 break-keep text-[11px] font-bold leading-5 text-ink-mute">{address}</div>
+        <div className="mt-3 break-keep text-[12px] font-bold leading-5 text-ink-mute">{address}</div>
       ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">{children}</div>
@@ -886,9 +886,9 @@ function CustomerDetailDrawer({
                 <div className="flex items-center justify-between gap-2 px-4 pt-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-lg bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">차단{parts.label ? ` · ${parts.label}` : ""}</span>
-                    {parts.items.length > 0 ? <span className="text-[11px] font-black text-danger-tx">품목 {parts.items.length}개</span> : null}
+                    {parts.items.length > 0 ? <span className="text-[12px] font-black text-danger-tx">품목 {parts.items.length}개</span> : null}
                   </div>
-                  <span className="shrink-0 text-[11px] font-black text-ink-mute">{clean(blockedAt) ? formatOrderDateTime(blockedAt) : ""}</span>
+                  <span className="shrink-0 text-[12px] font-black text-ink-mute">{clean(blockedAt) ? formatOrderDateTime(blockedAt) : ""}</span>
                 </div>
                 <BlockedCardBody parts={parts} address="">
                   <button
@@ -2151,7 +2151,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                               {!customer.kakaoId ? <span className="shrink-0 rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만)">미연동</span> : null}
                             </div>
-                            {customer.name ? <div className="truncate text-[11px] text-ink-mute">{customer.name}</div> : null}
+                            {customer.name ? <div className="truncate text-[12px] text-ink-mute">{customer.name}</div> : null}
                           </button>
                           {/* 연락처 / 로그인 (두 줄) */}
                           <div className="min-w-0 text-xs leading-tight">
@@ -2165,7 +2165,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               <div className="min-w-0" title={d.blockTitle || "차단됨"}>
                                 <div className="flex items-center gap-1">
                                   <span className="shrink-0 rounded bg-[var(--color-danger-tx)] px-1.5 py-0.5 text-[13px] font-black text-white">차단{d.blockParts?.label ? ` · ${d.blockParts.label}` : ""}</span>
-                                  {d.blockedAtShort ? <span className="shrink-0 text-[11px] font-bold text-ink-mute">{d.blockedAtShort}</span> : null}
+                                  {d.blockedAtShort ? <span className="shrink-0 text-[12px] font-bold text-ink-mute">{d.blockedAtShort}</span> : null}
                                 </div>
                                 {d.blockLine2 ? <div className="mt-0.5 truncate text-[13px] text-ink-soft">{d.blockLine2}</div> : null}
                               </div>
@@ -2360,7 +2360,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                       {bulkResult.success}명 지급 완료{bulkResult.failed.length > 0 ? ` · ${bulkResult.failed.length}명 실패` : ""}
                     </div>
                     {bulkResult.failed.length > 0 ? (
-                      <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-danger-tx bg-danger-bg p-2 text-[11px] font-bold leading-5 text-danger-tx">
+                      <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-danger-tx bg-danger-bg p-2 text-[12px] font-bold leading-5 text-danger-tx">
                         {bulkResult.failed.map((f, i) => <div key={i}>{f.label}: {f.reason}</div>)}
                       </div>
                     ) : null}
@@ -2391,7 +2391,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           <div ref={blockedListRef} role="dialog" aria-modal="true" aria-label="차단 목록" tabIndex={-1} style={{ outline: "none" }} className="max-h-[84dvh] w-full max-w-[720px] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-line pb-4">
               <div>
-                <div className="text-[11px] font-black tracking-[0.18em] text-danger-tx">BLOCKED CUSTOMERS</div>
+                <div className="text-[12px] font-black tracking-[0.18em] text-danger-tx">BLOCKED CUSTOMERS</div>
                 <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">
                   차단 고객 목록 {blockedTotalCount.toLocaleString("ko-KR")}명
                 </h2>

@@ -753,14 +753,14 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                       placeholder="예) 방송 중에만 주문받는 상품이에요"
                       className="mt-2 w-full resize-none rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm font-bold text-ink outline-none transition focus:border-rose-deep"
                     />
-                    <div className="mt-1 text-[11px] font-bold text-ink-mute">{productNoticeCustom.trim().length} / {PRODUCT_NOTICE_MAX_LEN}자</div>
+                    <div className="mt-1 text-[12px] font-bold text-ink-mute">{productNoticeCustom.trim().length} / {PRODUCT_NOTICE_MAX_LEN}자</div>
                   </div>
                 ) : null}
 
                 {/* 손님 화면에 그대로 보일 모습 — 저장 전에 눈으로 확인 */}
                 {resolveProductOrderNotice(productNoticeMode, productNoticeCustom) ? (
                   <div className="mt-3">
-                    <div className="mb-1 text-[11px] font-black text-ink-mute">손님 화면 미리보기</div>
+                    <div className="mb-1 text-[12px] font-black text-ink-mute">손님 화면 미리보기</div>
                     {/* [2026-09-22 3차] 손님 화면과 «같은 모양»으로 — 가운데점(·) 기준 두 줄 */}
                     {(() => {
                       const { head, sub } = splitProductOrderNotice(resolveProductOrderNotice(productNoticeMode, productNoticeCustom));

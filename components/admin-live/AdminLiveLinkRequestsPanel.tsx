@@ -231,7 +231,7 @@ export default function AdminLiveLinkRequestsPanel() {
 
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <div className="rounded-lg border border-line bg-surface p-3">
-                  <div className="text-[11px] font-black text-ink-mute">예전 계정 (합칠 대상)</div>
+                  <div className="text-[12px] font-black text-ink-mute">예전 계정 (합칠 대상)</div>
                   <div className="mt-1 text-[13px] font-black text-ink">
                     {formatKoreanPhone(row.target_customer_phone)} · {row.target_customer_name || "이름없음"}
                   </div>
@@ -244,14 +244,14 @@ export default function AdminLiveLinkRequestsPanel() {
                     <div className="mt-1 break-keep text-[12px] font-bold text-ink-soft">{joinAddress(row.old_address, row.old_detail_address)}</div>
                   ) : null}
                   {row.old_last_order_at ? (
-                    <div className="mt-1 text-[11px] font-bold text-ink-mute">
+                    <div className="mt-1 text-[12px] font-bold text-ink-mute">
                       마지막 주문 {when(row.old_last_order_at)}{row.old_last_order_product ? ` · ${row.old_last_order_product}` : ""}
                     </div>
                   ) : null}
                 </div>
 
                 <div className="rounded-lg border border-line bg-surface p-3">
-                  <div className="text-[11px] font-black text-ink-mute">지금 쓰는 계정 (새 카톡)</div>
+                  <div className="text-[12px] font-black text-ink-mute">지금 쓰는 계정 (새 카톡)</div>
                   <div className="mt-1 text-[13px] font-black text-ink">
                     {row.new_customer_phone ? formatKoreanPhone(row.new_customer_phone) : "번호 아직 없음"}
                     {row.new_customer_name ? ` · ${row.new_customer_name}` : ""}

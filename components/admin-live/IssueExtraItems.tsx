@@ -66,7 +66,7 @@ export default function IssueExtraItems({ value, onChange }: { value: IssueExtra
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={photos[it.productId]} alt="" className="h-[46px] w-[46px] shrink-0 rounded-xl border border-line object-cover" loading="lazy" />
               ) : it.source === "custom" ? (
-                <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-line bg-surface-2 text-[11px] font-black text-ink-mute">직접</span>
+                <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-line bg-surface-2 text-[12px] font-black text-ink-mute">직접</span>
               ) : <span className="h-[46px] w-[46px] shrink-0 rounded-xl border border-line bg-surface-2" />}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-black text-ink">{it.productName}</span>

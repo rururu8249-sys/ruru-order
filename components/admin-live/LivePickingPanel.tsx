@@ -567,7 +567,7 @@ export default function LivePickingPanel({ broadcastRanges, orders, fullBroadcas
                   <div className="mt-1 h-1 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width]" style={{width:`${pct}%`}} /></div>
                 </section>
               )}
-              {unpaidAll>0?<div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-ink-soft">
+              {unpaidAll>0?<div className="flex items-center justify-between gap-2 text-[12px] font-semibold text-ink-soft">
                 <span className="min-w-0">
                   {showUnpaid?`미결제 상품 ${unpaidAll}개 포함`:`미결제 ${unpaidAll}개는 목록에서 숨겼어요`}
                 </span>
@@ -575,9 +575,9 @@ export default function LivePickingPanel({ broadcastRanges, orders, fullBroadcas
                   {showUnpaid?'미결제 숨기기':'미결제 보기'}
                 </button>
               </div>:null}
-              {movedAway>0?<p className="text-[11px] text-ink-mute">다른 출고로 넘긴 상품 {movedAway}개는 여기서 뺐어요</p>:null}
-              {extraError?<p className="text-[11px] text-danger-tx">늦은 입금·다시 챙기기를 못 불러왔어요 — 닫았다 다시 열어 주세요</p>:null}
-              {loadError?<p className="text-[11px] text-danger-tx">챙김 상태를 확인하지 못했어요 — 닫았다 다시 열어 주세요(그동안 체크 막아 둠)</p>:null}
+              {movedAway>0?<p className="text-[12px] text-ink-mute">다른 출고로 넘긴 상품 {movedAway}개는 여기서 뺐어요</p>:null}
+              {extraError?<p className="text-[12px] text-danger-tx">늦은 입금·다시 챙기기를 못 불러왔어요 — 닫았다 다시 열어 주세요</p>:null}
+              {loadError?<p className="text-[12px] text-danger-tx">챙김 상태를 확인하지 못했어요 — 닫았다 다시 열어 주세요(그동안 체크 막아 둠)</p>:null}
             </div>
           ) : null}
           <div className="mt-1.5 flex flex-col gap-1.5 max-sm:mt-1.5 max-sm:flex-row max-sm:items-center">

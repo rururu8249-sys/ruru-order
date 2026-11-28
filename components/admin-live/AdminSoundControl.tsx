@@ -95,7 +95,7 @@ export default function AdminSoundControl() {
           className="w-full cursor-pointer disabled:cursor-not-allowed"
           style={{ accentColor: "var(--color-rose-deep)" }}
         />
-        <div className="mt-1 flex justify-between text-[11px] font-bold text-ink-mute">
+        <div className="mt-1 flex justify-between text-[12px] font-bold text-ink-mute">
           <span>작게</span>
           <span>크게</span>
         </div>

@@ -507,7 +507,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white" style={{ background: f.highlight ? "#2B6BEB" : "#8B99BC" }}>{fieldIndex + 1}</span>
                 <div className="w-[70px] shrink-0">
                   <div className="text-[12px] font-black" style={{ color: f.highlight ? "#2B6BEB" : "#5A6B92" }}>{f.label}</div>
-                  {f.hint ? <div className="text-[11px] font-bold" style={{ color: "#8B99BC" }}>{f.hint}</div> : null}
+                  {f.hint ? <div className="text-[12px] font-bold" style={{ color: "#8B99BC" }}>{f.hint}</div> : null}
                 </div>
                 <div className="min-w-0 flex-1 truncate text-[14px] font-black" style={{ color: "#101C3D" }}>
                   {f.value || <span style={{ color: "#8B99BC" }}>없음</span>}
@@ -545,7 +545,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={itemImages[String(item.id)]} alt="" onClick={() => setImagePreviewUrl(itemImages[String(item.id)])} className="h-9 w-9 shrink-0 cursor-zoom-in rounded-lg object-cover" style={{ border: "1px solid #DDE4F2" }} />
                     ) : (
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-ink-mute" style={{ background: "#F4F6FB" }}>상품</span>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold text-ink-mute" style={{ background: "#F4F6FB" }}>상품</span>
                     )}
                     <span className="min-w-0 flex-1 truncate">
                       {item.productName}

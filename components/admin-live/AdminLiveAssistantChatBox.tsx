@@ -450,7 +450,7 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
                     <button key={im.key} type="button" onClick={() => setZoom(im)} aria-label="보낸 사진 크게 보기(가린 상태 확인)" className="relative h-16 w-16 overflow-hidden rounded-lg">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={im.preview} alt="" className="h-16 w-16 object-cover" />
-                      {im.masked > 0 ? <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-center text-[11px] font-semibold text-white">{im.masked}곳 가림</span> : null}
+                      {im.masked > 0 ? <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-center text-[12px] font-semibold text-white">{im.masked}곳 가림</span> : null}
                     </button>
                   ))}
                 </div>
@@ -481,9 +481,9 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={im.preview} alt="" className="h-16 w-16 object-cover" />
                   </button>
-                ) : <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2 text-[11px] text-ink-mute">가리는 중</span>}
+                ) : <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2 text-[12px] text-ink-mute">가리는 중</span>}
                 <button type="button" aria-label="사진 빼기" onClick={() => setImages((prev) => prev.filter((x) => x.key !== im.key))}
-                  className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-ink text-[11px] font-bold leading-5 text-white">×</button>
+                  className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-ink text-[12px] font-bold leading-5 text-white">×</button>
               </div>
             ))}
             <span className="self-end text-[12px] text-ink-mute">전화·계좌·주소는 검게 가려서 보내요. 이름·닉네임은 못 가려요.</span>

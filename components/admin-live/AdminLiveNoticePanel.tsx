@@ -422,7 +422,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
   const card = "rounded-xl border border-line bg-surface-2 p-4";
   const input = "mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep";
   const label = "text-xs font-black text-ink-soft";
-  const help = "mt-1 block text-[11px] font-bold leading-5 text-ink-mute";
+  const help = "mt-1 block text-[12px] font-bold leading-5 text-ink-mute";
 
   // 미리보기 — 손님 팝업이 --- 를 가로줄로 바꿔 보여주는 것과 같은 방식
   const linkedNotice = notices.find(n => String(n.id) === linkedNoticeId && n.is_visible);

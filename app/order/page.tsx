@@ -7378,7 +7378,7 @@ export default function OrderPage() {
           style={uiV2 ? { background: "#FFFFFF", border: "1px solid #E5E5E5", boxShadow: "none" } : { background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", border: "1px solid #D9C5CC", boxShadow: "0 22px 55px rgba(123,45,67,0.13)" }}
         >
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] text-[32px]" style={uiV2 ? { background: "#F5F5F5", border: "none" } : { background: "#F9EDF1", border: "1px solid #E8D5DD" }}>{uiV2 ? <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg> : "⏳"}</div>
-          <p className="mt-5 text-[13px] font-black tracking-[-0.04em]" style={{ color: uiV2 ? "#111111" : "#7B2D43" }}>루루동이 LIVE</p>
+          <p className="mt-5 text-[13px] font-black tracking-[-0.04em]" style={{ color: uiV2 ? "#111111" : "#7B2D43" }}>루루동이 집구석LIVE</p>
           <h1 className="mt-2 break-keep text-[26px] font-black leading-tight tracking-[-0.07em] text-slate-950">주문 정보 확인 중</h1>
           <p className={uiV2 ? "mt-3 break-keep text-[15px] font-normal leading-relaxed text-[#39393B]" : "mt-3 break-keep text-[14.5px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600"}>닉네임과 배송지를 불러오고 있어요. 잠시만요!</p>
           <div className="mt-5 overflow-hidden rounded-full" style={{ background: uiV2 ? "#F5F5F5" : "#F0E4E9" }}>

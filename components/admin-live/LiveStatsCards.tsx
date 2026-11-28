@@ -163,7 +163,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
   const isMovedIn = (o: LiveOrder) => Boolean(movedInIds && movedInIds.has(String(o.id)));
   const movedPaidSum = paidOrders.filter(isMovedIn).reduce((s2, o) => s2 + Number(o.totalAmount || 0), 0);
   const movedUnpaidSum = [...bankUnpaid, ...cardUnpaid].filter(isMovedIn).reduce((s2, o) => s2 + Number(o.totalAmount || 0), 0);
-  const movedNote = (sum: number) => (sum > 0 ? <span className="ml-1 text-[11px] font-bold text-ink-mute">(옮겨 온 주문 {money(sum)} 포함)</span> : null);
+  const movedNote = (sum: number) => (sum > 0 ? <span className="ml-1 text-[12px] font-bold text-ink-mute">(옮겨 온 주문 {money(sum)} 포함)</span> : null);
   const unpaidTotal = bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0);
   return (
     <div className="mb-1 rounded-2xl border border-rose-line bg-surface md:mb-4 md:border-0 md:bg-transparent md:p-0">

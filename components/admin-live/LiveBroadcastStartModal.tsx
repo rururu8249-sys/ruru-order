@@ -120,7 +120,7 @@ export default function LiveBroadcastStartModal({ open, drafts, saving, onCancel
         <div className="text-xs font-black tracking-[0.2em] text-rose-deep">START BROADCAST</div>
         <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">방송을 시작할까요?</h2>
         <div className="mt-3 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm font-bold text-ink">
-          <div className="text-[11px] font-black text-ink-mute">방송 제목</div>
+          <div className="text-[12px] font-black text-ink-mute">방송 제목</div>
           <div className="mt-0.5 text-base font-black text-ink">{selectedDraft?.title || "방송을 선택해 주세요"}</div>
           <div className="mt-2 text-xs font-bold leading-5 text-ink-soft">
             지금부터 들어오는 주문이 이 방송으로 묶입니다. 켜져 있던 방송이 있으면 자동으로 종료됩니다.
@@ -201,7 +201,7 @@ export default function LiveBroadcastStartModal({ open, drafts, saving, onCancel
                   className={inputClass}
                 />
               </label>
-              <div className="text-[11px] font-bold leading-5 text-ink-mute">
+              <div className="text-[12px] font-bold leading-5 text-ink-mute">
                 결제완료된 주문만 셉니다. 방송 화면 위젯 주소는 이벤트 › 미션 탭에 있습니다.
               </div>
             </div>

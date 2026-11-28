@@ -527,7 +527,7 @@ export function IssueCard({
             <span className="text-ink-mute">번호 없음</span>
           )}
         </div>
-        <div className="text-[11px] xl:truncate text-ink-mute">
+        <div className="text-[12px] xl:truncate text-ink-mute">
           <span title={dateLabel(task.created_at)}>{dateShortLabel(task.created_at)}</span>
           {orderNo ? (
             <>
@@ -561,7 +561,7 @@ export function IssueCard({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="상품 사진" className="h-full w-full object-cover" loading="lazy" />
                 {photoIndex === 2 && photos.length > 3 ? (
-                  <span className="absolute inset-0 flex items-center justify-center bg-[var(--color-ink)]/60 text-[11px] font-black text-white">
+                  <span className="absolute inset-0 flex items-center justify-center bg-[var(--color-ink)]/60 text-[12px] font-black text-white">
                     +{photos.length - 2}
                   </span>
                 ) : null}
@@ -617,7 +617,7 @@ export function IssueCard({
         {amount ? (
           <>
             <div className="text-[14px] font-black text-ink">{amount.head}</div>
-            <div className="text-[11px] text-ink-mute">{amount.sub}</div>
+            <div className="text-[12px] text-ink-mute">{amount.sub}</div>
           </>
         ) : (
           <span className="text-[14px] font-black text-ink-mute">—</span>
@@ -1732,7 +1732,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       </div>
 
       {filterOn ? (
-        <div className="mt-2 text-[11px] font-bold text-ink-mute">
+        <div className="mt-2 text-[12px] font-bold text-ink-mute">
           찾은 결과 {visibleTasks.length.toLocaleString("ko-KR")}건
           {clean(keyword) ? ` · 검색 「${clean(keyword)}」` : ""}
           {typeFilter ? ` · 유형 「${getIssueTypeLabel(typeFilter)}」` : ""}

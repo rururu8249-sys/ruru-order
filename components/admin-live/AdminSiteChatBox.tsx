@@ -167,7 +167,7 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
               <span className="mr-1 font-bold text-ink-soft" style={palette?{color:palette.light}:undefined}>{m.nickname}</span>
               {m.badge ? <span style={palette?{background:palette.badge,color:palette.ink}:undefined} className={`mr-1 inline-flex h-[18px] items-center rounded px-1 align-[1px] text-[11px] font-bold ${BADGE_CLS[m.badge] || ""}`}>{BADGE_LABEL[m.badge]}</span> : null}
               <span className="break-words"><ChatBodyView body={m.body} emojis={emojiMap} /></span>
-              <span className="ml-1 text-[11px] text-ink-mute">{timeText(m.createdAt)}</span>
+              <span className="ml-1 text-[12px] text-ink-mute">{timeText(m.createdAt)}</span>
             </div>
             {m.badge === "bot" || menuId !== m.id ? null : (
               <div onClick={(e) => e.stopPropagation()} className="absolute right-1 top-0.5 z-10 flex gap-1 rounded-lg border border-line bg-surface p-0.5 shadow-sm">

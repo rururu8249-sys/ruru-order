@@ -35,7 +35,7 @@ export default function AdminLiveAiMembersPanel(){
    <div className="min-w-0 overflow-hidden rounded-xl border border-line">
     <div className="flex justify-between border-b border-line bg-surface-2 px-3 py-2 text-xs font-bold text-ink-soft"><span>닉네임 후보 {data?.filtered.toLocaleString('ko-KR')??'-'}개</span><span>선택하면 이력 표시</span></div>
     <div className="divide-y divide-line">{(data?.items||[]).map(x=><button key={x.nickname_key} type="button" onClick={()=>setKey(x.nickname_key)} className={`flex min-h-12 w-full items-center justify-between gap-2 px-3 text-left hover:bg-surface-2 ${key===x.nickname_key?'bg-surface-2':''}`}>
-     <span className="min-w-0"><span className="block truncate text-sm font-bold text-ink">{x.nickname}</span><span className="block text-[11px] text-ink-mute">{x.category||'기타'} · {dt(x.updated_at)}</span></span>
+     <span className="min-w-0"><span className="block truncate text-sm font-bold text-ink">{x.nickname}</span><span className="block text-[12px] text-ink-mute">{x.category||'기타'} · {dt(x.updated_at)}</span></span>
      <span className="shrink-0 rounded-full border border-line px-2 py-1 text-[11px] text-ink-soft">{x.status==='assigned'?'사용됨':x.status==='unused'?'미사용':'사용 중지'}</span>
     </button>)}{!loading&&data?.items.length===0?<p className="p-4 text-center text-xs text-ink-mute">검색 결과 없음</p>:null}</div>
     <div className="flex items-center justify-between border-t border-line px-3 py-2"><button type="button" className="rounded-lg border border-line px-3 py-2 text-xs disabled:opacity-40" disabled={page<=1} onClick={()=>{setPage(v=>v-1);setKey('')}}>이전</button><span className="text-xs text-ink-mute">{page} / {data?.pages||1}</span><button type="button" className="rounded-lg border border-line px-3 py-2 text-xs disabled:opacity-40" disabled={page>=(data?.pages||1)} onClick={()=>{setPage(v=>v+1);setKey('')}}>다음</button></div>
@@ -45,13 +45,13 @@ export default function AdminLiveAiMembersPanel(){
     {!selected?<p className="mt-3 text-xs leading-5 text-ink-mute">왼쪽에서 닉네임을 선택하면 저장된 가상 계정 프로필과 실제 테스트 주문 작업 기록을 확인할 수 있어요.</p>:<>
      <p className="mt-2 text-xs text-ink-soft">같은 닉네임의 과거 가상 계정 {selected.actors.length}건 (최대 15건 표시)</p>
      {selected.actors.map(a=><div key={a.id} className="mt-3 rounded-lg bg-surface-2 p-3">
-      <div className="flex justify-between gap-2"><span className="text-sm font-semibold text-ink">{a.nickname}</span><span className="text-[11px] text-ink-mute">{dt(a.created_at)}</span></div>
+      <div className="flex justify-between gap-2"><span className="text-sm font-semibold text-ink">{a.nickname}</span><span className="text-[12px] text-ink-mute">{dt(a.created_at)}</span></div>
       <div className="mt-1 text-xs leading-5 text-ink-soft">{a.retired_at?'지난 계정':'활동 계정'} · 테스트 주문 {a.order_count||0}건</div>
       <div className="mt-1 text-xs leading-5 text-ink-soft">말투: {String(a.profile?.style||'미설정')} · 취향: {String(a.profile?.interest||'미설정')}</div>
      </div>)}
      <h4 className="mt-4 text-xs font-bold text-ink">테스트 주문 작업 이력</h4>
      {selected.orders.length?selected.orders.map((o,i)=><div key={i} className="border-b border-line py-2 text-xs text-ink-soft"><div>{dt(o.completed_at)} · {o.status==='succeeded'?'작업 성공':o.status}</div>{o.items.map((it,j)=><div key={j} className="mt-1 text-ink">{it.name} {it.color} {it.size} ×{it.qty}</div>)}</div>):<p className="mt-2 text-xs text-ink-mute">저장된 테스트 주문 작업 없음</p>}
-     <p className="mt-3 text-[11px] leading-5 text-ink-mute">같은 이름의 과거 계정은 아직 영구 인물 ID로 연결하지 않았습니다. 현재 정보는 관찰용이며 실제 고객 주문이 아닙니다.</p>
+     <p className="mt-3 text-[12px] leading-5 text-ink-mute">같은 이름의 과거 계정은 아직 영구 인물 ID로 연결하지 않았습니다. 현재 정보는 관찰용이며 실제 고객 주문이 아닙니다.</p>
     </>}
    </aside>
   </div>

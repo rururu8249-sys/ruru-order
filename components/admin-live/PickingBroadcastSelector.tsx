@@ -56,9 +56,9 @@ export default function PickingBroadcastSelector({ items, selectedIds, loading, 
             {item.label}{typeof item.count === "number" ? ` · ${item.count}건` : ""}
           </label>
         ))}
-        {visibleItems.length === 0 ? <span className="text-[11px] text-ink-mute">{olderOpen ? "검색 결과가 없습니다." : "최근 14일 방송이 없습니다."}</span> : null}
+        {visibleItems.length === 0 ? <span className="text-[12px] text-ink-mute">{olderOpen ? "검색 결과가 없습니다." : "최근 14일 방송이 없습니다."}</span> : null}
       </div>
-      {loading ? <p className="mt-1 text-[11px] font-bold text-ink-soft">선택한 방송 주문을 불러오는 중…</p> : null}
+      {loading ? <p className="mt-1 text-[12px] font-bold text-ink-soft">선택한 방송 주문을 불러오는 중…</p> : null}
     </section>
   );
 }

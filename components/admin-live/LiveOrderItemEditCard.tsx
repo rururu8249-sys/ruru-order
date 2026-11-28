@@ -260,7 +260,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             </div>
           ) : (
           <label className="grid min-w-0 gap-1">
-            <span className="text-[11px] font-bold text-ink-soft">상품명</span>
+            <span className="text-[12px] font-bold text-ink-soft">상품명</span>
             <input
               value={form.productName}
               onChange={(event) => setForm((prev) => updateForm(prev, "productName", event.target.value))}
@@ -324,7 +324,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           <div className="grid grid-cols-1 gap-2">
             {itemHasRealColor || showColorField ? (
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-bold text-ink-soft">{colorFieldLabel}</span>
+              <span className="text-[12px] font-bold text-ink-soft">{colorFieldLabel}</span>
               <input
                 value={form.color}
                 onChange={(event) => setForm((prev) => updateForm(prev, "color", event.target.value))}
@@ -340,7 +340,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
             {itemHasRealSize || showSizeField ? (
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-bold text-ink-soft">사이즈</span>
+              <span className="text-[12px] font-bold text-ink-soft">사이즈</span>
               <input
                 value={form.size}
                 onChange={(event) => setForm((prev) => updateForm(prev, "size", event.target.value))}
@@ -363,7 +363,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
           <div className="grid grid-cols-1 gap-2">
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-bold text-ink-soft">수량</span>
+              <span className="text-[12px] font-bold text-ink-soft">수량</span>
               <input
                 value={form.qty}
                 inputMode="numeric"
@@ -374,7 +374,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             </label>
 
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-bold text-ink-soft">판매단가</span>
+              <span className="text-[12px] font-bold text-ink-soft">판매단가</span>
               <input
                 value={Number(form.unitPrice || 0).toLocaleString("ko-KR")}
                 inputMode="numeric"
@@ -393,13 +393,13 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
         {showHistory && hasChangeHistory ? (
           <div className="mt-3 rounded-2xl border border-warn-tx bg-warn-bg/50 p-3">
-            <div className="mb-2 text-[11px] font-bold text-warn-tx">최근 수정이력</div>
+            <div className="mb-2 text-[12px] font-bold text-warn-tx">최근 수정이력</div>
             <div className="grid gap-2">
               {[...(item.changeHistory || [])].slice(-5).reverse().map((entry: any, historyIndex) => {
                 const line = compactChangeLine(entry);
 
                 return (
-                  <div key={`${item.id}-editing-history-${historyIndex}`} className="rounded-xl bg-surface p-2 text-[11px] leading-5 text-ink-soft">
+                  <div key={`${item.id}-editing-history-${historyIndex}`} className="rounded-xl bg-surface p-2 text-[12px] leading-5 text-ink-soft">
                     <div className="mb-1 font-bold text-ink-mute">
                       {formatHistoryDate(entry?.changed_at)}
                       {entry?.product_changed ? " · 상품변경" : ""}
@@ -519,13 +519,13 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
       </div>
       {showHistory && Array.isArray(item.changeHistory) && item.changeHistory.length > 0 ? (
         <div className="mt-3 rounded-2xl border border-warn-tx bg-warn-bg/50 p-3">
-          <div className="mb-2 text-[11px] font-bold text-warn-tx">최근 수정이력</div>
+          <div className="mb-2 text-[12px] font-bold text-warn-tx">최근 수정이력</div>
           <div className="grid gap-2">
             {[...item.changeHistory].slice(-5).reverse().map((entry: any, historyIndex) => {
               const line = compactChangeLine(entry);
 
               return (
-                <div key={`${item.id}-history-${historyIndex}`} className="rounded-xl bg-surface p-2 text-[11px] leading-5 text-ink-soft">
+                <div key={`${item.id}-history-${historyIndex}`} className="rounded-xl bg-surface p-2 text-[12px] leading-5 text-ink-soft">
                   <div className="mb-1 font-bold text-ink-mute">
                     {formatHistoryDate(entry?.changed_at)}
                     {entry?.product_changed ? " · 상품변경" : ""}

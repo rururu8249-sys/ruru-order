@@ -112,7 +112,7 @@ export default function AutoTestOrderSettings(){
    <div className="mb-3 flex items-center justify-between gap-2">
      <div className="min-w-0">
        <h2 className="text-[16px] font-black text-ink">자동 실행</h2>
-       <p className="mt-0.5 text-[11px] text-ink-mute">주문 · AI 채팅 · 시청자</p>
+       <p className="mt-0.5 text-[12px] text-ink-mute">주문 · AI 채팅 · 시청자</p>
      </div>
      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${active?'bg-ink text-white':'bg-surface-2 text-ink-soft'}`} role="status">{!state?'확인 중':error?'확인 필요':active?'실행 중':'중지됨'}</span>
    </div>
@@ -143,7 +143,7 @@ export default function AutoTestOrderSettings(){
          className="h-8 w-full cursor-pointer accent-ink" />
        <div className="flex justify-between text-[12px] text-ink-mute"><span>0% · AI 채팅 중지</span><span>100% · 최대</span></div>
      </div>
-     <p className="text-[11px] leading-relaxed text-ink-mute">손을 떼거나 방향키로 조절하면 저장돼요. 비율은 테스트 자동화 강도이며 시간당 건수를 보장하지 않아요. 기존 안전 제한과 실제 주문은 그대로 유지돼요.</p>
+     <p className="text-[12px] leading-relaxed text-ink-mute">손을 떼거나 방향키로 조절하면 저장돼요. 비율은 테스트 자동화 강도이며 시간당 건수를 보장하지 않아요. 기존 안전 제한과 실제 주문은 그대로 유지돼요.</p>
    </div>
    <div className="mt-3 space-y-1 text-[12px] text-ink-soft">
      {state?.viewers?<p>시청 중 <strong className="text-ink">{state.activeViewers}명</strong></p>:null}
@@ -163,7 +163,7 @@ export default function AutoTestOrderSettings(){
          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-ink" style={{width:`${g.used===null?0:Math.min(100,Math.max(0,g.used/Math.max(1,g.limit)*100))}%`}} /></div>
          {g.blockedUntil>Date.now()?<div className="mt-1">{time(g.blockedUntil)}까지 대기</div>:null}
        </div>):<div className="text-[12px] text-ink-soft">사용량을 확인하지 못했어요.</div>}
-       <p className="text-[11px] leading-relaxed text-ink-mute">이 숫자는 사이트 자체 호출 집계예요. 실제 무료 API 한도는 Google AI Studio에서 확인해 주세요.</p>
+       <p className="text-[12px] leading-relaxed text-ink-mute">이 숫자는 사이트 자체 호출 집계예요. 실제 무료 API 한도는 Google AI Studio에서 확인해 주세요.</p>
      </div>:null}
    </div>
    <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2">
@@ -175,7 +175,7 @@ export default function AutoTestOrderSettings(){
      <div className="rounded-lg border border-line bg-surface-2/40 p-2.5">
        <div className="mb-1 text-[12px] font-bold text-ink">실전 연습 설정</div>
        <div className="flex items-center justify-between gap-2">
-         <div className="min-w-0"><div className="text-[12px] font-semibold text-ink">과거 구매 테스트 문구 공개</div><p className="mt-1 text-[11px] leading-relaxed text-ink-mute">연습 후 반드시 꺼 주세요. 켜면 일반 손님 화면에도 테스트 구매 문구가 보일 수 있어요.</p></div>
+         <div className="min-w-0"><div className="text-[12px] font-semibold text-ink">과거 구매 테스트 문구 공개</div><p className="mt-1 text-[12px] leading-relaxed text-ink-mute">연습 후 반드시 꺼 주세요. 켜면 일반 손님 화면에도 테스트 구매 문구가 보일 수 있어요.</p></div>
          <button type="button" role="switch" aria-checked={memoryPublic} disabled={!state?.ready} onClick={()=>void toggleMemory()} className={`${button} shrink-0 ${memoryPublic?'bg-ink text-white':'border border-line text-ink'}`}>{memoryPublic?'켬':'끔'}</button>
        </div>
      </div>

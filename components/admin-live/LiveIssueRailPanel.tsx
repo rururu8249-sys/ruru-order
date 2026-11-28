@@ -156,8 +156,8 @@ export default function LiveIssueRailPanel({ onOpenAll, onCountChange, variant =
               <li key={String(t.id ?? i)} className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-danger-tx)]" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[11px] font-black text-ink">{t.title || "제목 없음"}</div>
-                  <div className="truncate text-[11px] font-bold text-ink-mute">
+                  <div className="truncate text-[12px] font-black text-ink">{t.title || "제목 없음"}</div>
+                  <div className="truncate text-[12px] font-bold text-ink-mute">
                     {t.customer_nickname || ""}
                     {t.created_at ? ` · ${timeLabel(t.created_at)}` : ""}
                   </div>
@@ -171,7 +171,7 @@ export default function LiveIssueRailPanel({ onOpenAll, onCountChange, variant =
       <button
         type="button"
         onClick={onOpenAll}
-        className="mt-2 shrink-0 w-full rounded-lg border border-line bg-surface-2 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
+        className="mt-2 shrink-0 w-full rounded-lg border border-line bg-surface-2 py-1.5 text-[12px] font-black text-ink-soft transition hover:bg-surface-3"
       >
         고객이슈 전체 보기 · 처리 →
       </button>

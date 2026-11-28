@@ -188,7 +188,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
             >
               <div className="text-[13px] font-bold text-ink-soft">{m.label}</div>
               <div className={`mt-1 text-[24px] font-bold ${m.hot || active ? "text-ink" : "text-ink"}`}>{(stats?.segments[k] ?? 0).toLocaleString()}<span className="ml-1 text-sm font-bold text-ink-mute">명</span></div>
-              <div className="mt-1 text-[11px] font-bold leading-4 text-ink-mute">{m.desc(days)}</div>
+              <div className="mt-1 text-[12px] font-bold leading-4 text-ink-mute">{m.desc(days)}</div>
               <div className={`mt-2 text-[11px] font-bold ${active ? "text-ink" : "text-ink-mute"}`}>{active ? "아래 명단 보는 중" : "누르면 명단 보기"}</div>
             </button>
           );
@@ -214,7 +214,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
             className="ml-auto rounded-xl bg-ink px-4 py-2 text-[13px] font-bold text-white disabled:opacity-40"
           >선택 {checked.size}명에게 포인트+쪽지 보내기</button>
         </div>
-        <div className="mb-2 text-[11px] font-bold text-ink-mute">체크된 분들에게만 갑니다 · 최근 30일 안에 받은 분은 자동 제외(이미 보냄)</div>
+        <div className="mb-2 text-[12px] font-bold text-ink-mute">체크된 분들에게만 갑니다 · 최근 30일 안에 받은 분은 자동 제외(이미 보냄)</div>
         {loading ? <div className="py-8 text-center text-[13px] font-bold text-ink-mute">불러오는 중…</div> : null}
         {!loading && rows.length === 0 ? (
           <div className="py-8 text-center text-[13px] font-bold text-ink-mute">해당 손님 없음</div>
@@ -242,7 +242,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
                 <span className="text-[12px] font-bold text-ink-soft">{c.buys}회</span>
                 <span className="w-[64px] text-right text-[12px] font-bold text-ink-soft">{money(c.spend)}</span>
                 <span className="w-[86px] text-right text-[12px] font-bold text-ink">{c.daysSince}일째 조용</span>
-                {locked ? <span className="text-[11px] font-bold text-ink-mute">이미 보냄</span> : null}
+                {locked ? <span className="text-[12px] font-bold text-ink-mute">이미 보냄</span> : null}
               </label>
             );
           })}
@@ -284,7 +284,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
             <div className="mb-3 text-[14px] font-bold text-ink">{SEG_META[seg].label} {checked.size}명에게 보내기</div>
             <label className="mb-1 block text-[12px] font-bold text-ink-soft">1인당 포인트</label>
             <input value={amountText ? Number(amountText).toLocaleString("ko-KR") : ""} inputMode="numeric" onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))} className="mb-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[14px] font-bold text-ink outline-none focus:border-ink" />
-            <div className="mb-3 text-[11px] font-bold text-ink-mute">총 {(amountNum * checked.size).toLocaleString()}P · 업계 통상 1,000~3,000P — 기본 2,000P, 금액은 자유롭게 바꾸세요</div>
+            <div className="mb-3 text-[12px] font-bold text-ink-mute">총 {(amountNum * checked.size).toLocaleString()}P · 업계 통상 1,000~3,000P — 기본 2,000P, 금액은 자유롭게 바꾸세요</div>
             <label className="mb-1 block text-[12px] font-bold text-ink-soft">쪽지 내용 (비우면 아래 기본 문구)</label>
             <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={defaultNote} rows={3} className="mb-4 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[13px] font-bold text-ink outline-none focus:border-ink" />
             <div className="grid grid-cols-2 gap-2">

@@ -163,11 +163,11 @@ export default function WorkScopePickerModal({
             <strong className="text-[16px] font-black text-ink tabular-nums">총 챙길 물건 {quantity.total}개</strong>
             <span className="text-[12px] font-semibold text-ink-soft tabular-nums">결제완료 <b className="text-ink">{quantity.paid}개</b> <span className="mx-1">·</span> <span className={quantity.unpaid>0?'text-danger-tx':''}>미결제 {quantity.unpaid}개</span></span>
           </div>
-          {(summary.canceled>0 || summary.excluded>0) ? <p className="mt-0.5 text-[11px] text-ink-mute">{summary.canceled>0?`취소 주문서 ${summary.canceled}건 별도 제외`:''}{summary.canceled>0&&summary.excluded>0?' · ':''}{summary.excluded>0?`작업 제외 ${summary.excluded}건`:''}</p> : null}
+          {(summary.canceled>0 || summary.excluded>0) ? <p className="mt-0.5 text-[12px] text-ink-mute">{summary.canceled>0?`취소 주문서 ${summary.canceled}건 별도 제외`:''}{summary.canceled>0&&summary.excluded>0?' · ':''}{summary.excluded>0?`작업 제외 ${summary.excluded}건`:''}</p> : null}
         </section> : <section aria-label="송장 출력 범위 요약" aria-live="polite" className="rounded-lg bg-surface-2 px-3 py-2">
           <strong className="text-[20px] font-black text-ink">송장 대상 {summary.eligible}건</strong>
           <span className="ml-3 text-[12px] text-ink-soft">결제완료 {summary.paid}건 · 미결제 {summary.unpaid}건</span>
-          {(summary.canceled>0||summary.excluded>0)?<p className="mt-0.5 text-[11px] text-ink-mute">취소/제외 주문서는 포함하지 않습니다.</p>:null}
+          {(summary.canceled>0||summary.excluded>0)?<p className="mt-0.5 text-[12px] text-ink-mute">취소/제외 주문서는 포함하지 않습니다.</p>:null}
         </section>}
 
         {work === 'picking' ? <div role="group" aria-label="물건챙기기 결제 상태 표시" className="mt-2 grid grid-cols-2 gap-1.5">

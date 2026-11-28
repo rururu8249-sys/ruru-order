@@ -301,7 +301,7 @@ export default function SettlementManualEntryPanel({
         <span className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-black text-ink">
           합계 {totalIncome - totalExpense < 0 ? "−" : "+"}{won(Math.abs(totalIncome - totalExpense))}
         </span>
-        <span className="ml-auto text-[11px] font-bold text-ink-mute">{presetLabel || "위 정산 화면의 기간·방송 조건 기준"}</span>
+        <span className="ml-auto text-[12px] font-bold text-ink-mute">{presetLabel || "위 정산 화면의 기간·방송 조건 기준"}</span>
       </div>
 
       {/* ── 위: 입력칸 (고정) ── */}

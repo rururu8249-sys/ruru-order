@@ -100,7 +100,7 @@ export default function CustomerTopNav({
       <div className="flex items-start justify-between gap-3">
         <Link href="/" className="min-w-0 transition active:scale-[0.99]">
           <p className={v2 ? "text-[17px] font-bold text-[#111111]" : isCompact ? "text-[17px] font-black tracking-[-0.05em] text-slate-950" : "text-[15px] font-black tracking-[-0.04em] text-coral-700"}>
-            루루동이 LIVE
+            루루동이 집구석LIVE
           </p>
 
           {showGreeting && (

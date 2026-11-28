@@ -311,7 +311,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
               ⚙ 고급{advanced ? " 닫기" : ""}
             </button>
           </div>
-          <div className="mt-1.5 text-[11px] font-bold text-ink-mute">
+          <div className="mt-1.5 text-[12px] font-bold text-ink-mute">
             서버가 자동으로 읽어요 — 창을 켜놓을 필요 없습니다. 여기선 켜고 끄기만 하면 됩니다.
           </div>
 
@@ -325,7 +325,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                   </div>
                 ))}
               </div>
-              <div className="mt-1 text-[11px] font-bold text-warn-tx">방송에서 “○○님 주문서 제출해주세요~” 불러주시면 됩니다. 제출하면 자동으로 사라져요.</div>
+              <div className="mt-1 text-[12px] font-bold text-warn-tx">방송에서 “○○님 주문서 제출해주세요~” 불러주시면 됩니다. 제출하면 자동으로 사라져요.</div>
             </div>
           ) : null}
 
@@ -344,7 +344,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                     className="rounded-lg bg-[var(--color-info-tx)] px-3 py-1.5 text-[12px] font-black text-white disabled:opacity-50">연결</button>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-black">
+              <div className="flex flex-wrap items-center gap-2 text-[12px] font-black">
                 <button type="button" onClick={() => void readOnce()} disabled={busy === "read"}
                   className="rounded-lg bg-rose-deep px-3 py-1.5 font-black text-white disabled:opacity-50">
                   {busy === "read" ? "읽는중…" : "지금 1회 읽기 + 파싱"}
@@ -359,7 +359,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                 </label>
                 <span className="ml-auto text-ink-mute">오늘 API 호출 {todayCalls}회</span>
               </div>
-              {lastRead ? <div className="mt-1.5 text-[11px] font-black text-ink-mute">최근 읽기: {lastRead}</div> : null}
+              {lastRead ? <div className="mt-1.5 text-[12px] font-black text-ink-mute">최근 읽기: {lastRead}</div> : null}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <input
                   value={testUrl} onChange={(e) => setTestUrl(e.target.value)}
@@ -377,7 +377,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
 
         {/* 「지금 이거」 */}
         <div className="border-b border-line px-5 py-3">
-          <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-ink-soft">
+          <div className="mb-2 flex items-center gap-2 text-[12px] font-black text-ink-soft">
             <span>🎯 「지금 이거」</span>
             {current ? (
               <span className="rounded-lg bg-danger-bg px-2 py-0.5 text-danger-tx">{current.productName || current.productId}</span>
@@ -394,7 +394,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
           </div>
           <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
             {products.length === 0 ? (
-              <span className="text-[11px] font-black text-ink-mute">방송에 담긴 상품이 없습니다.</span>
+              <span className="text-[12px] font-black text-ink-mute">방송에 담긴 상품이 없습니다.</span>
             ) : products.map((p) => {
               const on = current?.productId === p.id;
               return (
@@ -433,7 +433,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
         {/* 문장 판정 테스트 (고급) */}
         {advanced ? (
           <div className="border-b border-line px-5 py-3">
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-ink-soft">
+            <div className="mb-2 flex items-center gap-2 text-[12px] font-black text-ink-soft">
               <span>🧪 문장 판정 테스트</span>
               <span className="text-ink-mute">한 줄에 하나씩 — 판정만 합니다(주문 안 됨)</span>
               <button type="button" onClick={() => void runSelfCheck()} disabled={busy === "selfcheck"}
@@ -469,7 +469,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                           <td className="px-3 py-1.5 font-bold text-ink">{r.product || "-"}</td>
                           <td className="px-3 py-1.5 text-ink">{r.variant || "-"}</td>
                           <td className="whitespace-nowrap px-3 py-1.5 text-right font-black text-ink">{r.status === "parsed" ? r.qty : ""}</td>
-                          <td className="px-3 py-1.5 text-[11px] text-ink-mute">{r.reason}</td>
+                          <td className="px-3 py-1.5 text-[12px] text-ink-mute">{r.reason}</td>
                         </tr>
                       );
                     })}
@@ -483,7 +483,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
         {/* 대기열 */}
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full text-[12px]">
-            <thead className="sticky top-0 bg-surface-2 text-[11px] font-black text-ink-soft">
+            <thead className="sticky top-0 bg-surface-2 text-[12px] font-black text-ink-soft">
               <tr>
                 <th className="px-3 py-2 text-left">시각</th>
                 <th className="px-3 py-2 text-left">닉네임</th>
@@ -522,7 +522,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                       } catch { /* 구형 데이터 */ }
                       return r.parsed_options || "";
                     })()}</td>
-                    <td className="px-3 py-2 text-[11px] text-ink-mute">
+                    <td className="px-3 py-2 text-[12px] text-ink-mute">
                       {r.parsed_matched_by ? <b className="text-ink-soft">{MATCHED_LABEL[r.parsed_matched_by] || r.parsed_matched_by}</b> : null}
                       {r.parsed_matched_by && r.parsed_reason ? " · " : ""}
                       {r.parsed_reason || ""}
@@ -535,7 +535,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
           </table>
         </div>
 
-        <div className="border-t border-line bg-surface-2 px-5 py-2 text-[11px] font-black text-ink-mute">
+        <div className="border-t border-line bg-surface-2 px-5 py-2 text-[12px] font-black text-ink-mute">
           이 화면은 판정 결과만 보여줍니다. 손님 장바구니에 담는 동작은 아직 없습니다.
         </div>
       </div>

@@ -471,7 +471,7 @@ export default function VisitStatsView({ style }: Props) {
                 <thead>
                   <tr className="bg-surface-2">
                     <th className={`${th} pl-4 text-left ${tab === "date" ? "w-[120px] max-md:w-[96px]" : ""}`}>{tab === "date" ? "날짜" : "방송"}</th>
-                    <th className={`${th} w-[150px] pr-3 text-right max-md:w-[120px]`}>방문자 <span className="text-[11px]">(중복 포함)</span></th>
+                    <th className={`${th} w-[150px] pr-3 text-right max-md:w-[120px]`}>방문자 <span className="text-[12px]">(중복 포함)</span></th>
                     <th className={`${th} w-[72px] pr-3 text-right max-md:hidden`}>처음</th>
                     <th className={`${th} w-[80px] pr-3 text-right max-md:hidden`}>방송 중</th>
                     <th className={`${th} w-[72px] pr-3 text-right max-md:w-[56px] max-md:pr-4`}>주문</th>

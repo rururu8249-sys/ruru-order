@@ -79,9 +79,9 @@ function StatCard({
 
   return (
     <div className={`rounded-2xl border px-4 py-3 shadow-sm ${toneClass}`}>
-      <div className="text-[11px] font-black text-ink-soft">{label}</div>
+      <div className="text-[12px] font-black text-ink-soft">{label}</div>
       <div className="mt-1 text-[22px] font-black tracking-[-0.05em]">{value}</div>
-      {sub ? <div className="mt-1 text-[11px] font-bold text-ink-soft">{sub}</div> : null}
+      {sub ? <div className="mt-1 text-[12px] font-bold text-ink-soft">{sub}</div> : null}
     </div>
   );
 }
@@ -104,21 +104,21 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
         <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-4">
           <div className="grid gap-3 text-sm font-bold text-ink md:grid-cols-5">
             <div className="md:col-span-2">
-              <div className="text-[11px] font-black text-ink-mute">방송명</div>
+              <div className="text-[12px] font-black text-ink-mute">방송명</div>
               <div className="mt-1 text-lg font-black text-ink">{summary.title}</div>
             </div>
             <div>
-              <div className="text-[11px] font-black text-ink-mute">방송일</div>
+              <div className="text-[12px] font-black text-ink-mute">방송일</div>
               <div className="mt-1 font-black text-ink">{summary.broadcastDateText}</div>
             </div>
             <div>
-              <div className="text-[11px] font-black text-ink-mute">방송시간</div>
+              <div className="text-[12px] font-black text-ink-mute">방송시간</div>
               <div className="mt-1 font-black text-ink">
                 {summary.startTimeText} ~ {summary.endTimeText}
               </div>
             </div>
             <div>
-              <div className="text-[11px] font-black text-ink-mute">총 방송시간</div>
+              <div className="text-[12px] font-black text-ink-mute">총 방송시간</div>
               <div className="mt-1 font-black text-rose-deep">{summary.durationText}</div>
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
           <div className={`mt-4 rounded-2xl border px-4 py-4 ${summary.mission.achieved ? "border-ok-tx/40 bg-ok-bg" : "border-line bg-surface-2"}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] font-black text-ink-mute">미션 게이지</div>
+                <div className="text-[12px] font-black text-ink-mute">미션 게이지</div>
                 <div className="mt-1 text-base font-black text-ink">
                   {summary.mission.title || "오늘의 미션"} ·{" "}
                   <span className={summary.mission.achieved ? "text-ok-tx" : "text-rose-deep"}>{summary.mission.achieved ? "달성!" : "미달성"}</span>

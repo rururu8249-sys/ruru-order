@@ -266,7 +266,7 @@ export default function AdminLiveCustomerBlockReasonModal({
                 <button key={item.type} type="button" onClick={() => setReasonType(on ? null : item.type)} title={item.hint}
                   className={`flex min-h-[44px] flex-col justify-center rounded-xl border-2 px-3 py-2 text-left ${on ? "border-danger-tx bg-danger-bg" : "border-line bg-surface hover:bg-surface-2"}`}>
                   <span className={`text-[13px] font-black ${on ? "text-danger-tx" : "text-ink"}`}>{on ? "✓ " : ""}{item.label}</span>
-                  <span className="truncate text-[11px] font-bold text-ink-mute">{item.hint}</span>
+                  <span className="truncate text-[12px] font-bold text-ink-mute">{item.hint}</span>
                 </button>
               );
             })}
@@ -279,7 +279,7 @@ export default function AdminLiveCustomerBlockReasonModal({
               </label>
               <input id="deal-break-date" type="date" value={dealDate} onChange={(event) => setDealDate(event.target.value)}
                 className="mt-2 min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-[14px] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink" />
-              <p className="mt-1 text-[11px] leading-5 text-ink-mute">차단 등록일이나 주문일과 다를 수 있으므로, 확인된 거파 발생일만 기입해 주세요.</p>
+              <p className="mt-1 text-[12px] leading-5 text-ink-mute">차단 등록일이나 주문일과 다를 수 있으므로, 확인된 거파 발생일만 기입해 주세요.</p>
             </div>
           ) : null}
 
@@ -288,9 +288,9 @@ export default function AdminLiveCustomerBlockReasonModal({
             <div className="mt-5">
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-[13px] font-black text-ink">② 무엇을 거파했나요?</div>
-                <div className="text-[11px] font-bold text-ink-mute">고른 것 {pickedLabels.length}개</div>
+                <div className="text-[12px] font-bold text-ink-mute">고른 것 {pickedLabels.length}개</div>
               </div>
-              <p className="mt-1 text-[11px] font-bold text-ink-mute">
+              <p className="mt-1 text-[12px] font-bold text-ink-mute">
                 {focusOnly ? "이 주문서의 품목입니다. 거파한 것만 남기고 빼세요." : "주문서 줄을 눌러 고르세요."} 안 고르고 메모만 남겨도 됩니다.
               </p>
 
@@ -317,7 +317,7 @@ export default function AdminLiveCustomerBlockReasonModal({
                             className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 text-left">
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-[13px] font-black text-ink">{fmtDate(group.createdAt)}{group.code ? ` · ${group.code}` : ""}</span>
-                              <span className="block truncate text-[11px] font-bold text-ink-mute">{group.broadcast || "방송 정보 없음"} · {group.rows.length}줄</span>
+                              <span className="block truncate text-[12px] font-bold text-ink-mute">{group.broadcast || "방송 정보 없음"} · {group.rows.length}줄</span>
                             </span>
                             <span className="shrink-0 text-[12px] font-black text-ink-mute">{expanded ? "▴" : "▾"}</span>
                           </button>
@@ -347,7 +347,7 @@ export default function AdminLiveCustomerBlockReasonModal({
 
               {keptItems.length > 0 ? (
                 <div className="mt-2 rounded-xl border border-line bg-surface-2 p-3">
-                  <div className="text-[11px] font-black text-ink-soft">예전에 적어둔 품목</div>
+                  <div className="text-[12px] font-black text-ink-soft">예전에 적어둔 품목</div>
                   <div className="mt-1 space-y-1">
                     {keptItems.map((item, index) => (
                       <div key={`${item}-${index}`} className="flex items-center gap-2">
@@ -372,7 +372,7 @@ export default function AdminLiveCustomerBlockReasonModal({
 
           {/* 저장될 내용 미리보기 */}
           <div className="mt-4 rounded-xl border border-line bg-surface-2 p-3">
-            <div className="text-[11px] font-black text-ink-soft">차단목록에 이렇게 남습니다</div>
+            <div className="text-[12px] font-black text-ink-soft">차단목록에 이렇게 남습니다</div>
             <pre className="mt-1 whitespace-pre-wrap break-words text-[12px] font-bold leading-5 text-ink">{finalReason || "아직 아무것도 안 골랐어요"}</pre>
           </div>
 

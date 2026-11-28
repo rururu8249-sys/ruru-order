@@ -39,7 +39,7 @@ export default function BroadcastVideoHistoryPicker({disabled, selectedVideoId, 
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={`https://i.ytimg.com/vi/${item.videoId}/default.jpg`} alt="" width={80} height={60} loading="lazy" className="h-14 w-20 shrink-0 rounded-lg object-cover" />
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] text-ink-mute">{dateLabel(item.date)} · 저장된 상품 연결 {item.introCount}개</div>
+              <div className="text-[12px] text-ink-mute">{dateLabel(item.date)} · 저장된 상품 연결 {item.introCount}개</div>
               <div className="line-clamp-2 break-words text-[13px] font-bold text-ink">{item.title}</div>
               <button type="button" disabled={disabled || item.videoId===selectedVideoId} onClick={()=>{onSelect(`https://www.youtube.com/watch?v=${item.videoId}`);setOpen(false);}} className="mt-1 min-h-10 rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-ink disabled:opacity-50">{item.videoId===selectedVideoId ? "선택된 영상" : "이 영상 선택"}</button>
             </div>

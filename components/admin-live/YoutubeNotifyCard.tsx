@@ -192,7 +192,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
             {testing ? "발송중..." : "테스트 발송"}
           </button>
         </div>
-        <div className="mt-2 text-[11px] font-bold leading-5 text-ink-mute">테스트는 방송 중에만 보임</div>
+        <div className="mt-2 text-[12px] font-bold leading-5 text-ink-mute">테스트는 방송 중에만 보임</div>
       </div>
     </div>
   );

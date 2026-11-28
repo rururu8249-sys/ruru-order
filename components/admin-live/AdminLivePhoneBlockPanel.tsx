@@ -129,7 +129,7 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
     <section className="rounded-2xl border border-danger-tx bg-danger-bg p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[11px] font-black tracking-[0.16em] text-danger-tx">PHONE BLOCK</div>
+          <div className="text-[12px] font-black tracking-[0.16em] text-danger-tx">PHONE BLOCK</div>
           <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-ink">전화번호 직접 차단</h2>
           <p className="mt-1 text-[12px] font-bold text-danger-tx">
             주문 이력이 없는 번호도 전화번호 전용 차단으로 저장합니다.

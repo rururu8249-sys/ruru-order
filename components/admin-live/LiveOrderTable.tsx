@@ -1297,7 +1297,7 @@ export default function LiveOrderTable({
                 : "장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"}
             >
               <span>장바구니</span>
-              <span className="whitespace-nowrap text-[11px] text-ink-mute">
+              <span className="whitespace-nowrap text-[12px] text-ink-mute">
                 {cartHoldSummaryReady ? `${cartHoldSummary.cartCount}명` : "확인 중"}
               </span>
               {cartHoldSummaryReady && cartHoldSummary.totalQty > 0 ? (
@@ -1450,7 +1450,7 @@ export default function LiveOrderTable({
               : "장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"}
           >
             <span>장바구니</span>
-            <span className="whitespace-nowrap text-[11px] text-ink-mute">
+            <span className="whitespace-nowrap text-[12px] text-ink-mute">
               {cartHoldSummaryReady ? `${cartHoldSummary.cartCount}명` : "확인 중"}
             </span>
             {cartHoldSummaryReady && cartHoldSummary.totalQty > 0 ? (
@@ -1808,9 +1808,9 @@ export default function LiveOrderTable({
                           const extra = Number((order as any).cardExtraAmount || 0)
                             || Math.max(0, Number((order as any).cardPaymentTotalAmount || 0) - Number(order.productAmount || 0) - Number(order.shippingFee || 0));
                           if (extra <= 0) return null;
-                          return <div className="text-[11px] font-black text-[var(--color-cardpay)]">+{money(extra)}</div>;
+                          return <div className="text-[12px] font-black text-[var(--color-cardpay)]">+{money(extra)}</div>;
                         })()}
-                        {Number(order.pointUsedAmount || 0) > 0 ? <div className="text-[11px] font-normal text-ok-tx">포인트 -{money(Number(order.pointUsedAmount || 0))}</div> : null}
+                        {Number(order.pointUsedAmount || 0) > 0 ? <div className="text-[12px] font-normal text-ok-tx">포인트 -{money(Number(order.pointUsedAmount || 0))}</div> : null}
                       </div>
                       {/* 결제 */}
                       <div className="px-2 py-2 text-left">
@@ -1818,7 +1818,7 @@ export default function LiveOrderTable({
                           onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
                           onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
                         })}</div>
-                        {order.paidAt && <div className="mt-0.5 text-[11px] text-ink-mute">{order.paidAt}</div>}
+                        {order.paidAt && <div className="mt-0.5 text-[12px] text-ink-mute">{order.paidAt}</div>}
                         {!(order.pickPull && !order.pickPull.whole) && ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                           <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-1 inline-flex h-7 items-center rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink-soft transition hover:bg-surface-2 disabled:opacity-40">
                             쪽지

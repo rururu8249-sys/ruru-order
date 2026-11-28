@@ -159,7 +159,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
       {/* ① 봇 토큰 */}
       <div className="rounded-2xl border border-line bg-surface-2 p-3">
         <div className="text-xs font-black text-ink">① 봇 토큰 붙여넣고 저장</div>
-        <div className="mt-1 text-[11px] font-bold leading-5 text-ink-mute">
+        <div className="mt-1 text-[12px] font-bold leading-5 text-ink-mute">
           @BotFather 에 /newbot 보내 받은 토큰
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -188,7 +188,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
       {/* ② 봇에게 말 걸기 */}
       <div className="rounded-2xl border border-line bg-surface-2 p-3">
         <div className="text-xs font-black text-ink">② 텔레그램에서 그 봇에게 아무 말이나 한 번 보내기</div>
-        <div className="mt-1 text-[11px] font-bold leading-5 text-ink-mute">
+        <div className="mt-1 text-[12px] font-bold leading-5 text-ink-mute">
           알림 받을 사람마다 한 번씩
         </div>
       </div>
@@ -205,14 +205,14 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
           </button>
         </div>
         <details className="mt-2">
-          <summary className="cursor-pointer text-[11px] font-bold text-ink-mute">받는 사람 번호(chat id)를 직접 넣기</summary>
+          <summary className="cursor-pointer text-[12px] font-bold text-ink-mute">받는 사람 번호(chat id)를 직접 넣기</summary>
           <input
             value={chatId}
             onChange={(e) => setChatId(e.target.value)}
             placeholder={chatIdSet ? `저장됨(${recipientCount}명) — 바꿀 때만 입력` : "예: 123456789 (여러 명이면 쉼표로)"}
             className="mt-2 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
           />
-          <span className="mt-1 block text-[11px] font-bold text-ink-mute">직접 넣은 뒤에는 위 「저장」을 누르세요.</span>
+          <span className="mt-1 block text-[12px] font-bold text-ink-mute">직접 넣은 뒤에는 위 「저장」을 누르세요.</span>
         </details>
       </div>
 
@@ -244,7 +244,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
         <button type="button" onClick={sendReport} disabled={reporting} className="h-10 rounded-xl bg-ok-tx px-4 text-sm font-black text-white disabled:opacity-50">
           {reporting ? "보내는 중…" : "지금 결산 보내기"}
         </button>
-        <span className="text-[11px] font-bold text-ink-mute">오늘 매출·미입금 요약을 폰으로</span>
+        <span className="text-[12px] font-bold text-ink-mute">오늘 매출·미입금 요약을 폰으로</span>
       </div>
     </div>
   );

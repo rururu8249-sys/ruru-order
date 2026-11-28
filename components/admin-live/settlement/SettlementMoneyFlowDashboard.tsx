@@ -283,7 +283,7 @@ export default function SettlementMoneyFlowDashboard({
               <CompactFilterButton label="올해" onClick={() => onQuickRange("year")} />
             </div>
 
-            <label className="grid min-w-[220px] flex-1 gap-1 text-[11px] font-black text-ink-mute">
+            <label className="grid min-w-[220px] flex-1 gap-1 text-[12px] font-black text-ink-mute">
               방송
               <select
                 value={selectedBroadcastValue}
@@ -319,7 +319,7 @@ export default function SettlementMoneyFlowDashboard({
           <details className="rounded-xl border border-line bg-surface-2 px-3 py-2">
             <summary className="cursor-pointer list-none text-xs font-black text-ink-soft">자세한 조건 (날짜 직접 입력 · 결제수단) ▾</summary>
             <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+              <label className="grid gap-1 text-[12px] font-black text-ink-mute">
                 시작일
                 <input
                   type="date"
@@ -329,7 +329,7 @@ export default function SettlementMoneyFlowDashboard({
                 />
               </label>
 
-              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+              <label className="grid gap-1 text-[12px] font-black text-ink-mute">
                 종료일
                 <input
                   type="date"
@@ -339,7 +339,7 @@ export default function SettlementMoneyFlowDashboard({
                 />
               </label>
 
-              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+              <label className="grid gap-1 text-[12px] font-black text-ink-mute">
                 연도
                 <select
                   value={selectedSettlementYear}
@@ -352,7 +352,7 @@ export default function SettlementMoneyFlowDashboard({
                 </select>
               </label>
 
-              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+              <label className="grid gap-1 text-[12px] font-black text-ink-mute">
                 월
                 <select
                   value={selectedSettlementMonth}
@@ -366,7 +366,7 @@ export default function SettlementMoneyFlowDashboard({
                 </select>
               </label>
 
-              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+              <label className="grid gap-1 text-[12px] font-black text-ink-mute">
                 결제수단
                 <select
                   value={paymentFilter}
@@ -422,7 +422,7 @@ export default function SettlementMoneyFlowDashboard({
             <div className="rounded-xl border border-warn-tx/35 bg-warn-bg px-4 py-2.5">
               <div className="text-xs font-black text-warn-tx">아직 안 들어온 돈</div>
               <div className="mt-0.5 text-xl font-black tabular-nums text-warn-tx">{won(stats.unpaidAmount)}</div>
-              <div className="mt-0.5 text-[11px] font-bold text-warn-tx/80">이 돈은 위 금액에 안 들어있습니다</div>
+              <div className="mt-0.5 text-[12px] font-bold text-warn-tx/80">이 돈은 위 금액에 안 들어있습니다</div>
             </div>
           ) : (
             <div className="rounded-xl border border-ok-tx/30 bg-ok-bg px-4 py-2.5 text-xs font-black text-ok-tx">
@@ -486,14 +486,14 @@ export default function SettlementMoneyFlowDashboard({
             />
             <CalcRow sign="" label="입금가 뺀 남는 돈" amount={stats.netAfterProductCost} emphasis="subtotal" />
             {stats.manualExpenseCount > 0 ? (
-              <div className="px-4 py-2 text-[11px] font-bold leading-5 text-ink-mute">· 「창고·기타 지출」에 창고정산을 손으로 넣었으면 상품 입금가와 두 번 빠질 수 있어요.</div>
+              <div className="px-4 py-2 text-[12px] font-bold leading-5 text-ink-mute">· 「창고·기타 지출」에 창고정산을 손으로 넣었으면 상품 입금가와 두 번 빠질 수 있어요.</div>
             ) : null}
           </div>
         ) : (
-          <div className="border-t border-line px-5 py-2 text-[11px] font-bold leading-5 text-ink-mute">· 상품 입금가(자동)는 상품 등록 폼 「입금가」를 넣은 뒤 들어온 주문부터 계산돼요.</div>
+          <div className="border-t border-line px-5 py-2 text-[12px] font-bold leading-5 text-ink-mute">· 상품 입금가(자동)는 상품 등록 폼 「입금가」를 넣은 뒤 들어온 주문부터 계산돼요.</div>
         )}
 
-        <div className="grid gap-1 border-t border-line bg-surface-2 px-5 py-3 text-[11px] font-bold leading-5 text-ink-mute">
+        <div className="grid gap-1 border-t border-line bg-surface-2 px-5 py-3 text-[12px] font-bold leading-5 text-ink-mute">
           <div className="flex flex-wrap items-center gap-x-2">
             <span>참고 · 주문서 총금액(추가 수익 포함)</span>
             <span className="font-black tabular-nums text-ink-soft">{won(stats.totalOrderAmount)}</span>

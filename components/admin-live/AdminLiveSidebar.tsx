@@ -136,7 +136,7 @@ export default function AdminLiveSidebar({
             </div>
             <div className="min-w-0">
               <div className="flex items-baseline gap-1.5"><span className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</span><span className="shrink-0 rounded bg-ink px-1.5 py-0.5 text-[11px] font-bold leading-none tracking-wide text-white" title={ADMIN_VERSION_NOTE}>VER {ADMIN_VERSION}</span></div>
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-ink-mute">
+              <div className="flex items-center gap-1.5 text-[12px] font-bold text-ink-mute">
                 <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
                 {broadcastOn ? "방송 중" : "방송 대기"}
               </div>
